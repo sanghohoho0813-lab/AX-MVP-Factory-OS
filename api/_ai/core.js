@@ -221,10 +221,34 @@ function lines(title, rows) {
  * context(화면이 만든 최소 묶음) + input(작업 요청) → 사용자 메시지 글. 예산을 넘으면 자료 글부터 줄인다.
  * 돌려주는 sent 는 시험 · 기록용(몇 글자를 보냈나).
  */
-/** D-272 스킬이 받는 기준 문서 글(없으면 '') */
-export function skillKnowledge(skill) {
-  const keys = Array.isArray(skill && skill.knowledge) ? skill.knowledge : []
+/**
+ * D-625 작업 요청의 고르기 값에 따라 더 받는 기준 문서 — skill.knowledgeByOption = { 고르기 이름: { 값: [묶음 …] } }
+ * (예: 제안서 구성의 형식 'AX 퀵진단 4장' 일 때만 퀵진단 기준). 모르는 값 · 숫자 · 빈 값은 아무것도 더하지 않는다.
+ */
+function optionKnowledgeKeys(skill, options) {
+  const by = skill && skill.knowledgeByOption
+  if (!by || typeof by !== 'object' || !options || typeof options !== 'object' || Array.isArray(options)) return []
+  const out = []
+  for (const [name, map] of Object.entries(by)) {
+    const v = options[name]
+    if (typeof v === 'string' && map && Object.prototype.hasOwnProperty.call(map, v) && Array.isArray(map[v])) out.push(...map[v])
+  }
+  return out
+}
+
+/** D-272 스킬이 받는 기준 문서 글(없으면 '') · D-625 고르기 값에 따른 묶음도 */
+export function skillKnowledge(skill, options) {
+  const base = Array.isArray(skill && skill.knowledge) ? skill.knowledge : []
+  const keys = [...new Set([...base, ...optionKnowledgeKeys(skill, options)])]
   return keys.map((k) => KNOWLEDGE[k]).filter(Boolean).map(sanitizeKnowledge).join('\n\n')
+}
+
+/** D-625 이 스킬이 어떤 고르기로든 받을 수 있는 기준 문서 전부 — 서버만 가진 글 색인(답에 통째로 옮겨지면 막기)용 */
+export function skillKnowledgeAll(skill) {
+  const base = Array.isArray(skill && skill.knowledge) ? skill.knowledge : []
+  const by = skill && skill.knowledgeByOption && typeof skill.knowledgeByOption === 'object' ? Object.values(skill.knowledgeByOption) : []
+  const extra = by.flatMap((map) => (map && typeof map === 'object' ? Object.values(map).flatMap((v) => (Array.isArray(v) ? v : [])) : []))
+  return [...new Set([...base, ...extra])].map((k) => KNOWLEDGE[k]).filter(Boolean).map(sanitizeKnowledge).join('\n\n')
 }
 
 export function buildPrompt(skill, context, input, tier, commonRules) {
@@ -261,7 +285,7 @@ export function buildPrompt(skill, context, input, tier, commonRules) {
   const user = [...head, ...lines('자료(필요한 부분만)', matRows), ...task].join('\n').trim()
   // D-264 비공개 규칙이 맨 앞 · 스킬은 화면 이름만(내부 번호 · 판 없이) · 쓰지 않는 이름 · 출처 이름은 한 번 더 지운다
   // D-272 AX 단추는 대표 AX 기준 문서(knowledge.js ax_strategy)를 판단 기준으로 같이 받는다
-  const know = skillKnowledge(skill)
+  const know = skillKnowledge(skill, ask.options)
   const system = scrubBrand([...CONFIDENTIAL_RULES, '', ...commonRules, '', `[스킬] ${skill.name}`, ...skill.systemInstruction, ...(know ? ['', '[기준 문서] 아래 기준대로 판단한다 — 단계 · 판정 · 금지사항을 그대로 지키고, 문장을 길게 옮겨 적지 않는다.', know] : []), '', '[출력 형식] 아래 JSON 과 같은 키로, JSON 하나만:', JSON.stringify(skill.example)].join('\n'))
   return { system, user, sent: { systemChars: system.length, userChars: user.length, materials: matRows.length } }
 }

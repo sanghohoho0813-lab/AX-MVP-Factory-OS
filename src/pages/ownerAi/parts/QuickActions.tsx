@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, Loader2, Sparkles } from 'lucide-react'
 import { buildAiContext, materialsFor, payloadChars } from '../../../services/ownerAi/context'
 import { newUuid } from '../../../services/ownerAi/caseUtil'
-import { QUICK_ACTIONS, SKILL_META, TIER_LABEL, type QuickAction } from '../../../services/ownerAi/skillCatalog'
+import { QUICK_ACTIONS, SKILL_META, TIER_LABEL, choicesToSend, shownChoices, type QuickAction } from '../../../services/ownerAi/skillCatalog'
 import { latestSnapshot, type CaseBundle } from '../../../services/ownerAi/workflow'
 import { MATERIAL_KIND_LABEL, type AiRunInput, type SkillId } from '../../../services/ownerAi/types'
 import { CASE_PURPOSES, caseNext, type CaseActionKey } from '../../../services/ownerAi/caseNext'
@@ -254,7 +254,7 @@ function ActionSheet({
       return
     }
     setSubmitting(true)
-    const input: AiRunInput = { task: ask.trim() || undefined, options: choices }
+    const input: AiRunInput = { task: ask.trim() || undefined, options: choicesToSend(action, choices) }
     const key = JSON.stringify([input, picked])
     const requestId = sent.key === null || sent.key === key ? sent.id : newUuid()
     const ok = await onRun({ skill, input, requestId, materialIds: picked, label: action.label })
@@ -293,8 +293,8 @@ function ActionSheet({
             AI 기능 설정이 필요합니다. 지금은 ChatGPT 결과 붙여넣기로 기록을 남길 수 있습니다.
           </p>
         )}
-        {(action.choices ?? []).map((c) => (
-          <fieldset key={c.key} className="flex flex-col gap-1.5">
+        {shownChoices(action, choices).map((c) => (
+          <fieldset key={c.key} className="flex flex-col gap-1.5" data-testid={`choice-${c.key}`}>
             <legend className="t-sub font-semibold text-slate-700">{c.label}</legend>
             <div className="flex flex-wrap gap-2">
               {c.options.map((o) => (
@@ -302,6 +302,7 @@ function ActionSheet({
                   key={o.value}
                   type="button"
                   aria-pressed={choices[c.key] === o.value}
+                  data-value={o.value}
                   onClick={() => setChoices((p) => ({ ...p, [c.key]: o.value }))}
                   className={`tap t-body min-h-11 rounded-full border px-4 font-semibold ${choices[c.key] === o.value ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-300 bg-white text-slate-600'}`}
                 >

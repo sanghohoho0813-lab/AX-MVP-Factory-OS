@@ -38,8 +38,14 @@ const AX_ITEM = {
     // D-272 기준 문서 — 가장 경제적인 방법 · AI 전에 없애거나 표준화할 일
     method: { type: 'string' },
     processFirst: { type: 'string' },
+    // D-625 기준 문서 11-04 개정 — 기술 위상(L1 · L2 · L3) · 1문장 기술 설명
+    techLevel: { type: 'string' },
+    oneSentence: { type: 'string' },
   },
 }
+/** D-625 벤처 증거 게이트 한 줄(G0 ~ G8) */
+const GATE = { type: 'object', required: ['id', 'status'], props: { id: { type: 'string' }, status: { type: 'string' }, note: { type: 'string' } } }
+const GATE_NAMES = 'G0 본업 문제 · G1 기존 대안 · G2 기술원리 · G3 실행 가능성 · G4 검증설계 · G5 기능 사실성 · G6 실증 진정성 · G7 사업 확장 · G8 심사 재현성'
 const AX_ITEM_EXAMPLE = {
   title: 'AX 이름(한 줄)',
   why: '추천 이유',
@@ -55,6 +61,8 @@ const AX_ITEM_EXAMPLE = {
   fundingLink: '정책지원과 이어질 점',
   method: 'RULE | OPTIMIZATION | ML | RAG | LLM | HUMAN 중 하나 — 왜 더 단순한 방법으로는 부족한지',
   processFirst: 'AI 전에 없애거나 표준화할 일',
+  techLevel: 'L1 업무편의 | L2 업종 핵심 엔진 | L3 재사용 제품 — 한 줄 이유',
+  oneSentence: '[현장 입력]을 [고유 판정 · 계산]해 [행동]을 바꿔 [측정지표]를 개선',
 }
 
 const STRINGS = { type: 'array', items: { type: 'string' } }
@@ -65,23 +73,31 @@ export const SKILLS = {
    * 예전엔 손으로 쓴 12단계 요약 지시만 갔다(MD 를 읽지 않음) → 이제 기준 문서(knowledge.js ax_strategy — MD 1 · 4~13장)를 같이 받고
    * 적합성 판정 · 16단계 · 핵심 병목 · 방법 선택 · 돈 KPI 3 · 12주 · 반론 질문 · 지금 만들 것/준비/나중 검증 으로 낸다.
    */
+  /*
+   * D-625 판 3 — 대표가 준 최신 AX 기준(11-04 개정 통합본)의 우선 원칙 · 필수 개정 부록(본업 핵심 문제 1개 · L1/L2/L3 · 증거 등급 · 게이트 G0~G8 ·
+   * 출력 계약)을 같이 받는다. 'AX 가 아니라 다른 기술이 맞다'(NO_AX_OTHER_TECH) 결론도 낸다.
+   */
   AX_PENGUIN: {
     id: 'AX_PENGUIN',
     name: 'AX 전략 분석',
-    version: 2,
+    version: 3,
     tier: 'deep',
     active: true,
     createdAt: D,
-    updatedAt: '2026-10-23',
-    description: '기준 문서대로 — 적합성 판정 · 16단계 · 핵심 병목 · 가장 추천하는 AX 1개와 차선 · 돈 KPI 3 · 12주 실증 · 반론 질문.',
+    updatedAt: '2026-11-17',
+    description: '기준 문서대로 — 본업 핵심 문제 1개 · 적합성 판정 · 16단계 · 가장 추천하는 AX 1개와 차선(L1 · L2 · L3) · 돈 KPI 3 · 12주 실증 · 증거 게이트 · 반론 질문.',
     knowledge: ['ax_strategy'],
     systemInstruction: [
       '이 업체의 AX 전략을 아래 [기준 문서] 대로 짠다. 기능 목록부터가 아니라 회사 현실 → 가장 큰 반복 손실 · 병목 → 없애기 · 표준화 · 디지털화 → 데이터 → 알맞은 방법 → 판단 · 행동 · 결과 → 실증 순서로 생각한다.',
-      'verdict = 적합성 판정 하나 — FULL_GO · LITE · NO_GO_REDESIGN · INSUFFICIENT_DATA 중 하나(기준 문서의 판정표 · 판정 질문으로). 점수만으로 FULL_GO 를 정하지 않는다. 핵심 사실이 모자라면 INSUFFICIENT_DATA 와 확인 질문(unknowns).',
+      '[기준 문서] 맨 앞 우선 원칙과 필수 개정 부록(A~G)이 앞 장과 다르면 개정 부록을 따른다 — "AI · AX 를 어떻게 넣을까" 보다 "이 회사 본업에서 가장 큰 손실을 만드는 사건이 무엇인가" 가 먼저다.',
+      'verdict = 적합성 판정 하나 — FULL_GO · LITE · NO_GO_REDESIGN · INSUFFICIENT_DATA · NO_AX_OTHER_TECH 중 하나(기준 문서의 판정표 · 판정 질문으로). 기존 제품 · 특허 · SaaS · 규칙 · 최적화 · 통계가 더 맞으면 AX 를 억지로 붙이지 않고 NO_AX_OTHER_TECH. 점수만으로 FULL_GO 를 정하지 않는다. 핵심 사실이 모자라면 INSUFFICIENT_DATA 와 확인 질문(unknowns).',
       'thinking = 기준 문서의 표준 분석 16단계를 차례로 — step 1~16, title = 단계 이름(회사 현실 · 핵심 병목 · 업무 재설계 · 데이터 기반 · 방법 선택 · 판단→행동→결과 · 12주 실증 · 현장 실행 넘기기 · 기업가치 증거 · 고객/파트너 접점 · 방어력/단위 경제성/확장 · 정부 관점 · 투자자 관점 · 자금 용도 · 반론 검증 · 후행 모듈), finding = 이 회사 판단 한두 문장. 정보가 없으면 "정보 부족 — 무엇을 물을지", 해당 없으면 "해당 없음" — 지어 채우지 않는다.',
-      'primaryConstraint = 가장 큰 반복 손실 · 병목 한 문장(이것을 찾기 전에는 기능을 말하지 않는다).',
-      'recommended = TOP AX 아이템 1개(선정 근거를 why 에), alternatives = 차선 1~2개 — 후보는 모두 합쳐 3개까지, 기준 문서의 비교 기준(문제 크기 · 12주 실증 가능성 · 실제 사용과 데이터 · 개발 노력과 유지비 · AI 필요성과 실패 비용 · 회사 자산화 · 매출/비용/확장 · 외부 심사 설명력)을 똑같이 적용한다. 근거가 모자라면 순위보다 검증할 차이를 쓴다.',
+      'primaryConstraint = 본업 핵심 문제(Anchor Problem) 1개 — 손실을 만드는 구체 사건 한 문장(누가 손해 · 얼마나 자주 · 무슨 손실, 모르면 "UNKNOWN — 누구에게 물을지"). 이것을 찾기 전에는 기능을 말하지 않는다. 관련 없는 챗봇 · 발주 · 고객포털 · 업무관리 묶음을 만들지 않는다.',
+      'recommended = TOP AX 아이템 1개(선정 근거를 why 에), alternatives = 차선 1~2개 — 후보는 모두 합쳐 3개(최소 3개 문제 후보를 견준다), 기준 문서의 비교 기준(문제 크기 · 12주 실증 가능성 · 실제 사용과 데이터 · 개발 노력과 유지비 · AI 필요성과 실패 비용 · 회사 자산화 · 매출/비용/확장 · 외부 심사 설명력)을 똑같이 적용한다. 근거가 모자라면 순위보다 검증할 차이를 쓴다.',
       '아이템마다 method = RULE · OPTIMIZATION · ML · RAG · LLM · HUMAN 중 가장 경제적인 것(why 에 왜 더 단순한 방법으로는 부족한지), processFirst = AI 전에 없애거나 표준화할 일, before/after = 누가 어느 화면 · 절차에서 무엇을 하는지까지.',
+      '아이템마다 techLevel = L1 업무편의(벤처 차별성 주장 자제) · L2 업종 핵심 엔진(벤처 연계 기본 후보) · L3 재사용 제품(검증된 L2 를 여러 고객에 — 실사용 · 판매 근거 없으면 미래 계획) 중 하나와 한 줄 이유, oneSentence = "[현장 입력]을 [고유 판정 · 계산]해 [행동]을 바꿔 [측정지표]를 개선" 한 문장. ventureLink 는 범용 CRM · 자동화와 다른 독자 원리 · 지표가 없으면 "VENTURE-WEAK" 로 시작한다.',
+      `evidence = 추천 아이템의 지금 증거 등급 하나 — E0 아이디어 · E1 설계문서 · E2 작동 데모 · E3 자체 반복시험 · E4 실제 현장 실증 · E5 다고객 반복성과(자료로 확인되는 것만 · 데모를 실증으로 올리지 않는다)와 근거 한 줄. gates = 증거 게이트 9개(${GATE_NAMES}) 각각 status = 통과 · 미통과 · 확인 필요 와 note(무엇이 있고 무엇이 없는지 · 미통과 조치). G0 · G2 · G3 · G4 가운데 하나라도 통과가 아니면 "벤처 연계 기술기획 완료" 라고 쓰지 않는다.`,
+      'cautions 맨 앞에는 기준 문서의 자동 중단 신호(실제 손실 사례 없음 · "AI 가 분석" 뿐 · 유사 서비스 대조 없음 · 1회 데모를 반복 시험처럼 · 외주 일을 자체 역량처럼 · 시뮬레이션을 실적처럼 · 통과 보장 문구 등)에 걸린 것을 "RED: …" 로. unknowns 에는 기준 문서의 프로젝트 시작 12개 질문 가운데 자료로 답이 안 되는 것을 중요한 순서로 5개까지 "UNKNOWN: 질문 — 누구에게".',
       'kpis = 돈 KPI 3 — cost(비용 · 효율) · revenue(매출 · 고객) · scale(규모 · 처리 능력) 각각 지표 하나와 지금 값. 지금 값이 자료에 없으면 "측정 필요" — 개선율 · 목표치를 만들지 않는다.',
       'prove12w = 12주에 증명할 것(누가 · 무엇을 · 어떤 원천 데이터로 재는지 — 0주 기준선부터).',
       'challenges = 기준 문서의 반론 질문 5개 각각에 이 회사의 답(q · answer)과 위험(risk = P0 · P1 · P2). 답이 없으면 강점으로 포장하지 않고 P0 또는 P1.',
@@ -101,6 +117,8 @@ export const SKILLS = {
         kpis: { type: 'object', props: { cost: { type: 'string' }, revenue: { type: 'string' }, scale: { type: 'string' } } },
         prove12w: { type: 'string' },
         challenges: { type: 'array', items: { type: 'object', props: { q: { type: 'string' }, answer: { type: 'string' }, risk: { type: 'string' } } } },
+        evidence: { type: 'string' },
+        gates: { type: 'array', items: GATE },
         buildNow: STRINGS,
         prepareNow: STRINGS,
         validateLater: STRINGS,
@@ -110,37 +128,40 @@ export const SKILLS = {
     },
     example: {
       oneLine: '이 회사 AX 한 줄 결론',
-      verdict: 'FULL_GO | LITE | NO_GO_REDESIGN | INSUFFICIENT_DATA',
-      primaryConstraint: '가장 큰 반복 손실 · 병목 한 문장',
+      verdict: 'FULL_GO | LITE | NO_GO_REDESIGN | INSUFFICIENT_DATA | NO_AX_OTHER_TECH',
+      primaryConstraint: '본업 핵심 문제 1개 — 손실을 만드는 구체 사건 한 문장',
       thinking: [{ step: 1, title: '회사 현실', finding: '판단' }],
       recommended: AX_ITEM_EXAMPLE,
       alternatives: [AX_ITEM_EXAMPLE],
       kpis: { cost: '비용 · 효율 지표 — 지금 값(없으면 측정 필요)', revenue: '매출 · 고객 지표 — 지금 값', scale: '규모 · 처리 능력 지표 — 지금 값' },
       prove12w: '12주에 누가 무엇을 어떤 데이터로 증명하는지',
       challenges: [{ q: '실제 누가 반복적으로 사용합니까?', answer: '이 회사의 답(없으면 없음)', risk: 'P0 | P1 | P2' }],
+      evidence: 'E0 | E1 | E2 | E3 | E4 | E5 — 근거 한 줄',
+      gates: [{ id: 'G0', status: '통과 | 미통과 | 확인 필요', note: '있는 것 · 없는 것 · 미통과 조치' }],
       buildNow: ['지금 만들 것'],
       prepareNow: ['준비할 것'],
       validateLater: ['나중에 검증할 것'],
-      cautions: ['주의할 점'],
-      unknowns: ['대표 · 업체에 확인할 것'],
+      cautions: ['RED: 걸린 자동 중단 신호(없으면 주의할 점)'],
+      unknowns: ['UNKNOWN: 질문 — 누구에게'],
     },
   },
 
   AX_IDEA: {
     id: 'AX_IDEA',
     name: 'AX 아이템 발굴',
-    version: 2,
+    version: 3,
     tier: 'standard',
     active: true,
     createdAt: D,
-    updatedAt: D,
-    description: '기준 문서대로 — 해 볼 만한 AX 아이템 후보(방법 · 12주 실증 가능성 · 빨리 되는 것 표시).',
-    // D-272 AX 단추는 모두 대표 AX 기준 문서를 같이 받는다
+    updatedAt: '2026-11-17',
+    description: '기준 문서대로 — 해 볼 만한 AX 아이템 후보(본업 손실 사건 · L1 · L2 · L3 · 방법 · 12주 실증 가능성 · 빨리 되는 것 표시).',
+    // D-272 AX 단추는 모두 대표 AX 기준 문서를 같이 받는다 · D-625 판 3 — 11-04 개정 부록(문제 후보 3개 비교 · L1/L2/L3)
     knowledge: ['ax_strategy'],
     systemInstruction: [
-      '이 업체에서 해 볼 만한 AX 아이템 후보 3~6개를 아래 [기준 문서] 대로 뽑는다 — 가장 큰 반복 손실 · 병목에서 출발하고(기능부터 말하지 않음), AI 전에 없애거나 표준화할 수 있는지 먼저 본다.',
-      '각 후보는 실제 반복 업무 · 데이터가 있는 곳에서 출발한다. 데이터가 없으면 그 사실을 적는다.',
+      '이 업체에서 해 볼 만한 AX 아이템 후보 3~6개를 아래 [기준 문서] 대로 뽑는다 — 가장 큰 반복 손실 · 병목에서 출발하고(기능부터 말하지 않음), AI 전에 없애거나 표준화할 수 있는지 먼저 본다. 개정 부록(A~G)이 앞 장과 다르면 개정 부록을 따른다.',
+      '각 후보는 실제 반복 업무 · 데이터가 있는 곳에서 출발한다 — problem 에 "실제 본업에서 일어나는 사건 · 누가 손해 · 손실 방식" 을 쓴다. 데이터가 없으면 그 사실을 적는다.',
       '후보마다 method = RULE · OPTIMIZATION · ML · RAG · LLM · HUMAN 중 가장 경제적인 것, prove12w = 12주 안에 무엇으로 증명할 수 있는지(못 하면 "어려움"). 후보는 기준 문서의 비교 기준을 똑같이 적용해 견준다.',
+      '후보마다 techLevel = L1 업무편의 · L2 업종 핵심 엔진 · L3 재사용 제품 중 하나(L1 도 버리지 않되 독자 기술로 주장하지 않는다 · L3 은 실사용 · 판매 근거 없으면 미래 계획). 규칙 · 최적화 · 기존 SaaS 로 충분한 후보는 method 를 그것으로 쓰고 AI 를 억지로 붙이지 않는다.',
       '빨리(한두 달 안) 효과가 보이는 것은 quickWin 을 true 로. 실측 없는 개선 수치는 만들지 않는다.',
       '이미 채택된 AX 방향과 겹치면 겹친다고 적는다.',
     ],
@@ -149,13 +170,13 @@ export const SKILLS = {
       required: ['oneLine', 'items'],
       props: {
         oneLine: { type: 'string' },
-        items: { type: 'array', items: { type: 'object', required: ['title', 'idea'], props: { title: { type: 'string' }, problem: { type: 'string' }, idea: { type: 'string' }, users: { type: 'string' }, dataNeeded: STRINGS, difficulty: { type: 'string' }, value: { type: 'string' }, quickWin: { type: 'boolean' }, method: { type: 'string' }, prove12w: { type: 'string' } } } },
+        items: { type: 'array', items: { type: 'object', required: ['title', 'idea'], props: { title: { type: 'string' }, problem: { type: 'string' }, idea: { type: 'string' }, users: { type: 'string' }, dataNeeded: STRINGS, difficulty: { type: 'string' }, value: { type: 'string' }, quickWin: { type: 'boolean' }, method: { type: 'string' }, prove12w: { type: 'string' }, techLevel: { type: 'string' } } } },
         unknowns: STRINGS,
       },
     },
     example: {
       oneLine: '한 줄 요약',
-      items: [{ title: '아이템', problem: '풀 문제(반복 손실)', idea: '어떻게', users: '누가 쓰나', dataNeeded: ['데이터'], difficulty: '낮음 | 중간 | 높음', value: '얻는 것', quickWin: true, method: 'RULE | OPTIMIZATION | ML | RAG | LLM | HUMAN', prove12w: '12주 안에 무엇으로 증명하나' }],
+      items: [{ title: '아이템', problem: '풀 문제(본업에서 일어나는 손실 사건)', idea: '어떻게', users: '누가 쓰나', dataNeeded: ['데이터'], difficulty: '낮음 | 중간 | 높음', value: '얻는 것', quickWin: true, method: 'RULE | OPTIMIZATION | ML | RAG | LLM | HUMAN', prove12w: '12주 안에 무엇으로 증명하나', techLevel: 'L1 업무편의 | L2 업종 핵심 엔진 | L3 재사용 제품' }],
       unknowns: ['확인할 것'],
     },
   },
@@ -163,15 +184,16 @@ export const SKILLS = {
   AX_MVP: {
     id: 'AX_MVP',
     name: 'MVP 구체화',
-    version: 2,
+    version: 3,
     tier: 'standard',
     active: true,
     createdAt: D,
-    updatedAt: D,
-    description: '채택한 AX 를 실제로 만들 MVP 범위 · 기능 · 화면 · 데이터 · 단계로 구체화한다.',
+    updatedAt: '2026-11-17',
+    description: '채택한 AX 를 실제로 만들 MVP 범위 · 기능 · 화면 · 데이터 · 단계 · 증명할 사건 3개로 구체화한다.',
     knowledge: ['ax_strategy'],
     systemInstruction: [
-      '[지금까지의 기억] 의 AX 방향(없으면 [작업 요청] 의 방향)을 실제로 만들 MVP 로 아래 [기준 문서] 대로 구체화한다 — 없애기 → 표준화 → 디지털화 → 자동화 → AI 순서.',
+      '[지금까지의 기억] 의 AX 방향(없으면 [작업 요청] 의 방향)을 실제로 만들 MVP 로 아래 [기준 문서] 대로 구체화한다 — 없애기 → 표준화 → 디지털화 → 자동화 → AI 순서. 개정 부록(A~G)이 앞 장과 다르면 개정 부록을 따른다.',
+      'MVP 는 핵심 경로 1개 + 눈에 띄는 기능 1개만 — 그 밖은 outOfScope(확장 대기). 화면 수를 늘리지 않는다. proofEvents = 화면 · 기록 · 행동 변화 · 결과 측정을 확인할 증명 사건 3개(기준 문서의 Proof Event · 최소 테스트팩: 실제 현장 사건 · 기준값 · 대조군 · 반복 · 기록).',
       '꼭 필요한 기능(필수)과 다음 판(다음)을 나눈다. 처음 MVP 는 작게. 기능마다 level = 자동화 수준(L1 도움 · L2 추천 · L3 준비 후 사람 승인 · L4 자동 — 금융 · 계약 · 대외 발송은 L3 이하).',
       '사용 흐름(coreFlow)에 판단 → 행동 → 결과가 이어지는 고리 하나를 꼭 넣는다. 현장 직원의 입력만 늘리는 기능은 넣지 않는다.',
       'KPI 는 돈 KPI 3(비용 · 매출 · 규모)에서 실제로 잴 수 있는 것만 — 지금 값이 없으면 "측정 필요". phases 는 12주 실증(0주 기준선 · 1~4주 사용 · 5~8주 성과 · 9~12주 정리)에 맞춘다.',
@@ -191,6 +213,7 @@ export const SKILLS = {
         data: STRINGS,
         phases: { type: 'array', items: { type: 'object', required: ['name'], props: { name: { type: 'string' }, scope: { type: 'string' }, duration: { type: 'string' } } } },
         kpis: { type: 'array', items: { type: 'object', required: ['name'], props: { name: { type: 'string' }, howToMeasure: { type: 'string' } } } },
+        proofEvents: STRINGS,
         outOfScope: STRINGS,
         risks: STRINGS,
         unknowns: STRINGS,
@@ -207,6 +230,7 @@ export const SKILLS = {
       data: ['필요 데이터'],
       phases: [{ name: '1단계', scope: '범위', duration: '4주(추정)' }],
       kpis: [{ name: '지표', howToMeasure: '재는 법' }],
+      proofEvents: ['증명 사건 — 무엇을 넣어 무엇이 나오고 무엇으로 확인하나(기준값 · 기록)'],
       outOfScope: ['이번에 안 하는 것'],
       risks: ['리스크'],
       unknowns: ['확인할 것'],
@@ -222,7 +246,7 @@ export const SKILLS = {
   AX_FRONT: {
     id: 'AX_FRONT',
     name: 'AX 화면 기획',
-    version: 2,
+    version: 3,
     tier: 'standard',
     active: true,
     createdAt: D,
@@ -234,6 +258,7 @@ export const SKILLS = {
       'basedOn 에 무엇을 바탕으로 그렸는지 한 줄(예: "MVP 구체화 — 배차 추천 + 운임 정산표"). 채택한 AX · MVP 가 없으면 basedOn 을 "채택한 MVP 없음 — 업체 자료의 가장 큰 반복 업무 하나만" 으로 쓰고, unknowns 맨 앞에 "MVP 구체화를 먼저 채택하면 화면이 그 범위에 맞춰집니다" 를 넣는다.',
       '[기준 문서] 는 화면에 담을 원칙으로만 쓴다 — 판단 → 행동 → 결과 고리가 한 화면에서 이어지게 · 금융 · 계약 · 대외 발송은 사람 승인 단추(L3 이하) · 시연 숫자와 실측 숫자를 섞지 않기 · KPI 는 돈 KPI(비용 · 매출 · 규모)에서. 전략 분석을 다시 하지 않는다.',
       '미래AI랩 AX Front 원칙: 고급스럽고 간결한 SaaS · 정보 과다 금지 · PC 핵심 Dashboard 1개 · 모바일 핵심 화면 2개 · 큰 글자 · 명확한 KPI · 실제 쓸 수 있는 UI · 장식 최소.',
+      'D-625 기준 문서(예상 AX 화면 장): PC 대시보드는 단 하나의 중요한 업무 판단을 보여 주는 흐름(메뉴를 늘리지 않는다) · 모바일 두 화면은 현장 입력 → 검토 · 조치 → 결과 확인으로 이어지는 실제 사용 경로 하나 · 핵심 구역마다 "입력값 → 판정 · 계산 결과 → 사람 행동" 이 한 줄로 보이게 · 아직 만들지 않은 화면이면 oneLine 끝에 "(콘셉트 시안 — 개발 전)" 을 붙인다.',
       '업체 업종에 맞는 데이터와, 데모 같지 않은 현실적인 문구를 쓴다. 표 · 숫자는 "예시 데이터" 다(실제 업체 숫자로 단정하지 않는다).',
       '그림을 그리지 말고 구조만 준다 — 화면은 OS 가 직접 그린다(글자 수정이 바로 반영된다).',
       'KPI 는 3~4개, 대시보드 구역은 2~4개, 표 열은 4~6개, 표 줄은 3~6개, 모바일 화면마다 블록 2~4개.',
@@ -270,19 +295,24 @@ export const SKILLS = {
     },
   },
 
+  /*
+   * D-625 판 2 — 형식 고르기(kind): 일반 제안서(예전 그대로) · AX 퀵진단 4장(대표 AX 기준 문서의 영업용 4장 — 고를 때만 그 기준을 받는다).
+   */
   SANGHO_PROPOSAL: {
     id: 'SANGHO_PROPOSAL',
     name: '제안서 구성',
-    version: 1,
+    version: 2,
     tier: 'standard',
     active: true,
     createdAt: D,
-    updatedAt: D,
-    description: '제안서의 목적 · 대상 · 페이지별 제목 · 핵심 메시지 · 본문 · 핵심 수치 · 시각 방향을 만든다(글자는 OS 가 그린다).',
+    updatedAt: '2026-11-17',
+    description: '제안서의 목적 · 대상 · 페이지별 제목 · 핵심 메시지 · 본문 · 핵심 수치 · 시각 방향을 만든다(글자는 OS 가 그린다). 형식에서 AX 퀵진단 4장을 고르면 기준 문서의 4장 틀로.',
+    knowledgeByOption: { kind: { quick4: ['ax_quick'] } },
     systemInstruction: [
       '미래AI랩 대표가 업체(또는 기관)에 보여 줄 제안서의 페이지 구성을 만든다.',
       '글자는 이미지로 그리지 않는다 — 페이지마다 제목 · 핵심 메시지 · 본문 줄 · 핵심 수치 · 시각 방향(visual)만 준다. OS 가 실제 글자로 그린다.',
-      '페이지 수는 [작업 요청] 의 pages(5 · 8 · 10). 제목은 서로 겹치지 않게, 각 22자 안. 핵심 메시지는 40자 안. 본문 줄은 페이지마다 2~4줄, 줄마다 45자 안.',
+      '[작업 요청] 의 kind 가 quick4 이면 pages 는 무시하고 아래 [기준 문서] 의 4장 출력 틀 그대로 정확히 4장: 1 회사 이해(본업 · 돈 버는 방식 · 업무 4~5단계 · 문제 가설 TOP3 · 확인 근거와 미확인 질문) · 2 현재 방식 → 핵심 문제 → AX 해결(손실 사건 1개를 제목으로 · 현장 입력 → 판정 · 계산 → 출력 → 행동 · 효과는 측정 방법만 · 기존 CRM/ERP/범용 AI 와 다른 점과 아직 증명 못 한 점) · 3 유사 사례 · 성장 가능성 · 자금 연계(확인 안 되는 사례 · 금액은 "확인 불가" · 기관마다 심사 목적이 다름 · 벤처 체크 4칸) · 4 예상 AX 화면(PC 판단 흐름 하나 + 모바일 현장 경로 하나 · 제목에 "콘셉트 시안 — 개발 전"). message 는 그 장의 한 문장(2장은 "우리는 [현장 입력]을 [구체 판단 · 계산]해 [조치]를 가능하게 하고, [지표]로 효과를 측정합니다" 꼴). 공식 점수 · 승인 가능성 · 절감률은 쓰지 않는다. 검증이 모자라면 unknowns 맨 앞에 "현재는 정밀 현장진단 먼저".',
+      'kind 가 quick4 가 아니면: 페이지 수는 [작업 요청] 의 pages(5 · 8 · 10). 제목은 서로 겹치지 않게, 각 22자 안. 핵심 메시지는 40자 안. 본문 줄은 페이지마다 2~4줄, 줄마다 45자 안.',
       '핵심 수치는 [업체 자료] · [지금까지의 기억] 에 있는 숫자만. basis 에 "업체 사실" · "추정" · "미확인" 중 하나.',
       '회사 이름은 [업체 자료] 의 회사명을 그대로 쓴다. 자리표시자([회사명] · OOO · XX)를 남기지 않는다.',
     ],
@@ -313,15 +343,17 @@ export const SKILLS = {
   PATENT_IDEA: {
     id: 'PATENT_IDEA',
     name: '특허 아이디어',
-    version: 2,
+    version: 3,
     tier: 'deep',
     active: true,
     createdAt: D,
     updatedAt: '2026-11-17',
-    description: '채택한 AX 를 바탕으로 특허 아이디어를 기준 문서대로 정리한다(변리사 대체 아님 · 특허 가능 확정 금지).',
-    knowledge: ['patent_idea'],
+    description: '채택한 AX 를 바탕으로 특허 아이디어를 기준 문서대로 정리한다(변리사 대체 아님 · 특허 가능 확정 금지 · 현장 문제 ↔ 청구항 ↔ 구현 ↔ 벤처 설명 한 줄로).',
+    // D-625 판 3 — AX 기준 개정 부록 G(특허 · 기술사업계획 · 벤처 정합성)를 같이 받는다
+    knowledge: ['patent_idea', 'ax_alignment'],
     systemInstruction: [
       '업체의 AX 전략([지금까지의 기억] 의 AX 방향 · MVP)을 바탕으로 특허 아이디어 2~3개를 정리한다.',
+      '아이디어마다 "현장 문제 → 기술 해결 원리 → 독립항의 주요 구성 → MVP 코드 · DB · 화면 → 시험 원본 → 벤처 사업계획 기술 설명" 이 한 줄로 이어지게 쓴다(기준 문서의 정합성 규칙) — 아직 구현 · 시험이 없는 구성은 businessLink 에 "미구현" · "시험 전" 으로 적는다. 출원을 등록처럼 · 특허를 기술성 입증처럼 쓰지 않는다.',
       '아이디어마다 아래 [기준 문서] 의 5개 고정 질문(현재 문제 · 기존 방식 · 차별 구조 · 처리 흐름 · 권리화 포인트)과 특허명 원칙을 따른다. 사업 아이디어를 낸 사람과 발명자를 섞어 쓰지 않는다(기준 문서의 발명자 · 권리귀속 확인).',
       '출원 전 최소 확인정보 가운데 자료에 없는 것은 unknowns 에 "대표 확인: (무엇)" 으로 적는다.',
       '변리사를 대신하지 않는다. "특허 가능" 이라고 확정하지 않는다. 특허성 리스크를 솔직히 쓴다.',
@@ -351,20 +383,22 @@ export const SKILLS = {
   VENTURE_PLAN: {
     id: 'VENTURE_PLAN',
     name: '벤처기업확인 사업계획',
-    version: 2,
+    version: 3,
     tier: 'deep',
     active: true,
     createdAt: D,
     updatedAt: '2026-11-17',
-    description: '업체 기억 + 채택한 AX/MVP + 특허 아이디어로 벤처기업확인 사업계획 논리를 9개 칸(기업인증 벤처 패키지와 같은 칸)에 기준 문서대로 쓴다.',
-    knowledge: ['venture_plan'],
+    description: '업체 기억 + 채택한 AX/MVP + 특허 아이디어로 벤처기업확인 사업계획 논리를 9개 칸(기업인증 벤처 패키지와 같은 칸)에 기준 문서대로 쓴다 · 공식 평가 항목별 근거와 빈 곳.',
+    // D-625 판 3 — AX 기준 개정 부록의 공식 평가기준 연결 · 증거 게이트 · 정합성 규칙을 같이 받는다
+    knowledge: ['venture_plan', 'ax_venture', 'ax_alignment'],
     systemInstruction: [
+      'criteria = 공식 평가 항목(기술혁신성: 연구조직 · 기술인력 · 연구개발비 · 기술개발계획 · R&D 실적 · 기술의 차별성 · 지식재산권 / 사업성장성: 고용 · 목표시장 · 기업가정신 기반 사업계획 · 협업 실적 · 자금운용계획 · 사업성과)마다 area · item · basis(자료로 확인되는 근거 · 없으면 빈 칸) · gap(모자란 증빙 · 다음 행동). 업력 · 신청 유형에 따라 해당 없는 항목은 gap 에 "해당 없음(업력 확인)". 내부 점수를 공식 점수 · 통과 가능성으로 쓰지 않는다. 실증이 없으면 "확인 준비 완료" 라고 쓰지 않는다.',
       '아래 [기준 문서] 의 작성 규칙을 지킨다 — 시장규모 · 성장률 · 매출 · 고객 수 · IP 건수 · 연구 인력은 근거 없이 만들지 않고 "[확인 필요]" 로, 계획 · 예상 · 개발 중 · 보유 완료를 구분, 기존 문제 → 해결 방식 → 차별성 → 시장 → 기술 특징 → 기술 역량 → 시장 진입 → 성장 역량 흐름이 칸마다 서로 어긋나지 않게. 출력 칸은 기준 문서의 양식이 아니라 아래 9칸이다.',
       '벤처기업확인 사업계획의 핵심 논리를 쓴다. 칸은 OS 기업인증 모듈의 벤처 준비 패키지와 같다:',
       'basic 회사 기본정보 · problem 해결하려는 문제 · product 제품 · 서비스 · tech 기술 · 차별성 · market 시장 · growth 매출 · 성장 · rnd 연구개발 · ip 지식재산 · proof 실증 · 성과.',
       '[지금까지의 기억] 의 AX 방향 · MVP · 특허 방향을 기술성 · 혁신성 · 사업성 논리에 이어서 쓴다.',
       '자료에 없는 실적 · 매출 · 인원 · 특허 번호는 만들지 않는다 — 그 칸은 "미확인 — 대표 확인: (무엇)" 으로.',
-      'evidenceNeeded 에 이 논리를 뒷받침할 서류 · 증빙을 적는다.',
+      'evidenceNeeded 에 이 논리를 뒷받침할 서류 · 증빙을 적는다 — 기준 문서의 증거 게이트(본업 문제 · 기존 대안 · 기술원리 · 실행 가능성 · 검증설계 · 기능 사실성 · 실증 진정성 · 사업 확장 · 심사 재현성) 가운데 아직 비어 있는 것부터.',
     ],
     outputSchema: {
       type: 'object',
@@ -372,6 +406,7 @@ export const SKILLS = {
       props: {
         oneLine: { type: 'string' },
         sections: { type: 'object', required: ['basic', 'problem', 'product', 'tech', 'market', 'growth', 'rnd', 'ip', 'proof'], props: { basic: { type: 'string' }, problem: { type: 'string' }, product: { type: 'string' }, tech: { type: 'string' }, market: { type: 'string' }, growth: { type: 'string' }, rnd: { type: 'string' }, ip: { type: 'string' }, proof: { type: 'string' } } },
+        criteria: { type: 'array', items: { type: 'object', required: ['item'], props: { area: { type: 'string' }, item: { type: 'string' }, basis: { type: 'string' }, gap: { type: 'string' } } } },
         evidenceNeeded: STRINGS,
         unknowns: STRINGS,
       },
@@ -379,7 +414,8 @@ export const SKILLS = {
     example: {
       oneLine: '사업계획 한 줄',
       sections: { basic: '회사 기본정보', problem: '해결하려는 문제', product: '제품 · 서비스', tech: '기술 · 차별성', market: '시장', growth: '매출 · 성장', rnd: '연구개발', ip: '지식재산', proof: '실증 · 성과' },
-      evidenceNeeded: ['필요 증빙'],
+      criteria: [{ area: '기술혁신성 | 사업성장성', item: '공식 평가 항목', basis: '자료로 확인되는 근거', gap: '모자란 증빙 · 다음 행동' }],
+      evidenceNeeded: ['필요 증빙(증거 게이트 기준)'],
       unknowns: ['확인할 것'],
     },
   },

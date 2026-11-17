@@ -13,13 +13,13 @@ export interface SkillMeta {
 }
 
 export const SKILL_META: Record<SkillId, SkillMeta> = {
-  AX_PENGUIN: { id: 'AX_PENGUIN', name: 'AX 전략 분석', version: 2, tier: 'deep', description: '기준 문서대로 — 적합성 판정 · 16단계 · 가장 큰 문제 · 추천 AX 1개와 차선 · 돈 KPI 3 · 12주 실증 · 반론 질문' },
-  AX_IDEA: { id: 'AX_IDEA', name: 'AX 아이템 발굴', version: 2, tier: 'standard', description: '기준 문서대로 — 해 볼 만한 AX 아이템 후보(방법 · 12주 증명 · 빨리 되는 것 표시)' },
-  AX_MVP: { id: 'AX_MVP', name: 'MVP 구체화', version: 2, tier: 'standard', description: '기준 문서대로 — 채택한 AX 를 MVP 범위 · 기능(자동화 수준) · 화면 · 12주 단계로' },
-  AX_FRONT: { id: 'AX_FRONT', name: 'AX 화면 기획', version: 2, tier: 'standard', description: '채택한 AX · MVP 를 화면으로 — PC 대시보드 1개 + 모바일 핵심 화면 2개(글자는 OS 가 그림 · 무엇을 바탕으로 했는지 한 줄)' },
-  SANGHO_PROPOSAL: { id: 'SANGHO_PROPOSAL', name: '제안서 구성', version: 1, tier: 'standard', description: '페이지 구성 · 제목 · 메시지 · 핵심 수치 → 제안서 스튜디오에서 실제 글자로' },
-  PATENT_IDEA: { id: 'PATENT_IDEA', name: '특허 아이디어', version: 2, tier: 'deep', description: '채택한 AX 로 특허 아이디어 정리 — 특허 · 벤처 메뉴와 같은 기준(변리사 검토 전 내부용)' },
-  VENTURE_PLAN: { id: 'VENTURE_PLAN', name: '벤처기업확인 사업계획', version: 2, tier: 'deep', description: '기업인증 벤처 패키지와 같은 9칸으로 사업계획 논리 — 벤처 사업계획서와 같은 기준(근거 없는 숫자는 [확인 필요])' },
+  AX_PENGUIN: { id: 'AX_PENGUIN', name: 'AX 전략 분석', version: 3, tier: 'deep', description: '기준 문서대로 — 본업 핵심 문제 1개 · 적합성 판정 · 16단계 · 추천 AX 1개와 차선(L1 · L2 · L3) · 돈 KPI 3 · 12주 실증 · 증거 게이트 · 반론 질문' },
+  AX_IDEA: { id: 'AX_IDEA', name: 'AX 아이템 발굴', version: 3, tier: 'standard', description: '기준 문서대로 — 해 볼 만한 AX 아이템 후보(본업 손실 사건 · L1 · L2 · L3 · 방법 · 12주 증명 · 빨리 되는 것 표시)' },
+  AX_MVP: { id: 'AX_MVP', name: 'MVP 구체화', version: 3, tier: 'standard', description: '기준 문서대로 — 채택한 AX 를 MVP 범위 · 기능(자동화 수준) · 화면 · 12주 단계 · 증명 사건 3개로' },
+  AX_FRONT: { id: 'AX_FRONT', name: 'AX 화면 기획', version: 3, tier: 'standard', description: '채택한 AX · MVP 를 화면으로 — PC 대시보드 1개 + 모바일 핵심 화면 2개(글자는 OS 가 그림 · 무엇을 바탕으로 했는지 한 줄)' },
+  SANGHO_PROPOSAL: { id: 'SANGHO_PROPOSAL', name: '제안서 구성', version: 2, tier: 'standard', description: '페이지 구성 · 제목 · 메시지 · 핵심 수치 → 제안서 스튜디오에서 실제 글자로(형식: 일반 제안서 · AX 퀵진단 4장)' },
+  PATENT_IDEA: { id: 'PATENT_IDEA', name: '특허 아이디어', version: 3, tier: 'deep', description: '채택한 AX 로 특허 아이디어 정리 — 특허 · 벤처 메뉴와 같은 기준 · 현장 문제 ↔ 청구항 ↔ 구현 ↔ 벤처 설명 한 줄로(변리사 검토 전 내부용)' },
+  VENTURE_PLAN: { id: 'VENTURE_PLAN', name: '벤처기업확인 사업계획', version: 3, tier: 'deep', description: '기업인증 벤처 패키지와 같은 9칸으로 사업계획 논리 + 공식 평가 항목별 근거 · 빈 곳 — 벤처 사업계획서와 같은 기준(근거 없는 숫자는 [확인 필요])' },
   FUNDING_STRATEGY: { id: 'FUNDING_STRATEGY', name: '정책자금 · 정부지원 전략', version: 1, tier: 'deep', description: '항목마다 근거 종류 표시 · 최신 자료 확인 필요 표시' },
   CONSULTANT_MESSAGE: { id: 'CONSULTANT_MESSAGE', name: '동료 전달문구', version: 1, tier: 'cheap', description: '카톡에 바로 붙일 요약 — 300자 · 500자 · 자세히' },
   FREE_CHAT: { id: 'FREE_CHAT', name: '자유 AI 작업', version: 1, tier: 'standard', description: '이 업체 기억이 붙은 자유 질문' },
@@ -38,7 +38,7 @@ export interface QuickAction {
   /** 한 줄 설명(단추 아래) */
   hint: string
   /** 고를 것 */
-  choices?: { key: string; label: string; options: { value: string; label: string }[]; initial: string }[]
+  choices?: { key: string; label: string; options: { value: string; label: string }[]; initial: string; /** D-625 다른 고르기가 이 값이면 숨기고 보내지 않는다 */ hideWhen?: Record<string, string> }[]
   /** 직접 적는 칸(자유 작업 · 제안 목적 등) */
   ask?: { label: string; placeholder: string; required?: boolean }
 }
@@ -54,8 +54,12 @@ export const QUICK_ACTIONS: readonly QuickAction[] = [
     key: 'proposal',
     label: '제안서 구성',
     skill: 'SANGHO_PROPOSAL',
-    hint: '페이지 구성 → 실제 글자로 그림',
-    choices: [{ key: 'pages', label: '페이지 수', options: [{ value: '5', label: '5장' }, { value: '8', label: '8장' }, { value: '10', label: '10장' }], initial: '5' }],
+    hint: '페이지 구성 → 실제 글자로 그림 · AX 퀵진단 4장도',
+    // D-625 형식 — 'AX 퀵진단 4장' 을 고르면 서버가 대표 AX 기준의 4장 틀을 같이 받는다(페이지 수는 4장으로 고정 · 페이지 수 고르기는 숨김)
+    choices: [
+      { key: 'kind', label: '형식', options: [{ value: 'general', label: '일반 제안서' }, { value: 'quick4', label: 'AX 퀵진단 4장' }], initial: 'general' },
+      { key: 'pages', label: '페이지 수', options: [{ value: '5', label: '5장' }, { value: '8', label: '8장' }, { value: '10', label: '10장' }], initial: '5', hideWhen: { kind: 'quick4' } },
+    ],
     ask: { label: '목적 · 대상(선택)', placeholder: '예: 대표 미팅용 AX 도입 제안' },
   },
   { key: 'front', label: 'AX 화면 기획', skill: 'AX_FRONT', hint: '채택한 MVP 를 PC 1 + 모바일 2 화면으로' },
@@ -69,6 +73,17 @@ export const QUICK_ACTIONS: readonly QuickAction[] = [
   },
   { key: 'free', label: '자유 AI 작업', skill: 'FREE_CHAT', hint: '이 업체 기억이 붙은 질문', ask: { label: '물어볼 것', placeholder: '예: 이 회사 대표 미팅 전에 물어볼 질문 만들어줘', required: true } },
 ]
+
+/** D-625 지금 고른 값으로 보이는 고르기만 — hideWhen 의 값이 모두 맞으면 숨긴다 */
+export function shownChoices(action: QuickAction, picked: Record<string, string>): NonNullable<QuickAction['choices']> {
+  return (action.choices ?? []).filter((c) => !c.hideWhen || !Object.entries(c.hideWhen).every(([k, v]) => picked[k] === v))
+}
+
+/** D-625 보낼 고르기 값 — 숨은 고르기(예: 퀵진단 4장일 때 페이지 수)는 보내지 않는다 */
+export function choicesToSend(action: QuickAction, picked: Record<string, string>): Record<string, string> {
+  const keys = new Set(shownChoices(action, picked).map((c) => c.key))
+  return Object.fromEntries(Object.entries(picked).filter(([k]) => keys.has(k)))
+}
 
 export function skillName(id: string): string {
   return (SKILL_META as Record<string, SkillMeta | undefined>)[id]?.name ?? id

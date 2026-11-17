@@ -6,10 +6,10 @@
  */
 import handler, { __resetAiRunState } from '../../../api/ai-run.js'
 import { SKILLS, COMMON_RULES } from '../../../api/_ai/skills.js'
-import { aiConfig, buildPrompt, extractJson, scrubDeep, skillKnowledge, validate } from '../../../api/_ai/core.js'
+import { aiConfig, buildPrompt, extractJson, scrubDeep, skillKnowledge, skillKnowledgeAll, validate } from '../../../api/_ai/core.js'
 import { KNOWLEDGE } from '../../../api/_ai/knowledge.js'
 import { hasBanned, leakedChars, secretIndex } from '../../../api/_ai/guard.js'
-import { SKILL_META, QUICK_ACTIONS } from '../ownerAi/skillCatalog'
+import { SKILL_META, QUICK_ACTIONS, shownChoices, choicesToSend } from '../ownerAi/skillCatalog'
 import { emptyCase, findDuplicates, makeMaterial, sameMaterial, normalizeCompany, newUuid, caseClash, findCaseForClient, clientsToStart } from '../ownerAi/caseUtil'
 import { buildAiContext, caseSnapshot, UNKNOWN } from '../ownerAi/context'
 import { renderStructured, revisedText, runSummary, runHeadline, PATENT_WARNING, fundingBasis, verdictLabel } from '../ownerAi/render'
@@ -223,7 +223,7 @@ async function serverTests() {
     const r = await post({ requestId: reqId(), skillId: 'AX_PENGUIN', caseId: CASE, input: { task: '영업 업무 먼저' }, context: { company: { name: '한빛정밀(주)', fields: [{ label: '업종', value: '정밀기계' }] } } })
     const run = r.body.run as Record<string, unknown>
     const sys = String(((llmCalls[0]?.body.messages as { content: string }[]) ?? [])[0]?.content ?? '')
-    check('B4 깊게 — AX 전략은 AI_MODEL_DEEP · 출력 한도 깊게 · 기준 문서(적합성 판정 · 반론 질문)가 붙음 · 판 2', llmCalls[0]?.model === 'm-deep' && llmCalls[0].body.max_completion_tokens === 12000 && sys.includes('[기준 문서]') && sys.includes('NO_GO_REDESIGN') && sys.includes('실제 누가 반복적으로 사용합니까') && run.skillVersion === 2, llmCalls[0]?.body.max_completion_tokens)
+    check('B4 깊게 — AX 전략은 AI_MODEL_DEEP · 출력 한도 깊게 · 기준 문서(적합성 판정 · 반론 질문)가 붙음 · 판 3(D-625)', llmCalls[0]?.model === 'm-deep' && llmCalls[0].body.max_completion_tokens === 12000 && sys.includes('[기준 문서]') && sys.includes('NO_GO_REDESIGN') && sys.includes('실제 누가 반복적으로 사용합니까') && run.skillVersion === SKILLS.AX_PENGUIN.version && run.skillVersion === 3, llmCalls[0]?.body.max_completion_tokens)
     check('B5 가격을 정했으면 비용 계산(USD · 1200×2.5 + 300×10 / 100만)', Math.abs(Number(run.estimatedCostUsd) - (1200 * 2.5 + 300 * 10) / 1e6) < 1e-9, run.estimatedCostUsd)
   }
 
@@ -430,7 +430,7 @@ async function engineTests() {
     let bundle: CaseBundle = { c, client: null, snapshots: [s1.snap], runs: [], latestRevision: new Map() }
     const rid = reqId()
     const r = await runSkill({ repo, bundle, skill: 'AX_PENGUIN', input: {}, requestId: rid, today: TODAY, userId: 'owner-1' })
-    check('N1 흐름 — 화면 → 서버 함수 → 결과 저장(구조 · 글 · 기억 판 · 요청 번호) · 타임라인', r.run.status === 'succeeded' && r.run.rendered.includes('가장 추천') && r.run.contextVersion === 1 && r.run.contextSnapshotId === s1.snap.id && r.run.requestId === rid && r.c.activity[0].text.startsWith('AX 전략 분석 v2 생성'), r.run)
+    check('N1 흐름 — 화면 → 서버 함수 → 결과 저장(구조 · 글 · 기억 판 · 요청 번호) · 타임라인', r.run.status === 'succeeded' && r.run.rendered.includes('가장 추천') && r.run.contextVersion === 1 && r.run.contextSnapshotId === s1.snap.id && r.run.requestId === rid && r.c.activity[0].text.startsWith(`AX 전략 분석 v${SKILLS.AX_PENGUIN.version} 생성`), r.run)
     const again = await runSkill({ repo, bundle, skill: 'AX_PENGUIN', input: {}, requestId: rid, today: TODAY, userId: 'owner-1' })
     const runs = await repo.listRuns(c.id)
     check('N2 같은 요청 번호로 또 — 공급자 1번 · 기록 1줄', llmCalls.length === 1 && runs.length === 1 && again.replayed === true, { calls: llmCalls.length, runs: runs.length })
@@ -569,13 +569,14 @@ function d624Tests() {
   // 1 어느 단추가 어느 기준 문서를 받나 — 특허 · 벤처 메뉴와 같은 기준
   check(
     'D624-1 기준 문서 — 특허 아이디어 = 특허 아이디어 기준 · 벤처 사업계획 = 벤처 사업계획서 기준 · 화면 기획 = AX 기준 · 제안서 · 자금 · 동료 문구 · 자유 질문 · 기억 정리 · 맞춤법 · 자료 요약은 없음',
-    JSON.stringify(kn('PATENT_IDEA')) === '["patent_idea"]' &&
-      JSON.stringify(kn('VENTURE_PLAN')) === '["venture_plan"]' &&
+    // D-625 판 3 — 특허는 + 정합성 규칙, 벤처는 + 공식 평가기준 · 증거 게이트 · 정합성 규칙(AX 기준 개정 부록)
+    JSON.stringify(kn('PATENT_IDEA')) === '["patent_idea","ax_alignment"]' &&
+      JSON.stringify(kn('VENTURE_PLAN')) === '["venture_plan","ax_venture","ax_alignment"]' &&
       JSON.stringify(kn('AX_FRONT')) === '["ax_strategy"]' &&
       (['SANGHO_PROPOSAL', 'FUNDING_STRATEGY', 'CONSULTANT_MESSAGE', 'FREE_CHAT', 'CONTEXT_UPDATE', 'PROOFREAD', 'SNAPSHOT_EXTRACT'] as const).every((id) => kn(id).length === 0),
     Object.fromEntries(Object.keys(SKILLS).map((id) => [id, kn(id as keyof typeof SKILLS)])),
   )
-  check('D624-2 판이 올라감(실행 기록에 남아 판 1 결과와 나눠 볼 수 있게) — 화면 목록과 같은 판', (['PATENT_IDEA', 'VENTURE_PLAN', 'AX_FRONT'] as const).every((id) => SKILLS[id].version === 2 && SKILL_META[id].version === 2))
+  check('D624-2 판이 올라감(실행 기록에 남아 판 1 결과와 나눠 볼 수 있게) — 화면 목록과 같은 판', (['PATENT_IDEA', 'VENTURE_PLAN', 'AX_FRONT'] as const).every((id) => SKILLS[id].version >= 2 && SKILL_META[id].version === SKILLS[id].version))
   const ctx = { company: { name: '그린로직스(주)', fields: [] } }
   const sysP = buildPrompt(SKILLS.PATENT_IDEA, ctx, {}, 'deep', COMMON_RULES).system
   const sysV = buildPrompt(SKILLS.VENTURE_PLAN, ctx, {}, 'deep', COMMON_RULES).system
@@ -624,9 +625,99 @@ function d624Tests() {
   )
 }
 
+
+/* ------------------------------------------------------------------ */
+/* D-625 최신 AX 기준(11-04 개정 통합본) — 묶음 · 작업마다 잇기 · 퀵진단 4장       */
+/* ------------------------------------------------------------------ */
+async function d625Tests() {
+  const ax = KNOWLEDGE.ax_strategy as string
+  const pg = '펭귄'
+  const clientA = '하나정보'
+  const clientB = '\x4B\x50\x4A\x4B'
+  // 1 묶음 — 새로 들어온 것(우선 원칙 · 12개 질문 · L1/L2/L3 · 증거 등급 · 게이트 · 출력 계약 · 정합성) · 개발 문서(부록 H · 14장 이후)는 빠짐
+  check(
+    'D625-1 AX 기준 묶음 — 우선 원칙(본업 손실 사건 먼저 · AX 아님 결론) · 개정 부록 A~G(12개 질문 · L1/L2/L3 · E0~E5 · G0~G8 · 출력 계약 · 정합성) · 부록 H · 운영 데이터 모델 장은 뺌',
+    ax.includes('가장 큰 손실을 만드는 사건') && ax.includes('NO-AX/OTHER-TECH') && ax.includes('## A2. 프로젝트 시작 시 12개 질문') && /L1 OPERATIONS[\s\S]*L2 INDUSTRY ENGINE[\s\S]*L3 REUSABLE IP/.test(ax) &&
+      ax.includes('E0 아이디어') && ax.includes('E5 다고객') && ['G0 본업 문제', 'G4 검증설계', 'G8 심사 재현성'].every((g) => ax.includes(g)) && ax.includes('# 부록 F.') && ax.includes('# 부록 G.') &&
+      !ax.includes('# 부록 H.') && !ax.includes('# 14. 운영 OS 데이터 모델'),
+    { chars: ax.length },
+  )
+  // 2 이름 가림 — 다른 고객사 이름 · 내부 명령 이름 · 인터넷 주소 · 그 회사 약어 0 (모든 묶음)
+  const leaks = Object.entries(KNOWLEDGE).filter(([, v]) => [pg, clientA, clientB, 'http://', 'https://', 'SO·DE', 'SO/DE'].some((w) => (v as string).includes(w)) || hasBanned(v as string)).map(([k]) => k)
+  check('D625-2 묶음 전부 — 다른 고객사 이름 0 · 내부 명령 이름 0 · 인터넷 주소 0 · 쓰지 않는 이름 0(사례는 사례 A · B 로)', leaks.length === 0 && ax.includes('사례 A') && ax.includes('사례 B'), leaks)
+  // 3 퀵진단 묶음 — 4장 틀 그대로 · 단계 이름은 하는 일 이름으로
+  const q = KNOWLEDGE.ax_quick as string
+  check(
+    'D625-3 퀵진단 4장 묶음 — PAGE 1~4 틀 · 통과 문장 · 자체 검수 8개 · 넘기기 줄은 "퀵진단(4장) → 상세 제안 → 정밀 분석" · 참고 출처 장은 뺌',
+    ['PAGE 1', 'PAGE 2', 'PAGE 3', 'PAGE 4'].every((x) => q.includes(x)) && q.includes('통과 문장 형식') && q.includes('## 7. 퀵진단 자체 검수') && q.includes('퀵진단(4장) → 관심이 있으면 상세 제안(') && q.includes('정밀 분석(전체 16단계') && !q.includes('## 9.') && !q.includes('`'.repeat(1) + '/'),
+    q.slice(q.indexOf('## 6.'), q.indexOf('## 6.') + 200),
+  )
+  // 4 작업마다 잇기 — 제안서는 '퀵진단 4장' 을 고를 때만 퀵진단 기준 · 일반은 없음 · 누출 색인에는 언제나
+  const ctx = { company: { name: '그린로직스(주)', fields: [] } }
+  // 지시문 안의 '[기준 문서]' 낱말이 아니라 서버가 붙이는 기준 문서 머리
+  const KB_HEAD = '[기준 문서] 아래 기준대로 판단한다'
+  const gen = buildPrompt(SKILLS.SANGHO_PROPOSAL, ctx, { options: { kind: 'general', pages: '5' } }, 'standard', COMMON_RULES)
+  const quick = buildPrompt(SKILLS.SANGHO_PROPOSAL, ctx, { options: { kind: 'quick4' } }, 'standard', COMMON_RULES)
+  const odd = buildPrompt(SKILLS.SANGHO_PROPOSAL, ctx, { options: { kind: 'toString' } }, 'standard', COMMON_RULES)
+  const old = buildPrompt(SKILLS.SANGHO_PROPOSAL, ctx, { options: { pages: '8' } }, 'standard', COMMON_RULES)
+  check(
+    'D625-4 제안서 — 형식 "AX 퀵진단 4장" 일 때만 [기준 문서](4장 틀)가 붙음 · 일반 · 예전 요청(형식 없음) · 이상한 값은 안 붙음 · 출력 형식 앞 · 쓰지 않는 이름 0',
+    quick.system.includes(KB_HEAD) && quick.system.includes('PAGE 2') && quick.system.lastIndexOf(KB_HEAD) < quick.system.lastIndexOf('[출력 형식]') && !hasBanned(quick.system) && !quick.system.includes(pg) &&
+      [gen, odd, old].every((x) => !x.system.includes(KB_HEAD) && !x.system.includes('PAGE 2')) && quick.user.includes('kind: quick4'),
+    { quick: quick.system.length, gen: gen.system.length },
+  )
+  check(
+    'D625-5 누출 색인 — 고르기로만 받는 퀵진단 기준도 서버만 가진 글로 셈(통째로 옮기면 막힘) · skillKnowledge 는 고른 것만',
+    skillKnowledgeAll(SKILLS.SANGHO_PROPOSAL).includes('PAGE 2') && !skillKnowledge(SKILLS.SANGHO_PROPOSAL).includes('PAGE 2') && leakedChars(q.slice(1500, 1800), secretIndex(Object.values(SKILLS).map((s) => skillKnowledgeAll(s)).filter(Boolean))) >= 200 &&
+      skillKnowledge(SKILLS.SANGHO_PROPOSAL, 3 as unknown as Record<string, string>) === '',
+  )
+  // 6 지시문 — AX 전략 분석 판 3(우선 원칙 · NO_AX · L1/L2/L3 · E0~E5 · G0~G8 · 12개 질문 · RED) · 특허 · 벤처 정합성 · 벤처 공식 항목
+  const sysAx = buildPrompt(SKILLS.AX_PENGUIN, ctx, {}, 'deep', COMMON_RULES).system
+  const sysV = buildPrompt(SKILLS.VENTURE_PLAN, ctx, {}, 'deep', COMMON_RULES).system
+  const sysP = buildPrompt(SKILLS.PATENT_IDEA, ctx, {}, 'deep', COMMON_RULES).system
+  const sysF = buildPrompt(SKILLS.AX_FRONT, ctx, {}, 'standard', COMMON_RULES).system
+  const sysM = buildPrompt(SKILLS.AX_MVP, ctx, {}, 'standard', COMMON_RULES).system
+  check(
+    'D625-6 지시문 — AX: 본업 핵심 문제 · NO_AX_OTHER_TECH · techLevel · oneSentence · evidence · gates 9개 · RED · UNKNOWN / MVP: 증명 사건 3개 / 화면: 콘셉트 시안 / 특허: 정합성 한 줄 / 벤처: 공식 평가 항목 criteria · 게이트 · 모두 쓰지 않는 이름 0',
+    ['본업 핵심 문제', 'NO_AX_OTHER_TECH', 'techLevel', 'oneSentence', 'evidence', 'G0 본업 문제', 'G8 심사 재현성', 'RED:', 'UNKNOWN:', '개정 부록'].every((x) => sysAx.includes(x)) &&
+      sysM.includes('proofEvents') && sysF.includes('콘셉트 시안') && sysP.includes('독립항의 주요 구성') && sysP.includes('# 부록 G.') &&
+      sysV.includes('criteria') && sysV.includes('# 부록 C.') && sysV.includes('# 부록 E.') && sysV.includes('증거 게이트') &&
+      [sysAx, sysV, sysP, sysF, sysM].every((t) => !hasBanned(t) && !t.includes(pg) && !t.includes(clientA)),
+    { ax: sysAx.length, v: sysV.length, p: sysP.length, f: sysF.length },
+  )
+  console.log(`  D-625 지시 글자 수: AX 전략 ${sysAx.length.toLocaleString()} · 벤처 ${sysV.length.toLocaleString()} · 특허 ${sysP.length.toLocaleString()} · 화면 ${sysF.length.toLocaleString()} · 제안서 일반 ${gen.system.length.toLocaleString()} · 퀵진단 4장 ${quick.system.length.toLocaleString()}`)
+  // 7 판 — 서버 = 화면 목록 · 바뀐 스킬은 판이 올라감
+  const bumped = { AX_PENGUIN: 3, AX_IDEA: 3, AX_MVP: 3, AX_FRONT: 3, SANGHO_PROPOSAL: 2, PATENT_IDEA: 3, VENTURE_PLAN: 3 } as const
+  check('D625-7 판 — 기준이 바뀐 7개 작업은 판이 올라감 · 서버와 화면 목록이 같은 판', Object.entries(bumped).every(([id, v]) => SKILLS[id as keyof typeof SKILLS].version === v && SKILL_META[id as SkillId].version === v))
+  // 8 예시 JSON · 결과 글 — 새 칸이 검사를 통과하고 글에 나옴 · 예전 결과(새 칸 없음)는 그대로
+  const exOk = (['AX_PENGUIN', 'AX_IDEA', 'AX_MVP', 'VENTURE_PLAN', 'SANGHO_PROPOSAL'] as const).every((id) => validate(SKILLS[id].outputSchema, SKILLS[id].example).ok)
+  const axOut = { oneLine: '배차 손실부터', verdict: 'NO_AX_OTHER_TECH', primaryConstraint: '당일 배차 변경으로 공차 운행', evidence: 'E1 설계문서 — 회의록만', recommended: { title: '배차 규칙표', why: '규칙으로 충분', techLevel: 'L1 업무편의 — 범용 기능', oneSentence: '[주문 · 차량]을 [규칙 판정]해 [배차]를 바꿔 [공차율]을 개선' }, alternatives: [], thinking: [], gates: [{ id: 'G0', status: 'PASS', note: '현장 사건 1개' }, { id: 'G2', status: 'fail', note: '판정 원리 도식 없음' }, { id: 'G4', status: '', note: '' }] }
+  const md = renderStructured('AX_PENGUIN', axOut)
+  const mdOld = renderStructured('AX_PENGUIN', { oneLine: '예전', verdict: 'LITE', recommended: { title: 'x', why: 'y' }, alternatives: [], thinking: [] })
+  const ideaMd = renderStructured('AX_IDEA', { oneLine: 'o', items: [{ title: '배차', idea: '규칙', techLevel: 'L2 업종 핵심 엔진' }] })
+  const mvpMd = renderStructured('AX_MVP', { mvpName: 'm', oneLine: 'o', features: [], proofEvents: ['주문 30건 · 기준값 대비 공차율'] })
+  const vMd = renderStructured('VENTURE_PLAN', { sections: {}, criteria: [{ area: '기술혁신성', item: '기술의 차별성', basis: '', gap: '경쟁 대안 비교표' }] })
+  check(
+    'D625-8 결과 글 — 판정 "AX 아님" · 증거 등급 · 기술 위상 · 한 문장 · 게이트(PASS → 통과 · fail → 미통과 · 빈 값 → 확인 필요) · 아이템 위상 · 증명할 사건 · 공식 항목 근거 없음/빈 곳 · 예전 결과엔 새 줄 없음',
+    exOk && md.includes('AX 아님 — 다른 기술') && verdictLabel('NO-AX/OTHER-TECH').startsWith('AX 아님') && verdictLabel('no ax other tech').startsWith('AX 아님') && md.includes('- 지금 증거 등급: E1 설계문서') && md.includes('- 기술 위상: L1 업무편의') && md.includes('- 한 문장: [주문 · 차량]') &&
+      md.includes('- G0 통과 — 현장 사건 1개') && md.includes('- G2 미통과 — 판정 원리') && md.includes('- G4 확인 필요') && !mdOld.includes('증거 게이트') && !mdOld.includes('증거 등급') &&
+      ideaMd.includes('- 기술 위상: L2 업종 핵심 엔진') && mvpMd.includes('**증명할 사건**') && vMd.includes('[기술혁신성] 기술의 차별성 — 근거: 없음 · 빈 곳: 경쟁 대안 비교표'),
+    md,
+  )
+  // 9 형식 고르기 — 퀵진단 4장이면 페이지 수 숨기고 보내지 않음 · 일반은 둘 다
+  const prop = QUICK_ACTIONS.find((a) => a.key === 'proposal')!
+  check(
+    'D625-9 제안서 형식 고르기 — 처음엔 일반 제안서 + 페이지 수 · 퀵진단 4장을 고르면 페이지 수 숨김 · 보내는 값에도 없음',
+    shownChoices(prop, { kind: 'general', pages: '5' }).map((c) => c.key).join() === 'kind,pages' && shownChoices(prop, { kind: 'quick4', pages: '5' }).map((c) => c.key).join() === 'kind' &&
+      JSON.stringify(choicesToSend(prop, { kind: 'quick4', pages: '8' })) === '{"kind":"quick4"}' && JSON.stringify(choicesToSend(prop, { kind: 'general', pages: '8' })) === '{"kind":"general","pages":"8"}' &&
+      prop.choices?.[0].initial === 'general',
+  )
+}
+
 await serverTests()
 await engineTests()
 caseFirstTests()
 d624Tests()
+await d625Tests()
 console.log(`\nownerAi: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

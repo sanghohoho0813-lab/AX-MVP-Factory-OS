@@ -821,7 +821,7 @@ async function d263Tests() {
 
 async function kbContractTests() {
   const WANT: Record<string, string> = {
-    'spec.idea': 'patent_idea',
+    'spec.idea': 'patent_idea+ax_alignment',
     'spec.talk': 'patent_idea',
     'spec.ideaRank': 'patent_idea',
     'spec.ideaMore': 'patent_idea',
@@ -835,7 +835,7 @@ async function kbContractTests() {
     'spec.fix': 'patent_format+patent_spec+patent_samples',
     'spec.judge': 'patent_spec+patent_format+patent_samples',
     'venture.market': 'venture_plan',
-    'venture.plan': 'venture_plan',
+    'venture.plan': 'venture_plan+ax_venture',
     'venture.talk': 'venture_plan',
     'venture.planRank': 'venture_plan',
     'venture.planMore': 'venture_plan',
@@ -845,7 +845,7 @@ async function kbContractTests() {
     'venture.g1': 'venture_plan',
     'venture.g2': 'venture_plan',
     'venture.x': 'venture_plan',
-    'venture.judge': 'venture_plan',
+    'venture.judge': 'venture_plan+ax_venture',
     'cert.say': 'inspection',
     'cert.reply': '',
   }
@@ -861,8 +861,8 @@ async function kbContractTests() {
   check('KB2 기준 문서 글이 실제로 지시문 안에 들어감(장마다 앞 300자 대조)', missing.length === 0, missing)
   const packs = Object.keys(KNOWLEDGE)
   // D-272 AX 기준(ax_strategy)은 AI 전략실 AX 단추(ai-run 스킬)가 쓴다
-  const used = new Set([...ours.flatMap((a) => knowledgeOf(a).map((k: { key: string }) => k.key)), ...topicPacks('청구항 몇 개 벤처 사업계획서 실사'), ...Object.values(SKILLS).flatMap((k) => ((k as { knowledge?: string[] }).knowledge ?? []))])
-  check(`KB3 만들어 둔 기준 문서 장 ${packs.length}개 + 샘플 — 쓰이지 않는 장 없음(예전엔 실사 장이 놀고 있었음 · AX 기준은 AI 전략실 AX 단추)`, [...packs, 'patent_samples'].every((k) => used.has(k)), [...packs, 'patent_samples'].filter((k) => !used.has(k)))
+  const used = new Set([...ours.flatMap((a) => knowledgeOf(a).map((k: { key: string }) => k.key)), ...topicPacks('청구항 몇 개 벤처 사업계획서 실사'), ...Object.values(SKILLS).flatMap((k) => ((k as { knowledge?: string[] }).knowledge ?? [])), ...Object.values(SKILLS).flatMap((k) => Object.values((k as { knowledgeByOption?: Record<string, Record<string, string[]>> }).knowledgeByOption ?? {}).flatMap((m) => Object.values(m).flat()))])
+  check(`KB3 만들어 둔 기준 문서 장 ${packs.length}개 + 샘플 — 쓰이지 않는 장 없음(예전엔 실사 장이 놀고 있었음 · AX 기준은 AI 전략실 AX 단추 · D-625 퀵진단 4장은 제안서 형식 고르기)`, [...packs, 'patent_samples'].every((k) => used.has(k)), [...packs, 'patent_samples'].filter((k) => !used.has(k)))
   const noJudge = ours.filter((a) => !['spec.idea', 'spec.research', 'venture.market', 'cert.say', 'cert.reply'].includes(a.id)).filter((a) => !assistSystem(a).includes('[자체점검 —')).map((a) => a.id)
   check('KB4 자체점검 — 명세서 · 사업계획서를 쓰거나 고치거나 판정하는 단추 모두에(아이디어 · 조사 · 시장조사 · 실사 빼고)', noJudge.length === 0, noJudge)
   const sizes = Object.fromEntries(ours.map((a) => [a.id, assistSystem(a, { skill: 'x'.repeat(8000) }).length]))

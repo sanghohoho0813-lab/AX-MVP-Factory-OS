@@ -41,10 +41,23 @@ export const VERDICT_LABEL: Record<string, string> = {
   LITE: '작게 시작 — 작은 워크플로 · 자동화 · MVP 부터',
   NO_GO_REDESIGN: '지금은 만들지 않음 — 업무 · 가설부터 다시 설계',
   INSUFFICIENT_DATA: '정보 부족 — 확인 질문부터(잠정 결론)',
+  // D-625 기준 문서 11-04 개정 — 기존 제품 · SaaS · 규칙 · 최적화가 더 맞을 때
+  NO_AX_OTHER_TECH: 'AX 아님 — 다른 기술(기존 SaaS · 규칙 · 최적화 · 통계)이 더 맞음',
 }
 export const verdictLabel = (v: unknown): string => {
-  const k = str(v).toUpperCase().replace(/[\s-]+/g, '_')
+  // D-625 기준 문서 표기 'NO-AX/OTHER-TECH' 도 같은 판정으로
+  const k = str(v).toUpperCase().replace(/[\s/-]+/g, '_')
   return VERDICT_LABEL[k] ?? str(v)
+}
+
+/** D-625 증거 게이트 상태 — 통과 · 미통과 · 확인 필요(영어로 와도) */
+export function gateStatus(v: unknown): string {
+  const s = str(v)
+  const k = s.toUpperCase().replace(/[\s_-]+/g, '')
+  if (/^(PASS|PASSED|OK|통과)$/.test(k)) return '통과'
+  if (/^(FAIL|FAILED|NOTPASSED|미통과|불통과)$/.test(k)) return '미통과'
+  if (!s || /^(UNKNOWN|CHECK|확인필요|미확인)$/.test(k)) return '확인 필요'
+  return s
 }
 
 function axItem(title: string, it: O): string[] {
@@ -55,6 +68,8 @@ function axItem(title: string, it: O): string[] {
     ...line('지금', it.before),
     ...line('바뀐 뒤', it.after),
     ...line('방법', it.method),
+    ...line('기술 위상', it.techLevel),
+    ...line('한 문장', it.oneSentence),
     ...line('난이도', it.difficulty),
     ...line('MVP 범위', it.mvpScope),
     ...(strs(it.coreFeatures).length ? [`- 핵심 기능: ${strs(it.coreFeatures).join(' · ')}`] : []),
@@ -79,12 +94,14 @@ export function renderStructured(skill: SkillId, s: unknown): string {
         ...line('판정', verdictLabel(o.verdict)),
         ...line('가장 큰 문제', o.primaryConstraint),
         ...line('12주에 증명할 것', o.prove12w),
+        ...line('지금 증거 등급', o.evidence),
         '',
         ...axItem('가장 추천', obj(o.recommended)),
         ...arr(o.alternatives).flatMap((a, i) => axItem(`차선 ${i + 1}`, obj(a))),
         ...list('돈 KPI 3', [str(k.cost) && `비용 · 효율: ${str(k.cost)}`, str(k.revenue) && `매출 · 고객: ${str(k.revenue)}`, str(k.scale) && `규모 · 처리 능력: ${str(k.scale)}`].filter(Boolean)),
         ...list(arr(o.thinking).length > 12 ? '16단계로 본 것' : '단계별로 본 것', arr(o.thinking).map((t) => `${str(obj(t).step)}. ${str(obj(t).title)} — ${str(obj(t).finding)}`)),
         ...list('반론 질문', arr(o.challenges).map((d) => { const x = obj(d); return `${str(x.risk) ? `[${str(x.risk)}] ` : ''}${str(x.q)} — ${str(x.answer) || '답 없음'}` }).filter((x) => x.length > 4)),
+        ...list('증거 게이트', arr(o.gates).map((g) => { const x = obj(g); return `${str(x.id)} ${gateStatus(x.status)}${str(x.note) ? ` — ${str(x.note)}` : ''}` }).filter((x) => x.trim().length > 2)),
         ...list('지금 만들 것', strs(o.buildNow)),
         ...list('준비할 것', strs(o.prepareNow)),
         ...list('나중에 검증할 것', strs(o.validateLater)),
@@ -93,7 +110,7 @@ export function renderStructured(skill: SkillId, s: unknown): string {
       ].filter((x, i, a) => x !== '' || a[i - 1] !== '').join('\n').trim()
     }
     case 'AX_IDEA':
-      return [`## ${str(o.oneLine)}`, '', ...arr(o.items).flatMap((x, i) => { const it = obj(x); return [`### ${i + 1}. ${str(it.title)}${it.quickWin === true ? ' (빨리 됨)' : ''}`, ...line('문제', it.problem), ...line('아이디어', it.idea), ...line('방법', it.method), ...line('쓰는 사람', it.users), ...line('난이도', it.difficulty), ...line('얻는 것', it.value), ...line('12주 증명', it.prove12w), ...(strs(it.dataNeeded).length ? [`- 데이터: ${strs(it.dataNeeded).join(' · ')}`] : []), ''] }), ...list('확인할 것', strs(o.unknowns))].join('\n').trim()
+      return [`## ${str(o.oneLine)}`, '', ...arr(o.items).flatMap((x, i) => { const it = obj(x); return [`### ${i + 1}. ${str(it.title)}${it.quickWin === true ? ' (빨리 됨)' : ''}`, ...line('문제', it.problem), ...line('아이디어', it.idea), ...line('방법', it.method), ...line('기술 위상', it.techLevel), ...line('쓰는 사람', it.users), ...line('난이도', it.difficulty), ...line('얻는 것', it.value), ...line('12주 증명', it.prove12w), ...(strs(it.dataNeeded).length ? [`- 데이터: ${strs(it.dataNeeded).join(' · ')}`] : []), ''] }), ...list('확인할 것', strs(o.unknowns))].join('\n').trim()
     case 'AX_MVP':
       return [
         `## ${str(o.mvpName)} — ${str(o.oneLine)}`,
@@ -106,6 +123,7 @@ export function renderStructured(skill: SkillId, s: unknown): string {
         ...list('데이터', strs(o.data)),
         ...list('단계', arr(o.phases).map((p) => `${str(obj(p).name)}: ${str(obj(p).scope)}${str(obj(p).duration) ? ` (${str(obj(p).duration)})` : ''}`)),
         ...list('KPI', arr(o.kpis).map((k) => `${str(obj(k).name)}${str(obj(k).howToMeasure) ? ` — ${str(obj(k).howToMeasure)}` : ''}`)),
+        ...list('증명할 사건', strs(o.proofEvents)),
         ...list('이번에 안 하는 것', strs(o.outOfScope)),
         ...list('리스크', strs(o.risks)),
         ...list('확인할 것', strs(o.unknowns)),
@@ -145,6 +163,7 @@ export function renderStructured(skill: SkillId, s: unknown): string {
         str(o.oneLine) ? `## ${str(o.oneLine)}` : '## 벤처기업확인 사업계획',
         '',
         ...Object.entries(VENTURE_SECTION_TITLE).flatMap(([k, t]) => [`### ${t}`, str(sec[k]) || '미확인', '']),
+        ...list('공식 평가 항목별 근거 · 빈 곳', arr(o.criteria).map((c) => { const x = obj(c); return `${str(x.area) ? `[${str(x.area)}] ` : ''}${str(x.item)} — 근거: ${str(x.basis) || '없음'}${str(x.gap) ? ` · 빈 곳: ${str(x.gap)}` : ''}` }).filter((x) => !x.startsWith(' —'))),
         ...list('필요 증빙', strs(o.evidenceNeeded)),
         ...list('확인할 것', strs(o.unknowns)),
       ].join('\n').trim()

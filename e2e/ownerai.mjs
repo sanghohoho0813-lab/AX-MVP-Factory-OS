@@ -134,6 +134,19 @@ const FIX = {
     unknowns: [],
   },
   PROOFREAD: { fixes: [{ where: 'p2 메시지', before: '줄일수', after: '줄일 수', reason: '띄어쓰기' }] },
+  // D-625 제안서 형식 'AX 퀵진단 4장' — 기준 문서(4장 틀)를 받았을 때만 이 답
+  SANGHO_PROPOSAL_QUICK4: {
+    purpose: '그린로직스 AX 퀵진단',
+    audience: '그린로직스 대표',
+    pageCount: 4,
+    pages: [
+      { no: 1, title: '그린로직스의 본업과 성장 병목', message: '배차 · 정산이 하루를 잡아먹습니다', bullets: ['중소 화주 물류 · 운임 매출', '문제 가설 TOP3 — 배차 · 정산 · 문의 전화'], keyNumbers: [], visual: '업무 5단계 흐름' },
+      { no: 2, title: '당일 배차 변경 → 공차 운행', message: '우리는 주문 · 차량 조건을 규칙으로 판정해 배차를 바꾸고, 공차율로 효과를 측정합니다', bullets: ['현장 입력 → 판정 → 추천 → 배차 담당 승인', '효과는 측정 방법만(기준값 수집 먼저)'], keyNumbers: [], visual: '좌: 지금 · 중: 판정 · 우: 측정 방법' },
+      { no: 3, title: '유사 사례 · 자금 연계', message: '사례 · 금액은 확인 불가 — 확인 뒤 채움', bullets: ['기관마다 심사 목적이 다름', '벤처 체크 4칸 — 모두 미검증'], keyNumbers: [], visual: '벤처 체크 4칸' },
+      { no: 4, title: '예상 AX 화면(콘셉트 시안 — 개발 전)', message: 'PC 배차 판단 한 흐름 + 모바일 현장 확인', bullets: ['입력값 → 추천 결과 → 담당 승인'], keyNumbers: [], visual: 'PC 65% + 모바일 35%' },
+    ],
+    unknowns: ['현재는 정밀 현장진단 먼저', '월 배차 건수 · 공차율 기준값'],
+  },
   AX_FRONT: {
     appName: '그린 배차',
     userType: '배차 담당 · 대표',
@@ -166,7 +179,8 @@ globalThis.fetch = async (input, init = {}) => {
       llmOverride = null
       return new Response(o.body, { status: o.status })
     }
-    const content = JSON.stringify(FIX[skill] ?? SKILLS[skill]?.example ?? {})
+    const quick4 = skill === 'SANGHO_PROPOSAL' && sys.includes('[기준 문서] 아래 기준대로') && sys.includes('PAGE 2')
+    const content = JSON.stringify(quick4 ? FIX.SANGHO_PROPOSAL_QUICK4 : FIX[skill] ?? SKILLS[skill]?.example ?? {})
     return new Response(JSON.stringify({ model: body.model, choices: [{ message: { content }, finish_reason: 'stop' }], usage: { prompt_tokens: 1800, completion_tokens: 600 } }), { status: 200 })
   }
   return realFetch(input, init)
@@ -397,7 +411,7 @@ await page.reload({ waitUntil: 'networkidle' })
   const pCard = page.locator('[data-skill="PATENT_IDEA"]')
   check('B 특허: 경고 문구(선행기술조사 · 변리사 검토) 보임', (await pCard.innerText()).includes('변리사 검토가 필요합니다'))
   const pCall = llm.filter((c) => c.skill === 'PATENT_IDEA').pop()
-  check('D624 H 특허 아이디어 — 특허 · 벤처 메뉴와 같은 기준 문서(5개 고정 질문 · 권리화 포인트)가 같이 감 · 판 2', !!pCall && pCall.system.includes('[기준 문서]') && pCall.system.includes('5개 고정 질문') && pCall.system.includes('권리화 포인트') && (await runs()).find((r) => r.skillId === 'PATENT_IDEA')?.skillVersion === 2)
+  check('D624 H 특허 아이디어 — 특허 · 벤처 메뉴와 같은 기준 문서(5개 고정 질문 · 권리화 포인트)가 같이 감 · D-625 판 3 + 정합성 규칙(부록 G)', !!pCall && pCall.system.includes('[기준 문서]') && pCall.system.includes('5개 고정 질문') && pCall.system.includes('권리화 포인트') && pCall.system.includes('# 부록 G.') && pCall.system.includes('독립항의 주요 구성') && (await runs()).find((r) => r.skillId === 'PATENT_IDEA')?.skillVersion === 3)
   check('B 특허: 지난번 채택한 AX 를 다시 설명 안 해도 같이 감', (pCall?.user ?? '').includes('배차 자동 추천'))
   await pCard.getByTestId('eval-partial').click()
   await page.getByText('배차 우선순위 산정 방법', { exact: false }).last().click()
@@ -422,6 +436,7 @@ await page.reload({ waitUntil: 'networkidle' })
   const vCall = llm.filter((c) => c.skill === 'VENTURE_PLAN').pop()?.user ?? ''
   const vSys = llm.filter((c) => c.skill === 'VENTURE_PLAN').pop()?.system ?? ''
   check('D624 I 벤처 사업계획 — 벤처 사업계획서 기준 문서(근거 없는 숫자 금지)가 같이 감 · 칸은 9칸 그대로', vSys.includes('[기준 문서]') && vSys.includes('근거 없이 생성하지 않는다') && vSys.includes('basic 회사 기본정보'))
+  check('D625 V 벤처 사업계획 — AX 기준의 공식 평가기준 연결(부록 C) · 증거 게이트(부록 E) · 공식 항목별 근거(criteria)도 같이 감', vSys.includes('# 부록 C.') && vSys.includes('# 부록 E.') && vSys.includes('criteria') && !vSys.includes('http'))
   check('C 벤처: 기억 v2(AX 방향 + 특허) · 채택 결과가 자동으로 AI 에', vCall.includes('지금까지의 기억 v2') && vCall.includes('배차 자동 추천') && vCall.includes('배차 우선순위'), vCall.slice(0, 500))
   const vText = await page.locator('[data-skill="VENTURE_PLAN"]').innerText()
   check('C 벤처 결과: 기업인증 벤처 패키지와 같은 9칸', ['회사 기본정보', '해결하려는 문제', '기술 · 차별성', '지식재산', '실증 · 성과'].every((t) => vText.includes(t)))
@@ -434,9 +449,12 @@ let caseId = ''
   await quick('proposal', async () => {
     await page.getByRole('button', { name: '5장' }).click()
   })
+  check('D625 P1 제안서 창 — 형식(일반 제안서 · AX 퀵진단 4장) · 처음엔 일반 + 페이지 수', (await page.getByTestId('choice-kind').count()) === 1 && (await page.locator('[data-testid="choice-kind"] [data-value="general"]').getAttribute('aria-pressed')) === 'true' && (await page.getByTestId('choice-pages').count()) === 1)
   await page.getByTestId('ai-run').click()
   await waitRuns(5)
   await page.waitForTimeout(300)
+  const gCall = llm.filter((c) => c.skill === 'SANGHO_PROPOSAL').pop()
+  check('D625 P2 일반 제안서 — 퀵진단 기준은 안 감 · 보낸 값 kind: general · pages: 5', !!gCall && !gCall.system.includes('PAGE 2') && !gCall.system.includes('[기준 문서] 아래 기준대로') && gCall.user.includes('kind: general') && gCall.user.includes('pages: 5'))
   await page.locator('[data-skill="SANGHO_PROPOSAL"]').getByTestId('open-studio').click()
   await page.getByTestId('proposal-studio').waitFor()
   await page.waitForTimeout(500)
@@ -532,6 +550,47 @@ let caseId = ''
   const file = await dl.catch(() => null)
   check('E PNG: PC 화면 그림 파일', !!file && /_PC\.png$/.test(await lastDl()), await lastDl())
   await shot(page, 'E1-front')
+}
+
+/* ---- D-625 제안서 형식 'AX 퀵진단 4장' — 기준 문서 4장 틀 → 스튜디오 4쪽 ---- */
+{
+  await page.goto(`${BASE}/ai/cases/${caseId}`, { waitUntil: 'networkidle' })
+  await page.getByTestId('case-workspace').waitFor()
+  const n0 = (await runs()).length
+  await quick('proposal', async () => {
+    await page.locator('[data-testid="choice-kind"] [data-value="quick4"]').click()
+  })
+  await page.mouse.move(5, 5)
+  await page.waitForTimeout(250)
+  const kindLook = await page.locator('[data-testid="choice-kind"] button').evaluateAll((els) => els.map((e) => [e.dataset.value, e.getAttribute('aria-pressed'), getComputedStyle(e).backgroundColor, getComputedStyle(e).borderColor]))
+  check('D625 Q1 퀵진단 4장을 고르면 페이지 수 고르기가 사라짐 · 눌린 모양은 퀵진단 4장(일반 제안서와 바탕 · 테두리 다름)', (await page.getByTestId('choice-pages').count()) === 0 && kindLook.length === 2 && kindLook[1][1] === 'true' && kindLook[0][1] === 'false' && (kindLook[1][2] !== kindLook[0][2] || kindLook[1][3] !== kindLook[0][3]), kindLook)
+  await shot(page, 'D625-quick4-sheet', false)
+  // 휴대폰 390 — 형식 두 칩이 한 줄 · 옆 넘침 0
+  const vp = page.viewportSize()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.waitForTimeout(300)
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  const chipTops = await page.locator('[data-testid="choice-kind"] button').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)))
+  check('D625 Q1b 휴대폰 390 — 형식 칩 두 개 한 줄 · 옆 넘침 0', over <= 0 && chipTops.length === 2 && chipTops[0] === chipTops[1], { over, chipTops })
+  await shot(page, 'D625-quick4-sheet-390', false)
+  await page.setViewportSize(vp)
+  await page.waitForTimeout(200)
+  await page.getByTestId('ai-run').click()
+  await waitRuns(n0 + 1)
+  await page.waitForTimeout(300)
+  const qCall = llm.filter((c) => c.skill === 'SANGHO_PROPOSAL').pop()
+  check(
+    'D625 Q2 서버에 간 것 — 퀵진단 4장 기준(PAGE 1~4 · 통과 문장 · 자체 검수) · 출력 형식 앞 · 보낸 값 kind: quick4 · 페이지 수 없음 · 다른 고객사 · 내부 명령 이름 · 주소 0',
+    !!qCall && ['PAGE 1', 'PAGE 4', '통과 문장 형식', '퀵진단 자체 검수'].every((x) => qCall.system.includes(x)) && qCall.system.lastIndexOf('[기준 문서] 아래 기준대로') < qCall.system.lastIndexOf('[출력 형식]') &&
+      qCall.user.includes('kind: quick4') && !qCall.user.includes('pages:') && !/\uD3AD\uADC4|\uD558\uB098\uC815\uBCF4|\x4B\x50\x4A\x4B|https?:/.test(qCall.system),
+  )
+  const qRun = (await runs()).filter((r) => r.skillId === 'SANGHO_PROPOSAL').at(-1)
+  check('D625 Q3 결과 — 제안서 판 2 · 4장(회사 이해 → 손실 사건 → 사례 · 자금 → 예상 화면) · 확인할 것 맨 앞 "정밀 현장진단 먼저"', qRun?.skillVersion === 2 && qRun?.structured?.pages?.length === 4 && (qRun?.rendered ?? '').includes('콘셉트 시안') && (qRun?.rendered ?? '').includes('현재는 정밀 현장진단 먼저'))
+  await page.locator('[data-skill="SANGHO_PROPOSAL"]').first().getByTestId('open-studio').click()
+  await page.getByTestId('proposal-studio').waitFor()
+  await page.waitForTimeout(500)
+  check('D625 Q4 제안서 스튜디오 — 4쪽 · 글자는 SVG text', (await page.locator('[data-testid="slide-list"] svg[data-slide]').count()) === 4 && (await page.locator('svg[data-slide] text').count()) > 12)
+  await shot(page, 'D625-quick4-studio')
 }
 
 /* ---- F. 실패 · 형식 다름 · 업체 상세 · Partner · 사용량 · 휴대폰 ---- */
