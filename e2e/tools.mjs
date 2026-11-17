@@ -567,7 +567,14 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('서류함: 4대보험 명부 칸에 쓰는 도구를 적는다', (await docTools.count()) === 1 && (await docTools.innerText()).includes('고용지원금'), (await docTools.innerText().catch(() => '없음')).slice(0, 80))
 
   // 업체 정보로 폼이 채워지는지 (창업감면) — 앞 단계에서 적어 둔 값은 비우고 본다
-  await page.evaluate(() => localStorage.removeItem('axmvp.tools.startupTax'))
+  // D-620 업체 기록에 붙여 둔 창업감면 답이 있으면 그 답이 먼저다 — 앞 단계(붙이기 시험)에서 붙인 창업감면 결과도 떼고 본다
+  await page.evaluate(() => {
+    localStorage.removeItem('axmvp.tools.startupTax')
+    const k = 'axmvp.v1.operations_clients'
+    const list = JSON.parse(localStorage.getItem(k) ?? '[]')
+    for (const c of list) if (c.id === 'cli_hansol') c.toolResults = (c.toolResults ?? []).filter((r) => r.toolKey !== 'startup-tax')
+    localStorage.setItem(k, JSON.stringify(list))
+  })
   await page.goto(BASE + '/tools/startup-tax?client=cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(900)
   const note = page.getByTestId('tool-prefill-note')

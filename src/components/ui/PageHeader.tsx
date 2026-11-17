@@ -47,10 +47,11 @@ export function PageHeader({ title, description, descriptionAsHint = false, acti
         {asHint ? (
           <>
             {/* 휴대폰 위쪽 띠가 이미 이름을 말하면 제목 · ⓘ 를 다시 그리지 않는다(읽어 주는 기계용 제목만) */}
-            {sameAsHeader && <h1 className="sr-only lg:hidden print:hidden">{title}</h1>}
+            {/* 인쇄 · PC 에 보이는 제목을 먼저 — 읽어 주는 기계용 제목은 뒤에(인쇄에서 첫 제목이 빈칸이 되지 않게) */}
             <HintTip tip={description} label={title} className={sameAsHeader ? 'hidden lg:flex print:flex' : ''}>
               <h1 className="t-page break-keep text-slate-900">{title}</h1>
             </HintTip>
+            {sameAsHeader && <h1 className="sr-only lg:hidden print:hidden">{title}</h1>}
           </>
         ) : (
           <h1 className={`t-page break-keep text-slate-900 ${sameAsHeader ? 'sr-only lg:not-sr-only print:not-sr-only' : ''}`}>
