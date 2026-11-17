@@ -417,10 +417,12 @@ let caseUrl = ''
   const sumText = await page.getByTestId('clients-summary').innerText()
   const tyTop = await top(page, '[data-testid="client-type-tabs"]')
   const sgTop = await top(page, '[data-testid="client-segment"]')
-  check('U3-1 PC — 띠 없음 · 머리 [AI 도우미] · 종류 · 계약 구분이 한 줄 · 숫자 칩 넷(잠재고객 칸 없음)', (await page.getByTestId('ai-assist-bar').count()) === 0 && (await page.getByTestId('ai-assist-open').count()) === 1 && Math.abs(tyTop - sgTop) <= 6 && chips.join() === 'clients-kpi-critical,clients-kpi-warning,clients-kpi-active,clients-kpi-unpaid' && !/잠재고객 \d+곳/.test(sumText), { tyTop, sgTop, chips, sumText })
+  check('U3-1 PC — 띠 없음 · 머리 [AI 도우미] · 종류 · 계약 구분이 한 줄 · 숫자 칩 셋(D-627 — 관리 중 · 잠재고객 칸 없음)', (await page.getByTestId('ai-assist-bar').count()) === 0 && (await page.getByTestId('ai-assist-open').count()) === 1 && Math.abs(tyTop - sgTop) <= 6 && chips.join() === 'clients-kpi-critical,clients-kpi-warning,clients-kpi-unpaid' && !/잠재고객 \d+곳/.test(sumText), { tyTop, sgTop, chips, sumText })
   await page.getByTestId('clients-kpi-unpaid').click()
   await page.waitForTimeout(300)
   check('U3-2 못 받은 내 돈 칩을 누르면 받을 돈 남은 곳으로 거름', (await page.getByLabel('업체 보기 조건').inputValue()) === 'unpaid')
+  // D-627 보기 조건은 [거르기] 안 — 닫혀 있으면 열고 고른다
+  if (!(await page.getByLabel('업체 보기 조건').isVisible())) await page.getByTestId('client-filters-toggle').click()
   await page.getByLabel('업체 보기 조건').selectOption('all')
   const m3 = await ctx.newPage()
   await m3.setViewportSize({ width: 390, height: 844 })
