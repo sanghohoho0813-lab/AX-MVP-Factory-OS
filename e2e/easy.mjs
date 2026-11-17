@@ -312,6 +312,11 @@ const headsWithoutHint = (page) =>
   // 업체 상세 개요 — 회사 정보만 펼침, 나머지는 한 줄(숫자 · 요약)
   await page.goto(BASE + '/ops/clients/cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
+  // D-627 글자 수 한도 — 첫 화면은 회사 기본 정보(제목만) + [더 보기] 하나. 숫자 · 계약 · 해 드린 일 · 전문 모듈은 [더 보기] 안
+  const ov0 = { company: await foldState(page, 'overview.company'), more: await foldState(page, 'overview.more') }
+  check('D-627 개요: 처음엔 회사 기본 정보 · [더 보기] 둘 다 접힌 채', ov0.company === '0' && ov0.more === '0', JSON.stringify(ov0))
+  await page.getByTestId('fold-overview-more').getByTestId('fold-toggle').first().click()
+  await page.waitForTimeout(400)
   const ov = {
     company: await foldState(page, 'overview.company'),
     numbers: await foldState(page, 'overview.numbers'),
@@ -319,9 +324,9 @@ const headsWithoutHint = (page) =>
     history: await foldState(page, 'overview.history'),
     tools: await foldState(page, 'overview.tools'),
   }
-  check('D-357 개요: 목차는 모두 접힌 채(회사 기본 정보 · 숫자 · 계약 · 해 드린 일 · 전문 모듈)', ov.company === '0' && ov.numbers === '0' && ov.contract === '0' && ov.history === '0' && ov.tools === '0', JSON.stringify(ov))
-  const coSum = (await page.getByTestId('fold-company').getByTestId('fold-summary').innerText().catch(() => '')) ?? ''
-  check('D-357 개요: 접힌 회사 기본 정보 옆에 사업자번호 · 대표 · 설립 한 줄(업체를 여는 이유 — D-144)', coSum.includes('123-45-67890') && coSum.includes('김대표') && coSum.includes('2019'), coSum)
+  check('D-357 개요: [더 보기] 안 목차도 모두 접힌 채(숫자 · 계약 · 해 드린 일 · 전문 모듈)', ov.company === '0' && ov.numbers === '0' && ov.contract === '0' && ov.history === '0' && ov.tools === '0', JSON.stringify(ov))
+  const coText = (await page.getByTestId('fold-company').innerText().catch(() => '')) ?? ''
+  check('D-627 개요: 접힌 회사 기본 정보는 제목만(사업자번호 · 대표 · 설립은 펼치면)', !coText.includes('123-45-67890'), coText.slice(0, 120))
   const cSum = (await page.getByTestId('fold-contract').getByTestId('fold-summary').innerText().catch(() => '')) ?? ''
   check('D-192 개요: 접힌 계약 목차 옆에 한 줄 요약(펼치지 않고도 금액 · 몇 달째)', /원/.test(cSum) && /개월|년/.test(cSum), cSum)
   check("D-192 개요: '번호는 조각마다 따로 복사' 설명은 목차 설명으로", !((await page.locator('main').innerText()) ?? '').includes('조각마다'))
