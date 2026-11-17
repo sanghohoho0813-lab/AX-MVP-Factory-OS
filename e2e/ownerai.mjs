@@ -138,6 +138,7 @@ const FIX = {
     appName: '그린 배차',
     userType: '배차 담당 · 대표',
     oneLine: '배차 · 정산을 한 화면에서',
+    basedOn: 'MVP 구체화 — 배차 추천 + 운임 정산표',
     kpis: [{ label: '오늘 배차', value: '42건', hint: '예시' }, { label: '미배차', value: '3건', hint: '' }, { label: '이번 달 정산', value: '1,240만', hint: '' }],
     navigation: ['대시보드', '배차', '정산', '기사'],
     dashboard: { title: '오늘 배차 현황', sections: [{ title: '급한 주문', kind: 'list', items: ['14시 납기 2건', '냉장 1건'] }, { title: '기사별 배차', kind: 'chart', items: ['김기사', '이기사', '박기사'] }] },
@@ -327,6 +328,11 @@ await page.reload({ waitUntil: 'networkidle' })
   check('A 결과 카드(D-272 기준 문서대로): 판정 "작게 시작" · 가장 큰 문제 · 12주 · 가장 추천(방법 · AI 전에 먼저) · 차선 · 돈 KPI 3 · 16단계 · 반론 질문 · 지금 만들 것', runText.includes('작게 시작') && runText.includes('가장 큰 문제') && runText.includes('12주에 증명할 것') && runText.includes('가장 추천') && runText.includes('배차 자동 추천') && runText.includes('AI 전에 먼저') && runText.includes('차선 1') && runText.includes('돈 KPI 3') && runText.includes('16단계로 본 것') && runText.includes('반론 질문') && runText.includes('지금 만들 것'), runText.slice(0, 300))
   check('A AX 분석 지시에 기준 문서(적합성 판정 · 반론 질문)가 같이 감 · 출처 이름 없음', !!axCall && axCall.system.includes('[기준 문서]') && axCall.system.includes('INSUFFICIENT_DATA') && axCall.system.includes('실제 누가 반복적으로 사용합니까') && !/펭귄|PENGUIN/i.test(axCall.system))
   await shot(page, 'A2-ax-result')
+  // D-624 결과는 작업마다 한 줄 — 새 결과가 나오면 그 줄이 펼쳐져 그 결과가 보인다
+  {
+    const groups = await page.getByTestId('run-group').evaluateAll((els) => els.map((e) => [e.dataset.group, e.dataset.open]))
+    check('D624 A 결과 = 작업 줄 하나(AX 전략 분석) · 새 결과라 펼쳐짐 · 상태 "검토 전"', JSON.stringify(groups) === '[["AX_PENGUIN","1"]]' && (await page.getByTestId('run-group-status').first().innerText()) === '검토 전', groups)
+  }
 
   // 일부 채택 → 기억에 넣기(바뀌는 칸만) → v1
   await page.getByTestId('eval-partial').first().click()
@@ -351,6 +357,31 @@ await page.reload({ waitUntil: 'networkidle' })
   await page.locator('[data-skill="CONSULTANT_MESSAGE"]').getByTestId('run-copy').click()
   const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '')
   check('A 복사: 클립보드에 전달 문구', clip.includes('그린로직스는 배차'), clip)
+  // D-624 두 번째 작업 — 줄이 둘 · 새 결과(동료 문구)만 펼침 · AX 줄은 접힌 채 결과 첫 줄이 보임 · 한 번에 한 줄만 펼침
+  {
+    const groups = await page.getByTestId('run-group').evaluateAll((els) => els.map((e) => [e.dataset.group, e.dataset.open]))
+    const axLine = await page.locator('[data-group="AX_PENGUIN"] [data-testid="run-group-line"]').innerText().catch(() => '')
+    check('D624 B 줄 순서는 작업 순서(AX 전략 분석 → 동료 전달문구) — 새것이 위로 올라오지 않음 · 동료 문구만 펼침 · AX 줄에 결과 첫 줄(일부 채택이면 고른 추천)', JSON.stringify(groups) === '[["AX_PENGUIN","0"],["CONSULTANT_MESSAGE","1"]]' && axLine.startsWith('배차 자동 추천 + 운임 정산 한 화면 — '), { groups, axLine })
+    check('D624 C 펼친 결과만 그려짐(결과 본문 1개)', (await page.locator('[data-run]').count()) === 1)
+    await page.locator('[data-group="AX_PENGUIN"] [data-testid="run-group-toggle"]').click()
+    const after = await page.getByTestId('run-group').evaluateAll((els) => els.map((e) => [e.dataset.group, e.dataset.open]))
+    check('D624 D AX 줄을 누르면 AX 결과가 펼쳐지고 동료 문구는 접힘', JSON.stringify(after) === '[["AX_PENGUIN","1"],["CONSULTANT_MESSAGE","0"]]' && (await page.locator('[data-run]').getAttribute('data-skill')) === 'AX_PENGUIN', after)
+    // 작업 목록 줄에도 같은 상태 말
+    const axStatus = await page.locator('[data-action="ax"] [data-testid="quick-action-status"]').innerText().catch(() => '')
+    const msgStatus = await page.locator('[data-action="message"] [data-testid="quick-action-status"]').innerText().catch(() => '')
+    check("D624 E '다른 작업' 줄에 결과 상태 — AX 전략 분석 '일부 채택' · 동료 전달문구 '검토 전' · 결과 없는 작업은 없음", axStatus === '일부 채택' && msgStatus === '검토 전' && (await page.locator('[data-action="idea"] [data-testid="quick-action-status"]').count()) === 0, { axStatus, msgStatus })
+    // 아이콘 색은 하나 · 모양은 작업마다
+    const icons = await page.locator('[data-testid="quick-actions"] [data-action]').evaluateAll((btns) =>
+      btns.map((b) => {
+        const svg = b.querySelector('svg')
+        return { color: svg ? getComputedStyle(svg).color : '', shape: svg ? (svg.getAttribute('class') ?? '').split(' ').find((c) => c.startsWith('lucide-') && c !== 'lucide') ?? '' : '' }
+      }),
+    )
+    check('D624 F 작업 10줄 — 아이콘 색 하나 · 모양 10가지 · 번호 1~10', new Set(icons.map((i) => i.color)).size === 1 && new Set(icons.map((i) => i.shape)).size === 10 && JSON.stringify(await page.locator('[data-testid="quick-actions"] [data-action] > span:first-child').allInnerTexts()) === JSON.stringify(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']), icons)
+    const tiles = await page.locator('[data-testid="case-purpose"] > span:first-child').evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor + '|' + getComputedStyle(e).color))
+    check('D624 G 목적 단추 그림 색도 하나', tiles.length >= 3 && new Set(tiles).size === 1, tiles)
+    await shot(page, 'A3-run-list')
+  }
 }
 
 /* ---- B. 며칠 뒤 다시 열기 ---- */
@@ -358,7 +389,7 @@ await page.reload({ waitUntil: 'networkidle' })
   await page.reload({ waitUntil: 'networkidle' })
   await page.getByTestId('case-workspace').waitFor()
   const mem = await page.getByTestId('memory-fields').innerText()
-  check('B 다시 열기: 기억(AX 방향) · 결과 2개 · 타임라인 그대로', mem.includes('배차 자동 추천') && (await page.locator('[data-run]').count()) === 2 && (await page.getByTestId('case-timeline').locator('li').count()) >= 6)
+  check('B 다시 열기: 기억(AX 방향) · 결과 2개 · 타임라인 그대로', mem.includes('배차 자동 추천') && (await page.getByTestId('run-group').count()) === 2 && (await page.getByTestId('case-timeline').locator('li').count()) >= 6)
   await quick('patent')
   await page.getByTestId('ai-run').click()
   await waitRuns(3)
@@ -366,6 +397,7 @@ await page.reload({ waitUntil: 'networkidle' })
   const pCard = page.locator('[data-skill="PATENT_IDEA"]')
   check('B 특허: 경고 문구(선행기술조사 · 변리사 검토) 보임', (await pCard.innerText()).includes('변리사 검토가 필요합니다'))
   const pCall = llm.filter((c) => c.skill === 'PATENT_IDEA').pop()
+  check('D624 H 특허 아이디어 — 특허 · 벤처 메뉴와 같은 기준 문서(5개 고정 질문 · 권리화 포인트)가 같이 감 · 판 2', !!pCall && pCall.system.includes('[기준 문서]') && pCall.system.includes('5개 고정 질문') && pCall.system.includes('권리화 포인트') && (await runs()).find((r) => r.skillId === 'PATENT_IDEA')?.skillVersion === 2)
   check('B 특허: 지난번 채택한 AX 를 다시 설명 안 해도 같이 감', (pCall?.user ?? '').includes('배차 자동 추천'))
   await pCard.getByTestId('eval-partial').click()
   await page.getByText('배차 우선순위 산정 방법', { exact: false }).last().click()
@@ -388,6 +420,8 @@ await page.reload({ waitUntil: 'networkidle' })
   await waitRuns(4)
   await page.waitForTimeout(300)
   const vCall = llm.filter((c) => c.skill === 'VENTURE_PLAN').pop()?.user ?? ''
+  const vSys = llm.filter((c) => c.skill === 'VENTURE_PLAN').pop()?.system ?? ''
+  check('D624 I 벤처 사업계획 — 벤처 사업계획서 기준 문서(근거 없는 숫자 금지)가 같이 감 · 칸은 9칸 그대로', vSys.includes('[기준 문서]') && vSys.includes('근거 없이 생성하지 않는다') && vSys.includes('basic 회사 기본정보'))
   check('C 벤처: 기억 v2(AX 방향 + 특허) · 채택 결과가 자동으로 AI 에', vCall.includes('지금까지의 기억 v2') && vCall.includes('배차 자동 추천') && vCall.includes('배차 우선순위'), vCall.slice(0, 500))
   const vText = await page.locator('[data-skill="VENTURE_PLAN"]').innerText()
   check('C 벤처 결과: 기업인증 벤처 패키지와 같은 9칸', ['회사 기본정보', '해결하려는 문제', '기술 · 차별성', '지식재산', '실증 · 성과'].every((t) => vText.includes(t)))
@@ -466,8 +500,15 @@ let caseId = ''
   await page.getByTestId('ai-run').click()
   await waitRuns(7)
   await page.waitForTimeout(300)
+  {
+    const fSys = llm.filter((c) => c.skill === 'AX_FRONT').pop()?.system ?? ''
+    check('D624 J 화면 기획 — 채택한 AX · MVP 를 화면으로 옮기라는 지시 · AX 기준 문서 · 바탕(basedOn) 칸', fSys.includes('[대표가 채택한 결과]') && fSys.includes('[기준 문서]') && fSys.includes('basedOn'))
+    const fText = await page.locator('[data-skill="AX_FRONT"]').getByTestId('run-text').innerText()
+    check('D624 K 화면 기획 결과 글 맨 위에 "바탕: MVP 구체화 …"', fText.includes('바탕: MVP 구체화 — 배차 추천 + 운임 정산표'), fText.slice(0, 200))
+  }
   await page.locator('[data-skill="AX_FRONT"]').getByTestId('open-studio').click()
   await page.getByTestId('front-studio').waitFor()
+  check('D624 L 화면 스튜디오에 "바탕: …" 한 줄', (await page.getByTestId('front-based-on').innerText().catch(() => '')).includes('MVP 구체화'))
   const pc = await page.getByTestId('front-pc').innerText()
   const m1 = await page.getByTestId('front-m1').innerText()
   const m2 = await page.getByTestId('front-m2').innerText()

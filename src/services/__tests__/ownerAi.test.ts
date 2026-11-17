@@ -12,7 +12,8 @@ import { hasBanned, leakedChars, secretIndex } from '../../../api/_ai/guard.js'
 import { SKILL_META, QUICK_ACTIONS } from '../ownerAi/skillCatalog'
 import { emptyCase, findDuplicates, makeMaterial, sameMaterial, normalizeCompany, newUuid, caseClash, findCaseForClient, clientsToStart } from '../ownerAi/caseUtil'
 import { buildAiContext, caseSnapshot, UNKNOWN } from '../ownerAi/context'
-import { renderStructured, revisedText, runSummary, PATENT_WARNING, fundingBasis, verdictLabel } from '../ownerAi/render'
+import { renderStructured, revisedText, runSummary, runHeadline, PATENT_WARNING, fundingBasis, verdictLabel } from '../ownerAi/render'
+import { listedRuns, runsBySkill, statusLabel, fmtShort } from '../../pages/ownerAi/parts/runStatus'
 import { proposeFromRun, contextDiff, applyContext } from '../ownerAi/memory'
 import { ownerAiRepo, OwnerAiDuplicateError } from '../ownerAi/repo'
 import { runSkill, evaluate, saveContext, saveRevision, pasteChatGpt, latestSnapshot, patchCase, type CaseBundle } from '../ownerAi/workflow'
@@ -152,7 +153,7 @@ const CASE = 'case_qa_test_01'
   {
     const ax = ['AX_PENGUIN', 'AX_IDEA', 'AX_MVP'] as const
     const pk = KNOWLEDGE.ax_strategy
-    check('S4b AX 단추 셋(전략 분석 · 아이템 발굴 · MVP 구체화)은 기준 문서(ax_strategy)를 받음 · 다른 스킬은 안 받음 · 기준 문서는 적합성 판정 · 16단계 · 반론 · 출력 규격까지(개발 문서 14장 이후는 뺌)', ax.every((id) => (SKILLS[id] as { knowledge?: string[] }).knowledge?.includes('ax_strategy') && skillKnowledge(SKILLS[id]).length > 10000) && !skillKnowledge(SKILLS.CONSULTANT_MESSAGE) && !skillKnowledge(SKILLS.PATENT_IDEA) && pk.includes('FULL_GO') && pk.includes('Company Reality') && pk.includes('실제 누가 반복적으로 사용합니까') && pk.includes('10초 요약') && !pk.includes('JSON 계약') && !pk.includes('구현 로드맵'))
+    check('S4b AX 단추 셋(전략 분석 · 아이템 발굴 · MVP 구체화)은 기준 문서(ax_strategy)를 받음 · 동료 문구는 안 받음 · D-624 특허 아이디어는 ax 기준이 아니라 특허 기준 · 기준 문서는 적합성 판정 · 16단계 · 반론 · 출력 규격까지(개발 문서 14장 이후는 뺌)', ax.every((id) => (SKILLS[id] as { knowledge?: string[] }).knowledge?.includes('ax_strategy') && skillKnowledge(SKILLS[id]).length > 10000) && !skillKnowledge(SKILLS.CONSULTANT_MESSAGE) && !(SKILLS.PATENT_IDEA as { knowledge?: string[] }).knowledge?.includes('ax_strategy') && pk.includes('FULL_GO') && pk.includes('Company Reality') && pk.includes('실제 누가 반복적으로 사용합니까') && pk.includes('10초 요약') && !pk.includes('JSON 계약') && !pk.includes('구현 로드맵'))
     const sysAx = buildPrompt(SKILLS.AX_PENGUIN, { company: { name: 'X', fields: [] } }, {}, 'deep', COMMON_RULES).system
     const sysMsg = buildPrompt(SKILLS.CONSULTANT_MESSAGE, { company: { name: 'X', fields: [] } }, {}, 'cheap', COMMON_RULES).system
     check('S4c 프롬프트 — AX 전략 분석에 [기준 문서] 가 출력 형식 앞에 · 출처 이름(펭귄 등) 0 · 동료 문구에는 없음', sysAx.includes('[기준 문서]') && sysAx.lastIndexOf('[기준 문서]') < sysAx.lastIndexOf('[출력 형식]') && sysAx.includes('ELIMINATE') && !hasBanned(sysAx) && !/펭귄|PENGUIN/i.test(sysAx) && !sysMsg.includes('[기준 문서]'))
@@ -559,8 +560,73 @@ function caseFirstTests() {
   check('CD2 이미 서류함에서 넣은 것은 빼고 센다(직접 올린 같은 이름은 따로)', left.length === 1 && left[0].key === 'businessRegistration', left.map((d) => d.key))
 }
 
+/* ------------------------------------------------------------------ */
+/* D-624 AI 전략실 — 기준 문서 · 결과 줄                                      */
+/* ------------------------------------------------------------------ */
+function d624Tests() {
+  type K = { knowledge?: string[] }
+  const kn = (id: keyof typeof SKILLS) => (SKILLS[id] as K).knowledge ?? []
+  // 1 어느 단추가 어느 기준 문서를 받나 — 특허 · 벤처 메뉴와 같은 기준
+  check(
+    'D624-1 기준 문서 — 특허 아이디어 = 특허 아이디어 기준 · 벤처 사업계획 = 벤처 사업계획서 기준 · 화면 기획 = AX 기준 · 제안서 · 자금 · 동료 문구 · 자유 질문 · 기억 정리 · 맞춤법 · 자료 요약은 없음',
+    JSON.stringify(kn('PATENT_IDEA')) === '["patent_idea"]' &&
+      JSON.stringify(kn('VENTURE_PLAN')) === '["venture_plan"]' &&
+      JSON.stringify(kn('AX_FRONT')) === '["ax_strategy"]' &&
+      (['SANGHO_PROPOSAL', 'FUNDING_STRATEGY', 'CONSULTANT_MESSAGE', 'FREE_CHAT', 'CONTEXT_UPDATE', 'PROOFREAD', 'SNAPSHOT_EXTRACT'] as const).every((id) => kn(id).length === 0),
+    Object.fromEntries(Object.keys(SKILLS).map((id) => [id, kn(id as keyof typeof SKILLS)])),
+  )
+  check('D624-2 판이 올라감(실행 기록에 남아 판 1 결과와 나눠 볼 수 있게) — 화면 목록과 같은 판', (['PATENT_IDEA', 'VENTURE_PLAN', 'AX_FRONT'] as const).every((id) => SKILLS[id].version === 2 && SKILL_META[id].version === 2))
+  const ctx = { company: { name: '그린로직스(주)', fields: [] } }
+  const sysP = buildPrompt(SKILLS.PATENT_IDEA, ctx, {}, 'deep', COMMON_RULES).system
+  const sysV = buildPrompt(SKILLS.VENTURE_PLAN, ctx, {}, 'deep', COMMON_RULES).system
+  const sysF = buildPrompt(SKILLS.AX_FRONT, ctx, {}, 'standard', COMMON_RULES).system
+  check(
+    'D624-3 프롬프트 — 특허: [기준 문서] 에 5개 고정 질문 · 발명자 확인 / 벤처: 근거 없는 숫자 금지 · 9칸 그대로 / 화면: AX 기준 + 채택한 MVP 를 화면으로 · 셋 다 출력 형식 앞 · 쓰지 않는 이름 0',
+    [sysP, sysV, sysF].every((t) => t.includes('[기준 문서]') && t.lastIndexOf('[기준 문서]') < t.lastIndexOf('[출력 형식]') && !hasBanned(t)) &&
+      sysP.includes('5개 고정 질문') && sysP.includes('권리화 포인트') && sysP.includes('발명자') &&
+      sysV.includes('근거 없이 생성하지 않는다') && sysV.includes('basic 회사 기본정보') &&
+      sysF.includes('채택한 결과') && sysF.includes('basedOn') && sysF.includes('ELIMINATE'),
+    { p: sysP.length, v: sysV.length, f: sysF.length },
+  )
+  // 비용 — 지시가 얼마나 늘었나(보고에 쓰는 숫자)
+  console.log(`  지시 글자 수: 특허 ${sysP.length.toLocaleString()} · 벤처 ${sysV.length.toLocaleString()} · 화면 ${sysF.length.toLocaleString()} (기준 문서 특허 ${skillKnowledge(SKILLS.PATENT_IDEA).length.toLocaleString()} · 벤처 ${skillKnowledge(SKILLS.VENTURE_PLAN).length.toLocaleString()} · AX ${skillKnowledge(SKILLS.AX_FRONT).length.toLocaleString()})`)
+  const ex = SKILLS.AX_FRONT.example as Record<string, unknown>
+  check('D624-4 화면 기획 예시 JSON 에 바탕(basedOn) · 확인할 것 — 출력 형식 검사 통과', 'basedOn' in ex && Array.isArray(ex.unknowns) && validate(SKILLS.AX_FRONT.outputSchema, ex).ok)
+  const front = { appName: '그린 배차', oneLine: '배차 · 정산 한 화면', basedOn: 'MVP 구체화 — 배차 추천 + 운임 정산표', kpis: [{ label: '배차 시간', value: '35분' }], dashboard: { title: '오늘', sections: [] }, mobile1: { title: 'm1', blocks: [] }, mobile2: { title: 'm2', blocks: [] }, unknowns: ['기사 앱 사용 여부'] }
+  const md = renderStructured('AX_FRONT', front)
+  const spec = frontFrom(front)
+  const again = frontFrom({ ...spec, appName: '그린 배차 플러스' })
+  check('D624-5 화면 기획 — 글에 바탕 · 확인할 것 줄 · 화면 스튜디오에서 고쳐도 바탕이 남음 · 예전 결과(바탕 없음)는 빈 칸', md.includes('- 바탕: MVP 구체화 — 배차 추천') && md.includes('확인할 것') && spec.basedOn.startsWith('MVP 구체화') && again.basedOn === spec.basedOn && revisedText('AX_FRONT', again).includes('바탕: MVP 구체화') && frontFrom({ appName: 'x', kpis: [], dashboard: {}, mobile1: {}, mobile2: {} }).basedOn === '', md)
+
+  // 결과 줄 한 줄(펼치지 않아도 무엇이 나왔는지)
+  const base = { adoptedPart: null, evaluation: 'draft' as const, status: 'succeeded' as const }
+  const h1 = runHeadline({ ...base, skillId: 'AX_PENGUIN', structured: { oneLine: '배차 · 정산을 한 화면에', recommended: { title: '배차 자동 추천', why: '하루 3시간' } }, rendered: '' })
+  const h2 = runHeadline({ ...base, skillId: 'AX_PENGUIN', structured: {}, rendered: '## 배차를 줄이는 물류 AX\n- 판정: 작게 시작' })
+  const h3 = runHeadline({ ...base, status: 'pasted', skillId: 'FUNDING_STRATEGY', structured: {}, rendered: '\n\n**ChatGPT:** 스마트물류 바우처를 먼저 보세요.' })
+  const h4 = runHeadline({ ...base, skillId: 'AX_MVP', structured: { mvpName: '', oneLine: '', features: [] }, rendered: '# 배차 추천 MVP\n필수 기능: 배차 추천' })
+  check(
+    'D624-6 결과 줄 한 줄 — 요약이 있으면 요약 · 칸이 비어 기호만 남으면 원문 첫 줄 · 붙여넣은 결과는 원문 첫 줄(# · ** 없이) · 140자 안',
+    h1.startsWith('배차 · 정산을 한 화면에 / 추천: 배차 자동 추천') && h2 === '배차를 줄이는 물류 AX' && h3 === 'ChatGPT: 스마트물류 바우처를 먼저 보세요.' && h4 === '배차 추천 MVP' && runHeadline({ ...base, skillId: 'FREE_CHAT', structured: { answer: '가'.repeat(400) }, rendered: '' }).length === 140,
+    { h1, h2, h3, h4 },
+  )
+
+  // 작업마다 묶기 · 상태 말
+  const at = (m: number) => new Date(Date.UTC(2026, 10, 17, 0, m)).toISOString()
+  const run = (id: string, skillId: SkillId, m: number, evaluation: AiRun['evaluation'] = 'draft', status: AiRun['status'] = 'succeeded') => ({ id, skillId, createdAt: at(m), evaluation, status }) as AiRun
+  const runs = [run('a', 'AX_PENGUIN', 1, 'adopted'), run('b', 'AX_IDEA', 2), run('c', 'AX_PENGUIN', 5), run('d', 'PROOFREAD', 6), run('e', 'CONTEXT_UPDATE', 7, 'adopted'), run('f', 'CONTEXT_UPDATE', 8), run('g', 'FUNDING_STRATEGY', 9, 'draft', 'pasted')]
+  const g = runsBySkill(listedRuns(runs))
+  check(
+    'D624-7 결과 묶기 — 작업마다 새것 먼저 · 맞춤법 · 반영한 기억 정리는 목록에서 뺌 · 상태 말(검토 전 · 결과 n개 · 붙여넣음)',
+    JSON.stringify(g.get('AX_PENGUIN')?.map((r) => r.id)) === '["c","a"]' && !g.has('PROOFREAD') && JSON.stringify(g.get('CONTEXT_UPDATE')?.map((r) => r.id)) === '["f"]' &&
+      statusLabel(g.get('AX_PENGUIN') ?? []) === '검토 전 · 결과 2개' && statusLabel(g.get('AX_IDEA') ?? []) === '검토 전' && statusLabel(g.get('FUNDING_STRATEGY') ?? []) === '붙여넣음 · 검토 전' &&
+      statusLabel([run('h', 'AX_MVP', 3, 'adopted')]) === '채택' && /^11\/17 \d\d:\d\d$/.test(fmtShort(at(1))) && fmtShort('') === '',
+    [...g].map(([k, v]) => [k, v.map((r) => r.id)]),
+  )
+}
+
 await serverTests()
 await engineTests()
 caseFirstTests()
+d624Tests()
 console.log(`\nownerAi: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

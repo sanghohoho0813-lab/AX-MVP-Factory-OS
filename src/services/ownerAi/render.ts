@@ -114,12 +114,14 @@ export function renderStructured(skill: SkillId, s: unknown): string {
       const d = obj(o.dashboard)
       return [
         `## ${str(o.appName)}${str(o.oneLine) ? ` — ${str(o.oneLine)}` : ''}`,
+        ...line('바탕', o.basedOn),
         ...line('사용자', o.userType),
         '',
         ...list('KPI(예시 데이터)', arr(o.kpis).map((k) => `${str(obj(k).label)}: ${str(obj(k).value)}`)),
         ...list(`PC 대시보드 · ${str(d.title)}`, arr(d.sections).map((x) => `${str(obj(x).title)}: ${strs(obj(x).items).join(' · ')}`)),
         ...list(`모바일 1 · ${str(obj(o.mobile1).title)}`, arr(obj(o.mobile1).blocks).map((b) => `${str(obj(b).title)}: ${strs(obj(b).lines).join(' · ')}`)),
         ...list(`모바일 2 · ${str(obj(o.mobile2).title)}`, arr(obj(o.mobile2).blocks).map((b) => `${str(obj(b).title)}: ${strs(obj(b).lines).join(' · ')}`)),
+        ...list('확인할 것', strs(o.unknowns)),
       ].join('\n').trim()
     }
     case 'SANGHO_PROPOSAL':
@@ -223,6 +225,29 @@ export function runSummary(run: Pick<AiRun, 'skillId' | 'structured' | 'rendered
     default:
       return (run.rendered || '').slice(0, 400)
   }
+}
+
+/**
+ * D-624 결과 줄에 보이는 한 줄 — 펼치지 않아도 무엇이 나왔는지.
+ * 요약(runSummary) 이 칸이 비어 기호만 남거나 붙여넣은 · 형식이 다른 결과면 원문에서 처음 읽을 만한 줄.
+ */
+export function runHeadline(run: Pick<AiRun, 'skillId' | 'structured' | 'rendered' | 'adoptedPart' | 'evaluation' | 'status'>, revised?: unknown, max = 140): string {
+  const flat = (s: string) =>
+    s
+      .replace(/[#*_>`|]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^(?:[-•·/—:]\s*)+/, '')
+      .replace(/(?:\s*[-•·/—:])+$/, '')
+      .trim()
+  // 이름표(추천: · 필수 기능 · 기술:)만 남은 것은 읽을 거리가 아니다
+  const meaningful = (s: string) => (s.replace(/추천:|필수 기능|기술:/g, '').match(/[가-힣A-Za-z0-9]/g) ?? []).length >= 4
+  if (run.status !== 'pasted' && run.status !== 'parse_fallback') {
+    const s = flat(runSummary(run, revised))
+    if (meaningful(s)) return s.slice(0, max)
+  }
+  const source = typeof revised === 'string' && revised.trim() ? revised : run.rendered || ''
+  return (source.split('\n').map(flat).find(meaningful) ?? '').slice(0, max)
 }
 
 export function runTitle(run: Pick<AiRun, 'skillId' | 'skillVersion'>): string {

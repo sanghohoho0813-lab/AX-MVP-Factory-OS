@@ -1,31 +1,27 @@
 /**
- * AI 결과 한 장 — 읽기 · 판단(채택 · 일부 채택 · 폐기) · 고치기(수정 이력) · 복사 · 기억에 넣기.
+ * AI 결과 한 개의 본문 — 읽기 · 판단(채택 · 일부 채택 · 폐기) · 고치기(수정 이력) · 복사 · 기억에 넣기.
  * 원래 결과는 지우지 않는다. 고친 글은 새 번호로 쌓이고, 화면은 마지막으로 고친 글을 보여 준다.
+ * D-624 머리(작업 이름 · 상태 · 펼치기)는 결과 목록의 줄(RunList)이 맡는다 — 여기는 펼쳤을 때 보이는 것만.
  */
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, ChevronDown, Copy, PencilLine, RotateCcw, X } from 'lucide-react'
-import { PATENT_WARNING, runParts, runTitle } from '../../../services/ownerAi/render'
-import { EVALUATION_LABEL, type AiRevision, type AiRun, type Evaluation } from '../../../services/ownerAi/types'
-import { Badge, Surface, type Tone } from '../../../components/ui/primitives'
+import { Check, Copy, PencilLine, RotateCcw, X } from 'lucide-react'
+import { PATENT_WARNING, runParts } from '../../../services/ownerAi/render'
+import { TIER_LABEL } from '../../../services/ownerAi/skillCatalog'
+import type { AiRevision, AiRun, Evaluation } from '../../../services/ownerAi/types'
 import { Button } from '../../../components/ui/Button'
 import { Modal } from '../../../components/ui/Modal'
 import { revisedText } from '../../../services/ownerAi/render'
-import { Md, TierBadge, copyToClipboard, fmtDateTime, fmtUsd } from '../shared'
-import { IconTile } from '../../../components/ui/visual'
-import { skillVisual } from '../skillVisual'
-
-const EVAL_TONE: Record<Evaluation, Tone> = { draft: 'neutral', adopted: 'success', partially_adopted: 'brand', rejected: 'danger' }
+import { Md, copyToClipboard, fmtDateTime, fmtUsd } from '../shared'
 
 export function runText(run: AiRun, rev: AiRevision | undefined): string {
   // D-219: 스튜디오에서 고친 판(구조)도 글로 — 예전엔 '고친 글 n번째' 배지를 달고 원래 AI 글을 보여 주고 복사했다
   return (rev ? revisedText(run.skillId, rev.content) : '') || run.rendered
 }
 
-export function RunCard({
+export function RunBody({
   run,
   revision,
-  defaultOpen,
   busy,
   onEvaluate,
   onRevise,
@@ -35,7 +31,6 @@ export function RunCard({
 }: {
   run: AiRun
   revision?: AiRevision
-  defaultOpen: boolean
   busy: boolean
   /** 저장됐으면 true — D-219: 창은 저장된 뒤에만 닫는다 */
   onEvaluate: (evaluation: Evaluation, note: string, part: unknown) => Promise<boolean>
@@ -45,39 +40,24 @@ export function RunCard({
   onRegenerate?: () => void
   toast: (m: string) => void
 }) {
-  const [open, setOpen] = useState(defaultOpen)
   const [dialog, setDialog] = useState<null | 'partial' | 'reject' | 'edit'>(null)
   const text = runText(run, revision)
   const adopted = run.evaluation === 'adopted' || run.evaluation === 'partially_adopted'
   const studio = run.skillId === 'SANGHO_PROPOSAL' ? 'proposal' : run.skillId === 'AX_FRONT' ? 'front' : null
   const isMessage = run.skillId === 'CONSULTANT_MESSAGE'
-  const sv = skillVisual(run.skillId)
 
   return (
-    <div data-run={run.id} data-skill={run.skillId} data-evaluation={run.evaluation}>
-    <Surface as="article" className="flex flex-col gap-3">
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="tap -m-1 flex min-h-11 items-start gap-3 p-1 text-left">
-        <IconTile icon={sv.icon} tone={sv.tone} size="md" />
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center gap-1.5">
-            <span className="t-card font-bold break-keep text-slate-900">{runTitle(run)}</span>
-            <TierBadge tier={run.tier} />
-            <Badge tone={EVAL_TONE[run.evaluation]}>{EVALUATION_LABEL[run.evaluation]}</Badge>
-            {run.status === 'parse_fallback' && <Badge tone="warning">형식 확인 필요</Badge>}
-            {revision && <Badge>고친 글 {revision.revisionNo}번째</Badge>}
-          </span>
-          <span className="t-meta mt-0.5 block text-slate-500">
-            {fmtDateTime(run.createdAt)}
-            {run.tier !== 'manual' && run.model ? ` · ${run.model}` : ''}
-            {run.contextVersion ? ` · 기억 v${run.contextVersion} 사용` : run.tier === 'manual' ? '' : ' · 기억 없이'}
-            {run.evaluationNote && ` · 메모: ${run.evaluationNote}`}
-          </span>
-        </span>
-        <ChevronDown aria-hidden="true" className={`mt-1 size-5 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      {open && (
-        <>
+    <article className="flex min-w-0 flex-col gap-3" data-run={run.id} data-skill={run.skillId} data-evaluation={run.evaluation}>
+      {/* 언제 · 얼마나 깊게 · 어느 모델 · 어느 기억으로 — 색 칩 대신 한 줄 글(주의할 것만 글자색) */}
+      <p className="t-meta flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-slate-500" data-testid="run-meta">
+        <span>{fmtDateTime(run.createdAt)}</span>
+        <span>· {TIER_LABEL[run.tier]}</span>
+        {run.tier !== 'manual' && run.model && <span className="break-all">· {run.model}</span>}
+        <span>{run.contextVersion ? `· 기억 v${run.contextVersion} 사용` : run.tier === 'manual' ? '' : '· 기억 없이'}</span>
+        {revision && <span className="font-semibold text-slate-700">· 고친 글 {revision.revisionNo}번째</span>}
+        {run.status === 'parse_fallback' && <span className="font-semibold text-warning-700">· 형식 확인 필요</span>}
+        {run.evaluationNote && <span className="break-keep">· 메모: {run.evaluationNote}</span>}
+      </p>
           {run.status === 'parse_fallback' && (
             <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep text-warning-700">
               AI 가 약속한 모양으로 답하지 않아 원문을 그대로 보관했습니다. 읽고 쓸 만하면 채택하거나 고쳐서 쓰세요.
@@ -154,14 +134,11 @@ export function RunCard({
               <dd>{run.evaluatedAt ? fmtDateTime(run.evaluatedAt) : '아직'}</dd>
             </dl>
           </details>
-        </>
-      )}
 
       {dialog === 'partial' && <PartialDialog run={run} busy={busy} onClose={() => setDialog(null)} onSave={async (note, part) => { if (await onEvaluate('partially_adopted', note, part)) setDialog(null) }} />}
       {dialog === 'reject' && <RejectDialog busy={busy} onClose={() => setDialog(null)} onSave={async (note) => { if (await onEvaluate('rejected', note, null)) setDialog(null) }} />}
       {dialog === 'edit' && <EditDialog initial={text} busy={busy} onClose={() => setDialog(null)} onSave={async (t, note) => { if (await onRevise(t, note)) setDialog(null) }} />}
-    </Surface>
-    </div>
+    </article>
   )
 }
 

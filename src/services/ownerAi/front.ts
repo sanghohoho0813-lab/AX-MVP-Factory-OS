@@ -30,6 +30,8 @@ export interface FrontSpec {
   appName: string
   userType: string
   oneLine: string
+  /** D-624 무엇을 바탕으로 그렸나(채택한 MVP) — 판 1 결과 · 예전 고친 글에는 없다('') */
+  basedOn: string
   kpis: FrontKpi[]
   navigation: string[]
   dashboardTitle: string
@@ -55,7 +57,7 @@ export function frontFrom(v: unknown): FrontSpec {
   if (Array.isArray(o.sections) && 'dashboardTitle' in o) {
     // 이미 다듬은 모양(고친 글)
     const s = o as unknown as FrontSpec
-    return { ...s, mobile1: mobile(s.mobile1, '모바일 1'), mobile2: mobile(s.mobile2, '모바일 2') }
+    return { ...s, basedOn: str(o.basedOn, 160), mobile1: mobile(s.mobile1, '모바일 1'), mobile2: mobile(s.mobile2, '모바일 2') }
   }
   const d = obj(o.dashboard)
   const t = obj(o.table)
@@ -64,6 +66,7 @@ export function frontFrom(v: unknown): FrontSpec {
     appName: str(o.appName, 40) || 'AX 서비스',
     userType: str(o.userType, 60),
     oneLine: str(o.oneLine, 120),
+    basedOn: str(o.basedOn, 160),
     kpis: arr(o.kpis).slice(0, 4).map((k) => ({ label: str(obj(k).label, 24), value: str(obj(k).value, 20), hint: str(obj(k).hint, 40) })),
     navigation: arr(o.navigation).map((n) => str(n, 16)).filter(Boolean).slice(0, 7),
     dashboardTitle: str(d.title, 40) || '대시보드',

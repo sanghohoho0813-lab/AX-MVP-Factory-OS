@@ -213,16 +213,26 @@ export const SKILLS = {
     },
   },
 
+  /*
+   * D-624 대표: "AX 화면 기획 — 눌러 보면 잘 되나? 신뢰가 안 가네."
+   * 판 1 은 기억 · 채택한 MVP 를 쓰라는 말이 없고 기준 문서도 받지 않아, 업종만 보고 그럴듯한 화면을 새로 지었다.
+   * 판 2 — 채택한 MVP(필수 기능 · 사용 흐름 · 돈 KPI · 자동화 수준)를 그대로 화면으로 옮기고, 무엇을 바탕으로 했는지(basedOn) 한 줄을 남긴다.
+   *        MVP 가 아직 없으면 지어내지 않고 가장 큰 반복 업무 하나만 그린 뒤 '먼저 할 것' 을 적는다. AX 기준 문서(ax_strategy)를 원칙으로만 받는다.
+   */
   AX_FRONT: {
     id: 'AX_FRONT',
     name: 'AX 화면 기획',
-    version: 1,
+    version: 2,
     tier: 'standard',
     active: true,
     createdAt: D,
-    updatedAt: D,
-    description: 'AX 서비스 화면을 구조화된 UI 명세로 — PC 대시보드 1개 + 모바일 핵심 화면 2개.',
+    updatedAt: '2026-11-17',
+    description: '채택한 AX · MVP 를 화면으로 — PC 대시보드 1개 + 모바일 핵심 화면 2개(무엇을 바탕으로 했는지 한 줄).',
+    knowledge: ['ax_strategy'],
     systemInstruction: [
+      '[지금까지의 기억] 의 AX 방향 · MVP 와 [대표가 채택한 결과] 의 MVP 구체화(필수 기능 · 사용 흐름 · KPI · 자동화 수준)를 그대로 화면으로 옮긴다 — 거기 없는 기능 · 메뉴를 새로 지어내지 않는다.',
+      'basedOn 에 무엇을 바탕으로 그렸는지 한 줄(예: "MVP 구체화 — 배차 추천 + 운임 정산표"). 채택한 AX · MVP 가 없으면 basedOn 을 "채택한 MVP 없음 — 업체 자료의 가장 큰 반복 업무 하나만" 으로 쓰고, unknowns 맨 앞에 "MVP 구체화를 먼저 채택하면 화면이 그 범위에 맞춰집니다" 를 넣는다.',
+      '[기준 문서] 는 화면에 담을 원칙으로만 쓴다 — 판단 → 행동 → 결과 고리가 한 화면에서 이어지게 · 금융 · 계약 · 대외 발송은 사람 승인 단추(L3 이하) · 시연 숫자와 실측 숫자를 섞지 않기 · KPI 는 돈 KPI(비용 · 매출 · 규모)에서. 전략 분석을 다시 하지 않는다.',
       '미래AI랩 AX Front 원칙: 고급스럽고 간결한 SaaS · 정보 과다 금지 · PC 핵심 Dashboard 1개 · 모바일 핵심 화면 2개 · 큰 글자 · 명확한 KPI · 실제 쓸 수 있는 UI · 장식 최소.',
       '업체 업종에 맞는 데이터와, 데모 같지 않은 현실적인 문구를 쓴다. 표 · 숫자는 "예시 데이터" 다(실제 업체 숫자로 단정하지 않는다).',
       '그림을 그리지 말고 구조만 준다 — 화면은 OS 가 직접 그린다(글자 수정이 바로 반영된다).',
@@ -235,6 +245,8 @@ export const SKILLS = {
         appName: { type: 'string' },
         userType: { type: 'string' },
         oneLine: { type: 'string' },
+        basedOn: { type: 'string' },
+        unknowns: STRINGS,
         kpis: { type: 'array', items: { type: 'object', required: ['label', 'value'], props: { label: { type: 'string' }, value: { type: 'string' }, hint: { type: 'string' } } } },
         navigation: STRINGS,
         dashboard: { type: 'object', required: ['title', 'sections'], props: { title: { type: 'string' }, sections: { type: 'array', items: { type: 'object', required: ['title'], props: { title: { type: 'string' }, kind: { type: 'string' }, items: STRINGS } } } } },
@@ -247,12 +259,14 @@ export const SKILLS = {
       appName: '서비스 이름',
       userType: '누가 쓰나',
       oneLine: '한 줄 설명',
+      basedOn: '무엇을 바탕으로 그렸나(채택한 MVP 이름 · 필수 기능)',
       kpis: [{ label: '지표 이름', value: '예시 값', hint: '보충' }],
       navigation: ['메뉴'],
       dashboard: { title: '대시보드 제목', sections: [{ title: '구역', kind: 'list | table | chart | kpi', items: ['줄'] }] },
       table: { title: '표 제목', columns: ['열'], rows: [['칸']] },
       mobile1: { title: '모바일 화면 1', purpose: '무엇을 하나', blocks: [{ title: '블록', lines: ['줄'] }] },
       mobile2: { title: '모바일 화면 2', purpose: '무엇을 하나', blocks: [{ title: '블록', lines: ['줄'] }] },
+      unknowns: ['확인할 것'],
     },
   },
 
@@ -292,17 +306,24 @@ export const SKILLS = {
     },
   },
 
+  /*
+   * D-624 판 2 — 특허 · 벤처 메뉴의 [아이디어 내줘] 가 쓰는 특허 아이디어 기준 문서(patent_idea)를 AI 전략실 단추도 같이 받는다.
+   * 판 1 은 기준 문서 없이 손으로 쓴 네 줄만 받아, 같은 업체라도 특허 · 벤처 메뉴와 다른 기준으로 아이디어를 냈다.
+   */
   PATENT_IDEA: {
     id: 'PATENT_IDEA',
     name: '특허 아이디어',
-    version: 1,
+    version: 2,
     tier: 'deep',
     active: true,
     createdAt: D,
-    updatedAt: D,
-    description: '채택한 AX 를 바탕으로 특허 아이디어를 정리한다(변리사 대체 아님 · 특허 가능 확정 금지).',
+    updatedAt: '2026-11-17',
+    description: '채택한 AX 를 바탕으로 특허 아이디어를 기준 문서대로 정리한다(변리사 대체 아님 · 특허 가능 확정 금지).',
+    knowledge: ['patent_idea'],
     systemInstruction: [
       '업체의 AX 전략([지금까지의 기억] 의 AX 방향 · MVP)을 바탕으로 특허 아이디어 2~3개를 정리한다.',
+      '아이디어마다 아래 [기준 문서] 의 5개 고정 질문(현재 문제 · 기존 방식 · 차별 구조 · 처리 흐름 · 권리화 포인트)과 특허명 원칙을 따른다. 사업 아이디어를 낸 사람과 발명자를 섞어 쓰지 않는다(기준 문서의 발명자 · 권리귀속 확인).',
+      '출원 전 최소 확인정보 가운데 자료에 없는 것은 unknowns 에 "대표 확인: (무엇)" 으로 적는다.',
       '변리사를 대신하지 않는다. "특허 가능" 이라고 확정하지 않는다. 특허성 리스크를 솔직히 쓴다.',
       '각 아이디어: 발명의 문제 · 기존 방식 · 핵심 아이디어 · 차별적 구성 · 데이터 흐름 · 핵심 처리 절차 · 예상 독립항 포인트 · 종속항 후보 · 구현 예 · 선행기술 검색 키워드 · 특허성 리스크 · 사업과의 연결.',
       'warning 에는 정확히 "내부 아이디어 정리용이며 실제 특허성/권리범위는 선행기술조사 및 변리사 검토가 필요합니다." 를 쓴다.',
@@ -323,16 +344,22 @@ export const SKILLS = {
     },
   },
 
+  /*
+   * D-624 판 2 — 기업인증 · 특허 · 벤처 메뉴의 벤처 사업계획서 AI 가 쓰는 기준 문서(venture_plan)를 AI 전략실 단추도 같이 받는다.
+   * 칸은 그대로 9칸(기업인증 벤처 패키지) — 기준 문서의 작성 규칙(근거 없는 숫자 금지 · [확인 필요] · 문제 → 해결 → 차별성 → 시장 흐름)만 따른다.
+   */
   VENTURE_PLAN: {
     id: 'VENTURE_PLAN',
     name: '벤처기업확인 사업계획',
-    version: 1,
+    version: 2,
     tier: 'deep',
     active: true,
     createdAt: D,
-    updatedAt: D,
-    description: '업체 기억 + 채택한 AX/MVP + 특허 아이디어로 벤처기업확인 사업계획 논리를 9개 칸(기업인증 벤처 패키지와 같은 칸)에 쓴다.',
+    updatedAt: '2026-11-17',
+    description: '업체 기억 + 채택한 AX/MVP + 특허 아이디어로 벤처기업확인 사업계획 논리를 9개 칸(기업인증 벤처 패키지와 같은 칸)에 기준 문서대로 쓴다.',
+    knowledge: ['venture_plan'],
     systemInstruction: [
+      '아래 [기준 문서] 의 작성 규칙을 지킨다 — 시장규모 · 성장률 · 매출 · 고객 수 · IP 건수 · 연구 인력은 근거 없이 만들지 않고 "[확인 필요]" 로, 계획 · 예상 · 개발 중 · 보유 완료를 구분, 기존 문제 → 해결 방식 → 차별성 → 시장 → 기술 특징 → 기술 역량 → 시장 진입 → 성장 역량 흐름이 칸마다 서로 어긋나지 않게. 출력 칸은 기준 문서의 양식이 아니라 아래 9칸이다.',
       '벤처기업확인 사업계획의 핵심 논리를 쓴다. 칸은 OS 기업인증 모듈의 벤처 준비 패키지와 같다:',
       'basic 회사 기본정보 · problem 해결하려는 문제 · product 제품 · 서비스 · tech 기술 · 차별성 · market 시장 · growth 매출 · 성장 · rnd 연구개발 · ip 지식재산 · proof 실증 · 성과.',
       '[지금까지의 기억] 의 AX 방향 · MVP · 특허 방향을 기술성 · 혁신성 · 사업성 논리에 이어서 쓴다.',

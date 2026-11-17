@@ -7,7 +7,7 @@
  *  - '깊게' 작업을 이미 한 번 만들었으면 다시 만들기 전에 한 번 묻는다(비용).
  */
 import { useEffect, useMemo, useState } from 'react'
-import { FileText, Landmark, Loader2, Sparkles, Stamp, Target, type LucideIcon } from 'lucide-react'
+import { ChevronRight, Loader2, Sparkles } from 'lucide-react'
 import { buildAiContext, materialsFor, payloadChars } from '../../../services/ownerAi/context'
 import { newUuid } from '../../../services/ownerAi/caseUtil'
 import { QUICK_ACTIONS, SKILL_META, TIER_LABEL, type QuickAction } from '../../../services/ownerAi/skillCatalog'
@@ -17,18 +17,18 @@ import { CASE_PURPOSES, caseNext, type CaseActionKey } from '../../../services/o
 import { Fold } from '../../../components/ui/fold'
 import { BottomSheet, Surface } from '../../../components/ui/primitives'
 import { Button } from '../../../components/ui/Button'
-import { TierBadge, type AiSetup } from '../shared'
+import type { AiSetup } from '../shared'
 import { ModelPicker } from '../../../components/ai/ModelPicker'
 import { IconTile } from '../../../components/ui/visual'
-import type { FeatureTone } from '../../../config/featureVisual'
-import { skillVisual } from '../skillVisual'
+import { SKILL_ICON_TEXT, SKILL_TONE, skillIcon } from '../skillVisual'
+import { EVAL_TEXT, listedRuns, runsBySkill, statusLabel } from './runStatus'
 
-/** D-282 목적 카드 그림 — 기능 색 갈래(AX 보라 · 자금 초록 · 특허 · 벤처 호박 · 제안서 파랑) */
-const PURPOSE_VISUAL: Partial<Record<CaseActionKey, { icon: LucideIcon; tone: FeatureTone; sub: string }>> = {
-  ax: { icon: Target, tone: 'purple', sub: '판정 · 추천 AX · 12주 증명' },
-  funding: { icon: Landmark, tone: 'green', sub: '맞는 자금 · 근거 표시' },
-  patent: { icon: Stamp, tone: 'amber', sub: '특허 아이디어 · 벤처 논리' },
-  proposal: { icon: FileText, tone: 'blue', sub: '페이지 구성 → 실제 글자로' },
+/** D-282 목적 카드 아래 한 줄. D-624 그림 색은 모두 하나(SKILL_TONE) — 모양은 작업마다 */
+const PURPOSE_SUB: Partial<Record<CaseActionKey, string>> = {
+  ax: '판정 · 추천 AX · 12주 증명',
+  funding: '맞는 자금 · 근거 표시',
+  patent: '특허 아이디어 · 벤처 논리',
+  proposal: '페이지 구성 → 실제 글자로',
 }
 
 export interface RunRequest {
@@ -75,6 +75,8 @@ export function QuickActions({
   const next = useMemo(() => caseNext(bundle.runs), [bundle.runs])
   const actionOf = (key: CaseActionKey) => QUICK_ACTIONS.find((a) => a.key === key)
   const purposes = CASE_PURPOSES.filter((p) => p.key !== next.action)
+  // D-624 작업마다 지금 결과 상태(검토 전 · 채택 · 결과 n개) — 결과 목록의 줄과 같은 말
+  const bySkill = useMemo(() => runsBySkill(listedRuns(bundle.runs)), [bundle.runs])
   return (
     <Surface className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -98,7 +100,7 @@ export function QuickActions({
         {purposes.map((p) => {
           const a = actionOf(p.key)
           if (!a) return null
-          const v = PURPOSE_VISUAL[p.key] ?? { ...skillVisual(a.skill), sub: a.hint }
+          const v = { icon: skillIcon(a.skill), tone: SKILL_TONE, sub: PURPOSE_SUB[p.key] ?? a.hint }
           return (
             <button
               key={p.key}
@@ -125,31 +127,58 @@ export function QuickActions({
         })}
       </div>
       <Fold id="ownerai.more" title="다른 작업 · ChatGPT 결과 붙여넣기" summary={`작업 ${QUICK_ACTIONS.length}가지 — AX 아이템 · MVP · 화면 기획 · 동료 전달문구 · 자유 질문 …`} testId="case-more">
-        <span className="t-sub break-keep text-slate-600">모두 이 업체 기억 · 자료를 같이 씁니다</span>
-        {/* 칸 폭이 좁아도 이름이 한 줄씩 읽히게 — 최소 10.5rem 칸을 들어가는 만큼(휴대폰 2칸 · PC 3~5칸) */}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))]" data-testid="quick-actions">
-          {QUICK_ACTIONS.map((a) => {
+        <span className="t-sub break-keep text-slate-600">모두 이 업체 기억 · 자료를 같이 씁니다 · 누르면 무엇을 보낼지 먼저 보여 드려요</span>
+        {/* D-624 네모 칸 열 개(작업마다 다른 색) → 번호 붙은 줄 목록(뜨는 주제 목록처럼) — 칸마다 테두리를 두르지 않고 줄 사이 가는 선.
+            아이콘은 한 색 · 모양만 다르게. 순서는 대표 지시 순서 그대로. 다음 추천 작업은 진한 번호로만 눈에 띄게 */}
+        {/* 칸 폭(@container)이 넉넉할 때만 두 줄 — PC 1440 은 오른쪽 기억 · 자료 칸 때문에 본문이 좁아 한 줄이 읽기 쉽다 */}
+        <div className="@container">
+        <ul className="grid grid-cols-1 @2xl:grid-cols-2 @2xl:gap-x-6" data-testid="quick-actions">
+          {QUICK_ACTIONS.map((a, i) => {
             const tier = SKILL_META[a.skill].tier
             const isRunning = running === a.label
-            const sv = skillVisual(a.skill)
+            const Icon = skillIcon(a.skill)
+            const made = bySkill.get(a.skill) ?? []
+            const isNext = next.action === a.key
             return (
-              <button
-                key={a.key}
-                type="button"
-                data-action={a.key}
-                disabled={!!running}
-                onClick={() => setOpen(a)}
-                className="tap flex min-h-[4.75rem] flex-col items-start gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-brand-400 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <span className="flex items-center gap-2">
-                  <IconTile icon={sv.icon} tone={sv.tone} size="sm" />
-                  <span className="t-body font-semibold break-keep text-slate-900">{a.label}</span>
-                </span>
-                <span className="t-meta break-keep text-slate-600">{isRunning ? '만드는 중…' : a.hint}</span>
-                <span className="mt-auto pt-1">{isRunning ? <Loader2 aria-hidden="true" className="size-4 animate-spin text-brand-600" /> : <TierBadge tier={tier} />}</span>
-              </button>
+              <li key={a.key} className="min-w-0 border-b border-slate-100">
+                <button
+                  type="button"
+                  data-action={a.key}
+                  data-next={isNext ? '1' : undefined}
+                  disabled={!!running}
+                  onClick={() => setOpen(a)}
+                  className="tap group flex min-h-14 w-full min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-2 text-left transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 sm:gap-3"
+                >
+                  <span aria-hidden="true" className={`t-sub flex size-7 shrink-0 items-center justify-center rounded-full font-bold ${isNext ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                    {i + 1}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                      {isRunning ? (
+                        <Loader2 aria-hidden="true" className={`size-4 shrink-0 animate-spin ${SKILL_ICON_TEXT}`} />
+                      ) : (
+                        <Icon aria-hidden="true" className={`size-4 shrink-0 ${SKILL_ICON_TEXT}`} />
+                      )}
+                      <span className="t-body font-bold break-keep text-slate-900">{a.label}</span>
+                      {isNext && <span className="t-meta font-bold text-brand-700">추천</span>}
+                      {/* 결과 상태는 이름 옆 — 오른쪽 칸에 두면 휴대폰에서 이름이 세 줄로 접혔다 */}
+                      {made.length > 0 && (
+                        <span className={`t-meta font-semibold whitespace-nowrap ${EVAL_TEXT[made[0].evaluation]}`} data-testid="quick-action-status">
+                          {statusLabel(made)}
+                        </span>
+                      )}
+                    </span>
+                    <span className="t-meta break-keep text-slate-600">
+                      {isRunning ? '만드는 중…' : a.hint}
+                      <span className="text-slate-500"> · {TIER_LABEL[tier]}</span>
+                    </span>
+                  </span>
+                  <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-600" />
+                </button>
+              </li>
             )
           })}
+        </ul>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="secondary" onClick={onPaste} data-testid="paste-chatgpt-open">

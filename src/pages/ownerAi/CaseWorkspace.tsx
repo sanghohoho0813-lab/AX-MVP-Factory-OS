@@ -28,7 +28,8 @@ import { Modal } from '../../components/ui/Modal'
 import { AiSetupBanner, fmtDateTime, useAiSetup, useFindClient, useOwnerAiIdentity, useOwnerAiRepo } from './shared'
 import { SnapshotCard } from './parts/SnapshotCard'
 import { QuickActions, type RunRequest } from './parts/QuickActions'
-import { RunCard } from './parts/RunCard'
+import { RunList, type RunFocus } from './parts/RunList'
+import { listedRuns } from './parts/runStatus'
 import { MemoryCard, MemoryEditor } from './parts/MemoryCard'
 import { MaterialsCard } from './parts/MaterialsCard'
 
@@ -54,7 +55,8 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
   const [saving, setSaving] = useState(false)
   const [memoryApply, setMemoryApply] = useState<null | { run: AiRun; proposed: CurrentContext }>(null)
   const [pasteOpen, setPasteOpen] = useState(false)
-  const [showOld, setShowOld] = useState(false)
+  // D-624 새 결과가 나오면 결과 목록에서 그 작업 줄을 펼치고 그 결과로 옮긴다
+  const [focus, setFocus] = useState<RunFocus | null>(null)
   // AI-2 첫 화면 [서류 넣기] → 업체 자료의 서류함 창(숫자가 바뀔 때마다 연다)
   const [docsOpen, setDocsOpen] = useState(0)
   // D-282 오른쪽 칸 — 기억 · 자료 · 기록을 탭으로(세 칸을 길게 쌓지 않는다). 셋 다 늘 그려 두고 고른 것만 보인다
@@ -141,6 +143,7 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
     try {
       const { run, c, replayed } = await runSkill({ repo, bundle: b, skill: req.skill, input: req.input, requestId: req.requestId, today, userId, materialIds: req.materialIds })
       setBundle((prev) => (prev ? { ...prev, c, runs: [run, ...prev.runs.filter((r) => r.id !== run.id)] } : prev))
+      if (run.skillId !== 'PROOFREAD') setFocus({ skill: run.skillId, runId: run.id, n: Date.now() })
       showToast(replayed ? '같은 요청이라 앞서 만든 결과를 그대로 보여 드립니다.' : run.status === 'parse_fallback' ? `${req.label} — 형식이 달라 원문을 보관했습니다.` : `${req.label} 결과가 나왔습니다. 채택 · 일부 채택 · 폐기 중 골라 주세요.`)
       return true
     } catch (e) {
@@ -219,8 +222,8 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
   }
 
   // 맞춤법 검사는 제안서 스튜디오 안에서 쓰는 것 — 결과 목록에는 안 보인다(기록 · 사용량에는 남는다)
-  const recentRuns = b.runs.filter((r) => r.skillId !== 'PROOFREAD' && (r.skillId !== 'CONTEXT_UPDATE' || r.evaluation === 'draft'))
-  const shownRuns = showOld ? recentRuns : recentRuns.slice(0, 8)
+  const recentRuns = listedRuns(b.runs)
+  const taskCount = new Set(recentRuns.map((r) => r.skillId)).size
 
   const relationSelect = (
     <label className="flex items-center gap-1.5">
@@ -329,36 +332,30 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
         <div className="flex min-w-0 flex-col gap-4">
           <QuickActions bundle={b} today={today} running={running} setup={setup} onRun={doRun} onPaste={() => setPasteOpen(true)} docsHint={newDocs} onDocs={() => setDocsOpen((n) => n + 1)} reopen={reopen} />
           <section className="flex flex-col gap-3" aria-label="AI 결과">
-            <div className="flex items-baseline justify-between gap-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
               <h2 className="t-section text-slate-900">AI 결과</h2>
-              <span className="t-sub text-slate-500">{b.runs.length}개 · 지우지 않고 쌓입니다</span>
+              <span className="t-sub text-slate-500" data-testid="run-list-count">
+                {recentRuns.length ? `작업 ${taskCount}개 · 결과 ${recentRuns.length}개 · 누르면 그 결과가 펼쳐져요` : '지우지 않고 쌓입니다'}
+              </span>
             </div>
             {recentRuns.length === 0 ? (
               <p className="t-sub rounded-(--radius-panel) border border-dashed border-slate-200 bg-white px-4 py-6 text-center break-keep text-slate-500">
                 아직 결과가 없습니다. 위 '추천' 단추를 누르면 여기에 결과가 쌓입니다.
               </p>
             ) : (
-              <div className="flex flex-col gap-3" data-testid="run-list">
-                {shownRuns.map((run, i) => (
-                  <RunCard
-                    key={run.id}
-                    run={run}
-                    revision={b.latestRevision.get(run.id)}
-                    defaultOpen={i === 0 && run.evaluation === 'draft'}
-                    busy={saving || !!running}
-                    onEvaluate={onEvaluate(run)}
-                    onRevise={onRevise(run)}
-                    onToMemory={() => toMemory(run)}
-                    onRegenerate={run.status !== 'pasted' && QUICK_ACTIONS.some((a) => a.skill === run.skillId) ? () => setReopen({ skill: run.skillId, n: Date.now() }) : undefined}
-                    toast={showToast}
-                  />
-                ))}
-                {recentRuns.length > shownRuns.length && (
-                  <Button variant="ghost" onClick={() => setShowOld(true)}>
-                    지난 결과 {recentRuns.length - shownRuns.length}개 더 보기
-                  </Button>
-                )}
-              </div>
+              <RunList
+                runs={recentRuns}
+                revisions={b.latestRevision}
+                focus={focus}
+                handlers={{
+                  busy: saving || !!running,
+                  onEvaluate,
+                  onRevise,
+                  onToMemory: toMemory,
+                  regenerate: (run) => (run.status !== 'pasted' && QUICK_ACTIONS.some((a) => a.skill === run.skillId) ? () => setReopen({ skill: run.skillId, n: Date.now() }) : undefined),
+                  toast: showToast,
+                }}
+              />
             )}
           </section>
         </div>
@@ -448,6 +445,7 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
             const r = await guard(() => pasteChatGpt(repo, b, skill, text, userId))
             if (!r) return
             setBundle((prev) => (prev ? { ...prev, c: r.c, runs: [r.run, ...prev.runs] } : prev))
+            setFocus({ skill: r.run.skillId, runId: r.run.id, n: Date.now() })
             setPasteOpen(false)
             showToast('ChatGPT 결과를 기록했습니다. 채택하면 기억에 넣을 수 있습니다.')
           }}
