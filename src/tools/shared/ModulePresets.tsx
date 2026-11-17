@@ -5,13 +5,12 @@
  *  - 안 골랐으면 예시 가정만 얹어 연다(업체를 고르라는 한 줄 — D-354 누르면 업체 고르기 창).
  *  - 규칙 계산(AI 아님) · 계산식은 그대로.
  *  - NX-4 예시가 많아져 처음엔 6개(휴대폰 4개)만 — 나머지는 [상황 예시 n개 더 보기].
- *  - D-627 글자 수 한도 — 처음엔 한 줄 단추([상황 예시 n가지]) 하나. 누르면 목록(위와 같은 6개 · 4개).
+ *  - D-627 글자 수 한도 — 처음엔 한 줄 단추([상황 예시 n가지]) 하나. 누르면 무엇을 하는지 한 줄 + 목록(위와 같은 6개 · 4개).
  */
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Building2, ChevronDown, Lightbulb } from 'lucide-react'
 import { SCENARIO_MODULE_PATH, SCENARIO_PRESETS, scenarioPath, type ScenarioModule } from '../../services/scenarioPresets'
-import { Surface } from '../../components/ui/primitives'
 import { Button } from '../../components/ui/Button'
 import { useToolClient } from './toolClientContext'
 import { useIsPhone } from '../../lib/useIsPhone'
@@ -29,19 +28,25 @@ export function ModulePresets({ module }: { module: ScenarioModule }) {
   const name = clientId ? clientRecord?.companyName : ''
   return (
     <div data-testid="module-presets" data-module={module}>
-      <Surface className="flex flex-col gap-3">
-        {/* D-627 처음엔 한 줄 — 누르면 상황 목록 */}
+      <div className={`flex flex-col rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-1 sm:px-4 ${open ? 'gap-3 pb-4' : ''}`}>
+        {/* D-627 처음엔 한 줄(상황 예시 n가지) — 누르면 상황 목록 · 무엇을 하는지 한 줄 */}
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="tap t-section flex w-full items-center gap-2 text-left break-keep text-slate-900"
+          title={`누르면 ${name ? `${name} 숫자로` : '바로'} 계산해요`}
+          className="tap t-body flex min-h-11 w-full items-center gap-2 text-left font-bold break-keep text-slate-900"
           data-testid="module-presets-open"
         >
           <Lightbulb aria-hidden="true" className="size-5 shrink-0 text-amber-500" />
-          <span className="min-w-0 flex-1">상황 예시 {list.length}가지 — 누르면 {name ? `${name} 숫자로` : '바로'} 계산</span>
+          <span className="min-w-0 flex-1">상황 예시 {list.length}가지</span>
           <ChevronDown aria-hidden="true" className={`size-5 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
+        {open && clientId && (
+          <p className="t-sub break-keep text-slate-600" data-testid="module-presets-how">
+            누르면 {name ? `${name} 숫자로` : '이 업체 숫자로'} 바로 계산해요.
+          </p>
+        )}
         {open && !clientId && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             {/* D-354 예전엔 '위에서 업체를 먼저 고르면' 이라고만 했다(위에 고르는 곳이 없었다) — 이제 여기서 바로 */}
@@ -74,7 +79,7 @@ export function ModulePresets({ module }: { module: ScenarioModule }) {
             {all ? '상황 예시 접기' : `상황 예시 ${list.length - first}개 더 보기`}
           </button>
         )}
-      </Surface>
+      </div>
     </div>
   )
 }

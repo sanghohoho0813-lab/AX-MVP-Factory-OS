@@ -327,9 +327,11 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
               )}
 
               {loaded && notices.length === 0 ? (
+                // D-627 글자 수 한도 — 빈 칸은 한 줄. 무엇을 해 주는지는 마우스를 올리면(title) · 단추 둘이 같은 말
+                <div title="기업마당 공고 글을 붙여 넣으면 우리 업체 중 맞는 곳을 바로 찾아 드립니다.">
                 <Blank
                   icon={<BellRing className="size-8" />}
-                  title="아직 넣은 공고가 없어요. 기업마당 공고 글을 붙여 넣으면 우리 업체 중 맞는 곳을 바로 찾아 드립니다."
+                  title="아직 넣은 공고가 없어요."
                   action={
                     <div className="flex flex-wrap justify-center gap-2">
                       <Button variant="primary" onClick={() => setAdding(true)}>
@@ -341,6 +343,7 @@ function GrantsContent({ workspaceId }: { workspaceId: string | null }) {
                     </div>
                   }
                 />
+                </div>
               ) : listed.length === 0 ? (
                 <Blank title={open.length === 0 ? '접수 중인 공고가 없습니다.' : '이 조건에 맞는 공고가 없습니다.'} />
               ) : (

@@ -108,7 +108,8 @@ export function CretopPage() {
   if (section === 'analyze')
     return (
       <div className="flex flex-col gap-6">
-        <PageHeader title="크레탑 분석기" description={meta?.hint ? `${meta.label} — ${meta.hint}` : '크레탑 기업종합보고서를 넣으면 핵심 재무와 미팅 포인트를 뽑습니다.'} />
+        {/* D-627 설명은 ? 로(제목 + 아래 시작 칸이 같은 말) */}
+        <PageHeader title="크레탑 분석기" descriptionAsHint description={meta?.hint ? `${meta.label} — ${meta.hint}` : '크레탑 기업종합보고서를 넣으면 핵심 재무와 미팅 포인트를 뽑습니다.'} />
         <CretopScreen />
       </div>
     )

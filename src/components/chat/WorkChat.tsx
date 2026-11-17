@@ -10,7 +10,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, BookOpen, Copy, LayoutList, Loader2, MessageCircle, Paperclip, RotateCcw, SendHorizontal, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowRight, BookOpen, ChevronDown, Copy, LayoutList, Loader2, MessageCircle, Paperclip, RotateCcw, SendHorizontal, Sparkles, Trash2 } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { BottomSheet } from '../ui/primitives'
 import { useToast } from '../ui/toastContext'
@@ -70,6 +70,8 @@ export interface WorkChatProps {
   frame?: { art: HeroArt; sub?: ReactNode; summary?: ReactNode; next?: ReactNode; aside?: ReactNode; chatFirst?: boolean }
   /** D-552 큰 제목 아래 한 줄 — 이 화면이 무엇을 해 주는지 */
   heroSub?: ReactNode
+  /** D-627 머리 한 줄에 다 못 담은 설명 — 마우스를 올리면(title) */
+  heroHint?: string
   /** D-552 '이렇게 물어보세요' — 누르면 질문칸에 들어간다(바로 보내지 않음 · 업체 이름만 바꿔 보내게) */
   examples?: readonly string[]
   /** D-552 대화 판 아래(처음 · 대화 중 모두) — 직접 눌러서 하기 칸 */
@@ -183,6 +185,8 @@ export function WorkChat(p: WorkChatProps) {
   const [turns, setTurns] = useState<ChatTurn[]>(() => loadTurns(p.module, p.clientId))
   const [text, setText] = useState('')
   const [guide, setGuide] = useState(false)
+  /** D-627 '이렇게 물어보세요' 펼침 */
+  const [exOpen, setExOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const turnsRef = useRef(turns)
   turnsRef.current = turns
@@ -334,8 +338,13 @@ export function WorkChat(p: WorkChatProps) {
         </Button>
       </div>
       <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 px-2 ${docked ? 'hidden lg:flex' : ''}`}>
-        <p className="t-meta min-w-0 flex-1 basis-56 break-keep text-slate-500" data-testid="chat-mode">
-          {aiReady ? '✨ AI 연결됨 — 쓴 질문은 AI가 이 회사 기록 요약을 보고 답해요(Enter)' : access === 'setup' ? 'AI 연결 준비 중 — 지금은 정해진 답으로 바로 알려 드려요' : '쓴 질문은 정해진 답으로 바로 알려 드려요(Enter)'}
+        {/* D-627 글자 수 한도 — 한 줄은 짧게, 무엇이 어떻게 답하는지는 마우스를 올리면(title) */}
+        <p
+          className="t-meta min-w-0 flex-1 basis-40 break-keep text-slate-500"
+          data-testid="chat-mode"
+          title={aiReady ? '쓴 질문은 AI가 이 회사 기록 요약을 보고 답해요(Enter)' : access === 'setup' ? 'AI 연결 준비 중 — 지금은 정해진 답으로 바로 알려 드려요' : '쓴 질문은 정해진 답으로 바로 알려 드려요(Enter)'}
+        >
+          {aiReady ? '✨ AI 연결됨' : access === 'setup' ? 'AI 연결 준비 중' : '정해진 답으로 알려 드려요'}
         </p>
         {/* D-255 대화창도 고른 모델로(전에는 늘 기본 모델) — 여기서 바꿔도 모든 AI 단추가 같이 */}
         {aiReady && <ModelPicker popover testId="chat-model" />}
@@ -405,17 +414,26 @@ export function WorkChat(p: WorkChatProps) {
     <section className={`flex flex-col gap-4 ${p.frame ? '' : p.brief ? 'py-2' : 'py-4 sm:py-10'}`} data-testid="chat-hero">
       <div className="flex flex-col gap-1">
         <h2 className={`${small ? 't-section' : 't-page'} ${p.frame ? 'text-left' : 'text-center'} font-bold break-keep text-slate-900`}>{p.heroTitle ?? '무엇을 도와드릴까요?'}</h2>
-        {p.heroSub && <p className={`t-sub break-keep text-slate-600 ${p.frame ? '' : 'text-center'}`} data-testid="chat-hero-sub">{p.heroSub}</p>}
+        {p.heroSub && <p className={`t-sub break-keep text-slate-600 ${p.frame ? '' : 'text-center'}`} data-testid="chat-hero-sub" title={p.heroHint}>{p.heroSub}</p>}
       </div>
       {composer(false)}
       {starterButtons(false)}
       {p.examples && p.examples.length > 0 && (
         // D-552 '이렇게 물어보세요' — 누르면 질문칸에 들어간다(업체 이름만 바꿔 Enter)
+        // D-627 글자 수 한도 — 처음엔 한 줄 단추. 누르면 예시 칩(그려 두고 숨긴다 — 접어도 예시 수는 그대로)
         <div className="flex flex-col gap-1.5" data-testid="chat-examples">
-          <p className="t-sub font-semibold text-slate-700">
-            이렇게 물어보세요 <span className="font-normal text-slate-500">— 누르면 질문칸에 들어가요</span>
-          </p>
-          <ul className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setExOpen((v) => !v)}
+            aria-expanded={exOpen}
+            title="누르면 질문칸에 들어가요"
+            className="tap t-sub inline-flex min-h-11 items-center gap-1 self-start rounded-(--radius-control) px-1 font-semibold text-slate-700 hover:bg-slate-50"
+            data-testid="chat-examples-open"
+          >
+            이렇게 물어보세요
+            <ChevronDown aria-hidden="true" className={`size-4 text-slate-500 transition-transform ${exOpen ? 'rotate-180' : ''}`} />
+          </button>
+          <ul className={exOpen ? 'flex flex-wrap gap-2' : 'hidden'}>
             {p.examples.map((ex) => (
               <li key={ex}>
                 <button

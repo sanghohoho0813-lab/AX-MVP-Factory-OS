@@ -277,12 +277,13 @@ export default function InputForm({ form, onChange, onSubmit, onReset, currentYe
 
       {rest.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-dashed border-gray-300 bg-white/70 px-5 py-3.5" data-testid="startup-rest" data-count={rest.length}>
-          <p className="min-w-0 flex-1 break-keep text-base text-gray-600">
+          {/* D-627 글자 수 한도 — '답하면 다음 질문이 하나씩 나와요' 는 마우스를 올리면 */}
+          <p className="min-w-0 flex-1 break-keep text-base text-gray-600" title="답하면 다음 질문이 하나씩 나와요.">
             <b className="text-gray-900">
               질문 {done}/{Q_ORDER.length}
             </b>{' '}
-            — 답하면 다음 질문이 하나씩 나와요(다음: {Q_LABEL[rest[0]]}
-            {rest.length > 1 ? ` 외 ${rest.length - 1}개` : ''}).
+            · 다음: {Q_LABEL[rest[0]]}
+            {rest.length > 1 ? ` 외 ${rest.length - 1}개` : ''}
           </p>
           <button type="button" onClick={() => setAll(true)} className="shrink-0 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50" data-testid="startup-show-all">
             한꺼번에 보기

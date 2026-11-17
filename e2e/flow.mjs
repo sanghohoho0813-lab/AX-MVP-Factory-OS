@@ -183,7 +183,8 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
 
   /* 10 (D-124) 세금 계산기 목록 — 밀면 안 닫힘 · 누르면 닫힘 (휴대폰) */
   if (mob) {
-    await page.goto(BASE + '/tools/tax', { waitUntil: 'networkidle' })
+    // D-627 /tools/tax 는 계산기 고르기 한 장 — 펼치는 목록은 계산기를 연 화면(?c=)에 있다
+    await page.goto(BASE + '/tools/tax?m=calc&c=t1', { waitUntil: 'networkidle' })
     await page.waitForTimeout(400)
     const picker = page.getByTestId('tax-picker')
     await picker.click()

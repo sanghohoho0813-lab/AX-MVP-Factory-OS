@@ -95,7 +95,8 @@ export default function DashboardPage() {
   return (
     <Layout
       title="대시보드"
-      subtitle={`${monthLabel} · 설립부터 사후관리까지 한눈에`}
+      // D-627 글자 수 한도 — 고객사가 없을 때는 달만(설명은 아래 빈 칸 한 장이 대신)
+      subtitle={(stats?.managedClients ?? 0) > 0 ? `${monthLabel} · 설립부터 사후관리까지 한눈에` : monthLabel}
       actions={
         <Link
           href="/tasks"
@@ -162,11 +163,13 @@ export default function DashboardPage() {
 
       {/* D-358 화면 원칙 — 아직 관리하는 고객사가 없으면 0 이 가득한 칸 · 빈 칸 다섯 대신 무엇을 하면 무엇이 생기는지 한 장 */}
       {(stats?.managedClients ?? 0) === 0 ? (
-        <section className="rounded-2xl border-2 border-dashed border-slate-300 bg-white px-6 py-6 text-center" data-testid="lab-dash-empty">
-          <p className="text-lg font-bold text-slate-900">아직 연구소로 관리하는 고객사가 없어요</p>
-          <p className="mx-auto mt-2 max-w-2xl break-keep text-base leading-relaxed text-slate-600">
-            ① 업체 목록에서 고객사를 넣고 → ② 설립 가능성을 체크하면 → ③ 여기에 오늘 할 일 · 설립 진행 · 연구노트 · 변경신고 기한 · 고객 리포트가 저절로 모여요.
-          </p>
+        // D-627 글자 수 한도 — ① → ② → ③ 설명 문장은 마우스를 올리면(title) · 단추 두 개가 같은 순서를 말한다
+        <section
+          className="rounded-2xl border-2 border-dashed border-slate-300 bg-white px-6 py-6 text-center"
+          data-testid="lab-dash-empty"
+          title="① 업체 목록에서 고객사를 넣고 → ② 설립 가능성을 체크하면 → ③ 여기에 오늘 할 일 · 설립 진행 · 연구노트 · 변경신고 기한 · 고객 리포트가 저절로 모여요."
+        >
+          <p className="text-lg font-bold text-slate-900">아직 관리하는 고객사가 없어요</p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Link href="/clients" className="rounded-xl bg-navy-700 px-5 py-2.5 text-base font-bold text-white hover:bg-navy-800">
               업체 목록에서 고객사 넣기

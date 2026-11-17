@@ -36,6 +36,8 @@ import { formatDate } from './lib/date'
 import { buildSummaryText } from './lib/summary'
 import InputForm from './orig/components/InputForm'
 import { StartupZoomPicker, useStartupZoom } from './StartupZoom'
+import { InPageTools } from '../../components/layout/PageTools'
+import { HintTip } from '../../components/ui/fold'
 import ResultCards from './orig/components/ResultCards'
 import PrintSheet from './orig/components/PrintSheet'
 
@@ -176,21 +178,22 @@ function StartupTaxScreen() {
       )}
       {/* MOD-1 상황 예시 — 판정 전 · 예시를 안 넣었을 때만(누르면 고른 업체 숫자로 바로 판정) */}
       {!presetUsed && !submitted && <ModulePresets module="startup-tax" />}
-      {/* D-167: 판정기 안에서만 글자 크기 고르기 — 기본은 OS 글자와 어울리게(예전 1.25배는 따로 노는 느낌) */}
-      <div className="flex justify-end">
-        <StartupZoomPicker value={zoom} onChange={setZoom} />
-      </div>
+      {/* D-167: 판정기 안에서만 글자 크기 고르기 — 기본은 OS 글자와 어울리게(예전 1.25배는 따로 노는 느낌)
+          D-627 글자 수 한도 — 화면 도구라 경로 줄 오른쪽 [⋯] 안으로(메뉴가 없는 곳에서는 예전 자리) */}
+      <InPageTools>
+        <div className="flex justify-end">
+          <StartupZoomPicker value={zoom} onChange={setZoom} />
+        </div>
+      </InPageTools>
       {/* 화면 UI — 원본 그대로 (원본은 글자 기준 20px). D-167: 폭 max-w-xl → max-w-5xl(양쪽 여백 줄이기) */}
       <div className="st-zoom" data-testid="startup-orig" data-zoom={zoom}>
         <div className="mx-auto max-w-5xl px-1 pb-10 pt-2">
           <header className="mb-6 px-1">
             {/* D-96: 제목 크기를 OS 화면 제목에 맞춘다 (원본 text-4xl 은 넓은 화면 1.25배 확대와 겹쳐 45px 였다) */}
-            <h1 className="t-page break-keep text-slate-900">창업감면 1분 판정기</h1>
-            <p className="t-sub mt-1 break-keep text-slate-500">
-              대표자 정보를 입력하면 창업기업 관련 감면 가능성을 1차로 판정합니다.
-              <br />
-              세액 계산기가 아닌 <b className="text-slate-700">상담 보조 판정 도구</b>입니다.
-            </p>
+            {/* D-627 글자 수 한도 — 설명 두 줄은 ? 로(제목 + 한 줄) */}
+            <HintTip label="창업감면 1분 판정기" tip="대표자 정보를 입력하면 창업기업 관련 감면 가능성을 1차로 판정합니다. 세액 계산기가 아닌 상담 보조 판정 도구입니다.">
+              <h1 className="t-page break-keep text-slate-900">창업감면 1분 판정기</h1>
+            </HintTip>
           </header>
 
           <div id="startup-result" className="scroll-mt-20" />
@@ -219,7 +222,8 @@ function StartupTaxScreen() {
             <InputForm form={form} onChange={handleChange} onSubmit={handleSubmit} onReset={handleReset} currentYear={currentYear} />
           )}
 
-          <footer className="t-meta mt-10 px-1 text-center text-slate-400">창업감면 1분 판정기 · 상담용 사전진단 도구</footer>
+          {/* D-627 판정 결과가 있을 때만(첫 화면에는 제목 ? 가 같은 말) */}
+          {submitted && result && <footer className="t-meta mt-10 px-1 text-center text-slate-400">창업감면 1분 판정기 · 상담용 사전진단 도구</footer>}
         </div>
       </div>
 

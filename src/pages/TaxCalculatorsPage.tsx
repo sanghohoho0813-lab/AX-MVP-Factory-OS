@@ -3,6 +3,10 @@
  *
  * 입력은 왼쪽, 결과는 오른쪽, 표는 아래. 원본(배포본 HTML)과 같은 순서·같은 이름·같은 숫자.
  * 적은 값은 계산기마다 이 브라우저에 남는다 — 상담 중에 화면을 옮겨도 다시 적지 않는다.
+ *
+ * D-627 글자 수 한도 — 업체 없이 열면(계산기 9종 탭 · ?c= 없음) 먼저 '계산기 고르기' 한 장(한 줄씩 5개 + [4개 더 보기]).
+ * 고르면(?c=) 그 계산기 하나만 — 다른 계산기로는 맨 위 [지금 계산기 · 바꾸기] 한 줄. 긴 표(9행 넘음)는 [표 보기] 로 접는다
+ * (접어도 표는 그려 둔다 — 원본 대조 시험 qa:tax 가 그대로 읽는다). 계산식(taxCalc.ts)은 손대지 않는다(D-341).
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -10,7 +14,7 @@ import { useToolClient } from '../tools/shared/toolClientContext'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { sharedToolKey } from '../tools/shared/toolStorage'
 import { useOutsideTap } from '../lib/useDismissable'
-import { BookOpen, Check, ChevronDown, Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { BookOpen, Check, ChevronDown, ChevronRight, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/ui/PageHeader'
 import { ToolResultAttach } from '../tools/shared/ToolResultAttach'
 import { Button } from '../components/ui/Button'
@@ -43,6 +47,9 @@ import {
 import { josa } from '../lib/josa'
 
 const STORAGE_PREFIX = 'axmvp.tax.'
+/** D-627 고르기 한 장 — 처음 보이는 계산기 수 · 접어 두는 긴 표(행 수 넘으면) */
+const FIRST_CALCS = 5
+const LONG_TABLE = 9
 
 /** D-94: 기본값도 금액 칸은 처음부터 쉼표로 (예전에는 칸을 한 번 눌렀다 떼야 쉼표가 붙었다) */
 function displayDefaults(calc: Calculator): Values {
@@ -181,6 +188,9 @@ export function TaxCalculatorsPage() {
   const [prefilled, setPrefilled] = useState<string[]>(first.prefilled)
   const [values, setValues] = useState<Values>(first.values)
   const [pickerOpen, setPickerOpen] = useState(false)
+  /** D-627 고르기 한 장의 [더 보기] · 펼친 긴 표(계산기.표) */
+  const [allCalcs, setAllCalcs] = useState(false)
+  const [openTables, setOpenTables] = useState<string[]>([])
   const pickerRef = useRef<HTMLDivElement>(null)
   // D-111: 펼친 목록은 Esc · 바깥을 누르면 닫는다 (고르지 않고 다시 보고 싶을 때)
   // D-124: 바깥을 '눌렀을 때만' — 화면을 밀어 스크롤할 때 닫히면 목록 높이만큼 화면이 튀었다
@@ -198,6 +208,8 @@ export function TaxCalculatorsPage() {
   // 계산기 01 예시 숫자가 업체 칸에 저장돼, 절세 설계에서 급여를 적은 뒤 계산기를 열어도 예시가 남았다
   // D-321 m=basis — 계산 기준표(계산기 · 판정이 쓰는 세율 · 공제)
   const mode: 'plan' | 'calc' | 'basis' = params.get('m') === 'basis' ? 'basis' : params.get('m') === 'plan' || (params.get('client') && !params.get('c') && params.get('m') !== 'calc') ? 'plan' : 'calc'
+  // D-627 계산기 탭인데 아직 고르지 않았으면(?c= 없음) 고르기 한 장
+  const choosing = mode === 'calc' && !params.get('c')
   const loadKey = `${mode}|${calc.key}|${clientId ?? ''}|${recordReady ? 'ok' : 'wait'}`
   const loadedFor = useRef(loadKey)
   /** D-244: 지금 values 가 어느 읽기(loadKey)의 값인지 — 읽은 바로 그 커밋에는 아직 앞 값이라 저장하지 않는다
@@ -297,7 +309,7 @@ export function TaxCalculatorsPage() {
     const client = params.get('client')
     if (client) next.set('client', client)
     next.set('m', m)
-    if (m === 'calc') next.set('c', calc.key)
+    // D-627 [계산기 9종] 탭은 고르기 한 장부터(예전엔 마지막 계산기를 바로 열었다)
     setParams(next)
   }
   /** 절세 설계에서 찾은 숫자 그대로 그 계산기를 연다 — 그 계산기에 적어 둔 값은 이 숫자로 바뀐다 */
@@ -497,10 +509,10 @@ export function TaxCalculatorsPage() {
         ))}
       </div>
 
-      {/* D-321 계산 기준표 — 몇 년 · 어떤 법으로 계산하는지 */}
+      {/* D-321 계산 기준표 — 몇 년 · 어떤 법으로 계산하는지 (D-627 이름만 · 설명은 마우스를 올리면) */}
       {mode !== 'basis' && (
-        <button type="button" onClick={() => setMode('basis')} className="no-print tap t-sub -mt-2 inline-flex min-h-11 items-center gap-1.5 self-start rounded-(--radius-control) px-2 font-semibold text-brand-800 hover:bg-brand-50" data-testid="tax-basis-open">
-          <BookOpen aria-hidden="true" className="size-4" /> 계산 기준표 보기 — 계산기가 쓰는 세율 · 공제
+        <button type="button" onClick={() => setMode('basis')} title="계산기가 쓰는 세율 · 공제 — 몇 년 · 어떤 법으로 계산하는지" className="no-print tap t-sub -mt-2 inline-flex min-h-11 items-center gap-1.5 self-start rounded-(--radius-control) px-2 font-semibold text-brand-800 hover:bg-brand-50" data-testid="tax-basis-open">
+          <BookOpen aria-hidden="true" className="size-4" /> 계산 기준표
         </button>
       )}
 
@@ -508,19 +520,50 @@ export function TaxCalculatorsPage() {
         <TaxBasis onBack={() => setMode('calc')} focus={params.get('s')} />
       ) : mode === 'plan' ? (
         <TaxPlanner onOpenCalc={openCalc} />
+      ) : choosing ? (
+        // D-627 계산기 고르기 — 한 줄씩(번호 · 이름). 무엇을 계산하는지는 마우스를 올리면(title)
+        <section aria-labelledby="tax-choose-title" className="flex flex-col gap-2" data-testid="tax-choose">
+          <h2 id="tax-choose-title" className="t-sub font-semibold text-slate-600">
+            계산기를 고르세요
+          </h2>
+          <ul className="grid gap-2 lg:grid-cols-2" aria-label="계산기 목록">
+            {TAX_CALCULATORS.slice(0, allCalcs ? undefined : FIRST_CALCS).map((c) => (
+              <li key={c.key}>
+                <button
+                  type="button"
+                  onClick={() => pick(c.key)}
+                  title={c.desc}
+                  data-testid="tax-calc-item"
+                  data-calc={c.key}
+                  className="tap flex min-h-11 w-full items-center gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-2.5 text-left hover:border-brand-300 hover:bg-slate-50"
+                >
+                  <span className="t-meta w-6 shrink-0 font-bold text-slate-400 tabular-nums">{c.no}</span>
+                  <span className="t-body min-w-0 flex-1 font-semibold break-keep text-slate-900">{c.title}</span>
+                  <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          {TAX_CALCULATORS.length > FIRST_CALCS && (
+            <button type="button" onClick={() => setAllCalcs((v) => !v)} aria-expanded={allCalcs} className="tap t-sub inline-flex min-h-11 items-center self-start px-1 font-semibold text-brand-700 hover:underline" data-testid="tax-calc-more">
+              {allCalcs ? '접기' : `${TAX_CALCULATORS.length - FIRST_CALCS}개 더 보기`}
+            </button>
+          )}
+        </section>
       ) : (
       <>
 
       {/* 계산기 고르기 — 휴대폰에서는 가로로 넘기는 조각, 넓으면 한 줄 감싸기 */}
       {/* D-109: 휴대폰에서는 9개를 옆으로 밀어 찾지 않는다 — 지금 계산기 한 줄을 누르면 목록이 펼쳐지고, 고르면 닫힌다 */}
-      <div ref={pickerRef} className="no-print sm:hidden">
+      {/* D-627 PC 도 같은 한 줄(예전 PC 는 계산기 아홉 개 칩이 늘 깔려 있었다) */}
+      <div ref={pickerRef} className="no-print">
         <button
           type="button"
           data-testid="tax-picker"
           aria-expanded={pickerOpen}
           aria-controls="tax-picker-list"
           onClick={() => setPickerOpen((o) => !o)}
-          className="tap flex w-full items-center gap-3 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-left shadow-(--shadow-card)"
+          className="tap flex w-full items-center gap-3 rounded-(--radius-card) border border-slate-200 bg-white px-4 py-3 text-left shadow-(--shadow-card) sm:w-fit sm:min-w-[24rem]"
         >
           <span className="t-meta shrink-0 rounded-full bg-navy-900 px-2 py-0.5 font-bold text-white tabular-nums">{calc.no}</span>
           <span className="min-w-0 flex-1">
@@ -530,7 +573,7 @@ export function TaxCalculatorsPage() {
           <ChevronDown aria-hidden="true" className={`size-5 shrink-0 text-slate-400 transition-transform ${pickerOpen ? 'rotate-180' : ''}`} />
         </button>
         {pickerOpen && (
-          <ul id="tax-picker-list" aria-label="계산기 목록" className="mt-2 overflow-hidden rounded-(--radius-card) border border-slate-200 bg-white shadow-(--shadow-card)">
+          <ul id="tax-picker-list" aria-label="계산기 목록" className="mt-2 overflow-hidden rounded-(--radius-card) border border-slate-200 bg-white shadow-(--shadow-card) sm:max-w-xl">
             {TAX_CALCULATORS.map((c, i) => {
               const on = c.key === calc.key
               return (
@@ -555,30 +598,15 @@ export function TaxCalculatorsPage() {
         )}
       </div>
 
-      <nav aria-label="계산기 목록" className="no-print hidden flex-wrap gap-1.5 sm:flex">
-        {TAX_CALCULATORS.map((c) => (
-          <button
-            key={c.key}
-            type="button"
-            aria-pressed={c.key === calc.key}
-            onClick={() => pick(c.key)}
-            className={`tap shrink-0 rounded-full border px-3 py-1.5 text-[0.875rem] font-medium whitespace-nowrap ${
-              c.key === calc.key ? 'border-brand-600 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            <span className={`mr-1.5 tabular-nums ${c.key === calc.key ? 'text-brand-100' : 'text-slate-400'}`}>{c.no}</span>
-            {c.title}
-          </button>
-        ))}
-      </nav>
-
       {/* D-102: 예전에는 짙은 남색(slate-900)을 박아 두어 테마를 바꿔도 그대로였다 — 테마의 짙은 색(navy-900·800, 사이드바와 같은 색)으로 */}
       <section className="flex flex-col gap-4">
         <div className="flex flex-wrap items-end justify-between gap-2 border-b-2 border-navy-900 pb-3">
           <div className="min-w-0">
             <p className="t-meta font-bold tracking-wide text-brand-700 uppercase">{calc.eyebrow}</p>
-            <h2 className="t-section mt-0.5 text-slate-900">{calc.title}</h2>
-            <p className="t-sub mt-1 break-keep text-slate-500">{calc.desc}</p>
+            {/* D-627 계산기 설명은 ? 로(제목 + 입력 칸이 먼저) */}
+            <HelpHeading as="h2" help={calc.desc} label={calc.title} className="t-section mt-0.5 text-slate-900">
+              {calc.title}
+            </HelpHeading>
           </div>
           <div className="no-print flex flex-wrap gap-1.5">
             {clientFill && clientFill.names.length > 0 && (
@@ -722,11 +750,29 @@ export function TaxCalculatorsPage() {
           </div>
         </div>
 
-        {(out.tables ?? []).map((t) => (
-          <div key={t.id} className="rounded-(--radius-panel) border border-slate-200 bg-white p-4">
-            <HelpHeading as="h3" tight wrapClassName="mb-3 border-b border-slate-100 pb-2" className="text-[1rem] font-bold text-slate-900">{t.title}</HelpHeading>
+        {(out.tables ?? []).map((t) => {
+          // D-627 긴 표(9행 넘음)는 처음엔 접어 둔다 — [표 보기] 로 펼침. 접어도 그려 두고 숨긴다(인쇄 · 원본 대조는 그대로)
+          const long = t.rows.length > LONG_TABLE
+          const shut = long && !openTables.includes(`${calc.key}.${t.id}`)
+          return (
+          <div key={t.id} className="rounded-(--radius-panel) border border-slate-200 bg-white p-4" data-table-box={t.id}>
+            <div className={`flex flex-wrap items-center gap-2 ${shut ? '' : 'mb-3 border-b border-slate-100 pb-2'}`}>
+              <HelpHeading as="h3" tight wrapClassName="min-w-0 flex-1" className="text-[1rem] font-bold text-slate-900">{t.title}</HelpHeading>
+              {long && (
+                <button
+                  type="button"
+                  onClick={() => setOpenTables((cur) => (cur.includes(`${calc.key}.${t.id}`) ? cur.filter((x) => x !== `${calc.key}.${t.id}`) : [...cur, `${calc.key}.${t.id}`]))}
+                  aria-expanded={!shut}
+                  className="no-print tap t-sub inline-flex min-h-11 items-center gap-1 rounded-(--radius-control) px-2 font-semibold text-brand-700 hover:bg-slate-50"
+                  data-testid="tax-table-toggle"
+                >
+                  {shut ? `표 보기 · ${t.rows.length}행` : '표 접기'}
+                  <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${shut ? '' : 'rotate-180'}`} />
+                </button>
+              )}
+            </div>
             {/* D-102: 인쇄하면 오른쪽 칸이 잘렸다 — 종이에서는 가로 넘김 대신 글자를 줄여 한 폭에 */}
-            <div className="overflow-x-auto print:overflow-visible">
+            <div className={`overflow-x-auto print:block print:overflow-visible ${shut ? 'hidden' : ''}`}>
               <table data-table={t.id} className="w-full min-w-[640px] text-[0.875rem] print:min-w-0 print:text-[7pt]">
                 <thead>
                   <tr>
@@ -750,9 +796,10 @@ export function TaxCalculatorsPage() {
                 </tbody>
               </table>
             </div>
-            {t.note && <p className="t-sub mt-3 break-keep text-slate-500">{t.note}</p>}
+            {t.note && !shut && <p className="t-sub mt-3 break-keep text-slate-500">{t.note}</p>}
           </div>
-        ))}
+          )
+        })}
 
         {calc.note && <p className="t-sub rounded-(--radius-control) border border-warning-200 bg-white px-3 py-2 break-keep text-slate-600">{calc.note}</p>}
       </section>

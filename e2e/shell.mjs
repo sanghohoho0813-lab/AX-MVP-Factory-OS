@@ -197,8 +197,10 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // 도구함
   await page.goto(BASE + '/tools', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
-  const tools = (await page.locator('main').innerText()) ?? ''
   check('모듈 전체: 모듈 카드 다섯(정부지원사업은 기업성장 안, D-163)', (await page.getByTestId('module-cards').locator('[data-module-card]').count()) === 5)
+  // D-627 카드는 처음엔 한 줄(기능 목록은 [기능 n] 을 누르면) — 다 펼쳐서 본다
+  for (const b of await page.getByTestId('module-card-more').all()) await b.click()
+  const tools = (await page.locator('main').innerText()) ?? ''
   check('모듈 전체: 세금 계산기는 절세·재무 카드 안', ((await page.locator('[data-module-card="tax-finance"]').innerText()) ?? '').includes('세금 계산기'))
   // D-170: 기업인증이 들어와 '준비 중' 카드가 없어졌다(cert 브랜치) — 이제 누르는 카드
   check('모듈 전체: 기업인증 · 크레탑 분석기가 들어와 있다(준비 중 카드 없음)', tools.includes('기업인증') && !tools.includes('기업인증 검토') && tools.includes('크레탑 분석기'))

@@ -212,7 +212,8 @@ export function ModuleDashboard({ toolKey, children, assist = true, presets = tr
           panel
           id={`modules.${toolKey}.all`}
           title={allTitle}
-          summary={[`업체 ${sum.clients.length}곳`, `지금 돌릴 수 있는 ${sum.ready.length}곳`, sum.gaps.length ? `서류 빠진 ${sum.gaps.length}곳` : '', overdue.length ? `지난 기한 ${overdue.length}건` : upcoming.length ? `30일 안 기한 ${upcoming.length}건` : '', sum.results.length ? `결과 ${sum.results.length}건` : ''].filter(Boolean).join(' · ')}
+          // D-627 접힌 한 줄 요약은 꼭 볼 것만(업체 수 · 서류 빠진 곳 · 지난 기한) — 나머지 숫자는 펼치면
+          summary={[`업체 ${sum.clients.length}곳`, sum.gaps.length ? `서류 빠진 ${sum.gaps.length}곳` : '', overdue.length ? `지난 기한 ${overdue.length}건` : ''].filter(Boolean).join(' · ')}
           testId="module-all"
         >
           <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
