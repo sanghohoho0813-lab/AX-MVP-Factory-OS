@@ -1812,6 +1812,8 @@ try {
     await pk.waitForTimeout(400)
     await go(pk, `/ops/clients/${kc}?tab=smart`)
     await pk.waitForTimeout(1200)
+    // D-627 서류 올리기 · 다음 행동 등은 [더 보기] 안 — 펼친 뒤 닫힌 칸 · 링크 0 도 같이 본다
+    await openFoldIn(pk, 'smart.more')
     const recoK = await deadEnds(pk)
     check(
       '고객(D-563) 맞춤 추천 탭: 먼저 제안할 것 · 모듈별 판정 · 맞춤 상담 · 맞는 지원사업 칸 없음 · 닫힌 주소 링크 0 · 모듈을 약속하는 말 0',
