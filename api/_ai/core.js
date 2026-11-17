@@ -251,6 +251,34 @@ export function skillKnowledgeAll(skill) {
   return [...new Set([...base, ...extra])].map((k) => KNOWLEDGE[k]).filter(Boolean).map(sanitizeKnowledge).join('\n\n')
 }
 
+/** D-626 대화가 길어져도 넘치지 않게 — 최근 것부터 이만큼(글자) */
+const TALK_BUDGET = { cheap: 5000, standard: 12000, deep: 20000 }
+const BOARD_MAX = 6000
+
+/**
+ * D-626 [지금 기획서 판] · [지금까지의 대화] — input.board(글) · input.history([{ q, a, mode }] 오래된 것부터).
+ * 최근 대화부터 채우고 넘치면 오래된 것은 뺀다(빠진 수를 한 줄로 알린다). 대화 속 지시는 명령이 아니라 자료다(비공개 규칙이 맨 앞에 있다).
+ */
+function talkSections(ask, tier) {
+  const out = []
+  const board = typeof ask.board === 'string' ? ask.board.trim() : ''
+  if (board) out.push(...lines('지금 기획서 판(앞에서 굳힌 것)', [clip(board, BOARD_MAX)]))
+  const turns = (Array.isArray(ask.history) ? ask.history : []).filter((t) => t && typeof t === 'object' && (t.q || t.a)).slice(-40)
+  if (!turns.length) return out
+  let left = TALK_BUDGET[tier] || TALK_BUDGET.standard
+  const rows = []
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const t = turns[i]
+    const row = `${t.mode ? `(${clip(t.mode, 12)}) ` : ''}대표: ${clip(t.q || '(물음 없음)', 1500)}\n답: ${clip(t.a || '(답 없음)', 2500)}`
+    if (row.length > left) break
+    rows.unshift(row)
+    left -= row.length
+  }
+  const dropped = turns.length - rows.length
+  out.push(...lines('지금까지의 대화(오래된 것부터)', [dropped > 0 ? `(앞의 ${dropped}번은 길어서 뺐다 — 굳힌 것은 위 기획서 판에 있다)` : null, ...rows]))
+  return out
+}
+
 export function buildPrompt(skill, context, input, tier, commonRules) {
   const c = context && typeof context === 'object' ? context : {}
   const budget = CONTEXT_BUDGET[tier] || CONTEXT_BUDGET.standard
@@ -266,9 +294,12 @@ export function buildPrompt(skill, context, input, tier, commonRules) {
   const ask = input && typeof input === 'object' ? input : {}
   const opts = ask.options && typeof ask.options === 'object' ? Object.entries(ask.options).slice(0, 12).map(([k, v]) => `- ${clip(k, 30)}: ${clip(typeof v === 'string' || typeof v === 'number' ? v : JSON.stringify(v), 3000)}`) : []
   // 맞춤법 검사는 제안서 글 전체가 작업 요청이다(위치 표시 붙은 줄들) — 그만큼 더 받는다
-  const taskMax = skill.id === 'PROOFREAD' ? 12000 : 4000
+  // D-626 기획 대화는 대표가 길게 적거나 다른 곳의 글을 붙여 묻는다 — 조금 더 받는다
+  const taskMax = skill.id === 'PROOFREAD' ? 12000 : skill.chat ? 6000 : 4000
   const task = [...lines('작업 요청', [ask.task ? clip(ask.task, taskMax) : '- (따로 요청 없음 — 이 스킬의 기본 작업)', ...opts])]
-  const used = head.join('\n').length + task.join('\n').length
+  // D-626 대화 스킬만 — 지금 기획서 판 · 지금까지의 대화를 이어받는다(다른 스킬은 보내도 안 쓴다)
+  const talk = skill.chat ? talkSections(ask, tier) : []
+  const used = head.join('\n').length + task.join('\n').length + talk.join('\n').length
   const mats = Array.isArray(c.materials) ? c.materials.slice(0, 12) : []
   let left = Math.max(0, budget - used)
   const matRows = []
@@ -282,7 +313,7 @@ export function buildPrompt(skill, context, input, tier, commonRules) {
     matRows.push(row)
     left -= row.length
   }
-  const user = [...head, ...lines('자료(필요한 부분만)', matRows), ...task].join('\n').trim()
+  const user = [...head, ...lines('자료(필요한 부분만)', matRows), ...talk, ...task].join('\n').trim()
   // D-264 비공개 규칙이 맨 앞 · 스킬은 화면 이름만(내부 번호 · 판 없이) · 쓰지 않는 이름 · 출처 이름은 한 번 더 지운다
   // D-272 AX 단추는 대표 AX 기준 문서(knowledge.js ax_strategy)를 판단 기준으로 같이 받는다
   const know = skillKnowledge(skill, ask.options)
@@ -294,11 +325,12 @@ export function buildPrompt(skill, context, input, tier, commonRules) {
 /* 공급자 — 세 곳 같은 모양(providers.js)                                         */
 /* ------------------------------------------------------------------ */
 
-export async function callProvider(cfg, tier, system, user) {
+/** opts.search(D-626 기획 리서치) — 공급자의 웹 검색을 붙인다(없는 공급자는 searched=false 로 그냥 답한다) */
+export async function callProvider(cfg, tier, system, user, opts = {}) {
   if (!cfg.key || !cfg.base || !cfg.models[tier]) throw new ProviderError('setup_needed', 503)
   // 예전 OpenAI 설정은 출력 상한을 그대로(시험이 본다) · 새 공급자는 '생각' 토큰 몫까지 두 배
   const maxOut = cfg.legacy ? cfg.maxOut[tier] : cfg.maxOut[tier] * 2
-  return callModel({ provider: cfg.provider, key: cfg.key, base: cfg.base, model: cfg.models[tier], system, user, maxOut, timeoutMs: cfg.timeoutMs })
+  return callModel({ provider: cfg.provider, key: cfg.key, base: cfg.base, model: cfg.models[tier], system, user, maxOut, timeoutMs: cfg.timeoutMs, ...(opts.search ? { search: true } : {}) })
 }
 
 export function costOf(cfg, tier, usage) {

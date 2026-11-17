@@ -10,11 +10,12 @@
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { buildAiContext } from './context'
 import { callAi, type ServerRun } from './aiClient'
-import { emptyCase, newUuid, normalizeBizNo, normalizeUrl, safeMaterialText, withCaseActivity } from './caseUtil'
+import { emptyCase, makeMaterial, newUuid, normalizeBizNo, normalizeUrl, safeMaterialText, sameMaterial, withCaseActivity } from './caseUtil'
 import { proposeFromRun } from './memory'
 import { renderStructured, runSummary } from './render'
 import type { OwnerAiRepo } from './repo'
 import { SKILL_META, skillName } from './skillCatalog'
+import { MODE_DEFAULT_ASK, MODE_LABEL, TALK_SKILL, boardFor, historyFor, pastedTitle, type TalkField, type TalkMode, type TalkThread } from './talk'
 import { EVALUATION_LABEL, RELATION_LABEL, type AiRevision, type AiRun, type AiRunInput, type CaseMaterial, type CaseRelation, type CompanyCase, type ContextSnapshot, type CurrentContext, type Evaluation, type SkillId } from './types'
 
 export interface CaseBundle {
@@ -217,6 +218,96 @@ export async function pasteChatGpt(repo: OwnerAiRepo, bundle: CaseBundle, skill:
   }
   const saved = await repo.addRun(run)
   const c = await patchCase(repo, bundle.c, (x) => withCaseActivity(x, `ChatGPT 결과 붙여넣기 — ${skillName(skill)}`, at))
+  return { run: saved, c }
+}
+
+/* ------------------------------------------------------------------ */
+/* D-626 기획 대화                                                       */
+/* ------------------------------------------------------------------ */
+
+export interface TalkTurnArgs {
+  repo: OwnerAiRepo
+  bundle: CaseBundle
+  /** 이어 가는 대화(없으면 새 대화의 첫 물음) */
+  thread: Pick<TalkThread, 'id' | 'turns' | 'board'> | null
+  threadId: string
+  field: TalkField
+  mode: TalkMode
+  ask: string
+  requestId: string
+  today: string
+  userId: string | null
+  usable?: (key: string) => boolean
+}
+
+/**
+ * 대화 한 번 — 앞 대화(최근 16번) · 지금 기획서 판을 같이 보내고, 답을 실행 한 줄로 남긴다.
+ * 저장하는 입력에는 물음 · 대화 번호 · 갈래만(앞 대화는 줄마다 이미 있다). 활동 기록은 새 대화 · 판 · 프롬프트일 때만(대화마다 쌓이면 다른 기록이 묻힌다).
+ */
+export async function talkTurn(a: TalkTurnArgs): Promise<{ run: AiRun; c: CompanyCase; replayed: boolean }> {
+  const skill = TALK_SKILL[a.mode]
+  const snap = latestSnapshot(a.bundle)
+  const task = a.ask.trim() || MODE_DEFAULT_ASK[a.mode]
+  const context = buildAiContext({
+    skill,
+    c: a.bundle.c,
+    client: a.bundle.client,
+    memory: snap ? { version: snap.version, content: snap.content } : null,
+    runs: a.bundle.runs,
+    revisions: a.bundle.latestRevision,
+    today: a.today,
+    usable: a.usable,
+  })
+  const board = a.thread?.board ?? null
+  const { run: sr, replayed } = await callAi({
+    requestId: a.requestId,
+    skillId: skill,
+    caseId: a.bundle.c.id,
+    contextVersion: snap?.version ?? 0,
+    input: { task, options: { field: a.field }, history: historyFor(a.thread?.turns ?? []), board: boardFor(board, board ? a.bundle.latestRevision.get(board.id)?.content : undefined) },
+    context,
+  })
+  const run = await a.repo.addRun(runFromServer(sr, a.bundle.c.id, { task, options: { thread: a.threadId, field: a.field } }, snap?.id ?? null, a.userId))
+  const first = !a.thread || a.thread.turns.length === 0
+  const note = first ? `기획 대화 시작 — ${task.split('\n')[0].slice(0, 40)}` : a.mode === 'lock' || a.mode === 'prompt' || a.mode === 'judge' ? `기획 대화 · ${MODE_LABEL[a.mode]}${run.status === 'parse_fallback' ? ' · 형식 확인 필요(원문 보관)' : ''}` : ''
+  const c = note ? await patchCase(a.repo, a.bundle.c, (x) => withCaseActivity(x, note, run.createdAt)) : a.bundle.c
+  return { run, c, replayed }
+}
+
+/**
+ * 다른 AI 창에서 하던 대화를 이 대화에 이어 붙인다 — OS 는 바깥 대화를 읽지 못한다. 대표가 붙여 넣은 글만.
+ * 전체 글은 업체 자료(다른 AI 대화)로 남아 다음 물음에 같이 가고, 대화에는 '가져온 대화' 한 줄로 보인다. AI 를 부르지 않는다.
+ */
+export async function importTalk(repo: OwnerAiRepo, bundle: CaseBundle, threadId: string, field: TalkField, text: string, userId: string | null, today: string): Promise<{ run: AiRun; c: CompanyCase }> {
+  const at = new Date().toISOString()
+  const body = safeMaterialText(text).trim().slice(0, 30000)
+  const mat = makeMaterial({ kind: 'chatgpt', title: pastedTitle(body, today), text: body, source: '기획 대화에 붙여 넣음' }, at)
+  const run: AiRun = {
+    id: newUuid(),
+    caseId: bundle.c.id,
+    skillId: 'PLAN_TALK',
+    skillVersion: SKILL_META.PLAN_TALK.version,
+    input: { task: '다른 AI 창에서 하던 대화를 가져옴', options: { thread: threadId, field } },
+    structured: null,
+    rendered: body,
+    contextSnapshotId: latestSnapshot(bundle)?.id ?? null,
+    contextVersion: latestSnapshot(bundle)?.version ?? null,
+    provider: 'manual',
+    model: '붙여넣기',
+    tier: 'manual',
+    status: 'pasted',
+    evaluation: 'draft',
+    evaluationNote: '',
+    adoptedPart: null,
+    evaluatedAt: null,
+    usage: { input: 0, output: 0, total: 0 },
+    estimatedCostUsd: null,
+    requestId: newUuid(),
+    createdBy: userId,
+    createdAt: at,
+  }
+  const saved = await repo.addRun(run)
+  const c = await patchCase(repo, bundle.c, (x) => withCaseActivity(sameMaterial(x.materials, mat) ? x : { ...x, materials: [...x.materials, mat] }, `기획 대화에 다른 AI 대화 가져옴(${body.length.toLocaleString()}자)`, at))
   return { run: saved, c }
 }
 

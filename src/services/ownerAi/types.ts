@@ -185,6 +185,15 @@ export type SkillId =
   | 'CONTEXT_UPDATE'
   | 'PROOFREAD'
   | 'SNAPSHOT_EXTRACT'
+  // D-626 기획 대화(이어서 묻기 · 리서치 · 자체점검 · 기획서 판 · 개발 프롬프트)
+  | 'PLAN_TALK'
+  | 'PLAN_RESEARCH'
+  | 'PLAN_JUDGE'
+  | 'PLAN_LOCK'
+  | 'DEV_PROMPT'
+
+/** D-626 기획 대화의 스킬들 — 대화 한 번이 실행 한 줄이다(결과 목록 · '최근 결과' 에는 넣지 않고 대화 화면에서 본다) */
+export const TALK_SKILL_IDS: readonly SkillId[] = ['PLAN_TALK', 'PLAN_RESEARCH', 'PLAN_JUDGE', 'PLAN_LOCK', 'DEV_PROMPT']
 
 export type Tier = 'cheap' | 'standard' | 'deep' | 'manual'
 
@@ -202,6 +211,19 @@ export type RunStatus = 'succeeded' | 'parse_fallback' | 'failed' | 'pasted'
 export interface AiRunInput {
   task?: string
   options?: Record<string, string | number>
+}
+
+/** D-626 기획 대화 한 번(서버에 이어서 보내는 앞 대화) */
+export interface TalkHistoryRow {
+  q: string
+  a: string
+  mode?: string
+}
+
+/** 서버에 보내는 입력 — 대화 스킬은 앞 대화 · 지금 기획서 판을 같이 보낸다(저장하는 입력에는 넣지 않는다 — 대화마다 줄이 따로 있다) */
+export interface AiCallInput extends AiRunInput {
+  history?: TalkHistoryRow[]
+  board?: string
 }
 
 export interface AiRun {

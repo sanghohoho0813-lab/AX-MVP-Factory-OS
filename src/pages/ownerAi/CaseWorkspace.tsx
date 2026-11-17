@@ -6,12 +6,13 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Archive, Brain, ChevronLeft, ExternalLink, FolderOpen, History, Sparkles, type LucideIcon } from 'lucide-react'
+import { Archive, Brain, ChevronLeft, ExternalLink, FolderOpen, History, MessagesSquare, Sparkles, type LucideIcon } from 'lucide-react'
 import { IconTile } from '../../components/ui/visual'
 import { NextActionBar, PageHero } from '../../components/ui/pageFrame'
 import { slotIcon } from '../../config/iconSlots'
 import { caseNext } from '../../services/ownerAi/caseNext'
 import { AiCallError } from '../../services/ownerAi/aiClient'
+import { threadsOf } from '../../services/ownerAi/talk'
 import { caseSnapshot } from '../../services/ownerAi/context'
 import { caseDocs, docsNotIn } from '../../services/ownerAi/caseDocs'
 import { factsFromExtract, newUuid, withCaseActivity } from '../../services/ownerAi/caseUtil'
@@ -136,6 +137,8 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
 
   const b = bundle
   const aiReady = setup.state === 'ready'
+  // D-626 이 업체의 기획 대화 수(머리 단추에 같이)
+  const talkCount = threadsOf(b.runs).length
 
   const doRun = async (req: RunRequest): Promise<boolean> => {
     if (running) return false
@@ -269,6 +272,11 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
           context={relationSelect}
           actions={
             <>
+              {/* D-626 기획 대화 — 한 번에 답이 안 나오는 일은 이어서 묻는다(대화가 이 업체에 쌓인다) */}
+              <Link to={`/ai/cases/${b.c.id}/talk`} className="tap t-body inline-flex h-11 items-center gap-1.5 rounded-(--radius-control) border border-violet-600 bg-violet-600 px-3 font-semibold text-white hover:border-violet-700 hover:bg-violet-700 sm:h-10" data-testid="case-talk-open" data-guide="fn-talk-open">
+                <MessagesSquare aria-hidden="true" className="size-4" />
+                기획 대화{talkCount > 0 ? ` ${talkCount}` : ''}
+              </Link>
               {b.client && (
                 <Link to={`/ops/clients/${b.client.id}`} className="tap t-body inline-flex h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-medium text-slate-700 hover:bg-slate-50 sm:h-10" data-testid="case-client-link">
                   고객 관리에서 보기
@@ -292,6 +300,9 @@ export function CaseWorkspace({ caseId, embedded = false }: { caseId: string; em
         <div className="t-sub flex flex-wrap items-center gap-x-3 gap-y-1 text-slate-500">
           {b.c.requester && <span>요청 {b.c.requester}</span>}
           {!b.client && <span>고객 관리와 아직 잇지 않음</span>}
+          <Link to={`/ai/cases/${b.c.id}/talk`} className="tap inline-flex min-h-11 items-center gap-1 font-semibold text-brand-700 hover:underline" data-testid="case-talk-open">
+            기획 대화{talkCount > 0 ? ` ${talkCount}` : ''}
+          </Link>
           <Link to={`/ai/cases/${b.c.id}`} className="tap inline-flex min-h-11 items-center gap-1 font-semibold text-brand-700 hover:underline">
             AI 전략실 크게 보기
             <ExternalLink aria-hidden="true" className="size-3.5" />

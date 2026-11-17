@@ -29,8 +29,9 @@ const appendLine = (cur: string, add: string) => {
  * 채택(또는 일부 채택)한 결과 → 기억 칸 제안. 바꾸는 칸만 돌려준다(대표가 확인 · 고친 뒤 새 판으로 저장).
  * revised: 대표가 고친 글(있으면 그것이 우선).
  */
-export function proposeFromRun(run: Pick<AiRun, 'skillId' | 'structured' | 'rendered' | 'adoptedPart' | 'evaluation' | 'skillVersion'>, current: CurrentContext, revised?: unknown): Partial<CurrentContext> {
+export function proposeFromRun(run: Pick<AiRun, 'skillId' | 'structured' | 'rendered' | 'adoptedPart' | 'evaluation' | 'skillVersion'> & Partial<Pick<AiRun, 'input'>>, current: CurrentContext, revised?: unknown): Partial<CurrentContext> {
   const s = obj(revised && typeof revised === 'object' ? revised : run.structured)
+  const opt = obj(run.input?.options)
   const summary = runSummary(run, revised)
   const out: Partial<CurrentContext> = {}
   const unknowns = arr(s.unknowns).map(str).filter(Boolean).slice(0, 5)
@@ -68,6 +69,35 @@ export function proposeFromRun(run: Pick<AiRun, 'skillId' | 'structured' | 'rend
       break
     case 'FREE_CHAT':
       out.decided = appendLine(current.decided, summary)
+      break
+    // D-626 기획 대화 — 대화에서 정해진 것만 기억으로(대표가 확인 · 고친 뒤 저장)
+    case 'PLAN_TALK':
+    case 'PLAN_RESEARCH': {
+      const keep = arr(s.keep).map(str).filter(Boolean).slice(0, 6)
+      if (keep.length) out.decided = keep.reduce((acc, k) => appendLine(acc, k), current.decided)
+      const ask = arr(s.questions).map(str).filter(Boolean).slice(0, 4)
+      if (ask.length) out.unknowns = ask.reduce((acc, u) => appendLine(acc, `- ${u}`), current.unknowns)
+      withUnknowns()
+      break
+    }
+    case 'PLAN_JUDGE': {
+      out.decided = appendLine(current.decided, `기획 자체점검: ${summary}`)
+      const fix = arr(s.mustFix).map(str).filter(Boolean).slice(0, 6)
+      if (fix.length) out.nextSteps = fix.reduce((acc, f) => appendLine(acc, `- ${f}`), current.nextSteps)
+      break
+    }
+    case 'PLAN_LOCK': {
+      // 굳힌 판 = 지금까지 선택된 방향(특허 · 벤처 기획이면 특허 방향 칸)
+      if (opt.field === 'ip') out.patent = summary
+      else out.axDirection = summary
+      const open = arr(s.open).map(str).filter(Boolean).slice(0, 6)
+      if (open.length) out.unknowns = open.reduce((acc, u) => appendLine(acc, `- ${u}`), current.unknowns)
+      const no = arr(s.notBuilding).map(str).filter(Boolean).slice(0, 4)
+      if (no.length) out.decided = appendLine(current.decided, `안 만드는 것: ${no.join(' / ')}`)
+      break
+    }
+    case 'DEV_PROMPT':
+      out.nextSteps = appendLine(current.nextSteps, summary)
       break
     case 'SNAPSHOT_EXTRACT': {
       const facts = arr(s.facts).map(obj)

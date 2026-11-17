@@ -4,7 +4,7 @@
  *       예전에는 작업마다 색이 달라(보라 · 호박 · 초록 · 파랑 · 청록 · 회색) 펼치면 오히려 눈에 안 들어왔다.
  */
 import type { LucideIcon } from 'lucide-react'
-import { Boxes, Brain, FileSearch, FileText, Landmark, LayoutDashboard, Lightbulb, MessageSquareText, MessagesSquare, Rocket, SpellCheck, Stamp, Target } from 'lucide-react'
+import { Boxes, Brain, ClipboardCheck, FileSearch, FileText, Globe, Landmark, LayoutDashboard, Lightbulb, MessageSquareText, MessagesSquare, Rocket, Scale, SpellCheck, Stamp, Target, TerminalSquare } from 'lucide-react'
 import type { FeatureTone } from '../../config/featureVisual'
 import type { SkillId } from '../../services/ownerAi/types'
 
@@ -27,6 +27,12 @@ export const SKILL_ICON: Record<SkillId, LucideIcon> = {
   CONTEXT_UPDATE: Brain,
   PROOFREAD: SpellCheck,
   SNAPSHOT_EXTRACT: FileSearch,
+  // D-626 기획 대화
+  PLAN_TALK: MessagesSquare,
+  PLAN_RESEARCH: Globe,
+  PLAN_JUDGE: Scale,
+  PLAN_LOCK: ClipboardCheck,
+  DEV_PROMPT: TerminalSquare,
 }
 
 export function skillIcon(id: SkillId): LucideIcon {

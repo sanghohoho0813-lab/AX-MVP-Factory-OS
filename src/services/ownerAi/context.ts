@@ -10,7 +10,7 @@ import { clientFacts } from '../../tools/shared/clientPrefill'
 import { buildInsights, manwonText } from '../clientInsights'
 import { redactSensitive } from '../../domain/consulting/privacyFilter'
 import { stripRrn } from '../../tools/employment/lib/privacy'
-import { RELATION_LABEL, type AiRevision, type AiRun, type CaseMaterial, type CompanyCase, type CurrentContext, type MaterialKind, type SkillId, CONTEXT_FIELDS } from './types'
+import { RELATION_LABEL, type AiRevision, type AiRun, type CaseMaterial, type CompanyCase, type CurrentContext, type MaterialKind, type SkillId, CONTEXT_FIELDS, TALK_SKILL_IDS } from './types'
 import { runSummary } from './render'
 import { skillName } from './skillCatalog'
 
@@ -90,6 +90,12 @@ const MATERIALS_FOR: Record<SkillId, readonly MaterialKind[] | 'all' | 'none'> =
   CONTEXT_UPDATE: 'none',
   PROOFREAD: 'none',
   SNAPSHOT_EXTRACT: 'all',
+  // D-626 기획 대화 — 붙여 넣은 다른 AI 대화 · 메모가 가장 중요한 자료다
+  PLAN_TALK: ['chatgpt', 'paste', 'memo', 'intro', 'company_info', 'bizplan', 'url', 'patent', 'other'],
+  PLAN_RESEARCH: ['chatgpt', 'paste', 'memo', 'intro', 'url'],
+  PLAN_JUDGE: ['chatgpt', 'paste', 'memo', 'intro', 'company_info', 'bizplan', 'patent'],
+  PLAN_LOCK: ['chatgpt', 'paste', 'memo', 'intro', 'company_info', 'bizplan', 'patent'],
+  DEV_PROMPT: ['chatgpt', 'paste', 'memo', 'intro'],
 }
 
 /** 화면 쪽에서 한 번 더 — 주민번호 · 비밀번호 · 키 · 계좌 · 이메일 · 휴대폰 */
@@ -149,7 +155,7 @@ export function buildAiContext(a: BuildContextArgs): AiContextPayload {
     adopted.push({ skill: skillName(r.skillId), version: r.skillVersion, partial: r.evaluation === 'partially_adopted', summary: clean(runSummary(r, a.revisions.get(r.id)?.content)).slice(0, 900) })
   }
   const recent = [...a.runs]
-    .filter((r) => r.evaluation === 'draft' && r.skillId !== a.skill && r.status !== 'failed')
+    .filter((r) => r.evaluation === 'draft' && r.skillId !== a.skill && r.status !== 'failed' && !TALK_SKILL_IDS.includes(r.skillId))
     .sort((x, y) => y.createdAt.localeCompare(x.createdAt))
     .slice(0, 2)
     .map((r) => ({ skill: skillName(r.skillId), summary: clean(runSummary(r)).slice(0, 300) }))

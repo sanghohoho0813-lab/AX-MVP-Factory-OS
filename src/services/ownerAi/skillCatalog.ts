@@ -26,6 +26,12 @@ export const SKILL_META: Record<SkillId, SkillMeta> = {
   CONTEXT_UPDATE: { id: 'CONTEXT_UPDATE', name: '기억 정리', version: 1, tier: 'cheap', description: '채택한 결과를 기억 칸에 맞게 정리(확인 뒤 저장)' },
   PROOFREAD: { id: 'PROOFREAD', name: '맞춤법 · 오타 검사', version: 1, tier: 'cheap', description: '제안서 글의 맞춤법 · 오타만' },
   SNAPSHOT_EXTRACT: { id: 'SNAPSHOT_EXTRACT', name: '자료 요약 · 정보 추출', version: 1, tier: 'cheap', description: '올린 자료 요약 · 업체 기본 정보(없으면 미확인)' },
+  // D-626 기획 대화 — 한 번에 답이 안 나오는 일을 이어서 묻는다(대화마다 저장 · 다른 작업이 이어받는다)
+  PLAN_TALK: { id: 'PLAN_TALK', name: '기획 대화', version: 1, tier: 'standard', description: '앞에서 한 말을 이어받아 묻고 답한다' },
+  PLAN_RESEARCH: { id: 'PLAN_RESEARCH', name: '기획 리서치', version: 1, tier: 'standard', description: '시장 · 사례 · 제도를 웹에서 찾아 근거 등급과 함께' },
+  PLAN_JUDGE: { id: 'PLAN_JUDGE', name: '기획 자체점검', version: 1, tier: 'deep', description: '지금까지의 기획을 반대 입장에서 따진다' },
+  PLAN_LOCK: { id: 'PLAN_LOCK', name: '기획서 판', version: 1, tier: 'deep', description: '대화에서 정해진 것을 기획서 한 판으로 굳힌다' },
+  DEV_PROMPT: { id: 'DEV_PROMPT', name: '개발 프롬프트', version: 1, tier: 'deep', description: '굳힌 판을 개발 AI 에 넘길 프롬프트로(저장소 이름 · 첫 메시지)' },
 }
 
 export const TIER_LABEL: Record<Tier, string> = { cheap: '빠르게', standard: '보통', deep: '깊게', manual: '붙여넣기' }

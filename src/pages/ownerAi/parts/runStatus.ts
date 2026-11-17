@@ -2,7 +2,7 @@
  * D-624 AI 전략실 — 작업마다 결과 상태(작업 목록 줄 · 결과 줄이 같은 말 · 같은 글자색).
  * 색은 글자에만: 검토 전 = 주황(해야 할 일) · 채택 = 초록 · 폐기 = 회색. 바탕은 칠하지 않는다.
  */
-import { EVALUATION_LABEL, type AiRun, type Evaluation, type SkillId } from '../../../services/ownerAi/types'
+import { EVALUATION_LABEL, TALK_SKILL_IDS, type AiRun, type Evaluation, type SkillId } from '../../../services/ownerAi/types'
 
 export const EVAL_TEXT: Record<Evaluation, string> = {
   draft: 'text-warning-700',
@@ -11,9 +11,9 @@ export const EVAL_TEXT: Record<Evaluation, string> = {
   rejected: 'text-slate-500',
 }
 
-/** 결과 목록에 보이는 실행 — 맞춤법 검사(제안서 스튜디오 안) · 이미 반영한 기억 정리는 뺀다(기록 · 사용량에는 남는다) */
+/** 결과 목록에 보이는 실행 — 맞춤법 검사(제안서 스튜디오 안) · 이미 반영한 기억 정리 · 기획 대화(D-626 대화 화면에서 본다)는 뺀다(기록 · 사용량에는 남는다) */
 export function listedRuns(runs: readonly AiRun[]): AiRun[] {
-  return runs.filter((r) => r.skillId !== 'PROOFREAD' && (r.skillId !== 'CONTEXT_UPDATE' || r.evaluation === 'draft'))
+  return runs.filter((r) => r.skillId !== 'PROOFREAD' && (r.skillId !== 'CONTEXT_UPDATE' || r.evaluation === 'draft') && !TALK_SKILL_IDS.includes(r.skillId))
 }
 
 /** 작업마다 결과(새것 먼저) */

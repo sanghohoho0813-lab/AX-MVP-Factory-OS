@@ -5,7 +5,7 @@
 import { getDataModeConfig } from '../../data/dataMode'
 import { getSupabaseClient } from '../../lib/supabase/client'
 import type { AiContextPayload } from './context'
-import type { AiRunInput, SkillId, Tier } from './types'
+import type { AiCallInput, SkillId, Tier } from './types'
 import { readChoice } from '../aiAssist/store'
 
 export const AI_ENDPOINT = '/api/ai-run'
@@ -99,7 +99,7 @@ export async function fetchAiStatus(): Promise<AiStatus> {
   return { configured: !!b.configured, tiers: b.tiers, missing: b.missing ?? [], priced: b.priced }
 }
 
-export async function callAi(req: { requestId: string; skillId: SkillId; caseId: string; contextVersion: number; input: AiRunInput; context: AiContextPayload }): Promise<{ run: ServerRun; replayed: boolean }> {
+export async function callAi(req: { requestId: string; skillId: SkillId; caseId: string; contextVersion: number; input: AiCallInput; context: AiContextPayload }): Promise<{ run: ServerRun; replayed: boolean }> {
   let res: Response
   try {
     res = await fetch(AI_ENDPOINT, {

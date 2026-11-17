@@ -350,6 +350,21 @@ await page.keyboard.press('Escape')
     check('G 업체 상세: 연구소를 물으면 답 위에 "이 업체 판정"(연구소 · 모듈과 같은 글)', llm.length > n0 && pinKey === 'labcare' && pinHead.length > 5, { pinKey, pinHead })
     check('G 업체 상세: AI 에 간 자료에도 같은 판정 줄 · 지시문에 "판정 줄 그대로 · 짧게"', sent.includes(pinHead.slice(0, 40)) && sent.includes('글자 그대로 옮긴다') && sent.includes('headline 은 2문장 안'), { has: sent.includes(pinHead.slice(0, 40)), rule: sent.includes('글자 그대로 옮긴다') })
     await shot(page, 'G-client-ask-pin')
+    // D-626 직접 물어보기는 이어서 — 방금 물은 것 · 답이 '앞선 대화' 로 같이 가고, 질문칸 아래에 그렇게 알린다 · [새로 묻기] 로 끊는다
+    const user2 = llm.at(-1)?.user ?? ''
+    check('G D-626 이어서 묻기: 둘째 질문에 [앞선 대화] 로 첫 질문 · 답이 같이 감', user2.includes('[자료 · 앞선 대화') && user2.includes('이 업체 지난달에 뭐 했어?') && llm.at(-1)?.sys.includes('앞선 대화] 가 있으면 그 대화에 이어지는 질문'), user2.slice(0, 500))
+    const carry = page.getByTestId('ai-assist-carry')
+    check("G D-626 질문칸 아래 '이어서 묻기 — 방금 물은 n개와 답을 같이 보내요'", (await carry.count()) === 1 && /방금 물은 [1-5]개/.test(await carry.innerText()), await carry.innerText().catch(() => ''))
+    await shot(page, 'G-ask-carry')
+    await page.getByTestId('ai-assist-carry-reset').click()
+    check('G D-626 [새로 묻기] → 이어받기 줄이 사라짐', (await page.getByTestId('ai-assist-carry').count()) === 0)
+    {
+      const n1 = llm.length
+      await page.getByTestId('ai-assist-ask').fill('새 이야기 — 이 업체 다음 약속이 언제야')
+      await page.getByTestId('ai-assist-ask-send').click()
+      for (let i = 0; i < 40 && llm.length === n1; i++) await page.waitForTimeout(250)
+      check('G D-626 [새로 묻기] 뒤 질문에는 앞 질문이 안 감', llm.length > n1 && !(llm.at(-1)?.user ?? '').includes('[자료 · 앞선 대화'), (llm.at(-1)?.user ?? '').slice(0, 300))
+    }
   }
   await page.keyboard.press('Escape')
 }

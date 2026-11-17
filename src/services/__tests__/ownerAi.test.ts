@@ -23,7 +23,10 @@ import { proposalFrom, qaProposal, roughMeasure, layoutPage, applyFix, proofread
 import { frontFrom } from '../ownerAi/front'
 import { caseNext, CASE_PURPOSES } from '../ownerAi/caseNext'
 import { caseDocs, docsNotIn } from '../ownerAi/caseDocs'
-import { emptyContext, type AiRun, type SkillId } from '../ownerAi/types'
+import { emptyContext, TALK_SKILL_IDS, type AiRun, type SkillId } from '../ownerAi/types'
+import { boardFor, historyFor, modeOfRun, nextStep, threadsOf, turnText, LEGACY_THREAD } from '../ownerAi/talk'
+import { historyRows } from '../workChat/chatTypes'
+import { askCarry } from '../aiAssist/store'
 import { normalizeClientOps } from '../clientOpsService'
 import type { ClientOpsRecord } from '../../types/clientOps'
 
@@ -143,7 +146,7 @@ const CASE = 'case_qa_test_01'
     const m = SKILL_META[s.id as SkillId]
     return m && m.version === s.version && m.tier === s.tier && m.name === s.name
   })
-  check('S1 스킬 서재 — 화면 목록과 서버 스킬이 같은 id · 판 · 단계 · 이름(13개)', same && server.length === 13, server.map((s) => `${s.id}:${s.version}:${s.tier}`))
+  check('S1 스킬 서재 — 화면 목록과 서버 스킬이 같은 id · 판 · 단계 · 이름(18개)', same && server.length === 18, server.map((s) => `${s.id}:${s.version}:${s.tier}`))
   check('S2 스킬 메타데이터 — id · name · version · description · systemInstruction(줄 배열) · outputSchema · active · createdAt · updatedAt', server.every((s) => s.id && s.name && s.version >= 1 && s.description && Array.isArray(s.systemInstruction) && s.systemInstruction.length >= 2 && s.outputSchema && typeof s.active === 'boolean' && /^\d{4}-\d{2}-\d{2}$/.test(s.createdAt) && s.updatedAt))
   check('S3 예시 JSON 이 출력 형식 검사를 통과(모델이 따라 쓸 틀이 틀리지 않음)', server.every((s) => validate(s.outputSchema, s.example).ok), server.filter((s) => !validate(s.outputSchema, s.example).ok).map((s) => [s.id, validate(s.outputSchema, s.example).errors]))
   // D-272 AX 전략 분석 = 대표 AX 기준 문서대로(예전 손으로 쓴 12단계 → 기준 문서의 16단계 · 적합성 판정 · 돈 KPI 3 · 12주 · 반론)
@@ -718,6 +721,66 @@ await serverTests()
 await engineTests()
 caseFirstTests()
 d624Tests()
+/* ---------------- D-626 기획 대화 ---------------- */
+async function d626Tests() {
+  const mk = (skillId: SkillId, at: string, task: string, structured: unknown, thread = 'th_aaaaaa01', extra: Partial<AiRun> = {}): AiRun => ({
+    id: `r_${at}_${skillId}`, caseId: 'case_1', skillId, skillVersion: 1, input: { task, options: { thread, field: 'ax' } }, structured, rendered: structured ? renderStructured(skillId, structured) : '원문', contextSnapshotId: null, contextVersion: 0,
+    provider: 'openai', model: 'm', tier: 'standard', status: 'succeeded', evaluation: 'draft', evaluationNote: '', adoptedPart: null, evaluatedAt: null, usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: 0, requestId: `q_${at}`, createdBy: null, createdAt: at, ...extra,
+  })
+  const board = { title: '그린 배차 AX', constraint: '배차 지연', coreValues: ['늦은 배차 줄이기'], moneyKpis: [{ name: '늦은 배차 건수', baseline: '', target: '절반', how: '배차 기록' }], process: { before: '전화', after: '추천' }, aiMethods: [{ job: '배차 추천', method: '규칙', why: '충분' }], notBuilding: ['기사 앱'], open: ['손실 금액 — 담당에게'], changed: [] }
+  const t1 = mk('PLAN_TALK', '2026-11-17T01:00:00Z', '어디서 돈이 새지', { title: '배차 병목', answer: '배차 지연입니다', questions: ['손실 금액'], next: ['좁혀 줘'], keep: ['병목은 배차'] })
+  const t2 = mk('PLAN_RESEARCH', '2026-11-17T01:05:00Z', '사례 찾아 줘', { answer: '사례가 적다', findings: [{ claim: '주선 수수료 구조', source: '통계', grade: 'A', kind: '시장 사실' }], unknowns: ['동종 수치'], searched: false, sources: [] })
+  const t3 = mk('PLAN_TALK', '2026-11-17T01:10:00Z', '지표를 정하자', { answer: '늦은 배차 건수', keep: [] })
+  const lock = mk('PLAN_LOCK', '2026-11-17T01:20:00Z', '굳혀 줘', board)
+  const other = mk('PLAN_TALK', '2026-11-17T02:00:00Z', '특허 갈래', { answer: '기존 기술 중심' }, 'th_bbbbbb02')
+  const old = mk('PLAN_TALK', '2026-11-16T00:00:00Z', '옛 대화', { answer: '답' }, '', { input: { task: '옛 대화' } })
+  const ax = mk('AX_PENGUIN', '2026-11-17T00:30:00Z', '', { verdict: 'GO' })
+  const all = [ax, t1, t2, t3, lock, other, old]
+
+  const th = threadsOf(all)
+  const main = th.find((t) => t.id === 'th_aaaaaa01')!
+  check('D626-1 실행 → 대화 묶음(대화 번호마다 · 최근에 이어 간 것 먼저 · 다른 작업은 빼고 · 번호 없는 옛 줄은 한 묶음)', th.length === 3 && th[0].id === 'th_bbbbbb02' && main.turns.length === 4 && th.some((t) => t.id === LEGACY_THREAD) && !th.some((t) => t.turns.includes(ax)), th.map((t) => `${t.id}:${t.turns.length}`))
+  check('D626-2 대화 제목 = 굳힌 판 이름 · 판 번호 · 최근 판', main.title === '그린 배차 AX' && main.boardVersion === 1 && main.board?.id === lock.id && main.prompt === null)
+  const hist = historyFor(main.turns)
+  check('D626-3 서버에 같이 보낼 앞 대화 — 오래된 것부터 · 물음 · 답 글 · 모드 이름', hist.length === 4 && hist[0].q === '어디서 돈이 새지' && hist[0].a.includes('배차 지연입니다') && hist[0].a.includes('정해진 것: 병목은 배차') && hist[1].mode === '리서치' && hist[1].a.includes('[A] 주선 수수료 구조') && hist[3].a.startsWith('기획서 판을 굳힘'), hist)
+  check('D626-4 앞 대화는 최근 16번까지(길어지면 오래된 것부터 뺌)', historyFor(Array.from({ length: 30 }, (_, i) => mk('PLAN_TALK', `2026-11-17T03:${String(i).padStart(2, '0')}:00Z`, `q${i}`, { answer: `a${i}` }))).length === 16 && historyFor(Array.from({ length: 30 }, (_, i) => mk('PLAN_TALK', `2026-11-17T03:${String(i).padStart(2, '0')}:00Z`, `q${i}`, { answer: `a${i}` })))[0].q === 'q14')
+  const bt = boardFor(lock)
+  check('D626-5 지금 기획서 판 글 — 칸 이름 · 지표 지금 값 미확인 · 미정 · 고친 판이 있으면 그것', bt.includes('가장 큰 병목: 배차 지연') && bt.includes('늦은 배차 건수 — 지금 미확인 → 목표 절반') && bt.includes('아직 미정') && boardFor(lock, { ...board, constraint: '정산 오류' }).includes('가장 큰 병목: 정산 오류') && boardFor(null) === '', bt)
+  check('D626-6 다음 걸음(규칙) — 세 번 주고받으면 판 · 판 뒤엔 자체점검 · 고칠 것이 나오면 판 다시 · 통과하면 프롬프트', nextStep({ turns: [t1, t2], board: null, judge: null, prompt: null }) === null && nextStep({ turns: [t1, t2, t3], board: null, judge: null, prompt: null })?.mode === 'lock' && nextStep(main)?.mode === 'judge'
+    && nextStep({ ...main, judge: mk('PLAN_JUDGE', '2026-11-17T01:30:00Z', '', { verdict: 'FIX', attacks: [] }) })?.mode === 'lock'
+    && nextStep({ ...main, judge: mk('PLAN_JUDGE', '2026-11-17T01:30:00Z', '', { verdict: 'GO', attacks: [] }) })?.mode === 'prompt'
+    && nextStep({ ...main, judge: mk('PLAN_JUDGE', '2026-11-17T01:30:00Z', '', { verdict: 'GO', attacks: [] }), prompt: mk('DEV_PROMPT', '2026-11-17T01:40:00Z', '', { repoName: 'x', firstMessage: 'y', prompt: 'z' }) }) === null)
+  check('D626-7 결과 목록 · 최근 결과에는 대화가 안 쌓임(대화 화면에서 봄) · 모드 찾기', listedRuns(all).length === 1 && listedRuns(all)[0].id === ax.id && TALK_SKILL_IDS.length === 5 && modeOfRun(lock) === 'lock' && turnText(mk('PLAN_TALK', '2026-11-17T04:00:00Z', 'x', null, 'th_aaaaaa01', { status: 'parse_fallback', rendered: '원문 그대로' })) === '원문 그대로')
+  const ctx = buildAiContext({ skill: 'AX_MVP', c: emptyCase({ companyName: '그린로직스' }, '2026-11-17T00:00:00Z'), client: null, memory: null, runs: [{ ...lock, evaluation: 'adopted', evaluatedAt: '2026-11-17T01:25:00Z' }, t1, t3], revisions: new Map(), today: '2026-11-17' })
+  check('D626-8 채택한 판은 다른 작업이 이어받음(대표가 채택한 결과) · 대화 한 번 한 번은 최근 결과에 안 감', ctx.adopted.some((a) => a.skill === '기획서 판' && a.summary.includes('병목: 배차 지연')) && ctx.recent.length === 0, ctx)
+  const mem = proposeFromRun({ ...lock, evaluation: 'adopted' }, emptyContext())
+  const memIp = proposeFromRun({ ...lock, evaluation: 'adopted', input: { task: '', options: { thread: 'th_aaaaaa01', field: 'ip' } } }, emptyContext())
+  check('D626-9 판 채택 → 기억 제안(방향 칸 · 미정은 모르는 것 · 안 만드는 것은 결정) · 특허 · 벤처 기획이면 특허 방향 칸', String(mem.axDirection).includes('그린 배차 AX') && String(mem.unknowns).includes('손실 금액') && String(mem.decided).includes('안 만드는 것: 기사 앱') && String(memIp.patent).includes('그린 배차 AX') && memIp.axDirection === undefined, mem)
+
+  // 서버 — 대화 스킬만 앞 대화 · 판을 받는다
+  const p = buildPrompt(SKILLS.PLAN_JUDGE, { company: { name: '그린로직스', fields: [] } }, { task: '따져 줘', options: { field: 'ax' }, board: bt, history: hist }, 'deep', COMMON_RULES)
+  check('D626-10 서버 — [지금 기획서 판] · [지금까지의 대화] 가 [작업 요청] 앞에 · 자체점검 기준 문서', p.user.indexOf('[지금 기획서 판') > 0 && p.user.indexOf('[지금까지의 대화') > p.user.indexOf('[지금 기획서 판') && p.user.indexOf('[작업 요청]') > p.user.indexOf('[지금까지의 대화') && p.user.includes('(리서치) 대표: 사례 찾아 줘') && p.system.includes('[기준 문서] 아래 기준대로 판단한다') && p.system.includes('STRATEGY 100'))
+  const long = Array.from({ length: 40 }, (_, i) => ({ q: `물음 ${i} ${'가'.repeat(1400)}`, a: `답 ${i} ${'나'.repeat(2400)}`, mode: '이어서 묻기' }))
+  const pl = buildPrompt(SKILLS.PLAN_TALK, { company: { name: '그린로직스', fields: [] } }, { task: '이어서', options: { field: 'ax' }, history: long }, 'standard', COMMON_RULES)
+  check('D626-11 서버 — 대화가 길면 최근 것부터 채우고 오래된 것은 뺌(뺀 수를 알림 · 넘치지 않음)', pl.user.includes('물음 39') && !pl.user.includes('물음 0 ') && /앞의 \d+번은 길어서 뺐다/.test(pl.user) && pl.user.length < 20000, pl.user.length)
+  const pf = buildPrompt(SKILLS.FREE_CHAT, { company: { name: '그린로직스', fields: [] } }, { task: 'x', history: hist, board: bt }, 'standard', COMMON_RULES)
+  check('D626-12 서버 — 대화 스킬이 아닌 작업은 앞 대화를 보내도 쓰지 않음', !pf.user.includes('지금까지의 대화') && !pf.user.includes('지금 기획서 판'))
+  check('D626-13 서버 — 갈래마다 기준 문서(AX = 전략 잠금 · 특허 · 벤처 = 네 갈래) · 쓰지 않는 이름 0', skillKnowledge(SKILLS.PLAN_TALK, { field: 'ax' }).includes('HYBRID STRATEGY LOCK') && skillKnowledge(SKILLS.PLAN_TALK, { field: 'ip' }).includes('4개 경로') && !skillKnowledge(SKILLS.PLAN_TALK, { field: 'ip' }).includes('HYBRID STRATEGY LOCK') && skillKnowledge(SKILLS.DEV_PROMPT, {}).includes('ASSET PREP BLOCK')
+    && TALK_SKILL_IDS.every((id) => !hasBanned(skillKnowledgeAll(SKILLS[id])) && !hasBanned(SKILLS[id].systemInstruction.join('\n')) && !hasBanned(SKILLS[id].name)))
+  check('D626-14 서버 — 리서치만 웹 검색을 붙임 · 모두 대화 스킬 표시', SKILLS.PLAN_RESEARCH.search === true && TALK_SKILL_IDS.every((id) => SKILLS[id].chat === true) && Object.values(SKILLS).filter((x: { search?: boolean }) => x.search).length === 1)
+
+  // 대화창(특허 · 벤처 · 기업인증 · 모듈) · 화면마다 AI 도우미 [직접 물어보기] — 앞 대화 이어받기
+  const turn = (i: number) => ({ id: `t${i}`, q: `질문 ${i}`, status: 'done' as const, a: { title: `답 ${i} 제목`, lines: [`답 ${i} 본문 줄`], tone: 'info' as const, actions: [], source: 'ai' as const } })
+  const rows = historyRows(Array.from({ length: 9 }, (_, i) => turn(i)) as never)
+  check('D626-15 대화창 — 앞 대화 최근 6번 · 답의 본문 줄까지 같이', rows.length === 6 && rows[0]['질문'] === '질문 3' && String(rows[5]['답']).includes('답 8 본문 줄'), rows)
+  const now = Date.parse('2026-11-17T06:00:00Z')
+  const he = (id: string, at: string, ask: string, headline: string, extra: Record<string, unknown> = {}) => ({ scope: 'marketing', assistId: id, label: '', ask, hash: '', run: { requestId: at, assistId: id, createdAt: at, structured: { headline, items: [{ title: '근거', detail: '자세히' }] }, raw: '' }, ...extra })
+  const carry = askCarry([he('marketing.ask', '2026-11-17T05:50:00Z', '둘째', '둘째 답'), he('marketing.ask', '2026-11-17T05:40:00Z', '첫째', '첫째 답'), he('marketing.plan', '2026-11-17T05:45:00Z', '', '단추 답'), he('marketing.ask', '2026-11-16T05:00:00Z', '어제', '어제 답'), he('marketing.ask', '2026-11-17T05:55:00Z', '이어 쓴 것', '답', { follow: { title: 'x', section: { name: 'x', rows: [] } } })] as never, '', now)
+  check('D626-16 직접 물어보기 — 이 화면에서 방금 물은 것만(오래된 것부터 · 단추 답 · 이어 쓰기 · 6시간 지난 것 빼고)', carry.length === 2 && carry[0]['질문'] === '첫째' && carry[1]['답'].includes('둘째 답 / 근거 — 자세히'), carry)
+  check('D626-17 [새로 묻기] 뒤에는 그 앞 질문을 이어받지 않음', askCarry([he('marketing.ask', '2026-11-17T05:50:00Z', '둘째', '둘째 답')] as never, '2026-11-17T05:55:00Z', now).length === 0)
+}
+
 await d625Tests()
+await d626Tests()
 console.log(`\nownerAi: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

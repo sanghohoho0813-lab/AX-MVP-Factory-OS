@@ -124,6 +124,24 @@ function readAll(): HistoryEntry[] {
   }
 }
 
+/**
+ * D-626 [직접 물어보기] 를 이어서 — 이 화면에서 방금 물은 것 · 받은 답을 다음 질문에 '앞선 대화' 로 같이 보낸다.
+ * 최근 5번 · 6시간 안 · [새로 묻기] 를 누른 뒤의 것만(오래된 대화가 엉뚱하게 섞이지 않게). 오래된 것부터.
+ */
+export const CARRY_TURNS = 5
+export const CARRY_WINDOW_MS = 6 * 3600_000
+export function askCarry(entries: readonly HistoryEntry[], from = '', now = Date.now()): { 질문: string; 답: string }[] {
+  return entries
+    .filter((e) => e.assistId.endsWith('.ask') && !e.follow && e.ask && e.run.createdAt > from && now - Date.parse(e.run.createdAt) < CARRY_WINDOW_MS)
+    .sort((a, b) => a.run.createdAt.localeCompare(b.run.createdAt))
+    .slice(-CARRY_TURNS)
+    .map((e) => {
+      const a = e.run.structured
+      const body = a ? [a.headline, ...(a.items ?? []).slice(0, 6).map((i) => [i.title, i.detail].filter(Boolean).join(' — '))].filter(Boolean).join(' / ') : e.run.raw
+      return { 질문: e.ask.slice(0, 300), 답: String(body ?? '').slice(0, 700) }
+    })
+}
+
 export function historyOf(scope: string): HistoryEntry[] {
   return readAll()
     .filter((e) => e.scope === scope)

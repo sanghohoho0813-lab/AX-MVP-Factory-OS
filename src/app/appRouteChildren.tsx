@@ -66,6 +66,7 @@ const OwnerAiCasePage = lazy(() => import('../pages/ownerAi/OwnerAiCasePage'))
 const OwnerAiUsagePage = lazy(() => import('../pages/ownerAi/OwnerAiUsagePage'))
 const ProposalStudioPage = lazy(() => import('../pages/ownerAi/ProposalStudioPage'))
 const FrontStudioPage = lazy(() => import('../pages/ownerAi/FrontStudioPage'))
+const OwnerAiTalkPage = lazy(() => import('../pages/ownerAi/TalkPage')) // D-626 기획 대화
 // D-103: 영업자용 1차 미팅 체크리스트가 들어올 자리
 const SalesIntakePage = lazy(() => import('../pages/sales/SalesIntakePage').then((m) => ({ default: m.SalesIntakePage })))
 const StrategyLibraryPage = lazy(() => import('../pages/sales/StrategyLibraryPage').then((m) => ({ default: m.StrategyLibraryPage })))
@@ -464,6 +465,7 @@ export const appRouteChildren = [
       { path: 'ai/cases/:caseId', element: <OwnerAiCasePage /> },
       { path: 'ai/cases/:caseId/proposal/:runId', element: <ProposalStudioPage /> },
       { path: 'ai/cases/:caseId/front/:runId', element: <FrontStudioPage /> },
+      { path: 'ai/cases/:caseId/talk', element: <OwnerAiTalkPage /> },
       { path: 'sales/first-meeting', element: <FirstMeetingChecklistPage /> },
       // 영업 관리 (D-114) — 기업컨설팅 OS 를 고객 관리 한 장부 위로. 사이드바 한 줄, 안에서는 탭
       { path: 'sales', element: <Navigate to="/sales/board" replace /> },

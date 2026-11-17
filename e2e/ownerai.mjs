@@ -759,6 +759,163 @@ for (const w of [360, 390]) {
   await m.close()
 }
 
+/* ---- D-626 기획 대화 — 이어서 묻기 · 리서치 · 자체점검 · 기획서 판 · 개발 프롬프트 ---- */
+{
+  FIX.PLAN_TALK = { title: '배차 병목 좁히기', answer: '결론: 배차 지연이 가장 큰 손실입니다.\n- 하루 3건이 늦게 나갑니다\n- 정산 오류가 뒤따릅니다', questions: ['늦은 배차 한 건의 손실 — 배차 담당에게'], next: ['병목 하나로 좁혀 줘', '지표부터 정하자'], keep: ['가장 큰 병목은 배차 지연'] }
+  FIX.PLAN_RESEARCH = { answer: '물류 배차 자동화 사례는 있으나 이 규모의 수치는 확인하지 못했습니다.', findings: [{ claim: '화물 배차 시장은 주선 수수료 구조다', source: '국토교통부 통계(2025)', grade: 'A', kind: '시장 사실', note: '수수료 절감이 지표 후보' }], unknowns: ['동종 규모 회사의 도입 전후 수치'], next: ['옆 업종 사례도 찾아 줘'], keep: ['시장은 주선 수수료 구조'] }
+  FIX.PLAN_JUDGE = { verdict: 'FIX', oneLine: '지표의 지금 값이 없어 효과를 증명할 수 없다', score: 58, scoreWhy: '증명 계획 0점', attacks: [{ role: '의심 많은 사장', point: '배차 추천을 기사가 안 따를 수 있다', why: '현장이 안 쓰면 효과 0', fix: '첫 2주는 추천만 보여 주고 따른 비율을 잰다', level: 'P0' }], five: [{ q: '실제 누가 반복해서 쓰는가', a: '배차 담당 2명', state: '답함' }], mustFix: ['지표의 지금 값을 첫 2주에 잰다'], stop: ['추천을 따른 비율'], next: ['고친 내용으로 판 다시 굳혀 줘'], keep: [] }
+  FIX.PLAN_LOCK = { title: '그린 배차 AX', verdict: '진행 — 본업 손실이 분명하다', constraint: '배차 지연', coreValues: ['늦은 배차 줄이기', '정산 오류 줄이기', '기사 대기 줄이기'], moneyKpis: [{ name: '늦은 배차 건수', baseline: '미확인(첫 2주에 잰다)', target: '절반', how: '배차 기록' }], conversion: '화주가 주문을 앱으로 넣는다', process: { before: '전화로 배차', after: '추천 보고 한 번에 배차' }, job: '오늘 물량을 제때 내보내기', dataAsset: '배차 · 지연 기록', eventMap: ['주문 접수 → 배차 추천'], aiMethods: [{ job: '배차 추천', method: '규칙', why: '거리 · 납기 규칙으로 충분' }], proofPlan: ['2주 전후 지연 건수 비교'], readiness: '화주 화면은 주문 조회만', expansion: ['정산 자동화'], moat: '배차 기록', risks: ['기사가 추천을 안 따름'], notBuilding: ['기사 앱 — 이번엔 문자로'], open: ['늦은 배차 한 건의 손실 — 배차 담당에게'], changed: [], ready: '미정을 채운 뒤 — 지표 값이 없다' }
+  FIX.DEV_PROMPT = { repoName: 'green-dispatch-ax', firstMessage: '저장소 green-dispatch-ax 를 만들고 전략 잠금부터 읽어 줘.', prompt: '# green-dispatch-ax\n\n## 전략 잠금\n- 병목: 배차 지연\n\n## 안 만드는 것\n- 기사 앱', assets: ['ax_cover_main.jpg — 첫 화면'], checks: ['지표의 지금 값을 채웠는지'], missing: ['늦은 배차 한 건의 손실'] }
+
+  const talkRuns = async () => (await runs()).filter((r) => ['PLAN_TALK', 'PLAN_RESEARCH', 'PLAN_JUDGE', 'PLAN_LOCK', 'DEV_PROMPT'].includes(r.skillId))
+  const waitTalk = async (n, ms = 15000) => {
+    const t = Date.now()
+    while (Date.now() - t < ms) {
+      if ((await talkRuns()).length >= n) return true
+      await page.waitForTimeout(150)
+    }
+    return false
+  }
+  const say = async (mode, text) => {
+    await page.getByTestId(`talk-mode-${mode}`).click()
+    if (text) await page.getByTestId('talk-input').fill(text)
+    await page.getByTestId('talk-send').click()
+  }
+  const resultRowsBefore = await page.goto(`${BASE}/ai/cases/${caseId}`, { waitUntil: 'networkidle' }).then(() => page.locator('[data-testid="run-row"], [data-testid="result-row"]').count())
+  const open = page.getByTestId('case-talk-open').first()
+  check('D626 T1 업체 작업실 머리에 [기획 대화] 단추', (await open.count()) > 0 && (await open.innerText()).includes('기획 대화'))
+  await open.click()
+  await page.getByTestId('talk-hero').waitFor()
+  check('D626 T2 첫 화면 — 질문칸 하나 · 순서 한 줄(1 → 2 → 3) · 시작 예시', page.url().endsWith('/talk') && (await page.getByTestId('talk-steps').innerText()).includes('자체점검') && (await page.getByTestId('talk-starter').count()) === 3 && (await page.getByTestId('talk-threads').count()) === 0)
+  await shot(page, 'T1-talk-hero', false)
+  await page.getByTestId('talk-starter').first().click()
+  check('D626 T3 시작 예시를 누르면 질문칸에 들어감(바로 보내지 않음)', (await page.getByTestId('talk-input').inputValue()).length > 10 && (await talkRuns()).length === 0)
+
+  // 1) 이어서 묻기 — 첫 물음
+  const llm0 = llm.length
+  await say('talk', '이 회사에서 돈이 가장 많이 새는 곳이 어디야')
+  check('D626 T4 첫 물음 → 답 카드(답 · 정해야 할 것 · 정해진 것 · 이어 물을 말)', (await waitTalk(1)) && (await page.getByTestId('talk-answer').first().innerText()).includes('배차 지연') && (await page.getByTestId('talk-questions').count()) === 1 && (await page.getByTestId('talk-next-chip').count()) === 2)
+  const c1 = llm.at(-1)
+  check('D626 T5 서버 — 기획 대화 스킬 · 전략 잠금 기준 문서 · 첫 물음엔 앞 대화 없음', llm.length === llm0 + 1 && c1.skill === 'PLAN_TALK' && c1.system.includes('[기준 문서] 아래 기준대로') && c1.system.includes('HYBRID STRATEGY LOCK') && !c1.user.includes('[지금까지의 대화'))
+  const r1 = (await talkRuns())[0]
+  check('D626 T6 대화 한 번 = 실행 한 줄(대화 번호 · 갈래 저장 · 앞 대화는 저장 입력에 안 넣음)', /^th_[a-z0-9]{6,24}$/.test(String(r1.input?.options?.thread)) && r1.input.options.field === 'ax' && !('history' in r1.input) && r1.status === 'succeeded')
+
+  // 2) 이어서 — 앞 대화가 같이 간다
+  await page.getByTestId('talk-next-chip').first().click()
+  check('D626 T7 답 아래 이어 물을 말을 누르면 질문칸에', (await page.getByTestId('talk-input').inputValue()) === '병목 하나로 좁혀 줘')
+  await page.getByTestId('talk-send').click()
+  await waitTalk(2)
+  const c2 = llm.at(-1)
+  check('D626 T8 둘째 물음 — [지금까지의 대화] 에 첫 물음과 첫 답이 같이 감', c2.user.includes('[지금까지의 대화') && c2.user.includes('돈이 가장 많이 새는 곳이 어디야') && c2.user.includes('결론: 배차 지연이 가장 큰 손실입니다') && c2.user.includes('병목 하나로 좁혀 줘'), c2.user.slice(-900))
+
+  // 3) 리서치 — 이 시험의 공급자는 웹 검색이 없다 → 알림
+  await say('research', '같은 업종에서 배차 자동화로 성과를 낸 사례')
+  await waitTalk(3)
+  check('D626 T9 리서치 — 근거 등급 줄 · 못 찾은 것 · 검색 못 한 모델이면 알림', llm.at(-1).skill === 'PLAN_RESEARCH' && (await page.getByTestId('talk-grade').first().innerText()) === 'A' && (await page.getByTestId('talk-unknowns').count()) === 1 && (await page.getByTestId('talk-nosearch').count()) === 1)
+  check('D626 T10 리서치 결과에 검색 여부 · 출처 목록이 서버에서 붙음', (await talkRuns()).find((r) => r.skillId === 'PLAN_RESEARCH')?.structured?.searched === false && Array.isArray((await talkRuns()).find((r) => r.skillId === 'PLAN_RESEARCH')?.structured?.sources))
+
+  // 4) 세 번 주고받으면 '다음: 기획서 판으로 굳히기'
+  const nextGo = page.getByTestId('talk-next-go')
+  check('D626 T11 세 번 주고받으면 다음 걸음 안내(기획서 판으로 굳히기)', (await nextGo.count()) === 1 && (await nextGo.innerText()).includes('기획서 판'))
+  await nextGo.click()
+  check('D626 T12 안내를 누르면 그 모드가 골라짐 · 물음 없이 보낼 수 있음', (await page.getByTestId('talk-send').getAttribute('data-mode')) === 'lock' && (await page.getByTestId('talk-send').isEnabled()))
+  await page.getByTestId('talk-send').click()
+  await waitTalk(4)
+  await page.getByTestId('talk-board').waitFor()
+  const cLock = llm.at(-1)
+  check('D626 T13 기획서 판 — 대화 세 번이 다 같이 가고 판이 옆 칸에(제목 · 칸 · 미정)', cLock.skill === 'PLAN_LOCK' && cLock.user.includes('리서치') && cLock.user.split('대표: ').length - 1 >= 3 && (await page.getByTestId('talk-board-title').innerText()) === '그린 배차 AX' && (await page.getByTestId('talk-board-field').count()) >= 12 && (await page.getByTestId('talk-board-open').innerText()).includes('미정 1개'))
+  check('D626 T14 판 번호(1번째)', (await page.getByTestId('talk-board-version').innerText()).includes('기획서 판 1번째'))
+
+  // 5) 자체점검 — 굳힌 판이 같이 간다
+  check('D626 T15 판을 굳힌 뒤 다음 걸음 = 자체점검', (await nextGo.innerText()).includes('자체점검'))
+  await say('judge', '')
+  await waitTalk(5)
+  const cJudge = llm.at(-1)
+  check('D626 T16 자체점검 — [지금 기획서 판] 이 같이 감 · 판정 · 꼭 고칠 것 · 따져 본 것 접힘', cJudge.skill === 'PLAN_JUDGE' && cJudge.user.includes('[지금 기획서 판') && cJudge.user.includes('그린 배차 AX') && cJudge.user.includes('가장 큰 병목: 배차 지연') && (await page.getByTestId('talk-verdict').getAttribute('data-verdict')) === 'FIX' && (await page.getByTestId('talk-mustfix').count()) === 1 && !(await page.getByTestId('talk-attacks').evaluate((d) => d.open)))
+  check('D626 T17 예전 점검 이름은 화면 · 지시문에 없음(자체점검)', !/악마\s*판사|\x44\x45\x56\x49\x4C/i.test((await page.locator('body').innerText()) + cJudge.system))
+
+  // 6) 개발 프롬프트
+  await say('prompt', '')
+  await waitTalk(6)
+  await page.getByTestId('talk-prompt').waitFor()
+  check('D626 T18 개발 프롬프트 — 저장소 이름 · 처음 붙일 말 · 비어 있는 것', llm.at(-1).skill === 'DEV_PROMPT' && (await page.getByTestId('talk-prompt-repo').innerText()) === 'green-dispatch-ax' && (await page.getByTestId('talk-prompt-first').innerText()).includes('전략 잠금부터') && (await page.getByTestId('talk-prompt-missing').count()) === 1)
+  await page.getByTestId('talk-prompt-copy').click()
+  check('D626 T19 [프롬프트 복사] = 프롬프트 글 그대로', (await page.evaluate(() => navigator.clipboard.readText())).startsWith('# green-dispatch-ax'))
+  await page.getByTestId('talk-prompt-download').click()
+  check('D626 T20 프롬프트 파일로 내려받기(.md)', /green-dispatch-ax_프롬프트\.md$/.test(await lastDl()), await lastDl())
+  await shot(page, 'T2-talk-chat', false)
+  await shot(page, 'T3-talk-full')
+
+  // 7) 판 채택 → 기억에 넣기 → 다른 작업이 이어받는다
+  const snaps0 = (await snaps()).length
+  await page.getByTestId('talk-board-adopt').click()
+  await page.getByTestId('memory-save').waitFor()
+  await page.getByTestId('memory-save').click()
+  await page.waitForFunction((n) => JSON.parse(localStorage.getItem('axmvp.v1.owner_ai.snapshots') ?? '[]').length > n, snaps0)
+  const lockRun = (await talkRuns()).find((r) => r.skillId === 'PLAN_LOCK')
+  const lastSnap = (await snaps()).at(-1)
+  check('D626 T21 [이 판 채택] → 기억에 넣기(방향 칸에 판 요약) · 새 기억 판', lockRun.evaluation === 'adopted' && (await snaps()).length === snaps0 + 1 && String(lastSnap.content.axDirection).includes('그린 배차 AX') && String(lastSnap.content.axDirection).includes('병목: 배차 지연'), lastSnap?.content?.axDirection)
+
+  // 8) 새로 고쳐도 그대로 · 실패 → 다시 보내기
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByTestId('talk-turns').waitFor()
+  check('D626 T22 새로 고쳐도 대화 6번 · 판 · 프롬프트 그대로', (await page.getByTestId('talk-turn').count()) === 6 && (await page.getByTestId('talk-board-title').innerText()) === '그린 배차 AX' && (await page.getByTestId('talk-prompt-repo').count()) === 1 && (await page.getByTestId('talk-thread').count()) === 1)
+  llmOverride = { status: 500, body: '{"error":{"message":"boom"}}' }
+  await say('talk', '지표를 하나로 줄이면 뭐가 남아')
+  await page.getByTestId('talk-failed').waitFor()
+  check('D626 T23 실패 — 대화에 실패 한 줄 · 적은 말은 질문칸에 그대로 · 저장 0', (await page.getByTestId('talk-input').inputValue()) === '지표를 하나로 줄이면 뭐가 남아' && (await talkRuns()).length === 6 && !(await page.getByTestId('talk-failed').innerText()).includes('boom'))
+  await page.getByTestId('talk-retry').click()
+  check('D626 T24 [다시 보내기] → 답', (await waitTalk(7)) && (await page.getByTestId('talk-turn').count()) === 7)
+
+  // 9) 새 대화 — 앞 대화와 섞이지 않는다
+  await page.getByTestId('talk-new').click()
+  await page.getByTestId('talk-hero').waitFor()
+  await page.getByTestId('talk-field-ip').click()
+  await say('talk', '이 회사가 가진 기술부터 정리하자')
+  await waitTalk(8)
+  const cNew = llm.at(-1)
+  const threadIds = [...new Set((await talkRuns()).map((r) => r.input.options.thread))]
+  check('D626 T25 새 대화 — 대화 번호 따로 · 앞 대화 내용이 안 섞임 · 특허 · 벤처 갈래 기준 문서', threadIds.length === 2 && !cNew.user.includes('돈이 가장 많이 새는 곳') && !cNew.user.includes('[지금 기획서 판') && cNew.user.includes('field: ip') && cNew.system.includes('4개 경로') && (await page.getByTestId('talk-thread').count()) === 2, cNew.user.slice(-500))
+
+  // 10) 다른 AI 대화 가져오기 — AI 를 부르지 않고 자료 + 대화 한 줄
+  const llmN = llm.length
+  await page.getByTestId('talk-import').click()
+  await page.getByTestId('talk-import-text').fill('나: 특허를 어느 갈래로 갈까\n답: 기존 설비 제어 기술이 있으니 기존 기술 중심으로 가세요. 담당자 주민번호 900101-1234567')
+  await page.getByTestId('talk-import-save').click()
+  await page.getByTestId('talk-pasted').waitFor()
+  const theCase = (await cases()).find((c) => c.id === caseId)
+  const imported = theCase.materials.find((m) => m.kind === 'chatgpt' && m.title.startsWith('가져온 대화'))
+  check('D626 T26 다른 AI 대화 가져오기 — AI 0번 · 업체 자료로 남음 · 주민번호 지움 · 대화에 한 줄', llm.length === llmN && !!imported && imported.text.includes('기존 기술 중심') && !JSON.stringify(theCase).includes('900101-1234567') && !JSON.stringify(await talkRuns()).includes('900101-1234567'))
+  await say('talk', '그럼 그 갈래로 증거부터 모으자')
+  await waitTalk(10)
+  check('D626 T27 가져온 대화가 다음 물음에 같이 감(자료 + 앞 대화)', llm.at(-1).user.includes('기존 기술 중심'), llm.at(-1).user.slice(0, 600))
+
+  // 11) 업체 작업실 — 결과 목록에는 대화가 안 쌓인다 · 단추에 대화 수
+  await page.goto(`${BASE}/ai/cases/${caseId}`, { waitUntil: 'networkidle' })
+  const rowsAfter = await page.locator('[data-testid="run-row"], [data-testid="result-row"]').count()
+  check('D626 T28 업체 작업실 — 단추에 대화 수 · 결과 목록은 그대로(대화가 결과 줄로 쌓이지 않음)', (await page.getByTestId('case-talk-open').first().innerText()).includes('기획 대화 2') && rowsAfter === resultRowsBefore && !(await page.locator('main').innerText()).includes('기획 리서치'), [resultRowsBefore, rowsAfter])
+
+  // 12) 휴대폰 390 — 넘침 0 · 대화 / 판 탭
+  {
+    const m = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR' })
+    const mp = await m.newPage()
+    await wireApi(mp)
+    await mp.goto(BASE + '/', { waitUntil: 'networkidle' })
+    const dump = await page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter((k) => k.startsWith('axmvp.')).map((k) => [k, localStorage.getItem(k)])))
+    await mp.evaluate((d) => Object.entries(d).forEach(([k, v]) => localStorage.setItem(k, v)), dump)
+    await mp.goto(`${BASE}/ai/cases/${caseId}/talk?t=${threadIds.find((t) => t === r1.input.options.thread)}`, { waitUntil: 'networkidle' })
+    await mp.getByTestId('talk-turns').waitFor()
+    const over = await mp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    const box = await mp.getByTestId('talk-send').boundingBox()
+    check('D626 T29 휴대폰 390 — 가로 넘침 0 · 보내기 단추 화면 안 · 대화/판 탭', over <= 1 && !!box && box.x + box.width <= 390 && box.height >= 40 && (await mp.getByTestId('talk-pane-board').isVisible()), [over, box])
+    await shot(mp, 'M390-talk', false)
+    await mp.getByTestId('talk-pane-board').click()
+    check('D626 T30 휴대폰 — [기획서 판] 탭을 누르면 판만 보임', (await mp.getByTestId('talk-board').isVisible()) && !(await mp.getByTestId('talk-turns').isVisible()))
+    await shot(mp, 'M390-talk-board', false)
+    await m.close()
+  }
+}
+
 /* ---- 키 · 공급자 노출 0 ---- */
 {
   const dist = path.resolve('dist/assets')

@@ -82,6 +82,65 @@ function axItem(title: string, it: O): string[] {
   ].filter((x, i, a) => x !== '' || a[i - 1] !== '')
 }
 
+/** D-626 자체점검 판정 → 화면 말 */
+export function judgeVerdictLabel(v: unknown): string {
+  const k = str(v).toUpperCase().replace(/[\s-]+/g, '_')
+  return ({ GO: '이대로 개발', FIX: '고치고 개발', HOLD: '더 알아본 뒤', NO_GO: '다시 기획' } as Record<string, string>)[k] ?? (str(v) || '판정 없음')
+}
+
+/** D-626 기획서 판 칸(순서 = 화면 · 글 · 서버에 다시 보내는 판) */
+export const BOARD_FIELDS: readonly { key: string; label: string; kind: 'text' | 'list' | 'kpi' | 'process' | 'method' }[] = [
+  { key: 'verdict', label: '판정', kind: 'text' },
+  { key: 'constraint', label: '가장 큰 병목', kind: 'text' },
+  { key: 'coreValues', label: '핵심 가치 3', kind: 'list' },
+  { key: 'moneyKpis', label: '돈으로 보이는 지표 3', kind: 'kpi' },
+  { key: 'conversion', label: '고객이 해야 하는 행동', kind: 'text' },
+  { key: 'process', label: '업무 재설계', kind: 'process' },
+  { key: 'job', label: '고객이 지금 하려는 일', kind: 'text' },
+  { key: 'dataAsset', label: '쌓이는 데이터 자산', kind: 'text' },
+  { key: 'eventMap', label: '고객 행동 → 사내 업무', kind: 'list' },
+  { key: 'aiMethods', label: 'AI 방식', kind: 'method' },
+  { key: 'proofPlan', label: '증명 계획', kind: 'list' },
+  { key: 'readiness', label: '고객 화면 · 확장 준비', kind: 'text' },
+  { key: 'expansion', label: '뒤에 넓힐 것', kind: 'list' },
+  { key: 'moat', label: '만든 뒤 남는 것', kind: 'text' },
+  { key: 'risks', label: '위험', kind: 'list' },
+  { key: 'notBuilding', label: '이번에 안 만드는 것', kind: 'list' },
+]
+
+/** 판 한 칸 → 줄들(빈 칸은 빈 목록) */
+export function boardFieldLines(kind: (typeof BOARD_FIELDS)[number]['kind'], v: unknown): string[] {
+  if (kind === 'text') return str(v) ? [str(v)] : []
+  if (kind === 'list') return strs(v)
+  if (kind === 'process') {
+    const p = obj(v)
+    return [str(p.before) ? `지금: ${str(p.before)}` : '', str(p.after) ? `바뀐 뒤: ${str(p.after)}` : ''].filter(Boolean)
+  }
+  if (kind === 'kpi')
+    return arr(v)
+      .map(obj)
+      .filter((k) => str(k.name))
+      .map((k) => `${str(k.name)} — 지금 ${str(k.baseline) || '미확인'} → 목표 ${str(k.target) || '미정'}${str(k.how) ? ` (재는 법: ${str(k.how)})` : ''}`)
+  return arr(v)
+    .map(obj)
+    .filter((m) => str(m.job))
+    .map((m) => `${str(m.job)} — ${str(m.method) || '미정'}${str(m.why) ? ` (${str(m.why)})` : ''}`)
+}
+
+/** 기획서 판 → 글(복사 · 서버에 '지금 기획서 판' 으로 다시 보내는 글) */
+export function boardText(s: unknown): string {
+  const o = obj(s)
+  const out: string[] = [`**${str(o.title) || '기획서 판'}**`, ...(str(o.ready) ? [`- 개발로 넘기기: ${str(o.ready)}`] : []), '']
+  for (const f of BOARD_FIELDS) {
+    const rows = boardFieldLines(f.kind, o[f.key])
+    if (!rows.length) continue
+    if (rows.length === 1 && f.kind === 'text') out.push(`- ${f.label}: ${rows[0]}`)
+    else out.push(`**${f.label}**`, ...rows.map((r) => `- ${r}`), '')
+  }
+  out.push('', ...list('아직 미정', strs(o.open)), ...list('지난 판에서 바뀐 것', strs(o.changed)))
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
 export function renderStructured(skill: SkillId, s: unknown): string {
   const o = obj(s)
   switch (skill) {
@@ -182,6 +241,45 @@ export function renderStructured(skill: SkillId, s: unknown): string {
       return str(o.message)
     case 'FREE_CHAT':
       return str(o.answer)
+    // D-626 기획 대화
+    case 'PLAN_TALK':
+      return [str(o.answer), '', ...list('정해야 할 것', strs(o.questions)), ...list('새로 정해진 것', strs(o.keep))].join('\n').trim()
+    case 'PLAN_RESEARCH':
+      return [
+        o.searched === false ? '(검색 없이 아는 범위로 답함 — 확인 필요)' : '',
+        str(o.answer),
+        '',
+        ...list('찾은 것', arr(o.findings).map(obj).map((f) => `[${[str(f.grade), str(f.kind)].filter(Boolean).join(' · ') || '등급 없음'}] ${str(f.claim)}${str(f.source) ? ` — ${str(f.source)}` : ''}${str(f.note) ? ` → ${str(f.note)}` : ''}`)),
+        ...list('못 찾은 것', strs(o.unknowns)),
+        ...list('출처(검색 기록)', arr(o.sources).map(obj).map((x) => `${str(x.title)} ${str(x.url)}`.trim()).filter(Boolean)),
+        ...list('기획에 남길 것', strs(o.keep)),
+      ].join('\n').trim()
+    case 'PLAN_JUDGE':
+      return [
+        `**판정: ${judgeVerdictLabel(o.verdict)}**${str(o.oneLine) ? ` — ${str(o.oneLine)}` : ''}`,
+        ...(typeof o.score === 'number' && o.score > 0 ? [`- 전략 점수: ${Math.round(o.score)}점${str(o.scoreWhy) ? ` — ${str(o.scoreWhy)}` : ''}`] : []),
+        '',
+        ...list('꼭 고칠 것', strs(o.mustFix)),
+        ...list('따져 본 것', arr(o.attacks).map(obj).map((a) => `[${str(a.level) || 'P1'}] ${str(a.role) ? `${str(a.role)}: ` : ''}${str(a.point)}${str(a.why) ? ` — ${str(a.why)}` : ''}${str(a.fix) ? ` → ${str(a.fix)}` : ''}`)),
+        ...list('다섯 질문', arr(o.five).map(obj).map((f) => `${str(f.q)} → ${str(f.a) || '(답 없음)'}${str(f.state) ? ` (${str(f.state)})` : ''}`)),
+        ...list('접거나 다시 설계할 기준', strs(o.stop)),
+      ].join('\n').trim()
+    case 'PLAN_LOCK':
+      return boardText(o)
+    case 'DEV_PROMPT':
+      return [
+        ...line('저장소 이름', o.repoName),
+        '',
+        ...list('아직 비어 있는 것', strs(o.missing)),
+        '**처음 붙여 넣을 말**',
+        str(o.firstMessage),
+        '',
+        '**프롬프트**',
+        str(o.prompt),
+        '',
+        ...list('먼저 만들어 둘 그림', strs(o.assets)),
+        ...list('보내기 전 확인', strs(o.checks)),
+      ].join('\n').trim()
     case 'CONTEXT_UPDATE':
       return Object.entries(obj(o.proposed)).filter(([, v]) => str(v)).map(([k, v]) => `- ${CONTEXT_FIELDS.find((f) => f.key === k)?.label ?? k}: ${str(v)}`).join('\n')
     case 'PROOFREAD':
@@ -239,6 +337,23 @@ export function runSummary(run: Pick<AiRun, 'skillId' | 'structured' | 'rendered
       return str(s.message).slice(0, 300)
     case 'FREE_CHAT':
       return str(s.memoryCandidate) || str(s.answer).slice(0, 300)
+    // D-626 기획 대화 — 채택한 판은 다른 작업(MVP · 화면 · 제안서)이 '대표가 채택한 결과' 로 이어받는다
+    case 'PLAN_TALK':
+    case 'PLAN_RESEARCH':
+      return strs(s.keep).join(' / ') || str(s.answer).slice(0, 300)
+    case 'PLAN_JUDGE':
+      return [`${judgeVerdictLabel(s.verdict)}${str(s.oneLine) ? ` — ${str(s.oneLine)}` : ''}`, strs(s.mustFix).length ? `꼭 고칠 것: ${strs(s.mustFix).slice(0, 4).join(' / ')}` : ''].filter(Boolean).join(' · ')
+    case 'PLAN_LOCK':
+      return [
+        str(s.title),
+        str(s.constraint) ? `병목: ${str(s.constraint)}` : '',
+        strs(s.coreValues).length ? `핵심 가치: ${strs(s.coreValues).slice(0, 3).join(' / ')}` : '',
+        arr(s.moneyKpis).length ? `지표: ${arr(s.moneyKpis).map(obj).map((k) => str(k.name)).filter(Boolean).slice(0, 3).join(' / ')}` : '',
+        strs(s.notBuilding).length ? `안 만드는 것: ${strs(s.notBuilding).slice(0, 3).join(' / ')}` : '',
+        strs(s.open).length ? `미정 ${strs(s.open).length}개` : '',
+      ].filter(Boolean).join(' · ')
+    case 'DEV_PROMPT':
+      return `개발 프롬프트 — 저장소 ${str(s.repoName) || '(이름 없음)'}${strs(s.missing).length ? ` · 비어 있는 것 ${strs(s.missing).length}개` : ''}`
     case 'SNAPSHOT_EXTRACT':
       return str(s.summary).slice(0, 400)
     default:

@@ -25,6 +25,12 @@ export const WHATS_NEW_MAX = 10
 
 export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
   {
+    id: 'ask-follow',
+    date: '2026-11-17',
+    title: 'AI 도우미에 이어서 물을 수 있어요 — 방금 한 답을 이어받아요',
+    how: "화면의 [AI 도우미] › 직접 물어보기에 한 번 묻고, 답을 본 뒤 '그럼 그중에 급한 건?' 처럼 이어서 물어보세요. 방금 주고받은 것을 같이 보고 답해요. 다른 이야기를 하려면 [새로 묻기] 를 누르면 돼요.",
+  },
+  {
     id: 'youtube-topics-one',
     date: '2026-11-15',
     title: "유튜브 '이번 주 뜨는 주제' 하나로 합쳤어요 — 누르면 제목 · 표지 글까지",
@@ -94,14 +100,6 @@ export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
     date: '2026-11-11',
     title: '휴대폰에서 맨 위 화면 이름을 누르면 그 화면 안내가 떠요',
     how: '어느 화면에서든 맨 위 이름 옆 ⓘ 를 눌러 보세요 — 무엇을 하는 곳인지 바로 나와요.',
-  },
-  {
-    id: 'bulk-clients',
-    date: '2026-11-10',
-    title: '여러 업체를 한 번에 등록해요',
-    how: '엑셀에서 목록을 복사해 붙여넣거나 엑셀 파일을 그대로 고르면 돼요. 이미 있는 업체는 건너뛰어요.',
-    path: '/ops/clients?bulk=1',
-    cta: '한 번에 등록해 보기',
   },
 ]
 

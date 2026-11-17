@@ -3,6 +3,7 @@
  *
  *   GET  /api/ai-run?status=1   설정 상태(키 · 모델 이름 값은 빼고 '있다/없다' 만)
  *   POST /api/ai-run            { requestId, skillId, caseId, contextVersion, input, context, choice? } → 결과(구조 JSON · 토큰 · 비용)
+ *                               D-626 대화 스킬(기획 대화 · 리서치 · 자체점검 · 기획서 판 · 개발 프롬프트)은 input.history · input.board 를 이어받는다
  *                               choice = { provider: 'gemini'|'openai'|'anthropic', model? } — 모델이 없으면 그 공급자의 빠르게/보통/깊게 모델(D-239),
  *                               있으면 모든 일에 그 모델(D-255 대표 "어디서든 내가 고른 모델로")
  *
@@ -46,9 +47,14 @@ async function runOnce(cfg, skill, body) {
   const context = scrubBrandDeep(scrubDeep(body.context || {}))
   const input = scrubBrandDeep(scrubDeep(body.input || {}))
   const { system, user, sent } = buildPrompt(skill, context, input, tier, COMMON_RULES)
-  const out = await callProvider(cfg, tier, system, user)
+  const out = await callProvider(cfg, tier, system, user, { search: !!skill.search })
   const parsed = extractJson(out.content)
   const checked = parsed ? validate(skill.outputSchema, parsed) : { ok: false, value: null, errors: ['JSON 아님'] }
+  // D-626 리서치 — 검색을 실제로 했는지 · 공급자가 돌려준 출처(모델이 적은 글이 아니라 검색 기록)를 결과에 같이
+  if (skill.search && checked.ok) {
+    checked.value.searched = !!out.searched
+    checked.value.sources = (Array.isArray(out.sources) ? out.sources : []).slice(0, 8)
+  }
   const status = checked.ok ? 'succeeded' : 'parse_fallback'
   const known = `${JSON.stringify(context)}\n${JSON.stringify(input)}`
   const safe = checked.ok ? guardOutput(checked.value, secrets(), known) : { value: null, blocked: 0 }

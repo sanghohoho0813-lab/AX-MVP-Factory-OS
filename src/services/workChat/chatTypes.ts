@@ -116,12 +116,17 @@ export function answerText(a: ChatAnswer): string {
   return [a.title, ...a.lines.map((l) => `- ${l}`), ...(a.next?.length ? ['', '다음:', ...a.next.map((n) => `- ${n}`)] : []), ...(a.caution ? ['', `확인: ${a.caution}`] : [])].join('\n')
 }
 
-/** AI 에 보낼 앞선 대화(최근 3개 · 질문은 가림 처리) */
+/**
+ * AI 에 보낼 앞선 대화(질문은 가림 처리).
+ * D-626 대표: "한 번 눌러서 답이 안 나오는 일은 여러 번 주고받아야 한다" — 전에는 최근 3번 · 답의 첫 줄(200자)만 보내
+ * 이어 물어도 앞 답의 내용을 몰랐다. 이제 최근 6번 · 답의 본문 줄까지(600자).
+ */
+export const HISTORY_TURNS_SENT = 6
 export function historyRows(turns: readonly ChatTurn[]): AssistRow[] {
   return turns
     .filter((t) => t.status === 'done' && t.a)
-    .slice(-3)
-    .map((t) => ({ 질문: redactSensitive(t.q).text.slice(0, 200), 답: t.a!.title.slice(0, 200) }))
+    .slice(-HISTORY_TURNS_SENT)
+    .map((t) => ({ 질문: redactSensitive(t.q).text.slice(0, 300), 답: redactSensitive([t.a!.title, ...t.a!.lines].join(' / ')).text.slice(0, 600) }))
 }
 
 /** [사용 방법] 시트 한 단계 */

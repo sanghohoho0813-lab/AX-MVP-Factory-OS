@@ -303,7 +303,7 @@ function cloudRepo(workspaceId: string, userId: string): OwnerAiRepo {
       return { id: String(r.id), caseId, version, content: normalizeContext(r.content), source: String(r.source), note: String(r.note ?? ''), createdBy: userId, createdAt: String(r.created_at) }
     },
     async listRuns(caseId) {
-      return check<Row[]>(await db().from('ai_runs').select('*').eq('company_case_id', caseId).order('created_at', { ascending: false }).limit(300)).map(runFromRow)
+      return check<Row[]>(await db().from('ai_runs').select('*').eq('company_case_id', caseId).order('created_at', { ascending: false }).limit(1000)).map(runFromRow)
     },
     async listRunsSince(iso) {
       return check<Row[]>(await db().from('ai_runs').select('*').gte('created_at', iso).order('created_at', { ascending: false }).limit(2000)).map(runFromRow)

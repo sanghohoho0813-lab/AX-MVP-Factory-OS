@@ -33,7 +33,7 @@ import type { AssistBundle } from '../../services/aiAssist/context'
 import { askPresetOf, presetsFor } from '../../services/aiAssist/presets'
 import type { AssistPage, AssistPreset } from '../../services/aiAssist/presets'
 import { CHOICE_EVENT, contextHash, historyOf, markDone, newRequestId, pushHistory, readChoice, saveChoice, allowedProviders, isCheapOnly } from '../../services/aiAssist/store'
-import type { AiChoice, FollowMeta, HistoryEntry } from '../../services/aiAssist/store'
+import { askCarry, type AiChoice, type FollowMeta, type HistoryEntry } from '../../services/aiAssist/store'
 import { useToast } from '../ui/toastContext'
 import { ModelPicker } from './ModelPicker'
 import { josa } from '../../lib/josa'
@@ -338,6 +338,9 @@ function AssistPanel({
   const [shown, setShown] = useState<Shown>(null)
   const [history, setHistory] = useState<HistoryEntry[]>(() => historyOf(scope))
   const [ask, setAsk] = useState('')
+  // D-626 [새로 묻기] 를 누른 때 — 그 앞의 질문은 이어받지 않는다
+  const [carryFrom, setCarryFrom] = useState('')
+  const carryFromRef = useRef('')
   // D-618 지금 보고 있는 질문 — 그 화면이 규칙으로 아는 답(pin)을 AI 답보다 먼저 보여 준다(AI 가 실패해도 남는다)
   const [liveAsk, setLiveAsk] = useState('')
   // D-288 적은 질문은 기본으로 '직접 질문'(이 화면 자료로 그 질문에만 답) — 예전에는 첫 단추(예: 이번 주 일정 한눈에)에 묶여 그 단추 답만 나왔다
@@ -394,7 +397,9 @@ function AssistPanel({
         const bundle = await Promise.resolve(build())
         const hash = contextHash(JSON.stringify(bundle.context))
         setNowHash(hash)
-        const context = opts.follow ? { ...bundle.context, sections: [opts.follow.section, ...bundle.context.sections] } : bundle.context
+        // D-626 직접 물어보기는 이어서 — 이 화면에서 방금 주고받은 것을 '앞선 대화' 로 같이 보낸다(단추 · 이어 쓰기는 그대로)
+        const carry = !opts.follow && preset.id.endsWith('.ask') ? askCarry(historyOf(scope), carryFromRef.current) : []
+        const context = opts.follow ? { ...bundle.context, sections: [opts.follow.section, ...bundle.context.sections] } : carry.length ? { ...bundle.context, sections: [{ name: '앞선 대화', rows: carry }, ...bundle.context.sections] } : bundle.context
         const runResult: AssistRun = await callAssist({ requestId, assistId: preset.id, page, choice: opts.choice ?? choice ?? (status ? status.defaultChoice : null), context, ask: masked })
         const label = opts.follow ? `${preset.label} · ${opts.follow.title}` : preset.id.endsWith('.ask') ? '직접 물어본 것' : preset.label
         const entry: HistoryEntry & { links: Record<string, string> } = { scope, assistId: preset.id, label, ask: masked, hash, run: runResult, links: bundle.links, ids: bundle.ids ?? {}, ...(bundle.aliases ? { aliases: bundle.aliases } : {}), ...(opts.follow ? { follow: opts.follow } : {}) }
@@ -476,6 +481,9 @@ function AssistPanel({
     const p = presets.find((x) => x.id === autoRun)
     if (p) request(p, p.label)
   }, [autoRun, presets, request])
+
+  // D-626 다음 질문에 같이 갈 앞 질문 수(이 화면 · 6시간 안 · [새로 묻기] 뒤)
+  const carryCount = useMemo(() => askCarry(history, carryFrom).length, [history, carryFrom])
 
   const sendAsk = () => {
     const text = ask.trim()
@@ -570,6 +578,24 @@ function AssistPanel({
                     {askPreset === DIRECT ? '물어보기' : '같이 보내기'}
                   </button>
                 </div>
+                {/* D-626 이어서 묻기 — 방금 주고받은 것을 같이 보낸다는 것을 보여 주고, 끊고 싶으면 [새로 묻기] */}
+                {askPreset === DIRECT && carryCount > 0 && (
+                  <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-1 break-keep text-violet-900" data-testid="ai-assist-carry">
+                    <span>이어서 묻기 — 방금 물은 {carryCount}개와 답을 같이 보내요</span>
+                    <button
+                      type="button"
+                      className="tap t-sub rounded-full border border-violet-300 bg-white px-2.5 py-0.5 font-semibold text-violet-800 hover:bg-violet-50"
+                      onClick={() => {
+                        const at = new Date().toISOString()
+                        carryFromRef.current = at
+                        setCarryFrom(at)
+                      }}
+                      data-testid="ai-assist-carry-reset"
+                    >
+                      새로 묻기
+                    </button>
+                  </p>
+                )}
               </div>
             </section>
 
