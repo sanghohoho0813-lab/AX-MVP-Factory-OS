@@ -7,7 +7,7 @@
  * 직접 적는 빠른 등록은 그대로(머리줄 [업체 등록]).
  */
 import { useMemo, useState } from 'react'
-import { FileUp, Search, Users } from 'lucide-react'
+import { FileUp, Search, Users, ChevronRight } from 'lucide-react'
 import { NewClientDocDrop } from '../../../components/ops/NewClientDocDrop'
 import { Badge, Surface } from '../../../components/ui/primitives'
 import { Button } from '../../../components/ui/Button'
@@ -98,12 +98,13 @@ export function CaseQuickStart({
                     type="button"
                     disabled={busy}
                     onClick={() => onPickClient(c.id)}
-                    className="tap flex min-h-14 w-full min-w-0 flex-col items-start gap-0.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-left hover:border-brand-300 hover:bg-brand-50/50 disabled:opacity-60"
+                    className="tap flex min-h-11 w-full min-w-0 items-center justify-between gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-left hover:border-brand-300 hover:bg-brand-50/50 disabled:opacity-60"
                     data-testid="case-quick-client"
                     data-id={c.id}
                     title={[c.contactName, c.businessNumber, c.contract?.signedAt ? '계약 고객' : c.sales ? '잠재고객' : ''].filter(Boolean).join(' · ') || undefined}
                   >
-                    <span className="t-body w-full truncate font-semibold text-slate-900">{c.companyName}</span>
+                    <span className="t-body min-w-0 flex-1 truncate font-semibold text-slate-900">{c.companyName}</span>
+                    <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-slate-400" />
                   </button>
                 </li>
               ))}
