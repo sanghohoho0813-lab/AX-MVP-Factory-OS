@@ -13,6 +13,7 @@
  *   node e2e/guide.mjs http://localhost:4390 [사진 폴더]
  */
 import { chromium } from 'playwright'
+import { openTools } from './pageTools.mjs'
 import { seedScript } from './seed.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
@@ -97,7 +98,8 @@ check(`G3 보이는 메뉴 줄 ${keys.length}개 전부에 안내 열쇠`, keys.
 await page.mouse.move(800, 500)
 await row('help').click()
 await page.waitForTimeout(900)
-check('G4 메뉴 [사용법 안내] → /guide · 한 줄 설명', page.url().endsWith('/guide') && (await page.getByTestId('guide-page').count()) === 1 && ((await page.locator('main').innerText()) ?? '').includes('메뉴를 누르면'))
+// D-627 긴 설명은 제목 옆 ⓘ 안(마우스 · 누르면) — 글은 그대로 있다
+check('G4 메뉴 [사용법 안내] → /guide · 한 줄 설명(ⓘ)', page.url().endsWith('/guide') && (await page.getByTestId('guide-page').count()) === 1 && ((await page.locator('main [role="tooltip"]').allTextContents()).join(' ')).includes('메뉴를 누르면'))
 const groups = await page.getByTestId('guide-group').evaluateAll((els) => els.map((e) => e.getAttribute('data-group')))
 check('G4 묶음 탭 — 오늘 · 고객 · 영업 · 설정 …(왼쪽 메뉴와 같은 묶음)', ['today', 'clients', 'sales', 'settings'].every((g) => groups.includes(g)), groups)
 check('G4 첫 화면은 이름 줄만(펼친 줄 0 · 첫 묶음 메뉴만)', (await page.locator('[data-testid="guide-row"][data-open="1"]').count()) === 0 && (await page.getByTestId('guide-row').count()) <= 8, await page.getByTestId('guide-row').count())
@@ -182,6 +184,8 @@ await page.waitForTimeout(300)
 const sText = ((await card.innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
 check('G8 머리줄 [찾기] 에 마우스 → 기능 안내(이름 "찾기" + 네 칸)', (await card.getAttribute('data-key').catch(() => '')) === 'fn-search' && sText.includes('찾기') && ['무엇을 하나요', '왜 있나요', '쓰면 이렇게 돼요', '앞으로'].every((x) => sText.includes(x)), sText.slice(0, 200))
 await page.mouse.move(700, 880)
+// D-627 화면 꾸미기는 경로 줄 오른쪽 [⋯] 안 — 먼저 연다
+await openTools(page)
 const arr = page.locator('[data-guide="fn-arrange"]').first()
 await arr.hover()
 await card.waitFor({ timeout: 4000 }).catch(() => {})
