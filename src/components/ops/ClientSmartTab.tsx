@@ -222,7 +222,13 @@ export default function ClientSmartTab({
       {/* 3. 확인이 필요한 정보 */}
       <FactInboxCard record={record} now={nowIso()} onCommit={onCommit} preview={acceptPreview} />
       {/* D-627 글자 수 한도 — 맞춤 추천 첫 화면은 '먼저 제안할 것' · '확인할 정보' 만. 나머지(서류 올리기 · 다음 행동 · 설계서 · 상황 예시 · 맞춤 상담 · 모듈별 판정 · 지금 챙길 것 · 지원사업)는 한 번 누르면(기억 · [모두 펼치기] 따름) */}
-      <Fold id="smart.more" title="더 보기" testId="fold-smart-more" hint="서류 올리기 · 다음 행동 · 상황별 설계서 · 상황 예시 · 맞춤 상담 · 모듈별 판정 · 지금 챙길 것 · 맞는 지원사업">
+      {/* D-563 고객 계정에는 닫힌 칸 이름(설계서 · 상황 예시 · 판정 …)을 ⓘ 설명에도 쓰지 않는다 — 고객에게 보이는 칸만 */}
+      <Fold
+        id="smart.more"
+        title="더 보기"
+        testId="fold-smart-more"
+        hint={customer ? '서류 올리기 · 다음 행동 · 지금 챙길 것' : '서류 올리기 · 다음 행동 · 상황별 설계서 · 상황 예시 · 맞춤 상담 · 모듈별 판정 · 지금 챙길 것 · 맞는 지원사업'}
+      >
         {/* D-192: 아래 목차는 접어 두고 제목 줄만 — 한 번에 펼치거나 접기(맨 위 '먼저 제안할 것' 은 그대로 맨 위) */}
         <FoldAllButton className="-my-2 self-end" />
 

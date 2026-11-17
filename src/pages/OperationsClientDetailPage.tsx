@@ -1080,7 +1080,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       )}
 
       {/* D-627 글자 수 한도 — 개요 첫 화면은 '먼저 제안할 것 · 회사 기본 정보 · 다음 약속' 만. 나머지 기록은 한 번 누르면(기억 · [모두 펼치기] 따름) */}
-      <Fold panel id="overview.more" title="더 보기" testId="fold-overview-more" hint="숫자 · 인증, 맞춤 추천 줄, 영업 · 계약 · 해 드린 일 · 모듈 결과 · 진행 요약 · 활동 기록">
+      {/* D-563 고객 계정 ⓘ 설명에는 닫힌 칸 이름(모듈 결과 · 맞춤 추천 줄)을 쓰지 않는다 */}
+      <Fold
+        panel
+        id="overview.more"
+        title="더 보기"
+        testId="fold-overview-more"
+        hint={customer ? '숫자 · 인증, 영업 · 계약 · 해 드린 일 · 진행 요약 · 활동 기록' : '숫자 · 인증, 맞춤 추천 줄, 영업 · 계약 · 해 드린 일 · 모듈 결과 · 진행 요약 · 활동 기록'}
+      >
         <FoldAllButton className="-my-1 self-end" />
           {/* D-627 머리줄에 있던 계약 종류 · 몇 개월째는 여기로(머리줄은 이름 · 단계 · 전화만) */}
           {contractAge !== '' && (
