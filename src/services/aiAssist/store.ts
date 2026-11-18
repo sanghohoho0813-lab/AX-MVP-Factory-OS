@@ -1,6 +1,10 @@
 /**
  * AI 도우미 — 고른 공급자 · 모델과 지난 답(이 브라우저 · 이 사람만).
  * 'axmvp.' 키라 로그인 경계에서 사람마다 금고로 옮겨진다(D-162). 못 읽으면 기본값으로 — 화면은 그대로 그린다.
+ *
+ * D-629 모델 고르는 방식 둘 — 대표(2026-11-18): "단순 질문에 비싼 모델을 쓸 이유가 없다 · 모델도 실시간으로 바꿀 수 있게".
+ *   자동(auto)   고른 모델이 없다 — 물음은 가장 싼 모델 · 일을 시킬 때는 좋은 모델(요청마다 callAssist 가 정한다 · autoModel.ts). 한 번도 안 고른 계정의 기본
+ *   직접(manual) 고른 모델 그대로(예전 방식) — 예전에 저장된 { provider, model } 은 모두 직접 고른 것으로 읽는다
  */
 import type { AssistRun, ProviderId } from './client'
 import type { AssistSection } from './context'
@@ -16,6 +20,13 @@ export interface AiChoice {
   model: string
 }
 
+/** D-629 모델 고르는 방식 — 자동(요청마다 정함) · 직접(고른 모델 그대로) */
+export type ModelMode = 'auto' | 'manual'
+/** 저장 모양 — 방식을 고른 모델과 함께 적는다. 예전 { provider, model } 은 mode 가 없다(= 직접) */
+type StoredChoice = { mode?: ModelMode; provider?: ProviderId; model?: string }
+/** D-629 자동이 방금 고른 모델을 모델 고르기 판에 알리는 이름 */
+export const AUTO_EVENT = 'axmvp:ai-auto'
+
 const ALL_PROVIDERS: readonly ProviderId[] = ['gemini', 'openai', 'anthropic']
 let onlyProviders: readonly ProviderId[] | null = null
 
@@ -24,10 +35,17 @@ let onlyProviders: readonly ProviderId[] | null = null
  * 화면 맨 위(AppShell)에서 그리기 전에 정한다. 고른 것이 그 밖이면 고른 것 없음(= 서버 기본 Gemini)으로 읽는다.
  */
 export function setAllowedProviders(list: readonly ProviderId[] | null): void {
+  if ((onlyProviders?.join() ?? '*') !== (list?.join() ?? '*')) epoch += 1
   onlyProviders = list
 }
 export function allowedProviders(): readonly ProviderId[] {
   return onlyProviders ?? ALL_PROVIDERS
+}
+
+/** D-629 화면이 다른 계정 모양(대표 ↔ 팀장 · 고객 화면)으로 바뀐 횟수 — 기억해 둔 서버 모델 목록을 그때 다시 받는다 */
+let epoch = 0
+export function accountEpoch(): number {
+  return epoch
 }
 
 let cheapOnly = false
@@ -36,10 +54,20 @@ let cheapOnly = false
  * 모델 고르기에 회사마다 가장 싼 모델(서버 목록의 tier cheap) 하나만 보인다. 서버도 다른 모델을 가장 싼 것으로 바꿔 부른다.
  */
 export function setCheapOnly(on: boolean): void {
+  if (cheapOnly !== on) epoch += 1
   cheapOnly = on
 }
 export function isCheapOnly(): boolean {
   return cheapOnly
+}
+
+/**
+ * D-629 자동이 '일을 시킬 때 좋은 모델' 로 올려 써도 되는 화면인가 — 대표 화면만.
+ * 팀장(회사마다 가장 싼 모델 하나) · 구독 고객(Gemini · 사용량을 단계로 셈) 화면은 자동이어도 늘 예전 기본(가장 싼 모델) 그대로다.
+ * 더 비싼 모델을 팀장 · 고객에게 여는 것은 대표에게 먼저 묻는 일이라 여기서 열지 않는다(서버도 팀장은 가장 싼 모델로 바꿔 부른다).
+ */
+export function autoUpgradeAllowed(): boolean {
+  return onlyProviders === null && !cheapOnly
 }
 
 let cheapIds: ReadonlySet<string> | null = null
@@ -59,29 +87,69 @@ export function noteCheapModels(providers: readonly { models: readonly { id: str
   }
 }
 
-export function readChoice(): AiChoice | null {
+/** 저장을 못 한 브라우저(저장 공간 막힘)에서도 방금 고른 것이 다음 질문부터 쓰이게 — 이 화면에서만 기억 */
+let unsaved: { v: StoredChoice | null } | null = null
+
+function stored(): StoredChoice | null {
+  if (unsaved) return unsaved.v
   try {
-    const v = JSON.parse(localStorage.getItem(CHOICE_KEY) ?? 'null') as AiChoice | null
-    // D-614 가장 싼 모델만 쓰는 계정 — 이 브라우저에 예전에 고른 비싼 모델이 남아 있으면 기본(가장 싼 Gemini)으로 읽는다(고른 기록은 지우지 않음)
-    if (v && cheapOnly && cheapIds && !cheapIds.has(v.model)) return null
-    if (v && allowedProviders().includes(v.provider) && typeof v.model === 'string' && v.model) return v
+    const v = JSON.parse(localStorage.getItem(CHOICE_KEY) ?? 'null') as StoredChoice | null
+    return v && typeof v === 'object' ? v : null
   } catch {
-    // 못 읽으면 기본값
+    // 못 읽으면 기본값(자동)
+    return null
   }
+}
+
+/** 직접 고른 모델 — 자동이면 null(그때 쓸 모델은 요청마다 callAssist 가 정한다) */
+export function readChoice(): AiChoice | null {
+  const v = stored()
+  if (!v || v.mode === 'auto') return null
+  // D-614 가장 싼 모델만 쓰는 계정 — 이 브라우저에 예전에 고른 비싼 모델이 남아 있으면 기본(가장 싼 Gemini)으로 읽는다(고른 기록은 지우지 않음)
+  if (cheapOnly && cheapIds && !cheapIds.has(String(v.model))) return null
+  if (v.provider && allowedProviders().includes(v.provider) && typeof v.model === 'string' && v.model) return { provider: v.provider, model: v.model }
   return null
 }
 
+/** D-629 지금 방식 — 직접 고른 모델이 있으면(이 화면에서 쓸 수 있는 것) 직접, 없으면 자동 */
+export function readMode(): ModelMode {
+  return readChoice() ? 'manual' : 'auto'
+}
+
+/** 모델을 고르면 직접 · null 이면 자동으로 — 방식을 고른 모델과 함께 적는다. 바로 다음 질문부터 쓰인다(다시 읽지 않아도) */
 export function saveChoice(c: AiChoice | null): void {
+  const v: StoredChoice = c ? { mode: 'manual', provider: c.provider, model: c.model } : { mode: 'auto' }
   try {
-    if (c) localStorage.setItem(CHOICE_KEY, JSON.stringify(c))
-    else localStorage.removeItem(CHOICE_KEY)
+    localStorage.setItem(CHOICE_KEY, JSON.stringify(v))
+    unsaved = null
   } catch {
     // 저장 못 해도 이번 화면에서는 그대로 쓴다
+    unsaved = { v }
   }
   try {
     window.dispatchEvent(new CustomEvent(CHOICE_EVENT, { detail: c }))
   } catch {
     // 알림을 못 보내도 이 도우미는 그대로
+  }
+}
+
+/** D-629 자동이 방금 고른 것 — 모델 고르기 판의 '방금: 좋은 모델로 답함' 한 줄(이 화면에서만 · 저장 안 함) */
+export interface AutoPick {
+  weight: 'light' | 'heavy'
+  provider: ProviderId
+  model: string
+  at: number
+}
+let lastAuto: AutoPick | null = null
+export function lastAutoPick(): AutoPick | null {
+  return lastAuto
+}
+export function noteAutoPick(p: AutoPick | null): void {
+  lastAuto = p
+  try {
+    window.dispatchEvent(new Event(AUTO_EVENT))
+  } catch {
+    // 알림을 못 보내도 판을 다시 열면 보인다
   }
 }
 

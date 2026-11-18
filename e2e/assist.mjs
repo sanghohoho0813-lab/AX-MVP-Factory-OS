@@ -6,7 +6,9 @@
  *
  *   0  키 없음 → '키가 아직 없어요' + 넣을 이름(GEMINI_API_KEY) · 공급자 안 부름
  *   A  오늘 → [오늘 제일 중요한 것 3개만] 한 번 → 답 · 기본은 Gemini 가장 싼 모델 · 보낸 자료에 사람 이름 · 전화 없음 · [열어 보기] → 업체
- *   B  모델 바꾸기 → Claude Haiku → 다음 질문은 Claude 로 · 새로고침해도 기억 · 지난 답
+ *   B  모델 바꾸기 → Claude Haiku → 다음 질문은 Claude 로 · 새로고침해도 기억 · 지난 답 · [자동으로 되돌리기]
+ *   M  D-629 자동 모델 — 처음부터 [모델 · 자동] · 단순 질문은 가장 싼 모델 · "기획 시작해 줘 …" 는 좋은 모델 · 판에 '방금: 좋은 모델로 답함' ·
+ *      [가장 싼 모델] · [좋은 모델] 한 번에 고르기(직접 고르면 그 모델 그대로 · 바로 다음 질문부터) · 팀장 계정은 끝까지 가장 싼 모델
  *   C  화면마다 띠: 영업 · 고객 관리 · 정산 · 매출비용 · 일정 · 고용지원금(고객 전체) · 기업성장 모듈 · 업체 상세 맞춤 추천 · 내 콘텐츠
  *   D  블로그 · 플레이스 홍보 글: 이름 · '미래AI랩으로 만들기' → 같은 자리 · 블로그 글 한 번에(규칙집이 같이 감) → 보관함에 저장 → 보관함에 쌓임
  *   F  D-241 답 → 다음 단계: 번호 단추 이름(업체 열기) · [할 일로 넣기] → 오늘 목록 · 마케팅 TOP5 기획에 채널 설계 기준 · 내 채널이 감 ·
@@ -48,6 +50,7 @@ const shot = async (page, name) => {
 }
 
 const OWNER = 'Bearer owner-e2e-token-aaaaaaaaaaaa'
+const PILOT = 'Bearer pilot-e2e-token-bbbbbbbbbbbb'
 const G_KEY = 'gem-e2e-SECRET-445566'
 const A_KEY = 'ant-e2e-SECRET-778899'
 function setEnv(over = {}) {
@@ -70,8 +73,12 @@ const realFetch = globalThis.fetch
 globalThis.fetch = async (input, init = {}) => {
   const url = String(input)
   const h = init.headers ?? {}
-  if (url.startsWith('https://qa.supabase.test/auth/v1/user')) return new Response(JSON.stringify({ id: h.Authorization === OWNER ? 'owner-1' : 'x' }), { status: h.Authorization === OWNER ? 200 : 401 })
+  if (url.startsWith('https://qa.supabase.test/auth/v1/user')) return new Response(JSON.stringify({ id: h.Authorization === OWNER ? 'owner-1' : h.Authorization === PILOT ? 'pilot-1' : 'x' }), { status: h.Authorization === OWNER || h.Authorization === PILOT ? 200 : 401 })
   if (url.startsWith('https://qa.supabase.test/rest/v1/rpc/has_capability')) return new Response(JSON.stringify(h.Authorization === OWNER), { status: 200 })
+  // D-629 팀장(내부) 계정 — 서버가 등급을 묻는 길: 접근 등급 pilot · 사용량 장부(0022) 없음 · 고객 구분 칸(0024) 없음 = 지금 운영의 내부 팀장
+  if (url.startsWith('https://qa.supabase.test/rest/v1/rpc/my_os_access')) return new Response(JSON.stringify(h.Authorization === PILOT ? 'pilot' : h.Authorization === OWNER ? 'full' : 'none'), { status: 200 })
+  if (url.startsWith('https://qa.supabase.test/rest/v1/rpc/my_ai_access')) return new Response(JSON.stringify({ code: 'PGRST202', message: 'Could not find the function public.my_ai_access' }), { status: 404 })
+  if (url.startsWith('https://qa.supabase.test/rest/v1/os_access?select=audience')) return new Response(JSON.stringify({ code: '42703', message: 'column os_access.audience does not exist' }), { status: 400 })
   if (url.includes('generativelanguage.googleapis.com') && url.includes(':generateContent')) {
     const body = JSON.parse(String(init.body ?? '{}'))
     const sys = String(body.systemInstruction?.parts?.[0]?.text ?? '')
@@ -179,8 +186,90 @@ await page.waitForTimeout(400)
 check('B4 새로고침해도 고른 모델 기억 · 지난 답 2개', (await page.getByTestId('ai-assist-model-label').innerText()).includes('Claude Haiku 5.5') && (await page.getByTestId('ai-assist-history').locator('li').count()) >= 2)
 await page.getByTestId('ai-assist-model-toggle').click()
 await page.getByTestId('ai-assist-model-reset').click()
-check('B5 기본(가장 싼 Gemini)으로 되돌리기', (await page.getByTestId('ai-assist-model-label').innerText()).includes('Gemini 3.1 Flash-Lite'))
+// D-629 고른 모델을 되돌리면 '자동' — 물음에는 예전 기본(가장 싼 Gemini) · 일에는 한 단계 위 모델
+const autoLine = await page.getByTestId('ai-model-auto-status').innerText()
+check('B5 [자동으로 되돌리기] → 쓰는 모델 자동 · 물음은 가장 싼 Gemini(3.1 Flash-Lite) · 일은 Gemini 3.8 Flash', (await page.getByTestId('ai-assist-model-label').innerText()).includes('자동') && (await page.getByTestId('ai-assist-model-label').getAttribute('data-mode')) === 'auto' && (await page.getByTestId('ai-model-auto').getAttribute('aria-pressed')) === 'true' && /물음 Gemini 3\.1 Flash-Lite · 일 Gemini 3\.8 Flash/.test(autoLine), autoLine)
 await page.keyboard.press('Escape')
+
+/* ---------------- M D-629 자동 모델 — 물음은 가장 싼 모델 · 일을 시킬 때는 좋은 모델 ---------------- */
+{
+  const modelOf = (c) => /models\/([^:]+):generateContent/.exec(c?.url ?? '')?.[1] ?? c?.model ?? ''
+  /** 직접 물어보기 칸에 적어 보낸 뒤 공급자에 간 요청 */
+  const askDirect = async (q) => {
+    const n = llm.length
+    await page.getByTestId('ai-assist-ask').fill(q)
+    await page.getByTestId('ai-assist-ask-send').click()
+    for (let i = 0; i < 100 && llm.length <= n; i++) await page.waitForTimeout(100)
+    await page.getByTestId('ai-assist-running').waitFor({ state: 'detached', timeout: 10000 }).catch(() => {})
+    await page.waitForTimeout(300)
+    return llm.length > n ? llm.at(-1) : null
+  }
+  // 한 번도 고르지 않은 브라우저 — 처음부터 자동
+  await page.evaluate(() => localStorage.removeItem('axmvp.ai.choice.v1'))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  await openTools(page)
+  const chip = page.getByTestId('ai-assist-model-chip').first()
+  const chipText = (await chip.innerText()).trim()
+  check('M1 한 번도 고르지 않은 계정 — 모델 단추가 [모델 · 자동] · 가리키는 모델은 가장 싼 Gemini', chipText === '모델 · 자동' && (await chip.getAttribute('data-mode')) === 'auto' && (await chip.getAttribute('data-model')) === 'gemini-3.1-flash-lite', chipText)
+  await chip.click()
+  await page.getByTestId('model-pick-panel').waitFor()
+  await page.waitForFunction(() => /물음 Gemini 3\.1 Flash-Lite/.test(document.querySelector('[data-testid="model-pick-panel"] [data-testid="ai-model-auto-status"]')?.textContent ?? ''), null, { timeout: 8000 }).catch(() => {})
+  const popText = await page.getByTestId('model-pick-panel').innerText()
+  const quickTexts = await page.getByTestId('model-pick-panel').getByTestId('ai-model-quick').allInnerTexts()
+  const firstRow = await page.getByTestId('model-pick-panel').locator('button[data-testid="ai-model-auto"], button[data-testid="ai-assist-model-option"]').first().getAttribute('data-testid')
+  check("M2 모델 판 맨 위 — '자동 — 물음은 가장 싼 모델 · 일을 시킬 때는 좋은 모델'(골라져 있음) · 그 아래 모델 목록 · 한 번에 고르기 [가장 싼 모델] [좋은 모델] · 목록의 어느 모델도 고른 것으로 표시되지 않음",
+    popText.includes('자동 — 물음은 가장 싼 모델 · 일을 시킬 때는 좋은 모델') && firstRow === 'ai-model-auto' && (await page.getByTestId('model-pick-panel').getByTestId('ai-model-auto').getAttribute('aria-pressed')) === 'true' && quickTexts.join('|') === '가장 싼 모델|좋은 모델' && (await page.getByTestId('model-pick-panel').locator('[data-testid="ai-assist-model-option"].border-violet-500').count()) === 0 && (await page.getByTestId('model-pick-panel').getByTestId('ai-assist-model-option').count()) >= 3, { firstRow, quickTexts })
+  await shot(page, 'M-auto-popover')
+  await page.keyboard.press('Escape')
+  await openTools(page)
+  await page.getByTestId('ai-assist-open').first().click()
+  await page.getByTestId('ai-assist-panel').waitFor()
+  const easy = await askDirect('사업자등록증 들어가 있나?')
+  const easyMeta = await page.getByTestId('ai-assist-meta').innerText()
+  check('M3 자동 · 단순 질문("사업자등록증 들어가 있나?") → 가장 싼 모델로 보냄 · 답 아래에도 그 모델', modelOf(easy) === 'gemini-3.1-flash-lite' && /Gemini · gemini-3\.1-flash-lite/.test(easyMeta), `${modelOf(easy)} / ${easyMeta}`)
+  const work = await askDirect('기획 시작해 줘 — 한솔정밀 정책자금 제안서')
+  const workMeta = await page.getByTestId('ai-assist-meta').innerText()
+  check('M4 자동 · "기획 시작해 줘 …" → 좋은 모델(Gemini 3.8 Flash — 가장 비싼 모델 아님)로 보냄 · 답 아래에도 그 모델', modelOf(work) === 'gemini-3.8-flash' && /Gemini · gemini-3\.8-flash/.test(workMeta), `${modelOf(work)} / ${workMeta}`)
+  await page.getByTestId('ai-assist-model-toggle').click()
+  const last = page.getByTestId('ai-assist-settings').getByTestId('ai-model-auto-last')
+  check("M5 모델 판 '자동' 줄에 방금 어느 쪽으로 답했는지 — '방금: 좋은 모델로 답함'(화면에 새 띠 없음)", (await last.count()) === 1 && /방금: 좋은 모델로 답함/.test(await last.innerText()) && (await last.getAttribute('data-model')) === 'gemini-3.8-flash', (await last.count()) ? await last.innerText() : '없음')
+  await shot(page, 'M-auto-last')
+  // 단추를 고르면 [이대로 질문하기] 전에 어느 모델로 물을지 — 목록 단추는 가장 싼 모델
+  await page.getByTestId('ai-assist-preset').filter({ hasText: '오늘 제일 중요한 것 3개만' }).click()
+  const confirmModel = await page.getByTestId('ai-assist-confirm-model').innerText()
+  await page.getByTestId('ai-assist-confirm-cancel').click()
+  check('M6 단추를 고르면 확인 줄에 "자동 · Gemini 3.1 Flash-Lite 로"(목록 단추 = 가장 싼 모델)', /자동 · Gemini 3\.1 Flash-Lite 로/.test(confirmModel), confirmModel)
+  // 한 번에 고르기 — 직접 고른 모델은 물어도 일을 시켜도 그 모델 그대로 · 다시 읽지 않고 바로 다음 질문부터
+  await page.locator('[data-testid="ai-assist-settings"] [data-testid="ai-model-quick"][data-pick="cheap"]').click()
+  const cheapLabel = await page.getByTestId('ai-assist-model-label').innerText()
+  const work2 = await askDirect('기획 시작해 줘 — 한솔정밀 정책자금 제안서')
+  check('M7 [가장 싼 모델] → 쓰는 모델 Gemini 3.1 Flash-Lite(직접 고름) · "기획 시작해 줘" 도 그 모델로 · "방금" 줄 없음', cheapLabel.includes('Gemini 3.1 Flash-Lite') && (await page.getByTestId('ai-assist-model-label').getAttribute('data-mode')) === 'manual' && modelOf(work2) === 'gemini-3.1-flash-lite' && (await page.getByTestId('ai-model-auto-last').count()) === 0, `${cheapLabel} / ${modelOf(work2)}`)
+  await page.locator('[data-testid="ai-assist-settings"] [data-testid="ai-model-quick"][data-pick="good"]').click()
+  const goodLabel = await page.getByTestId('ai-assist-model-label').innerText()
+  const easy2 = await askDirect('사업자등록증 들어가 있나?')
+  const savedGood = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.ai.choice.v1') ?? 'null'))
+  check('M8 [좋은 모델] → 쓰는 모델 Gemini 3.8 Flash · 단순 질문도 고른 모델로(직접 고른 것은 그대로) · 저장에 방식(직접)과 모델이 함께', goodLabel.includes('Gemini 3.8 Flash') && modelOf(easy2) === 'gemini-3.8-flash' && savedGood?.mode === 'manual' && savedGood?.provider === 'gemini' && savedGood?.model === 'gemini-3.8-flash', `${goodLabel} / ${modelOf(easy2)} / ${JSON.stringify(savedGood)}`)
+  await page.getByTestId('ai-assist-settings').getByTestId('ai-model-auto').click()
+  const easy3 = await askDirect('사업자등록증 들어가 있나?')
+  const savedAuto = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.ai.choice.v1') ?? 'null'))
+  check('M9 [자동] 을 다시 누르면 바로 다음 질문부터 — 단순 질문은 가장 싼 모델 · 저장은 { mode: auto }', modelOf(easy3) === 'gemini-3.1-flash-lite' && savedAuto?.mode === 'auto' && (await page.getByTestId('ai-assist-model-label').innerText()).includes('자동'), `${modelOf(easy3)} / ${JSON.stringify(savedAuto)}`)
+  await page.keyboard.press('Escape')
+
+  // 팀장 계정 — 화면이 좋은 모델을 보내도(자동이 일로 판단한 것처럼) 서버가 가장 싼 모델로 부른다 · 모델 목록도 회사마다 하나
+  const direct = async (method, url, body) => {
+    const res = { statusCode: 200, headers: {}, raw: '', setHeader(k, v) { this.headers[k] = v }, end(b) { this.raw = b ?? '' } }
+    await handler({ method, url, headers: { authorization: PILOT }, body: body ? JSON.stringify(body) : undefined }, res)
+    return { status: res.statusCode, body: JSON.parse(res.raw || '{}') }
+  }
+  const pst = await direct('GET', '/api/ai-assist?status=1')
+  const nP = llm.length
+  const pr = await direct('POST', '/api/ai-assist', { requestId: 'pilot-auto-heavy-000001', assistId: 'today.ask', page: 'today', choice: { provider: 'gemini', model: 'gemini-3.8-flash' }, context: { title: '오늘', today: '2026-11-18', sections: [] }, ask: '기획 시작해 줘 — 한솔정밀 정책자금 제안서' })
+  const pn = await direct('POST', '/api/ai-assist', { requestId: 'pilot-auto-heavy-000002', assistId: 'today.ask', page: 'today', choice: null, context: { title: '오늘', today: '2026-11-18', sections: [] }, ask: '기획 시작해 줘 — 한솔정밀 정책자금 제안서' })
+  check('M10 팀장 계정 — 모델 목록은 회사마다 가장 싼 모델 하나(올려 쓸 모델 없음) · "기획 시작해 줘" 에 좋은 모델을 보내도 · 고른 것 없이 보내도 끝은 가장 싼 Gemini',
+    pst.status === 200 && pst.body.role === 'pilot' && pst.body.providers.every((p) => p.models.length === 1) && pr.status === 200 && pr.body.run?.model === 'gemini-3.1-flash-lite' && pn.status === 200 && pn.body.run?.model === 'gemini-3.1-flash-lite' && llm.length === nP + 2 && llm.slice(nP).every((c) => modelOf(c) === 'gemini-3.1-flash-lite'),
+    { role: pst.body.role, models: pst.body.providers?.map((p) => p.models.map((x) => x.id).join('+')), sent: [pr.body.run?.model, pn.body.run?.model], urls: llm.slice(nP).map(modelOf) })
+}
 
 /* ---------------- C 화면마다 띠 ---------------- */
 const pages = [
@@ -529,14 +618,16 @@ check('F11 [이 기획으로 대본 끝까지] → 같은 판에서 대본 단�
 check('F12 대본 답 — 구간별 대사(0:00 오프닝 · 1:00 사례) · 제목 후보 · 판 제목에 고른 기획', (await page.getByTestId('ai-assist-body').count()) >= 2 && (await page.getByTestId('ai-assist-result').innerText()).includes('대본 끝까지 쓰기 · 고용지원금 놓치는 회사'))
 await shot(page, 'F-script-answer')
 const better = page.getByTestId('ai-assist-better')
-check('F13 [더 잘 쓰는 모델로 다시] — 지금(Flash-Lite) 한 단계 위 Gemini 3.8 Flash', (await better.count()) === 1 && (await better.getAttribute('data-model')) === 'gemini-3.8-flash', await better.count())
+// D-629 자동 — 대본 쓰기(쓰기 단추)는 처음부터 좋은 모델(Gemini 3.8 Flash)로 쓴다 → [더 잘 쓰는 모델로 다시] 는 그 한 단계 위(Gemini 4 Argon)
+check('F13a 자동 · 대본 끝까지 쓰기(쓰기 단추)는 좋은 모델 Gemini 3.8 Flash 로 씀', scr.url.includes('/models/gemini-3.8-flash:generateContent'), scr.url)
+check('F13 [더 잘 쓰는 모델로 다시] — 지금(Gemini 3.8 Flash) 한 단계 위 Gemini 4 Argon', (await better.count()) === 1 && (await better.getAttribute('data-model')) === 'gemini-4-argon', await better.count())
 const nBefore = llm.length
 await better.click()
 await page.getByTestId('ai-assist-confirm-go').click() // D-289 이어 쓰기 · 다시도 [이대로 질문하기]
 await page.waitForFunction((n) => document.querySelectorAll('[data-testid="ai-assist-history"] li').length >= n, 4, { timeout: 10000 })
 await page.waitForTimeout(400)
 const re = llm.at(-1)
-check('F14 다시 만든 대본은 보통 모델로 · 같은 고른 기획 그대로 · 고른 모델 설정은 안 바뀜', llm.length === nBefore + 1 && re.url.includes('/models/gemini-3.8-flash:generateContent') && re.user.includes('[자료 · 고른 기획') && (await page.getByTestId('ai-assist-model-label').innerText()).includes('Flash-Lite'), re.url)
+check('F14 다시 만든 대본은 그 한 단계 위 모델로(이번 한 번만) · 같은 고른 기획 그대로 · 고른 모델 설정은 안 바뀜(자동 그대로)', llm.length === nBefore + 1 && re.url.includes('/models/gemini-4-argon:generateContent') && re.user.includes('[자료 · 고른 기획') && (await page.getByTestId('ai-assist-model-label').innerText()).includes('자동') && (await page.getByTestId('ai-assist-model-label').getAttribute('data-mode')) === 'auto', re.url)
 await page.getByTestId('ai-assist-result-actions').locator('[data-action="save-script"]').click()
 await page.getByTestId('ai-assist-result-actions').getByTestId('ai-assist-action-go').waitFor({ timeout: 8000 })
 await page.getByTestId('ai-assist-result-actions').getByTestId('ai-assist-action-go').click()

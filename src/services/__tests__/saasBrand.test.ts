@@ -154,11 +154,12 @@ async function run() {
   calls = []
   __setBrandForTest('ws-1', normalizeBrand(BRAND))
   await callAssist({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: null, context: CTX as never })
-  const sentA = calls.find((c) => c.url.includes('/api/ai-assist'))?.body
+  // D-629 자동 모델은 첫 요청 앞에 서버 모델 목록을 한 번 받는다 — 요청 자체(assistId 가 있는 것)를 찾는다
+  const sentA = calls.find((c) => c.url.includes('/api/ai-assist') && c.body.assistId)?.body
   __setBrandForTest('ws-1', emptyBrand())
   calls = []
   await callAssist({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: null, context: CTX as never })
-  const sentB = calls.find((c) => c.url.includes('/api/ai-assist'))?.body
+  const sentB = calls.find((c) => c.url.includes('/api/ai-assist') && c.body.assistId)?.body
   check('B19 AI 요청에 이 작업공간 설정이 같이 감 · 비었으면 보내지 않음', (sentA?.brand as Record<string, string> | undefined)?.name === '박컨설턴트' && !!sentB && !('brand' in sentB), { a: sentA?.brand, b: sentB && 'brand' in sentB })
 
   console.log(`\nsaasBrand: ${passed} passed, ${failed} failed`)

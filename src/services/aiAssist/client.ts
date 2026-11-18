@@ -7,7 +7,8 @@ import { getSupabaseClient } from '../../lib/supabase/client'
 import type { AssistContext } from './context'
 import type { AssistPage } from './presets'
 import { brandForRequest } from '../brandProfile'
-import { noteCheapModels } from './store'
+import { accountEpoch, allowedProviders, autoUpgradeAllowed, noteAutoPick, noteCheapModels, readChoice } from './store'
+import { classifyAsk, pickAuto, type AskWeight } from './autoModel'
 
 export const ASSIST_ENDPOINT = '/api/ai-assist'
 
@@ -47,6 +48,8 @@ export interface ProviderProbe {
 }
 
 export interface AssistStatus {
+  /** D-629 서버가 본 이 계정 — owner(대표) · pilot(팀장 등급: 내부 팀장 · 구독 고객). 옛 서버 · 시험 자료에는 없을 수 있다 */
+  role?: 'owner' | 'pilot'
   /** D-353 [연결 점검] 결과(눌렀을 때만) */
   probe?: ProviderProbe[]
   providers: ProviderInfo[]
@@ -233,7 +236,8 @@ export async function fetchAssistStatus(withModels = false, probe = false): Prom
   const b = (await res.json()) as AssistStatus & { ok: boolean }
   // D-614 가장 싼 모델 이름을 기억해 둔다(가장 싼 것만 쓰는 계정이 예전에 고른 비싼 모델을 걸러 낸다)
   if (Array.isArray(b.providers)) noteCheapModels(b.providers.filter((p) => p && Array.isArray(p.models)))
-  return {
+  const status: AssistStatus = {
+    ...(b.role === 'owner' || b.role === 'pilot' ? { role: b.role } : {}),
     ...(Array.isArray(b.probe) ? { probe: b.probe.filter((x) => x && isProvider(x.id)).map((x) => ({ id: x.id, code: String(x.code ?? ''), keyName: x.keyName ? String(x.keyName) : undefined, model: x.model ? String(x.model) : undefined, detail: String(x.detail ?? '').slice(0, 160) })) } : {}),
     providers: Array.isArray(b.providers) ? b.providers : [],
     defaultChoice: b.defaultChoice,
@@ -241,6 +245,66 @@ export async function fetchAssistStatus(withModels = false, probe = false): Prom
     marketing: b.marketing === true,
     usage: b.usage && Number.isFinite(b.usage.used) ? { used: b.usage.used, limit: Number.isFinite(b.usage.limit) ? b.usage.limit : null, month: String(b.usage.month ?? ''), kind: b.usage.kind === 'internal' ? 'internal' : 'customer', plan: String(b.usage.plan ?? ''), active: b.usage.active === true } : null,
   }
+  // D-629 자동 모델이 요청마다 다시 묻지 않게 기억해 둔다(어느 화면이 받았든 같이 쓴다)
+  seen = { status, at: Date.now(), epoch: accountEpoch() }
+  return status
+}
+
+/* ------------------------------------------------------------------ */
+/* D-629 자동 모델 — 요청마다 물음은 가장 싼 모델 · 일을 시킬 때는 좋은 모델     */
+/* ------------------------------------------------------------------ */
+
+/** 서버 모델 목록을 기억하는 동안 · 못 받은 뒤 다시 묻기까지 */
+const STATUS_KEEP_MS = 5 * 60_000
+const STATUS_FAIL_MS = 30_000
+let seen: { status: AssistStatus; at: number; epoch: number } | null = null
+let failedAt = 0
+let loading: Promise<AssistStatus | null> | null = null
+
+/** 기억해 둔 서버 모델 목록(없으면 null) — 모델 고르기 단추가 판을 열기 전에도 '자동' 인지 알게 */
+export function peekAssistStatus(): AssistStatus | null {
+  return seen && seen.epoch === accountEpoch() ? seen.status : null
+}
+
+/** 시험용 — 기억한 서버 모델 목록 비우기 */
+export function __resetAssistStatusCache(): void {
+  seen = null
+  failedAt = 0
+  loading = null
+}
+
+/** 자동이 쓸 서버 모델 목록 — 기억한 것(5분) · 없으면 한 번 받는다(동시에 여러 요청이 와도 한 번). 못 받으면 null */
+async function statusForAuto(): Promise<AssistStatus | null> {
+  const now = Date.now()
+  const mine = seen && seen.epoch === accountEpoch() ? seen : null
+  if (mine && now - mine.at < STATUS_KEEP_MS) return mine.status
+  // 방금 못 받았으면 잠깐은 다시 묻지 않는다(서버 함수가 없는 미리보기에서 요청마다 두 번씩 부르지 않게) — 예전 것이 있으면 그것으로
+  if (now - failedAt < STATUS_FAIL_MS) return mine?.status ?? null
+  loading ??= fetchAssistStatus()
+    .catch(() => {
+      failedAt = Date.now()
+      return mine?.status ?? null
+    })
+    .finally(() => {
+      loading = null
+    })
+  return loading
+}
+
+/**
+ * 이번 요청에 쓸 모델 — 모든 AI 단추 · 대화창이 여기 한 곳을 지난다(화면마다 따로 정하지 않는다).
+ *   부른 쪽이 준 모델(이번 한 번만 다른 모델 · 직접 고른 모델) → 그대로
+ *   직접 고른 모델이 저장돼 있음 → 그대로(부른 쪽이 안 읽어 왔어도)
+ *   자동 → 물음은 가장 싼 모델 · 일을 시킬 때는 좋은 모델(서버가 이 계정에 준 목록 안에서)
+ *   자동인데 올려 쓸 수 없는 화면(팀장 · 구독 고객) · 목록을 못 받음 → 고른 것 없이(서버 기본 = 예전 그대로 가장 싼 모델)
+ */
+export async function resolveAssistChoice(req: { assistId: string; ask?: string; skill?: string; choice: { provider: ProviderId; model: string } | null }): Promise<{ choice: { provider: ProviderId; model: string } | null; auto: AskWeight | null }> {
+  const picked = req.choice ?? readChoice()
+  if (picked) return { choice: picked, auto: null }
+  if (!autoUpgradeAllowed()) return { choice: null, auto: null }
+  const weight = classifyAsk(req)
+  const choice = pickAuto(await statusForAuto(), weight, { providers: allowedProviders(), upgrade: true })
+  return { choice, auto: choice ? weight : null }
 }
 
 /** D-260 영상 단추(radar.transcript) — 영상 번호 · 구간(초). 주소는 서버가 만든다 */
@@ -252,13 +316,15 @@ export interface AssistVideo {
 
 export async function callAssist(req: { requestId: string; assistId: string; page: AssistPage; choice: { provider: ProviderId; model: string } | null; context: AssistContext; ask?: string; video?: AssistVideo; skill?: string; signal?: AbortSignal }): Promise<AssistRun> {
   const brand = brandForRequest()
+  // D-629 자동이면 이 요청의 물음 · 단추로 모델을 정한다(직접 고른 모델은 그대로)
+  const { choice, auto } = await resolveAssistChoice(req)
   let res: Response
   try {
     res = await fetch(ASSIST_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
       // SAAS-1 이 작업공간의 브랜드 · AI 설정(있으면) — 서버는 대표가 아닌 계정에만 쓴다
-      body: JSON.stringify({ requestId: req.requestId, assistId: req.assistId, page: req.page, choice: req.choice, context: req.context, ask: req.ask ?? '', ...(req.video ? { video: req.video } : {}), ...(req.skill ? { skill: req.skill } : {}), ...(brand ? { brand } : {}) }),
+      body: JSON.stringify({ requestId: req.requestId, assistId: req.assistId, page: req.page, choice, context: req.context, ask: req.ask ?? '', ...(req.video ? { video: req.video } : {}), ...(req.skill ? { skill: req.skill } : {}), ...(brand ? { brand } : {}) }),
       // D-350 [멈추기] — 기다리던 답을 버린다(서버가 이미 받은 요청은 끝까지 갈 수 있다)
       ...(req.signal ? { signal: req.signal } : {}),
     })
@@ -270,5 +336,7 @@ export async function callAssist(req: { requestId: string; assistId: string; pag
   if (notJson(res)) throw new AssistError('not_deployed', MESSAGE.not_deployed)
   const b = (await res.json()) as { ok: boolean; run?: AssistRun }
   if (!b || !b.run) throw new AssistError('provider_error', MESSAGE.provider_error)
+  // D-629 자동이 고른 것 — 모델 고르기 판에 '방금: 좋은 모델로 답함' 한 줄(서버가 실제로 부른 모델로 — 답 아래 'AI 답 · 모델' 과 같은 이름)
+  if (auto && isProvider(b.run.provider)) noteAutoPick({ weight: auto, provider: b.run.provider, model: String(b.run.model || choice?.model || ''), at: Date.now() })
   return b.run
 }
