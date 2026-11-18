@@ -24,6 +24,12 @@
  *  - 뜨는 주제 줄 = 번호 · 주제 · 신호 세기 · (제작 예정) · 칩. PC 마우스를 올리면 근거 숫자(OppPeek) · 누르면 그 줄 아래 펼침(OppBody —
  *    왜 지금 · 근거 · [이 주제로 글 · 대본 만들기] · [이번 주로 확정] · 이번 주 이렇게 찍으세요(제목 · 첫 문장 · 표지 글) · 왜 추천됐나요 · 근거 보기).
  *  - 예전처럼 한 번에 콘텐츠 묶음으로 가던 길은 펼친 판의 큰 단추 하나. 본업 주제 칩 · 직접 쓴 주제는 그대로 바로 묶음.
+ * D-630 대표(2026-11-18) "유튜브를 눌렀을 때도 조금 많다 — 차라리 '이번 주 뜨는 주제' 까지만 보이면 좋은데 자세히 보기 밑으로
+ *        '이번 주 뜨는 주제는 …' · '다음 후보 찾기' 같은 것까지 다 보인다":
+ *  - 들어오면 판 하나 = 이름(이번 주 뜨는 주제) + 한 줄 + 번호 · 주제 다섯 줄 + [n개 더 보기]. 그 밖은 전부 맨 아래 접힌 한 줄 [더 보기] 안.
+ *  - [더 보기] = 1주일치 한 번에 · 우리 본업 주제 · 주제 직접 쓰기 · 내 관심 분야 · 사용 방법(1 → 2 → 3) · 받은 때 · [자세히 보기].
+ *    들어올 때마다 접힌 채(펼친 것을 기억하지 않는다 — 한 번 펼쳐 둔 것 때문에 첫 화면이 다시 길어지지 않게). [모두 펼치기] 를 해 둔 사람만 처음부터 펼침.
+ *  - 접힌 줄은 번호 · 주제 · 신호 막대 · 상태 하나(제작 예정 > AI로 써 둠 > 새로 > 내 관심). 신호 글 · 나머지 상태는 줄을 펼치면.
  */
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
@@ -34,7 +40,7 @@ import { OppBody, OppPeek, type OppCard } from './PlanView'
 import { StrengthMeter } from './RadarParts'
 import { INTEREST_GROUPS, interestLine } from '../../../services/marketing/interests'
 import { Button } from '../../../components/ui/Button'
-import { HintTip } from '../../../components/ui/fold'
+import { Fold, HintTip, foldAllOpen } from '../../../components/ui/fold'
 import { TextScaleQuickButton } from '../../../components/ui/TextScaleQuickButton'
 import { AiConfirm } from '../../../components/ai/AiConfirm'
 import type { ContentAxis } from '../../../services/marketing/radarPlaybook'
@@ -109,7 +115,7 @@ export interface HomeKeyword {
 }
 
 const HOW_TO: readonly { title: string; body: string }[] = [
-  { title: '주제를 하나 누르세요', body: '맨 위 다섯(정책자금 · 정부지원금/고용지원금 · 기업인증 · 정부지원사업 · 절세)은 우리 본업 주제라 늘 그 자리예요 — 작은 글씨는 기업마당에 이번 주 새로 나온 공고 수예요. 아래 \'이번 주 뜨는 주제\' 는 경제 · 경영 · AI 유튜브에서 최근 2주 동안 여러 채널이 함께 다루고 많이 본 주제예요(1번이 가장 강해요 · 옆 막대가 신호 세기). 마우스를 올리면 근거 숫자가, 누르면 왜 지금 · 제목 · 표지 글 · 찍는 법이 펼쳐지고 [이 주제로 글 · 대본 만들기] 를 누르면 글이 나와요. [내 관심 분야 고르기] 로 분야를 고르면 그 분야 주제가 맨 앞에 와요.' },
+  { title: '주제를 하나 누르세요', body: '맨 위 \'이번 주 뜨는 주제\' 는 경제 · 경영 · AI 유튜브에서 최근 2주 동안 여러 채널이 함께 다루고 많이 본 주제예요(1번이 가장 강해요 · 옆 막대가 신호 세기). 마우스를 올리면 근거 숫자가, 누르면 왜 지금 · 제목 · 표지 글 · 찍는 법이 펼쳐지고 [이 주제로 글 · 대본 만들기] 를 누르면 글이 나와요. [내 관심 분야 고르기] 로 분야를 고르면 그 분야 주제가 맨 앞에 와요. 이 [더 보기] 안의 다섯(정책자금 · 정부지원금/고용지원금 · 기업인증 · 정부지원사업 · 절세)은 우리 본업 주제라 늘 그대로예요 — 작은 글씨는 기업마당에 이번 주 새로 나온 공고 수예요.' },
   { title: '글이 한 번에 나와요', body: '제목 · 유튜브 대본 · 짧은 영상(릴스) 대본 · 블로그 글 · 카드뉴스 · 올릴 때 쓰는 글까지. 대표 계정이면 [AI로 다 쓰기] 를 눌렀을 때 AI 가 검증된 방법대로 더 자연스럽게 다시 써요(20~60초 — 그동안 초안을 먼저 보여 드려요).' },
   { title: '칸마다 [복사] 해서 쓰세요', body: '[공식 자료 확인] 이라고 적힌 빈칸은 공고 · 보도자료 · 실제 상담 기록으로 채워요. 금액 · 날짜는 지어내지 않아요.' },
   { title: '찍을 거면 [내 콘텐츠에 담기]', body: '대본이 그대로 저장돼요. 찍는 날 · 올리는 날 · 할 일 표는 위 목차의 [내 콘텐츠] 에서 적어요. 다음에 오면 맨 위 [이어서 하기] 로 바로 돌아와요.' },
@@ -153,7 +159,13 @@ export function KeywordHome({
   interests,
   more,
   opps,
+  below,
+  meta,
 }: {
+  /** D-630 목록 자리 바로 아래(받는 중 · 못 받았을 때 안내 — 예시로 보기) */
+  below?: ReactNode
+  /** D-630 받은 때 · 채널 · 영상 수 — [더 보기] 안 작은 글 */
+  meta?: ReactNode
   /** D-616 이번 주 뜨는 주제마다 레이더 후보(이유 · 근거 · 찍는 법) — 있으면 줄을 누르면 펼침, 없는 줄은 예전처럼 바로 콘텐츠 묶음 */
   opps?: { byKey: ReadonlyMap<string, Opportunity>; card: OppCard }
   /** D-603 판 맨 아래 한 줄 — [자세히 보기](시장 신호 · 추천 기준 · AI 도우미) */
@@ -229,191 +241,28 @@ export function KeywordHome({
   }
   return (
     <section className="flex flex-col overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white" aria-labelledby="mk-home-title" data-testid="mk-home">
-      <div className="flex items-start gap-3 border-b border-slate-100 px-4 py-3">
-        {/* D-507 한 줄 질문 + 1 → 2 → 3 — 처음 온 사람도 무엇을 누르면 어떻게 되는지 먼저 보이게(예전 형식 칩 · 기준 줄은 [사용 방법] 안) */}
-        <div className="min-w-0 flex-1">
-          {/* 제목 옆 ⓘ 는 앱 어디서나 같은 '설명 보기'(qa:easy) · 오른쪽 단추는 글자로 [사용법](둘이 헷갈리지 않게) */}
-          <HintTip tip="맨 위 다섯은 우리 본업 주제라 늘 그 자리예요(작은 글씨 = 기업마당 이번 주 새 공고 수 · 누르면 올릴 글 · 대본이 바로 나와요). 아래 이번 주 뜨는 주제는 경제 · 경영 · AI 유튜브에서 최근 2주 동안 많이 본 주제예요 — 누르면 왜 지금 · 제목 · 표지 글 · 찍는 법이 펼쳐지고 [이 주제로 글 · 대본 만들기] 로 글이 나와요." label="이번 주 무엇을 올릴까요?">
-            <h2 id="mk-home-title" className="t-section flex items-center gap-1.5 text-slate-900">
-              <Flame aria-hidden="true" className="size-5 shrink-0 text-red-600" />
-              <span>
-                <span className="max-sm:hidden">이번 주 </span>무엇을 올릴까요?
-              </span>
-            </h2>
-          </HintTip>
-          {/* 휴대폰은 세 칸(번호 위 · 글 아래), PC 는 한 줄 화살표 */}
-          <ol className="mt-2 grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:items-center sm:gap-x-1.5 sm:gap-y-1" aria-label="쓰는 순서" data-testid="mk-steps">
-            {STEPS.map((st, i) => (
-              <li key={st.t} className="t-sub flex flex-col items-center gap-1 px-0.5 text-center leading-snug font-semibold break-keep text-slate-800 sm:flex-row sm:gap-1.5 sm:p-0 sm:text-left">
-                {i > 0 && <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-400 max-sm:hidden" />}
-                <span aria-hidden="true" className="t-meta flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
-                  {i + 1}
-                </span>
-                {/* D-627 글자 수 한도 — PC 도 짧은 말(긴 말은 [사용 방법] 안) */}
-                <span>{st.short}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-        <button
-          type="button"
-          onClick={() => setHelp((v) => !v)}
-          aria-expanded={help}
-          aria-label="사용 방법"
-          className="tap t-sub inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50 sm:px-3"
-          data-testid="mk-howto-toggle"
-        >
-          {/* 휴대폰은 글자만(제목이 두 줄로 꺾이지 않게 · 제목 옆 ⓘ 와 헷갈리지 않게) */}
-          <CircleHelp aria-hidden="true" className="size-4 max-sm:hidden" /> <span className="sm:hidden">사용법</span>
-          <span className="hidden sm:inline">사용 방법</span>
-        </button>
+      {/* D-630 대표 "유튜브를 눌렀을 때도 조금 많다 — 차라리 '이번 주 뜨는 주제' 까지만" — 판 머리는 이름 하나 + 한 줄.
+          1 → 2 → 3 · [사용 방법] · 1주일치 · 본업 주제 · 직접 쓰기 · 관심 분야 · [자세히 보기] 는 판 맨 아래 [더 보기] 안(지운 것 없음 · 같은 시험 이름) */}
+      <div className="flex flex-col gap-0.5 border-b border-slate-100 px-4 py-3">
+        {/* 제목 옆 ⓘ 는 앱 어디서나 같은 '설명 보기'(qa:easy) */}
+        <HintTip tip="경제 · 경영 · AI 유튜브에서 최근 2주 동안 여러 채널이 함께 다루고 많이 본 주제예요(1번이 가장 강해요 · 옆 막대가 신호 세기). 주제를 누르면 왜 지금 · 제목 · 표지 글 · 찍는 법이 펼쳐지고 [이 주제로 글 · 대본 만들기] 로 글이 나와요. 우리 본업 주제 · 직접 쓴 주제 · 1주일치 한 번에 · 사용 방법은 아래 [더 보기] 에 있어요." label="이번 주 뜨는 주제">
+          <h2 id="mk-home-title" className="t-section flex items-center gap-1.5 text-slate-900">
+            <Flame aria-hidden="true" className="size-5 shrink-0 text-red-600" />
+            <span>이번 주 뜨는 주제</span>
+          </h2>
+        </HintTip>
+        {/* D-507 이 화면이 무엇을 해 주는지 한 줄(쉬운 말) — 무엇을 누르면 어떻게 되는지 */}
+        <p className="t-sub break-keep text-slate-700" data-testid="mk-home-about">
+          주제를 누르면 글 · 대본이 나와요.
+        </p>
       </div>
 
-      {help && (
-        <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-4 py-3">
-          <ol className="flex flex-col gap-2" data-testid="mk-howto">
-            {HOW_TO.map((h, i) => (
-              <li key={h.title} className="flex gap-2.5">
-                <span aria-hidden="true" className="t-sub flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
-                  {i + 1}
-                </span>
-                <p className="t-sub min-w-0 break-keep text-slate-800">
-                  <b className="text-slate-900">{h.title}</b> — {isMarketingCustomer() ? mkText(h.body).replace('대표 계정이면 ', '') : h.body}
-                </p>
-              </li>
-            ))}
-            <li className="t-sub break-keep pl-8 text-slate-600">{mkText('주제를 하나 고르면 유튜브 대본 · 짧은 영상 대본 · 블로그 글 · 카드뉴스가 한 번에 나와요.')} 왜 이 주제인지는 뜨는 주제를 누르면 그 아래에, 시장 신호 · 추천 기준은 이 판 아래 [자세히 보기] 에 있어요.</li>
-          </ol>
-          {/* 한 번에 나오는 형식 · 무엇을 기준으로 골랐나(예전 첫 화면 위 두 줄) — 처음 화면을 가볍게 하려고 여기로 */}
-          <ul className="flex flex-wrap gap-1.5 pl-8" aria-label="한 번에 나오는 형식" data-testid="mk-formats">
-            {FORMATS.filter((f) => !(isMarketingCustomer() && f.label === '카드뉴스')).map((f) => (
-              <li key={f.label} className="t-meta inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
-                <f.icon aria-hidden="true" className="size-3.5" />
-                {f.label}
-              </li>
-            ))}
-          </ul>
-          {basis && (
-            <p className="t-meta break-keep pl-8 text-slate-600" data-testid="mk-basis">
-              {basis}
-            </p>
-          )}
-          {change && list.length > 0 && (
-            <p className="t-meta break-keep pl-8 text-slate-700" data-testid="mk-change">
-              {change}
-            </p>
-          )}
-          {/* D-507 글자가 작게 보이면 바로 여기서 — 앱 전체 글자 크기(설정 › 보기 와 같은 값 · 누를 때마다 기본 → 크게 → 매우 크게) */}
-          <p className="t-sub flex flex-wrap items-center gap-2 pl-8 break-keep text-slate-700" data-testid="mk-howto-text">
-            글자가 작게 보이면 <TextScaleQuickButton showLabel /> <span className="t-meta text-slate-600">누를 때마다 기본 → 크게 → 매우 크게</span>
-          </p>
-        </div>
-      )}
-
       <div className="flex flex-col gap-3 p-3 sm:p-4">
-        {resume && <ResumeCard {...resume} />}
-        {week && <WeekButton {...week} />}
-        {/* D-603 대표 "유튜브 화면도 박스 너무 많아 — 스레드 · 릴스처럼" — 본업 주제 다섯 칸(네모 칸) → 한 줄 칩(스레드 '우리 분야 주제' 와 같은 모양).
-            둘째 줄 짧은 설명(융자 · 보증)은 마우스를 올리면(title) · 새 공고 수 · 영상 수 · AI로 써 둠은 칩 안에 작게 그대로 */}
-        {fixed.length > 0 && (
-          <div className="flex flex-col gap-1.5" data-testid="mk-fixed">
-            <p className="t-meta flex items-center gap-1 font-bold text-slate-700">
-              <Pin aria-hidden="true" className="size-3.5 text-slate-500" /> 우리 본업 주제
-            </p>
-            <ul className="flex flex-wrap gap-1.5" data-testid="mk-fixed-keys">
-              {fixed.map((k) => (
-                <li key={k.key} className="min-w-0 max-w-full">
-                  <button
-                    type="button"
-                    onClick={() => onPick(k.key)}
-                    title={k.sub ? `${k.topic} — ${k.sub}` : undefined}
-                    className="tap inline-flex min-h-11 max-w-full min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-full border border-slate-300 bg-white px-3.5 py-1 text-left transition-colors hover:border-brand-400 hover:bg-slate-50"
-                    data-testid="mk-fixed-key"
-                    data-key={k.key}
-                  >
-                    <span className="t-sub font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{k.topic}</span>
-                    {k.note && (
-                      <span className="t-meta font-semibold text-emerald-800" data-testid="mk-key-note">
-                        {k.note}
-                      </span>
-                    )}
-                    {/* D-560 그 주제 영상 수(참고 채널 최근 30일) — 누르면 묶음 화면 '관련 영상 펼쳐보기' 에 그 영상 */}
-                    {!!k.videos && (
-                      <span className="t-meta shrink-0 font-semibold text-slate-600" data-testid="mk-fixed-videos" data-n={k.videos}>
-                        영상 {k.videos}편
-                      </span>
-                    )}
-                    {aiDone.has(k.key) && (
-                      <span className="t-meta inline-flex shrink-0 items-center gap-0.5 font-semibold text-violet-700" data-testid="mk-key-ai">
-                        <Sparkles aria-hidden="true" className="size-3" /> AI로 써 둠
-                      </span>
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <div className={`-mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 ${fixed.length > 0 ? 'border-t border-slate-100 pt-3' : ''}`}>
-          <p className="t-meta flex items-center gap-1 font-bold text-slate-700">
-            <Flame aria-hidden="true" className="size-3.5 text-slate-500" /> 이번 주 뜨는 주제
-          </p>
-          {/* D-627 뜨는 주제를 받았을 때만(받기 전에는 고를 것이 없다) */}
-          {interests && (list.length > 0 || pickOpen) && (
-            <button
-              type="button"
-              onClick={openPicker}
-              aria-expanded={pickOpen}
-              className="tap t-meta ml-auto inline-flex min-h-9 items-center gap-1 rounded-full border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50"
-              data-testid="mk-interest-open"
-            >
-              <SlidersHorizontal aria-hidden="true" className="size-3.5" />
-              {interests.picked.length ? <>내 관심 분야 · <span className="text-brand-700">{interestLine(interests.picked)}</span></> : '내 관심 분야 고르기'}
-            </button>
-          )}
-        </div>
-        {interests && pickOpen && (
-          <div className="flex flex-col gap-2 border-y border-slate-100 py-3" data-testid="mk-interest-panel">
-            <p className="t-sub break-keep text-slate-700">고른 분야의 주제가 아래 10개 맨 앞에 와요 — 남은 자리는 요즘 뜨는 다른 주제예요. 계정마다 따로 저장돼요.</p>
-            <div className="flex flex-wrap gap-1.5" role="group" aria-label="관심 분야">
-              {INTEREST_GROUPS.map((g) => {
-                const on = pickDraft.includes(g.id)
-                return (
-                  <button
-                    key={g.id}
-                    type="button"
-                    aria-pressed={on}
-                    title={g.hint}
-                    onClick={() => setPickDraft((d) => (on ? d.filter((x) => x !== g.id) : [...d, g.id]))}
-                    className={`tap t-sub inline-flex min-h-10 flex-col items-start rounded-xl border px-3 py-1 text-left ${on ? 'border-brand-500 bg-white text-brand-800 ring-1 ring-brand-300' : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50'}`}
-                    data-testid="mk-interest-chip"
-                    data-id={g.id}
-                  >
-                    <span className="font-bold">{on ? '✓ ' : ''}{g.label}</span>
-                    <span className="t-meta text-slate-600">{g.hint}</span>
-                  </button>
-                )
-              })}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="primary" onClick={() => void savePick(pickDraft)} disabled={pickSaving || interests.readOnly} data-testid="mk-interest-save">
-                {pickDraft.length ? `이 ${pickDraft.length}가지로 맞추기` : '모든 분야로 보기'}
-              </Button>
-              {interests.picked.length > 0 && (
-                <Button size="sm" variant="ghost" onClick={() => void savePick([])} disabled={pickSaving || interests.readOnly} data-testid="mk-interest-clear">
-                  고른 것 지우기(모든 분야)
-                </Button>
-              )}
-              <Button size="sm" variant="ghost" onClick={() => setPickOpen(false)}>
-                닫기
-              </Button>
-            </div>
-          </div>
-        )}
         {list.length > 0 ? (
           // D-603 네모 칸 열 개 → 번호 붙은 목록(줄 사이 가는 선) — 칸마다 테두리를 두르지 않는다. 1번은 진한 번호 동그라미로만 눈에 띄게
           // D-616 예전 '이번 주 찍을 것' 1~10위(같은 주제 · 같은 순서)를 이 목록 하나로 — 줄마다 신호 세기 · 마우스를 올리면 근거 숫자 ·
           //       누르면 이유 · 제목 · 표지 글 · 찍는 법이 이 줄 아래 펼쳐지고 [이 주제로 글 · 대본 만들기] 로 예전 콘텐츠 묶음
+          // D-630 접힌 줄은 번호 · 주제 · 신호 막대 · 상태 하나 — 신호 글 · 나머지 상태는 줄을 펼치면(화면 읽기에는 늘)
           <ul className="grid grid-cols-1 items-start sm:grid-cols-2 sm:gap-x-6" data-testid="mk-keys">
             {list.flatMap((k, i) => {
               const o = opps?.byKey.get(k.key)
@@ -422,6 +271,38 @@ export function KeywordHome({
               const open = isPinned || isPeek
               const s = o ? opps?.card.status.get(k.key) : undefined
               const planned = !!s && s !== 'idea'
+              // 상태 칩 — 중요한 것부터. 접힌 줄에는 맨 앞 하나만 보이고 나머지는 펼치면
+              const marks: ReactNode[] = []
+              if (planned)
+                marks.push(
+                  <span className="t-meta inline-flex items-center gap-1 font-bold text-success-700" data-testid="radar-row-planned">
+                    <CalendarCheck aria-hidden="true" className="size-3.5" /> {s === 'selected' ? '제작 예정' : IDEA_STATUS_LABEL[s]}
+                  </span>,
+                )
+              if (aiDone.has(k.key))
+                marks.push(
+                  <span className="t-meta inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800" data-testid="mk-key-ai">
+                    <Sparkles aria-hidden="true" className="size-3.5" /> AI로 써 둠
+                  </span>,
+                )
+              if (fresh?.has(k.key))
+                marks.push(
+                  <span className="t-meta rounded-full bg-brand-600 px-2 py-0.5 font-bold text-white" data-testid="mk-key-new">
+                    새로
+                  </span>,
+                )
+              if (k.topicId && interestSet.has(k.topicId))
+                marks.push(
+                  <span className="t-meta rounded-full border border-brand-300 bg-white px-2 py-0.5 font-semibold text-brand-700" data-testid="mk-key-interest">
+                    내 관심
+                  </span>,
+                )
+              if (k.note)
+                marks.push(
+                  <span className="t-meta rounded-full border border-emerald-300 bg-white px-2 py-0.5 font-semibold text-emerald-800" data-testid="mk-key-note">
+                    {k.note}
+                  </span>,
+                )
               const row = (
                 <li
                   key={k.key}
@@ -456,32 +337,12 @@ export function KeywordHome({
                         {k.topic}
                       </span>
                       <span className="flex flex-wrap items-center gap-1 sm:gap-1.5">
-                        {o && <StrengthMeter strength={o.strength} />}
-                        {planned && (
-                          <span className="t-meta inline-flex items-center gap-1 font-bold text-success-700" data-testid="radar-row-planned">
-                            <CalendarCheck aria-hidden="true" className="size-3.5" /> {s === 'selected' ? '제작 예정' : IDEA_STATUS_LABEL[s]}
+                        {o && <StrengthMeter strength={o.strength} compact={!isPinned} />}
+                        {marks.map((m, j) => (
+                          <span key={j} className={j === 0 || isPinned ? 'inline-flex' : 'sr-only'}>
+                            {m}
                           </span>
-                        )}
-                        {k.note && (
-                          <span className="t-meta rounded-full border border-emerald-300 bg-white px-2 py-0.5 font-semibold text-emerald-800" data-testid="mk-key-note">
-                            {k.note}
-                          </span>
-                        )}
-                        {k.topicId && interestSet.has(k.topicId) && (
-                          <span className="t-meta rounded-full border border-brand-300 bg-white px-2 py-0.5 font-semibold text-brand-700" data-testid="mk-key-interest">
-                            내 관심
-                          </span>
-                        )}
-                        {fresh?.has(k.key) && (
-                          <span className="t-meta rounded-full bg-brand-600 px-2 py-0.5 font-bold text-white" data-testid="mk-key-new">
-                            새로
-                          </span>
-                        )}
-                        {aiDone.has(k.key) && (
-                          <span className="t-meta inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800" data-testid="mk-key-ai">
-                            <Sparkles aria-hidden="true" className="size-3.5" /> AI로 써 둠
-                          </span>
-                        )}
+                        ))}
                       </span>
                     </span>
                     {o ? (
@@ -531,8 +392,8 @@ export function KeywordHome({
               return [row, ...bodies]
             })}
           </ul>
-        ) : (
-          // D-627 한 줄로 — 더 긴 까닭은 마우스를 올리면(title)
+        ) : below && status !== 'ready' ? null : (
+          // D-627 한 줄로 — 더 긴 까닭은 마우스를 올리면(title) · D-630 받는 중 · 못 받았을 때는 아래 안내(below)가 같은 말을 한다
           <p
             className="t-sub break-keep py-2 text-slate-600"
             data-testid="mk-keys-empty"
@@ -545,6 +406,63 @@ export function KeywordHome({
           <button type="button" onClick={() => setAllRows(true)} className="tap t-sub -mt-1 inline-flex min-h-11 items-center gap-1 self-start rounded-(--radius-control) px-2 font-semibold text-brand-700 hover:bg-slate-50" data-testid="mk-keys-more">
             {hiddenRows}개 더 보기 <ChevronDown aria-hidden="true" className="size-4" />
           </button>
+        )}
+        {/* 받는 중 · 못 받았을 때 안내(예시로 보기)는 목록 자리 바로 아래 — [더 보기] 보다 먼저 */}
+        {below}
+
+        {/* D-630 나머지는 접힌 한 줄 [더 보기] — 들어올 때마다 접힌 채(펼친 것을 기억하지 않는다 · [모두 펼치기] 를 해 둔 사람만 처음부터 펼침) */}
+        <div className="-mb-1 border-t border-slate-100 pt-1">
+          <Fold
+            id="mk.home.more"
+            title="더 보기"
+            hint="1주일치 한 번에 만들기 · 우리 본업 주제(정책자금 · 고용지원금 …) · 주제 직접 쓰기 · 내 관심 분야 고르기 · 사용 방법 · [자세히 보기](시장 신호 · 추천 기준 · AI 도우미 · 새로 가져오기 · 엑셀로 받기 · 채널 설계 기준)가 여기 있어요."
+            keepClosed
+            forceOpen={foldAllOpen()}
+            className="data-[open=1]:pb-1"
+            testId="mk-home-more"
+          >
+        {resume && <ResumeCard {...resume} />}
+        {week && <WeekButton {...week} />}
+        {/* D-603 대표 "유튜브 화면도 박스 너무 많아 — 스레드 · 릴스처럼" — 본업 주제 다섯 칸(네모 칸) → 한 줄 칩(스레드 '우리 분야 주제' 와 같은 모양).
+            둘째 줄 짧은 설명(융자 · 보증)은 마우스를 올리면(title) · 새 공고 수 · 영상 수 · AI로 써 둠은 칩 안에 작게 그대로 */}
+        {fixed.length > 0 && (
+          <div className="flex flex-col gap-1.5" data-testid="mk-fixed">
+            <p className="t-meta flex items-center gap-1 font-bold text-slate-700">
+              <Pin aria-hidden="true" className="size-3.5 text-slate-500" /> 우리 본업 주제
+            </p>
+            <ul className="flex flex-wrap gap-1.5" data-testid="mk-fixed-keys">
+              {fixed.map((k) => (
+                <li key={k.key} className="min-w-0 max-w-full">
+                  <button
+                    type="button"
+                    onClick={() => onPick(k.key)}
+                    title={k.sub ? `${k.topic} — ${k.sub}` : undefined}
+                    className="tap inline-flex min-h-11 max-w-full min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-full border border-slate-300 bg-white px-3.5 py-1 text-left transition-colors hover:border-brand-400 hover:bg-slate-50"
+                    data-testid="mk-fixed-key"
+                    data-key={k.key}
+                  >
+                    <span className="t-sub font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{k.topic}</span>
+                    {k.note && (
+                      <span className="t-meta font-semibold text-emerald-800" data-testid="mk-key-note">
+                        {k.note}
+                      </span>
+                    )}
+                    {/* D-560 그 주제 영상 수(참고 채널 최근 30일) — 누르면 묶음 화면 '관련 영상 펼쳐보기' 에 그 영상 */}
+                    {!!k.videos && (
+                      <span className="t-meta shrink-0 font-semibold text-slate-600" data-testid="mk-fixed-videos" data-n={k.videos}>
+                        영상 {k.videos}편
+                      </span>
+                    )}
+                    {aiDone.has(k.key) && (
+                      <span className="t-meta inline-flex shrink-0 items-center gap-0.5 font-semibold text-violet-700" data-testid="mk-key-ai">
+                        <Sparkles aria-hidden="true" className="size-3" /> AI로 써 둠
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <form
@@ -571,8 +489,133 @@ export function KeywordHome({
             이 주제로 만들기 <ArrowRight aria-hidden="true" className="size-4" />
           </Button>
         </form>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* D-627 뜨는 주제를 받았을 때만(받기 전에는 고를 것이 없다) */}
+          {interests && (list.length > 0 || pickOpen) && (
+            <button
+              type="button"
+              onClick={openPicker}
+              aria-expanded={pickOpen}
+              className="tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50"
+              data-testid="mk-interest-open"
+            >
+              <SlidersHorizontal aria-hidden="true" className="size-4" />
+              {interests.picked.length ? <>내 관심 분야 · <span className="text-brand-700">{interestLine(interests.picked)}</span></> : '내 관심 분야 고르기'}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setHelp((v) => !v)}
+            aria-expanded={help}
+            className="tap t-sub inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-700 hover:bg-slate-50"
+            data-testid="mk-howto-toggle"
+          >
+            <CircleHelp aria-hidden="true" className="size-4" /> 사용 방법
+          </button>
+        </div>
+
+      {help && (
+        <div className="flex flex-col gap-2 border-y border-slate-100 bg-white py-3">
+          {/* D-507 1 → 2 → 3 — 누르면 무엇이 되는지(휴대폰은 세 칸 · PC 는 한 줄 화살표) */}
+          <ol className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:items-center sm:gap-x-1.5 sm:gap-y-1" aria-label="쓰는 순서" data-testid="mk-steps">
+            {STEPS.map((st, i) => (
+              <li key={st.t} className="t-sub flex flex-col items-center gap-1 px-0.5 text-center leading-snug font-semibold break-keep text-slate-800 sm:flex-row sm:gap-1.5 sm:p-0 sm:text-left">
+                {i > 0 && <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-slate-400 max-sm:hidden" />}
+                <span aria-hidden="true" className="t-meta flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
+                  {i + 1}
+                </span>
+                <span>{st.short}</span>
+              </li>
+            ))}
+          </ol>
+          <ol className="flex flex-col gap-2" data-testid="mk-howto">
+            {HOW_TO.map((h, i) => (
+              <li key={h.title} className="flex gap-2.5">
+                <span aria-hidden="true" className="t-sub flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
+                  {i + 1}
+                </span>
+                <p className="t-sub min-w-0 break-keep text-slate-800">
+                  <b className="text-slate-900">{h.title}</b> — {isMarketingCustomer() ? mkText(h.body).replace('대표 계정이면 ', '') : h.body}
+                </p>
+              </li>
+            ))}
+            <li className="t-sub break-keep pl-8 text-slate-600">{mkText('주제를 하나 고르면 유튜브 대본 · 짧은 영상 대본 · 블로그 글 · 카드뉴스가 한 번에 나와요.')} 왜 이 주제인지는 뜨는 주제를 누르면 그 아래에, 시장 신호 · 추천 기준은 이 [더 보기] 맨 아래 [자세히 보기] 에 있어요.</li>
+          </ol>
+          {/* 한 번에 나오는 형식 · 무엇을 기준으로 골랐나(예전 첫 화면 위 두 줄) — 처음 화면을 가볍게 하려고 여기로 */}
+          <ul className="flex flex-wrap gap-1.5 pl-8" aria-label="한 번에 나오는 형식" data-testid="mk-formats">
+            {FORMATS.filter((f) => !(isMarketingCustomer() && f.label === '카드뉴스')).map((f) => (
+              <li key={f.label} className="t-meta inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+                <f.icon aria-hidden="true" className="size-3.5" />
+                {f.label}
+              </li>
+            ))}
+          </ul>
+          {basis && (
+            <p className="t-meta break-keep pl-8 text-slate-600" data-testid="mk-basis">
+              {basis}
+            </p>
+          )}
+          {change && list.length > 0 && (
+            <p className="t-meta break-keep pl-8 text-slate-700" data-testid="mk-change">
+              {change}
+            </p>
+          )}
+          {/* D-507 글자가 작게 보이면 바로 여기서 — 앱 전체 글자 크기(설정 › 보기 와 같은 값 · 누를 때마다 기본 → 크게 → 매우 크게) */}
+          <p className="t-sub flex flex-wrap items-center gap-2 pl-8 break-keep text-slate-700" data-testid="mk-howto-text">
+            글자가 작게 보이면 <TextScaleQuickButton showLabel /> <span className="t-meta text-slate-600">누를 때마다 기본 → 크게 → 매우 크게</span>
+          </p>
+        </div>
+      )}
+
+        {interests && pickOpen && (
+          <div className="flex flex-col gap-2 border-y border-slate-100 py-3" data-testid="mk-interest-panel">
+            <p className="t-sub break-keep text-slate-700">고른 분야의 주제가 위 목록 맨 앞에 와요 — 남은 자리는 요즘 뜨는 다른 주제예요. 계정마다 따로 저장돼요.</p>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="관심 분야">
+              {INTEREST_GROUPS.map((g) => {
+                const on = pickDraft.includes(g.id)
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    aria-pressed={on}
+                    title={g.hint}
+                    onClick={() => setPickDraft((d) => (on ? d.filter((x) => x !== g.id) : [...d, g.id]))}
+                    className={`tap t-sub inline-flex min-h-10 flex-col items-start rounded-xl border px-3 py-1 text-left ${on ? 'border-brand-500 bg-white text-brand-800 ring-1 ring-brand-300' : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50'}`}
+                    data-testid="mk-interest-chip"
+                    data-id={g.id}
+                  >
+                    <span className="font-bold">{on ? '✓ ' : ''}{g.label}</span>
+                    <span className="t-meta text-slate-600">{g.hint}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="primary" onClick={() => void savePick(pickDraft)} disabled={pickSaving || interests.readOnly} data-testid="mk-interest-save">
+                {pickDraft.length ? `이 ${pickDraft.length}가지로 맞추기` : '모든 분야로 보기'}
+              </Button>
+              {interests.picked.length > 0 && (
+                <Button size="sm" variant="ghost" onClick={() => void savePick([])} disabled={pickSaving || interests.readOnly} data-testid="mk-interest-clear">
+                  고른 것 지우기(모든 분야)
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => setPickOpen(false)}>
+                닫기
+              </Button>
+            </div>
+          </div>
+        )}
+        {/* D-630 받은 때 · 채널 · 영상 수(예전 머리 아래 작은 글) */}
+        {meta && (
+          <p className="t-meta flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-600" data-testid="mk-home-meta">
+            {meta}
+          </p>
+        )}
         {/* D-603 [자세히 보기] 는 따로 떨어진 판 대신 이 판 맨 아래 한 줄(가는 선 위) — 펼치면 이 판 안에서 길어진다 */}
         {more && <div className="-mb-1 border-t border-slate-100 pt-1">{more}</div>}
+          </Fold>
+        </div>
       </div>
     </section>
   )

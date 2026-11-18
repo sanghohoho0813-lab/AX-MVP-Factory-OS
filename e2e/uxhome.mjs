@@ -18,6 +18,7 @@ import { chromium } from 'playwright'
 import fs from 'node:fs'
 import path from 'node:path'
 import { seedScript } from './seed.mjs'
+import { openMkHomeMore } from './support/mkOpen.mjs'
 import { openTools } from './pageTools.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
@@ -200,10 +201,12 @@ let caseUrl = ''
   check("G1 마케팅 첫 화면 — 대화창(무엇을 만들까요?) + 목차 두 줄 '살펴보기' · '만들기'(D-511)", t.includes('살펴보기') && t.includes('만들기') && (await page.getByTestId('mk-ask').count()) === 1)
   // D-511 1 → 2 → 3 · 키워드 판은 [이번 주 찍을 것] 안
   await page.goto(BASE + '/marketing?view=plan', { waitUntil: 'networkidle' })
-  // D-507 첫 화면은 1 → 2 → 3, 한 번에 나오는 형식 넷은 [사용 방법] 안
-  const steps = await page.getByTestId('mk-steps').locator('li').count().catch(() => 0)
+  // D-507 1 → 2 → 3, 한 번에 나오는 형식 넷은 [사용 방법] 안 · D-630 [사용 방법] 은 판 맨 아래 접힌 [더 보기] 안(들어오면 '이번 주 뜨는 주제' + 한 줄만)
+  const about = ((await page.getByTestId('mk-home-about').innerText().catch(() => '')) ?? '').trim()
+  await openMkHomeMore(page)
   if (await page.getByTestId('mk-howto-toggle').count()) await page.getByTestId('mk-howto-toggle').click()
-  check('G2 첫 화면 1 → 2 → 3 · [사용 방법] 안에 한 번에 나오는 형식 4(유튜브 대본 · 릴스 · 블로그 · 카드뉴스)', steps === 3 && (await page.getByTestId('mk-formats').locator('li').count()) === 4, steps)
+  const steps = await page.getByTestId('mk-steps').locator('li').count().catch(() => 0)
+  check('G2 유튜브 화면 한 줄(무엇을 누르면 어떻게) · [더 보기] › [사용 방법] 안에 1 → 2 → 3 · 한 번에 나오는 형식 4(유튜브 대본 · 릴스 · 블로그 · 카드뉴스)', about.length > 0 && steps === 3 && (await page.getByTestId('mk-formats').locator('li').count()) === 4, { about, steps })
   const m = await ctx.newPage()
   await m.setViewportSize({ width: 390, height: 844 })
   await m.goto(BASE + '/marketing', { waitUntil: 'networkidle' })

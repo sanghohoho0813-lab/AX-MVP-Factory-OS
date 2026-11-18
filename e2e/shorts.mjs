@@ -15,6 +15,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import fs from 'node:fs'
 import { seedScript } from './seed.mjs'
+import { visibleText } from './support/mkOpen.mjs'
 import { openTools } from './pageTools.mjs'
 
 const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
@@ -141,7 +142,7 @@ await page.getByTestId('sht-qs-platform-reels').hover()
 await page.waitForTimeout(150)
 check('H2 [인스타 릴스] 칩에 마우스 → 20초 안팎 짧은 영상', /20초 안팎/.test(await page.getByTestId('hover-tip').innerText().catch(() => '')))
 await page.mouse.move(5, 700)
-check('H3 지금 칸 한 줄 · "이것만 지키면 돼요" 4줄 — 굵은 한마디 + 짧은 설명(예시는 ? / 마우스)', /오늘 만들 영상 — 주제만 고르면/.test(await page.getByTestId('sht-about').innerText()) && (await page.locator('[data-testid="sht-basic"] [data-testid="hint-dot"]').count()) === 4 && /첫마디는 짧게/.test(await page.getByTestId('sht-basics').innerText()))
+check('H3 지금 칸 한 줄 · "이것만 지키면 돼요" 4줄 — 굵은 한마디 + 짧은 설명(예시는 ? / 마우스)', /^주제만 고르면 대본을 써 줘요/.test(await visibleText(page.getByTestId('sht-about'))) /* D-630 한 줄은 설명만 — 칸 이름은 고른 칸(만들기)이 말하고 화면 읽기에는 그대로 */ && /오늘 만들 영상 — 주제만 고르면/.test(((await page.getByTestId('sht-about').textContent()) ?? '').replace(/\s+/g, ' ')) && (await page.locator('[data-testid="sht-tab-write"][aria-selected="true"]').innerText()).trim() === '만들기' && (await page.locator('[data-testid="sht-basic"] [data-testid="hint-dot"]').count()) === 4 && /첫마디는 짧게/.test(await page.getByTestId('sht-basics').innerText()))
 await page.locator('[data-testid="sht-basic"]').first().hover()
 await page.waitForTimeout(150)
 check('H4 "첫마디는 짧게" 에 마우스 → 예시("안녕하세요" 로 시작하지 않아요)', /안녕하세요/.test(await page.locator('[data-testid="sht-basic"]').first().getByTestId('hint-tip').innerText().catch(() => '')))
@@ -360,7 +361,7 @@ for (const [w, scale] of [[360, ''], [390, ''], [430, ''], [360, 'extra_large']]
   await mp.getByTestId('sht-tab-guide').click()
   await mp.waitForTimeout(200)
   // D-298 휴대폰은 눌러도 설명 상자가 뜨지 않는다(가리지 않게) — 지금 칸 한 줄 · 카드마다 쉽게 말하면
-  check(`M ${tag}: 형식 · 공식 — 넘침 0 · 설명 상자 안 뜸 · 지금 칸 한 줄 · 카드마다 쉽게 말하면 · JS 오류 0`, (await overflowX(mp)) <= 0 && (await mp.locator('[data-testid="sht-tabtip"]').count()) === 0 && /형식 · 공식 — /.test(await mp.getByTestId('sht-about').innerText()) && (await mp.getByTestId('sht-guide-plain').count()) === 5 && errs.length === 0, { over: await overflowX(mp), errs })
+  check(`M ${tag}: 형식 · 공식 — 넘침 0 · 설명 상자 안 뜸 · 지금 칸 한 줄 · 카드마다 쉽게 말하면 · JS 오류 0`, (await overflowX(mp)) <= 0 && (await mp.locator('[data-testid="sht-tabtip"]').count()) === 0 && /^영상 형식 5가지 설명서/.test(await visibleText(mp.getByTestId('sht-about'))) && /형식 · 공식 — /.test(((await mp.getByTestId('sht-about').textContent()) ?? '').replace(/\s+/g, ' ')) && (await mp.getByTestId('sht-guide-plain').count()) === 5 && errs.length === 0, { over: await overflowX(mp), errs })
   await m.close()
 }
 

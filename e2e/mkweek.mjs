@@ -25,6 +25,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import fs from 'node:fs'
 import { seedScript } from './seed.mjs'
+import { openMkHomeMore, pickWeekTab } from './support/mkOpen.mjs'
 
 const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
 const { default: handler, __resetAiAssistState } = await fromRoot('api/ai-assist.js')
@@ -161,16 +162,18 @@ async function openHome(p) {
     await p.waitForTimeout(900)
   }
   await p.getByTestId('mk-home').waitFor({ timeout: 10000 })
+  // D-630 [1주일치 한 번에 만들기] · 본업 주제는 판 맨 아래 접힌 [더 보기] 안 — 한 번 펼치고 쓴다(이미 펼쳐져 있으면 그대로)
+  await openMkHomeMore(p)
 }
 const weekCalls = () => llm.filter((x) => /\((radar\.pack\.video|shorts\.write|threads\.write)/.test(x.sys))
 const idOf = (c) => (c.sys.match(/\((radar\.pack\.video|shorts\.write|threads\.write)/) ?? [])[1]
 const weekDone = (p) => p.waitForSelector('[data-testid="mk-week-ai"]:not([data-state="running"])', { timeout: 25000 })
 const overflowX = (p) => p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-/** D-356 1주일치는 탭 넷(롱폼 · 릴스/쇼츠 · 스레드 · 올릴 날) — 한 번에 하나만 그려진다 */
-const tabTo = async (p, key) => {
-  await p.locator(`[data-testid="mk-week-tab"][data-tab="${key}"]`).click()
-  await p.waitForSelector(`[data-testid="mk-week-panel"][data-tab="${key}"]`, { timeout: 5000 }).catch(() => {})
-}
+/**
+ * D-356 1주일치는 탭 넷(롱폼 · 릴스/쇼츠 · 스레드 · 올릴 날) — 한 번에 하나만 그려진다.
+ * D-630 들어오면 고른 탭이 없다(묶음 머리 + 탭 넷만) · 고른 탭을 한 번 더 누르면 접힌다 — 그래서 이미 그 탭이면 누르지 않는다.
+ */
+const tabTo = (p, key) => pickWeekTab(p, key)
 /** D-627 아래 도구 줄(전체 복사 · 내려받기 · 점수 · 90점 아래 고쳐 쓰기)은 접힌 한 줄 — 누르기 · 읽기 전에 펼친다 */
 const openTools = async (p) => {
   const box = p.getByTestId('mk-week-tools')
@@ -208,7 +211,8 @@ const open = page.getByTestId('mk-week-open')
 const keysTop = (await page.getByTestId('mk-keys').boundingBox())?.y ?? 0
 // D-627 글자 수 한도 — 단추 글은 '1주일치 한 번에 만들기', 무엇이 나오는지(긴 영상 1 · 짧은 영상 3 · 스레드 글 7)는 아이콘 셋 + 마우스(title · 읽어 주기 이름)
 const openTip = `${(await open.getAttribute('title')) ?? ''} ${(await page.getByTestId('mk-week-what').getAttribute('aria-label')) ?? ''}`
-check('H1 첫 화면 이번 주 키워드 위에 [1주일치 한 번에 만들기] — 유튜브 긴 영상 1 · 짧은 영상 3 · 스레드 글 7(D-507 쉬운 말 · D-627 아이콘 + 마우스)', (await open.count()) === 1 && ((await open.boundingBox())?.y ?? 9999) < keysTop && (await open.innerText()).includes('1주일치 한 번에 만들기') && openTip.includes('스레드 글 7') && openTip.includes('긴 영상 1') && openTip.includes('짧은 영상 3'), { text: await open.innerText(), openTip })
+// D-630 들어오면 '이번 주 뜨는 주제' 목록만 — [1주일치 한 번에 만들기] 는 목록 아래 [더 보기] 안 맨 위(마케팅 첫 화면 대화창의 [1주일치 한 번에] 로도 온다)
+check('H1 [1주일치 한 번에 만들기] 는 뜨는 주제 목록 아래 [더 보기] 안 맨 위(D-630) — 유튜브 긴 영상 1 · 짧은 영상 3 · 스레드 글 7(D-507 쉬운 말 · D-627 아이콘 + 마우스)', (await open.count()) === 1 && (await page.getByTestId('mk-home-more').getByTestId('mk-week-open').count()) === 1 && ((await open.boundingBox())?.y ?? 0) > keysTop && ((await open.boundingBox())?.y ?? 9999) < ((await page.getByTestId('mk-fixed').boundingBox())?.y ?? 0) && (await open.innerText()).includes('1주일치 한 번에 만들기') && openTip.includes('스레드 글 7') && openTip.includes('긴 영상 1') && openTip.includes('짧은 영상 3'), { text: await open.innerText(), openTip })
 await shot(page, 'H-home')
 // 고정 키워드(본업) 이름들 — 짝의 앞쪽이 이 가운데 하나여야
 const fixedText = await page.getByTestId('mk-fixed').innerText().catch(() => '')
@@ -224,13 +228,13 @@ await open.click()
 await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
 await page.waitForTimeout(300)
 {
-  // D-356 프로젝트 머리 + 탭 넷 · 처음엔 롱폼만(달력 · 쇼츠 · 스레드는 탭 뒤)
+  // D-356 프로젝트 머리 + 탭 넷 · D-630 들어오면 고른 탭이 없다(롱폼 · 달력 · 쇼츠 · 스레드 모두 탭을 눌러야)
   const tabs = await page.getByTestId('mk-week-tab').evaluateAll((els) => els.map((e) => e.getAttribute('data-tab')))
-  const first = { long: await page.getByTestId('mk-week-long').count(), short: await page.getByTestId('mk-week-short').count(), thread: await page.getByTestId('mk-week-thread').count(), cal: await page.getByTestId('mk-week-calendar').count() }
+  const first = { long: await page.getByTestId('mk-week-long').count(), short: await page.getByTestId('mk-week-short').count(), thread: await page.getByTestId('mk-week-thread').count(), cal: await page.getByTestId('mk-week-calendar').count(), panel: await page.getByTestId('mk-week-panel').count(), picked: await page.locator('[data-testid="mk-week-tab"][aria-selected="true"]').count() }
   const runTab = await page.locator('[data-testid="mk-week-tab"][data-tab="threads"]').getAttribute('data-state')
-  check('G0 1주일치 = 프로젝트 박스(기간 · 만든 날 · 짝 셋) + 탭 넷(롱폼 · 릴스/쇼츠 · 스레드 · 올릴 날) · 처음엔 롱폼 하나만 · 쓰는 중이면 탭에 표시', (await page.getByTestId('mk-week-project').count()) === 1 && tabs.join() === 'long,shorts,threads,plan' && first.long === 1 && first.short === 0 && first.thread === 0 && first.cal === 0 && runTab === 'running', { tabs, first, runTab })
+  check('G0 1주일치 = 프로젝트 박스(기간 · 만든 날 · 짝 셋) + 탭 넷(롱폼 · 릴스/쇼츠 · 스레드 · 올릴 날) · 들어오면 고른 탭 0 · 아래 칸 0(D-630) · 쓰는 중이면 탭에 표시', (await page.getByTestId('mk-week-project').count()) === 1 && tabs.join() === 'long,shorts,threads,plan' && first.long === 0 && first.short === 0 && first.thread === 0 && first.cal === 0 && first.panel === 0 && first.picked === 0 && runTab === 'running', { tabs, first, runTab })
 }
-check('G1 ?week=1 · 1주일치 화면 · 쓰는 중에도 탭마다 초안이 다 보임(롱폼 · 쇼츠 3 · 스레드 7)', new URL(page.url()).searchParams.get('week') === '1' && (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'running' && (await page.getByTestId('mk-week-long').count()) === 1 && (await countIn(page, 'shorts', '[data-testid="mk-week-short"]:not([data-n="0"])')) === 3 && (await countIn(page, 'threads', '[data-testid="mk-week-thread"]:not([data-day="0"])')) === 7 && new URL(page.url()).searchParams.get('wt') === 'threads')
+check('G1 ?week=1 · 1주일치 화면 · 쓰는 중에도 탭마다 초안이 다 보임(롱폼 · 쇼츠 3 · 스레드 7)', new URL(page.url()).searchParams.get('week') === '1' && (await page.getByTestId('mk-week-ai').getAttribute('data-state')) === 'running' && (await countIn(page, 'long', '[data-testid="mk-week-long"]')) === 1 && new URL(page.url()).searchParams.get('wt') === 'long' && (await countIn(page, 'shorts', '[data-testid="mk-week-short"]:not([data-n="0"])')) === 3 && (await countIn(page, 'threads', '[data-testid="mk-week-thread"]:not([data-day="0"])')) === 7 && new URL(page.url()).searchParams.get('wt') === 'threads')
 await tabTo(page, 'long')
 await shot(page, 'G-running')
 const pairs = await page.locator('[data-testid="mk-week-topics"] li > span:nth-child(2)').evaluateAll((els) => els.map((e) => (e.textContent ?? '').trim()))
@@ -398,7 +402,7 @@ await proj.click()
 await page.getByTestId('mk-week').waitFor({ timeout: 8000 })
 await page.waitForTimeout(500)
 const wurl = new URL(page.url())
-check('W3 프로젝트를 누르면 그 주 1주일치(롱폼 · 쇼츠 3 · 스레드 7 + 예비 · AI 글 — 탭마다) · 뒤로 단추 = 내 콘텐츠', wurl.searchParams.get('from') === 'make' && /^\d{4}-\d{2}-\d{2}$/.test(wurl.searchParams.get('start') ?? '') && (await page.getByTestId('mk-week-long').getAttribute('data-ai')) === '1' && (await countIn(page, 'threads', AI9)) === 9 && (await page.getByTestId('mk-week-back').innerText()).includes('내 콘텐츠'))
+check('W3 프로젝트를 누르면 그 주 1주일치(롱폼 · 쇼츠 3 · 스레드 7 + 예비 · AI 글 — 탭마다) · 뒤로 단추 = 내 콘텐츠', wurl.searchParams.get('from') === 'make' && /^\d{4}-\d{2}-\d{2}$/.test(wurl.searchParams.get('start') ?? '') && (await countIn(page, 'long', '[data-testid="mk-week-long"][data-ai="1"]')) === 1 && (await countIn(page, 'threads', AI9)) === 9 && (await page.getByTestId('mk-week-back').innerText()).includes('내 콘텐츠'))
 await page.getByTestId('mk-week-back').click()
 await page.waitForURL(/view=make/, { timeout: 5000 }).catch(() => {})
 await page.getByTestId('mk-projects').waitFor({ timeout: 5000 }).catch(() => {})
@@ -572,6 +576,8 @@ for (const [w, scale] of [[360, 'extra_large'], [390, ''], [430, 'large']]) {
     await p.getByTestId('mk-week').waitFor({ timeout: 8000 })
     await twice(p.getByTestId('mk-week-run'))
     await p.waitForTimeout(300)
+    // D-630 들어오면 고른 탭이 없다 — 그 채로 [AI로 …] 를 누르면 첫 탭(긴 영상)이 펼쳐져 쓰는 글이 바로 아래에 보인다
+    check('M390 D-630 고른 탭 없이 [AI로 1주일치 다 쓰기] → 긴 영상 탭이 펼쳐짐(주소 wt=long)', (await p.getByTestId('mk-week').getAttribute('data-tab')) === 'long' && (await p.locator('[data-testid="mk-week-panel"][data-tab="long"]').count()) === 1 && new URL(p.url()).searchParams.get('wt') === 'long', { tab: await p.getByTestId('mk-week').getAttribute('data-tab'), url: p.url() })
     await p.locator('a[href="/ops/clients"]:visible').first().click()
     await p.waitForTimeout(500)
     const box = await p.getByTestId('week-dock').boundingBox()

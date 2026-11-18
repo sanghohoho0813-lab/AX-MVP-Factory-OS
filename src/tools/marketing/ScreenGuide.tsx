@@ -5,6 +5,8 @@
  *  - 쓰는 사람이 [접기] 를 누르면 그 화면에서는 한 줄 요약만 남긴다(다시 누르면 펼침 · 이 브라우저에 기억).
  * D-627 대표 "목차를 눌러 들어갔을 때 한 화면 글자 수를 엄격하게" — 처음에는 한 줄(무엇을 하는 곳)만, 1 → 2 → 3 은 [순서 보기] 를 눌러야.
  *   펼쳐 둔 화면은 이 브라우저에 기억한다(axmvp.mkguide.open.v1). 예전에 [접기] 한 기억(closed)도 그대로 접힘.
+ * D-630 대표 "마케팅은 들어갔을 때 아직 많다 — 딱 한 가지만" — 한 줄 앞의 '이 화면은 —' 글자는 화면에 깔지 않는다(ⓘ 아이콘 + 한 문장 · 화면 읽기에는 그대로).
+ *   순서는 들어올 때마다 접힌 채로(예전에 펼쳐 둔 기억으로 첫 화면이 길어지지 않게) — [순서 보기] 를 누르면 그 자리에서 펼친다.
  */
 import { useState } from 'react'
 import { ArrowRight, ChevronDown, ChevronUp, Info } from 'lucide-react'
@@ -48,7 +50,8 @@ export function ScreenGuide({
   /** D-627 더 긴 설명 — 마우스를 올리면(title) */
   tip?: string
 }) {
-  const [closed, setClosed] = useState(() => !readList(OPEN_KEY).includes(id) || readList(KEY).includes(id))
+  // D-630 들어올 때는 늘 접힌 채 — 펼친 기억(OPEN_KEY)은 적어 두기만 한다(이 버전은 읽지 않는다 · 저장된 값은 지우지 않음)
+  const [closed, setClosed] = useState(true)
   const toggle = () => {
     const opened = readList(OPEN_KEY).filter((x) => x !== id)
     writeList(OPEN_KEY, closed ? [...opened, id] : opened)
@@ -61,7 +64,8 @@ export function ScreenGuide({
         <Info aria-hidden="true" className="size-5 shrink-0 text-brand-700" />
         {/* D-627 더 긴 설명(tip)은 마우스를 올리면 — 휴대폰 좁은 줄에 ? 단추가 끼어 글이 세 줄로 꺾이지 않게 */}
         <p className="t-sub min-w-0 flex-1 break-keep text-slate-800" title={tip}>
-          <b className="font-bold text-slate-900">이 화면은</b> — {what}
+          <span className="sr-only">이 화면은 — </span>
+          {what}
         </p>
         {steps.length > 0 && (
           <button type="button" onClick={toggle} aria-expanded={!closed} className="tap t-meta inline-flex min-h-10 shrink-0 items-center gap-1 rounded-(--radius-control) px-2 font-semibold text-slate-600 hover:bg-slate-50" data-testid={`${testId}-toggle`}>

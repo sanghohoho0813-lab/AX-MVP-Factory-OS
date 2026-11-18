@@ -58,6 +58,8 @@
       "mk-week-long-titles",
       "mk-week-short-spare",
       "mk-week-thread-spare",
+      "mk.basics.more",
+      "mk.home.more",
       "mk.make.long",
       "money.outlook",
       "money.undated",
@@ -119,6 +121,7 @@
       "yt.hour",
       "yt.ideas",
       "yt.length",
+      "yt.top.more",
       "yt.weekday"
     ],
     "nav": [

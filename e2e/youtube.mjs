@@ -18,6 +18,7 @@
  *   돌아올 때(focus · visibilitychange) · 판 바뀜 · [지금 새로] · 실패하면 지난번 것 + 받은 때 · PC 1440 = 휴대폰 390 같은 추천
  */
 import { mkTab } from './support/mkTabs.mjs'
+import { keepPlanInsideOpen, openPlanInside, openTopTools, showAllTop } from './support/mkOpen.mjs'
 import { openTools } from './pageTools.mjs'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -73,6 +74,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', acceptDownloads: true })
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE })
   const page = await ctx.newPage()
+  // D-630 [자세히 보기] 는 [더 보기] 안 · 들어올 때마다 접힌 채 — 이 시험들은 그 안을 보므로 유튜브 화면을 열 때마다 두 줄을 펼친다(들어왔을 때 모양은 D630 시험에서)
+  const planHook = keepPlanInsideOpen(page)
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
   const outside = []
@@ -126,7 +129,30 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   // D-233 대표 "왼쪽 위 콘텐츠 레이더라는 이름 말고 마케팅 · 브랜딩으로" — 제목은 '마케팅 · 브랜딩', 콘텐츠 레이더는 보조 줄에
   // D-251 첫 화면 = 이번 주 키워드 단추 — 예전 첫 화면(1순위 카드 · 시장 신호 …)은 아래 [자세히 보기](이 시험은 펼쳐 둔 채 · axmvp.fold.mk-more)
   // D-627 글자 수 한도 — 무엇을 하는 곳인지 한 줄은 마케팅 첫 화면(/marketing)에만 · 이번 주 찍을 것(유튜브)은 판 머리 '이번 주 무엇을 올릴까요?' + 1 → 2 → 3
-  check('D-194 · D-233 · D-251 첫 화면 = 이번 주 키워드 단추 + [자세히 보기] 안에 예전 판 · 제목 "마케팅 · 브랜딩"("콘텐츠 레이더" 아님) · 판 머리 한 줄(1 → 2 → 3)', (await page.getByTestId('mk-home').isVisible()) && (await page.getByTestId('mk-key').count()) >= 2 && (await page.getByTestId('mk-fixed-key').count()) === 5 /* D-558 고정 주제(고용지원금 · 법인세)는 10개에서 빠짐 — 이 시험 자료는 뜨는 주제 2 + 고정 5 */ && (await page.getByTestId('mk-more').isVisible()) && (await page.getByTestId('radar-plan').isVisible()) && ((await page.locator('main h1').first().innerText()) ?? '').includes('마케팅 · 브랜딩') && !((await page.locator('main h1').first().innerText()) ?? '').includes('콘텐츠 레이더') && (await page.getByTestId('mk-steps').isVisible()) && (await page.getByTestId('radar-subtitle').count()) === 0, { home: await page.getByTestId('mk-home').isVisible(), keys: await page.getByTestId('mk-key').count(), more: await page.getByTestId('mk-more').isVisible(), plan: await page.getByTestId('radar-plan').isVisible(), h1: await page.locator('main h1').first().innerText().catch(() => '') })
+  // D-630 대표 "유튜브를 눌렀을 때도 조금 많다 — '이번 주 뜨는 주제' 까지만 · 자세히 보기 밑으로 … 다 보인다" — 들어왔을 때 모양(아무것도 펼치지 않음)
+  planHook.off()
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.waitForTimeout(800)
+  {
+    const d630 = {
+      title: (await page.locator('#mk-home-title').innerText()).trim(),
+      about: (await page.getByTestId('mk-home-about').innerText()).trim(),
+      more: await page.getByTestId('mk-home-more').getAttribute('data-open'),
+      inside: await page.locator('[data-testid="mk-more"], [data-testid="radar-plan"], [data-testid="mk-fixed"], [data-testid="mk-custom"], [data-testid="mk-week-open"], [data-testid="mk-howto-toggle"], [data-testid="mk-interest-open"], [data-testid="mk-steps"], [data-testid="yt-feedline"], [data-testid="radar-guide-next"], [data-testid="radar-signals"]').count(),
+      rows: await page.getByTestId('mk-key').evaluateAll((els) => els.filter((e) => e.getBoundingClientRect().height > 0).length),
+      text: (await page.locator('main').innerText()).replace(/\s+/g, ' '),
+    }
+    check('D630-1 유튜브에 들어오면 판 하나 = "이번 주 뜨는 주제" + 한 줄 + 주제 줄(다섯까지) + 접힌 [더 보기] — 본업 주제 · 직접 주제 · 1주일치 · 사용 방법 · 받은 때 · [자세히 보기] · "이번 주 뜨는 주제는 …" · "다음 후보 찾기" 0(예전 펼침 기억 axmvp.fold.mk-more = 1 이 있어도)', d630.title === '이번 주 뜨는 주제' && d630.about.replace(/\s/g, '').length <= 30 && d630.more === '0' && d630.inside === 0 && d630.rows >= 2 && d630.rows <= 5 && !/이번 주 뜨는 주제는|다음 후보 찾기|자세히 보기|받은 때/.test(d630.text), { ...d630, text: d630.text.slice(0, 300) })
+    await page.getByTestId('mk-home-more').getByTestId('fold-toggle').first().click()
+    await page.waitForTimeout(300)
+    const in1 = { fixed: await page.getByTestId('mk-fixed-key').count(), custom: await page.getByTestId('mk-custom-input').count(), week: await page.getByTestId('mk-week-open').count(), howto: await page.getByTestId('mk-howto-toggle').count(), feed: await page.getByTestId('yt-feedline').count(), detail: await page.getByTestId('mk-more').getAttribute('data-open').catch(() => null), plan: await page.getByTestId('radar-plan').count() }
+    check('D630-2 [더 보기] 한 번 → 1주일치 · 본업 주제 5 · 직접 주제 · 사용 방법 · 받은 때 · [자세히 보기](아직 접힘 — 시장 신호는 한 번 더 눌러야)', in1.fixed === 5 && in1.custom === 1 && in1.week === 1 && in1.howto === 1 && in1.feed === 1 && in1.detail === '0' && in1.plan === 0, in1)
+    await page.getByTestId('mk-more').getByTestId('fold-toggle').first().click()
+    await page.waitForTimeout(400)
+    check('D630-3 [자세히 보기] 한 번 더 → 예전 판(고르는 기준 · 추천 기준 · 시장 신호) 그대로 — 지운 것 없음', (await page.getByTestId('radar-plan').isVisible()) && /이번 주 뜨는 주제는/.test(await page.getByTestId('radar-guide-next').innerText()) && (await page.getByTestId('radar-mix').count()) === 1)
+  }
+  planHook.on()
+  check('D-194 · D-233 · D-251 첫 화면 = 이번 주 키워드 단추 + [더 보기] › [자세히 보기] 안에 예전 판 · 제목 "마케팅 · 브랜딩"("콘텐츠 레이더" 아님) · 판 머리 = 이번 주 뜨는 주제 + 한 줄(D-630 — 1 → 2 → 3 은 [사용 방법] 안)', (await page.getByTestId('mk-home').isVisible()) && (await page.getByTestId('mk-key').count()) >= 2 && (await page.getByTestId('mk-fixed-key').count()) === 5 /* D-558 고정 주제(고용지원금 · 법인세)는 10개에서 빠짐 — 이 시험 자료는 뜨는 주제 2 + 고정 5 */ && (await page.getByTestId('mk-more').isVisible()) && (await page.getByTestId('radar-plan').isVisible()) && ((await page.locator('main h1').first().innerText()) ?? '').includes('마케팅 · 브랜딩') && !((await page.locator('main h1').first().innerText()) ?? '').includes('콘텐츠 레이더') && (await page.getByTestId('mk-home-about').isVisible()) && (await page.locator('#mk-home-title').innerText()).includes('이번 주 뜨는 주제') && (await page.getByTestId('mk-steps').count()) === 0 && (await page.getByTestId('radar-subtitle').count()) === 0, { home: await page.getByTestId('mk-home').isVisible(), keys: await page.getByTestId('mk-key').count(), more: await page.getByTestId('mk-more').isVisible(), plan: await page.getByTestId('radar-plan').isVisible(), h1: await page.locator('main h1').first().innerText().catch(() => '') })
   // D-627 첫 화면 보조 한 줄 — 쉬운 말 · 30자 안 · 예전 이름(콘텐츠 레이더)은 마우스를 올리면(title)
   await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
   await page.waitForTimeout(400)
@@ -139,6 +165,18 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForTimeout(600)
   await mkTab(page, 'yt-view-top')
   await page.waitForTimeout(400)
+  // D-630 남의 인기 영상도 들어오면 한 가지만 — 많이 본 영상 세 편(1 · 2 · 3위) + [n편 더 보기]. 주목 주제 · 거르기 · 기간 · 키워드 · 숫자 한 줄은 접힌 [기간 · 주제 고르기] 안
+  {
+    const top0 = { tools: await page.getByTestId('yt-top-tools').getAttribute('data-open'), inside: await page.locator('[data-testid="yt-hot"], [data-testid="yt-periods"], [data-testid="yt-keywords"], [data-testid="yt-summary"], [data-testid="yt-filter-toggle"]').count(), cards: await page.getByTestId('yt-card').count(), more: ((await page.getByTestId('yt-top-more').innerText().catch(() => '')) ?? '').trim(), feed: await page.locator('[data-testid="yt-feedline"]').evaluateAll((els) => els.filter((e) => e.checkVisibility()).length), cardText: ((await page.getByTestId('yt-card').first().innerText()) ?? '').replace(/\s+/g, ' ') }
+    check('D630-4 남의 인기 영상에 들어오면 많이 본 영상 세 편 + [5편 더 보기] · 접힌 [기간 · 주제 고르기] — 주목 주제 · 기간 · 키워드 · 숫자 한 줄 0 · 받은 때는 [⋯] 안(화면에 안 보임)', top0.tools === '0' && top0.inside === 0 && top0.cards === 3 && /^5편 더 보기/.test(top0.more) && top0.feed === 0, top0)
+    await openTopTools(page)
+    await showAllTop(page)
+  }
+  /** 목록이 바뀌면(기간 · 키워드 · 거르기) 다시 세 편부터 — 전부 세는 시험은 [n편 더 보기] 를 눌러 놓고 센다 */
+  const allTop = async (ms = 300) => {
+    await page.waitForTimeout(ms)
+    await showAllTop(page)
+  }
   const hot = await page.getByTestId('yt-hot-item').allInnerTexts()
   // 한글 3자 이상만 낱말로 친다(예전 앱 그대로) — '청년 · 채용 · 절세' 같은 두 글자는 빠진다
   check('이번 주 주목 주제 TOP 3: 두 낱말 묶음 먼저(가업승계 증여특례 · 2채널) → 한 낱말(고용지원금 · 4채널)', hot.length >= 2 && hot[0].includes('가업승계 증여특례') && hot[0].includes('2채널') && hot.some((h) => h.includes('고용지원금') && h.includes('4채널')), hot)
@@ -153,34 +191,40 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('D-194 카드 누르면 상세 창(평소 대비 · 참고할 것)', (await page.getByTestId('radar-video-detail').isVisible()) && (await page.getByTestId('radar-lessons').locator('li').count()) >= 2)
   await page.keyboard.press('Escape')
   await page.waitForTimeout(200)
-  check('카드: 유튜브 링크는 새 창 · 안전하게(noopener)', ((await cards.first().locator('a').first().getAttribute('href')) ?? '').startsWith('https://www.youtube.com/watch?v=a1') && (await cards.first().locator('a').first().getAttribute('rel'))?.includes('noopener'))
+  // D-630 카드 한 장 = 제목 + 조회수 — 유튜브에서 보기 · 채널 · 평소 대비 · 좋아요 · 댓글 · 올린 날은 누르면 뜨는 '참고 영상' 창에
+  await cards.first().getByTestId('yt-card-thumb').click()
+  await page.waitForTimeout(300)
+  const ytLink = page.getByTestId('radar-open-youtube')
+  check('카드를 누른 창: 유튜브 링크는 새 창 · 안전하게(noopener) · 카드에는 링크 0(D-630)', ((await ytLink.getAttribute('href')) ?? '').startsWith('https://www.youtube.com/watch?v=a1') && (await ytLink.getAttribute('rel'))?.includes('noopener') && (await ytLink.getAttribute('target')) === '_blank' && (await cards.first().locator('a').count()) === 0)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
 
   // 4. 거르기
   await page.getByTestId('yt-keyword').filter({ hasText: '#가업승계 증여특례' }).click()
-  await page.waitForTimeout(300)
+  await allTop()
   const kwTitles = await page.getByTestId('yt-card').allInnerTexts()
   check('키워드 누르면 그 말이 든 영상만 · 주소에 kw', kwTitles.length === 2 && kwTitles.every((t) => t.includes('가업승계') && t.includes('증여특례')) && new URL(page.url()).searchParams.get('kw') === '가업승계 증여특례', page.url())
   await page.getByTestId('yt-period-month').click()
-  await page.waitForTimeout(300)
+  await allTop()
   // D-194: 거르기는 필요할 때만 펼친다
   check('D-194 거르기는 접혀 있다(한 줄 요약)', (await page.getByTestId('yt-filters').count()) === 0 && ((await page.getByTestId('yt-filter-toggle').innerText()) ?? '').includes('거르기'))
   await page.getByTestId('yt-filter-toggle').click()
   check('기간 바꾸면 키워드는 풀린다 · 이번 달 = 30일 안(12편)', !page.url().includes('kw=') && (await page.getByTestId('yt-card').count()) === 12, await page.getByTestId('yt-card').count())
   await page.getByTestId('yt-type-short').click()
-  await page.waitForTimeout(300)
+  await allTop()
   check('쇼츠만(3분 이하): 이번 달 쇼츠 4편', (await page.getByTestId('yt-card').count()) === 4, await page.getByTestId('yt-card').count())
   await page.getByTestId('yt-type-all').click()
   await page.getByTestId('yt-channel').selectOption('UCa')
-  await page.waitForTimeout(300)
+  await allTop()
   const onlyA = await page.getByTestId('yt-card').allInnerTexts()
   check('채널 고르기: 그 채널 영상만(이번 달 4편)', onlyA.length === 4 && onlyA.every((t) => t.includes('세무 알려주는 채널')), onlyA.length)
   await page.getByTestId('yt-channel').selectOption('')
   await page.getByTestId('yt-period-year').click()
   await page.getByTestId('yt-topn').selectOption('20')
-  await page.waitForTimeout(300)
+  await allTop()
   check('올해 · TOP 20: 365일 안 16편 모두', (await page.getByTestId('yt-card').count()) === 16)
   await page.getByTestId('yt-period-shorts').click()
-  await page.waitForTimeout(300)
+  await allTop()
   check('쇼츠 칸: 90일 안 쇼츠만 · 롱폼/쇼츠 거르기는 숨김', (await page.getByTestId('yt-card').count()) === 4 && (await page.getByTestId('yt-type-long').count()) === 0)
 
   await openTools(page) // D-627 새로 가져오기 · 엑셀로 받기는 [⋯] 안
@@ -298,6 +342,8 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE })
   const page = await ctx.newPage()
+  // D-630 [자세히 보기] 는 [더 보기] 안 · 들어올 때마다 접힌 채 — 이 시험들은 그 안을 보므로 유튜브 화면을 열 때마다 두 줄을 펼친다(들어왔을 때 모양은 D630 시험에서)
+  const planHook = keepPlanInsideOpen(page)
   const errors = []
   const outside = []
   page.on('pageerror', (e) => errors.push(e.message))
@@ -383,6 +429,7 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   const toPlan = async () => {
     await mkTab(page, 'yt-view-plan')
     await page.waitForTimeout(300)
+    await openPlanInside(page)
   }
   const topic = ((await first.getByTestId('radar-opp-topic').innerText()) ?? '').trim()
   await firstC.getByTestId('radar-save').click()
@@ -509,6 +556,7 @@ const FORBIDDEN = ['AI 추천', 'AI가 분석', 'AI 분석', '성공 가능', '�
   check('채널 끄기: 끈 채널은 "꺼 둠" 으로', (await page.locator('[data-testid="yt-channel-row"][data-enabled="0"]').count()) === 3)
   await mkTab(page, 'yt-view-plan')
   await page.waitForTimeout(400)
+  await openPlanInside(page)
   check('AI · AX 채널을 모두 끄면 "AI 벤치마킹 데이터가 부족합니다" · AX·AI 카드는 억지로 만들지 않는다', (await page.getByTestId('radar-ai-short').count()) === 1 && (await page.locator('[data-testid^="radar-opp"][data-axis="axai"]').count()) === 0)
   await mkTab(page, 'yt-view-channels')
   await page.waitForTimeout(300)
@@ -578,6 +626,8 @@ const FJSON = JSON.stringify(FOCUS)
 for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height: 844, tag: '390', mobile: true }]) {
   const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, locale: 'ko-KR', ...(vp.mobile ? { isMobile: true, hasTouch: true } : {}) })
   const page = await ctx.newPage()
+  // D-630 [자세히 보기] 는 [더 보기] 안 · 들어올 때마다 접힌 채 — 이 시험들은 그 안을 보므로 유튜브 화면을 열 때마다 두 줄을 펼친다(들어왔을 때 모양은 D630 시험에서)
+  const planHook = keepPlanInsideOpen(page)
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
   await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
@@ -638,9 +688,10 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   await page.waitForTimeout(400)
   check(`F16 ${T} 채널: "기본 벤치마킹 채널" 10곳(내 채널 포함) · 채널마다 "왜 보나" 한 줄 · "내가 추가한 채널" 0곳(빈 안내)`, (await page.getByTestId('radar-default-channels').getAttribute('data-count')) === '10' && (await page.getByTestId('radar-ch-note').count()) === 10 && (await page.getByTestId('radar-added-channels').getAttribute('data-count')) === '0' && (await page.getByTestId('radar-added-empty').isVisible()) && (await page.locator('[data-testid="yt-channel-row"][data-source="default"]').count()) === 10)
   check(`${T} 채널 화면 넘침 0`, (await over()) <= 0, await over())
-  // 인기 탭 — 핵심 키워드 / 기타 급상승
+  // 인기 탭 — 핵심 키워드 / 기타 급상승(D-630 접힌 [기간 · 주제 고르기] 안)
   await mkTab(page, 'yt-view-top')
   await page.waitForTimeout(400)
+  await openTopTools(page)
   const core = await page.getByTestId('yt-keyword').allInnerTexts()
   const other = await page.getByTestId('yt-keyword-other').allInnerTexts()
   check(`${T} 인기 탭: 핵심 키워드(정책자금 · 클로드 …)와 기타 급상승(다이어트 …)이 나뉜다`, core.some((k) => /정책자금|클로드|금리/.test(k)) && !core.some((k) => /다이어트|브이로그/.test(k)) && other.some((k) => /다이어트|브이로그/.test(k)), { core, other })
@@ -659,6 +710,8 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height: 844, tag: '390', mobile: true }]) {
     const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, locale: 'ko-KR', ...(vp.mobile ? { isMobile: true, hasTouch: true } : {}) })
     const page = await ctx.newPage()
+    // D-630 [자세히 보기] 는 [더 보기] 안 · 들어올 때마다 접힌 채 — 이 시험들은 그 안을 보므로 유튜브 화면을 열 때마다 두 줄을 펼친다(들어왔을 때 모양은 D630 시험에서)
+    const planHook = keepPlanInsideOpen(page)
     const errors = []
     page.on('pageerror', (e) => errors.push(e.message))
     await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
@@ -787,6 +840,8 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
 for (const width of [360, 390, 430]) {
   const ctx = await browser.newContext({ viewport: { width, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
   const page = await ctx.newPage()
+  // D-630 [자세히 보기] 는 [더 보기] 안 · 들어올 때마다 접힌 채 — 이 시험들은 그 안을 보므로 유튜브 화면을 열 때마다 두 줄을 펼친다(들어왔을 때 모양은 D630 시험에서)
+  const planHook = keepPlanInsideOpen(page)
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
   await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
@@ -837,6 +892,27 @@ for (const width of [360, 390, 430]) {
     return cards.length === 2 && cards[1].top > cards[0].top && !!thumb && thumb.width < window.innerWidth * 0.5
   })
   check(`${width} 인기 영상: 휴대폰은 한 줄 목록(썸네일 왼쪽 · PC 카드를 줄이지 않음) · 넘침 0`, list && (await over()) <= 0, await over())
+  // D-630 휴대폰도 처음엔 세 편 · [기간 · 주제 고르기] 는 접힘 — 펼치고 [n편 더 보기] 를 눌러도 넘침 0
+  // (이 창은 견본 계정 그대로 = [모두 펼치기] 를 해 둔 계정이라 처음부터 다 펼쳐진다 — 그 표시를 잠깐 지우고 들어왔을 때 모양을 본 뒤 되돌린다)
+  {
+    const allOpen = await page.evaluate(() => {
+      const v = localStorage.getItem('axmvp.fold.all')
+      localStorage.removeItem('axmvp.fold.all')
+      return v
+    })
+    await page.reload({ waitUntil: 'networkidle' })
+    await page.waitForTimeout(600)
+    const first3 = await page.getByTestId('yt-card').count()
+    const closed = await page.getByTestId('yt-top-tools').getAttribute('data-open')
+    const over0 = await over()
+    await openTopTools(page)
+    await showAllTop(page)
+    const d630 = { first3, closed, over0, periods: await page.getByTestId('yt-periods').count(), cards: await page.getByTestId('yt-card').count(), over: await over() }
+    check(`${width} 인기 영상(D-630): 처음 세 편 · 접힌 [기간 · 주제 고르기] → 펼치고 [n편 더 보기] 를 눌러도 넘침 0`, d630.first3 === 3 && d630.closed === '0' && d630.over0 <= 0 && d630.periods === 1 && d630.cards > 3 && d630.over <= 0, d630)
+    if (allOpen !== null) await page.evaluate((v) => localStorage.setItem('axmvp.fold.all', v), allOpen)
+    await page.reload({ waitUntil: 'networkidle' })
+    await page.waitForTimeout(600)
+  }
   for (const k of ['channels', 'analysis']) {
     await mkTab(page, `yt-view-${k}`, 'tap')
     await page.waitForTimeout(300)
@@ -877,6 +953,8 @@ for (const width of [360, 390, 430]) {
   const open = async (vp, mobile, cache, o = {}) => {
     const ctx = await browser.newContext({ viewport: vp, locale: 'ko-KR', ...(mobile ? { isMobile: true, hasTouch: true } : {}) })
     const page = await ctx.newPage()
+    // D-630 [자세히 보기] 는 [더 보기] 안 · 들어올 때마다 접힌 채 — 이 시험들은 그 안을 보므로 유튜브 화면을 열 때마다 두 줄을 펼친다(들어왔을 때 모양은 D630 시험에서)
+    const planHook = keepPlanInsideOpen(page)
     const errors = []
     page.on('pageerror', (e) => errors.push(e.message))
     await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
@@ -1002,6 +1080,8 @@ for (const width of [360, 390, 430]) {
 for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height: 844, tag: '390', mobile: true }]) {
   const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, locale: 'ko-KR', ...(vp.mobile ? { isMobile: true, hasTouch: true } : {}) })
   const page = await ctx.newPage()
+  // D-630 [자세히 보기] 는 [더 보기] 안 · 들어올 때마다 접힌 채 — 이 시험들은 그 안을 보므로 유튜브 화면을 열 때마다 두 줄을 펼친다(들어왔을 때 모양은 D630 시험에서)
+  const planHook = keepPlanInsideOpen(page)
   const errs = []
   page.on('pageerror', (e) => errs.push(e.message))
   await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
@@ -1057,6 +1137,8 @@ for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height:
   const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, locale: 'ko-KR', timezoneId: 'Asia/Seoul', ...(vp.mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) })
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE })
   const page = await ctx.newPage()
+  // D-630 [자세히 보기] 는 [더 보기] 안 · 들어올 때마다 접힌 채 — 이 시험들은 그 안을 보므로 유튜브 화면을 열 때마다 두 줄을 펼친다(들어왔을 때 모양은 D630 시험에서)
+  const planHook = keepPlanInsideOpen(page)
   const errs = []
   page.on('pageerror', (e) => errs.push(e.message))
   await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))
@@ -1174,6 +1256,8 @@ const J232 = JSON.stringify(FEED232)
 for (const vp of [{ width: 1440, height: 900, tag: 'PC' }, { width: 390, height: 844, tag: '390', mobile: true }]) {
   const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, locale: 'ko-KR', ...(vp.mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) })
   const page = await ctx.newPage()
+  // D-630 [자세히 보기] 는 [더 보기] 안 · 들어올 때마다 접힌 채 — 이 시험들은 그 안을 보므로 유튜브 화면을 열 때마다 두 줄을 펼친다(들어왔을 때 모양은 D630 시험에서)
+  const planHook = keepPlanInsideOpen(page)
   const errs = []
   page.on('pageerror', (e) => errs.push(e.message))
   await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))

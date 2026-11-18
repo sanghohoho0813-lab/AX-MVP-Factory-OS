@@ -18,6 +18,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import fs from 'node:fs'
 import { seedScript } from './seed.mjs'
+import { openMkDetail, openMkHomeMore } from './support/mkOpen.mjs'
 
 const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
 const { default: handler, __resetAiAssistState } = await fromRoot('api/ai-assist.js')
@@ -122,8 +123,12 @@ async function wire(page) {
   })
 }
 
-/** 로컬 미리보기에는 유튜브 함수가 없다 — [예시로 보기] 를 눌러야 키워드가 생긴다 */
-async function openHome(p) {
+/**
+ * 로컬 미리보기에는 유튜브 함수가 없다 — [예시로 보기] 를 눌러야 키워드가 생긴다.
+ * D-630 본업 주제 · 직접 주제 · 사용 방법 · 관심 분야는 판 맨 아래 접힌 [더 보기] 안 — 그 칸을 쓰는 시험은 사람처럼 한 번 펼치고 쓴다(more).
+ * 들어왔을 때 모양 그대로를 보는 시험(H · M)은 more = false.
+ */
+async function openHome(p, more = true) {
   await p.goto(BASE + '/marketing?view=plan', { waitUntil: 'networkidle' })
   await p.waitForTimeout(500)
   const sample = p.getByTestId('yt-sample')
@@ -132,6 +137,7 @@ async function openHome(p) {
     await p.waitForTimeout(900)
   }
   await p.getByTestId('mk-home').waitFor({ timeout: 10000 })
+  if (more) await openMkHomeMore(p)
 }
 const packCalls = () => llm.filter((x) => /\(radar\.pack\./.test(x.sys))
 const aiDone = (p) => p.waitForSelector('[data-testid="mk-pack-ai"]:not([data-state="running"])', { timeout: 20000 })
@@ -153,21 +159,37 @@ await page.evaluate(() => {
 })
 
 /* ---------------- H 첫 화면 ---------------- */
-await openHome(page)
+await openHome(page, false)
 const keys = page.getByTestId('mk-key')
 // D-253 6개 → 10개(레이더 후보가 그만큼 있을 때) — 예시 데이터 후보 수만큼, 10개를 넘지 않게
 const KEYS_N = await keys.count()
 check(`H1 첫 화면 = 이번 주 키워드 단추 ${KEYS_N}개(6개 넘게 · 10개까지) · 1번이 맨 앞(빨간 칸) · 마지막 번호 = 개수`, KEYS_N > 6 && KEYS_N <= 10 && (await keys.first().innerText()).trim().startsWith('1') && (await keys.last().innerText()).trim().startsWith(String(KEYS_N)), KEYS_N)
 const more = page.getByTestId('mk-more')
-check('H2 예전 첫 화면(1순위 카드 · 시장 신호)은 [자세히 보기] 안 — 처음엔 접힘', (await more.getAttribute('data-open')) === '0' && (await page.getByTestId('radar-plan').count()) === 0)
+// D-630 대표 "유튜브를 눌렀을 때도 조금 많다 — '이번 주 뜨는 주제' 까지만" — 들어오면 이름 + 한 줄 + 다섯 줄 + [더 보기] 한 줄뿐.
+//   본업 주제 · 직접 주제 · 1주일치 · 사용 방법 · 관심 분야 · [자세히 보기] 는 그 접힌 줄 안(처음엔 그려지지도 않는다)
+const homeMore = page.getByTestId('mk-home-more')
+const entry = {
+  title: (await page.locator('#mk-home-title').innerText()).trim(),
+  about: (await page.getByTestId('mk-home-about').innerText()).trim(),
+  moreOpen: await homeMore.getAttribute('data-open'),
+  inside: await page.locator('[data-testid="mk-more"], [data-testid="mk-fixed"], [data-testid="mk-custom"], [data-testid="mk-week-open"], [data-testid="mk-howto-toggle"], [data-testid="mk-interest-open"], [data-testid="mk-steps"], [data-testid="yt-feedline"]').count(),
+  shownRows: await keys.evaluateAll((els) => els.filter((e) => e.getBoundingClientRect().height > 0).length),
+  strengthWords: await page.getByTestId('mk-keys').evaluate((e) => (e.innerText.match(/신호 (강함|보통)|초기 신호/g) ?? []).length),
+}
+check('H2(D-630) 들어오면 판 하나 = "이번 주 뜨는 주제" + 한 줄 + 다섯 줄 · [더 보기] 는 접힘 · 본업 주제 · 직접 주제 · 1주일치 · 사용 방법 · 관심 분야 · 받은 때 · [자세히 보기] 는 그 안(처음엔 0)', entry.title === '이번 주 뜨는 주제' && entry.about.length > 0 && entry.about.replace(/\s/g, '').length <= 30 && entry.moreOpen === '0' && entry.inside === 0 && entry.shownRows === Math.min(5, KEYS_N) && (await page.getByTestId('radar-plan').count()) === 0, entry)
 check('H3 첫 화면에 AI 도우미 판 · 새로 가져오기 · CSV · 채널 설계 기준이 안 보임(그 안으로)', (await page.getByTestId('ai-assist-bar').count()) === 0 && (await page.getByTestId('yt-refresh').count()) === 0 && (await page.getByTestId('radar-brief').count()) === 0)
 const chars = (await page.locator('main').innerText()).replace(/\s+/g, '').length
 const firstKeyTop = (await keys.first().boundingBox())?.y ?? 9999
-check('H4 첫 화면 글자 수 1,000자 아래(전: 2,656자) · 1번 키워드가 첫 화면 안(높이 1000)', chars < 1000 && firstKeyTop < 900, { chars, firstKeyTop })
+// D-630 화면 읽기용 글(신호 세기 이름 등)까지 넣어 센 숫자 — 눈에 보이는 글자 수는 qa:chars '유튜브 · 주제 받은 뒤'(100자 안)
+check('H4 첫 화면 글자 수 200자 아래(D-251 전: 2,656자 · D-630 전: 1,000자 아래) · 1번 키워드가 첫 화면 안(높이 1000)', chars < 200 && firstKeyTop < 900, { chars, firstKeyTop })
 console.log('     첫 화면 글자 수(PC):', chars)
 await shot(page, 'H-home')
+await openMkHomeMore(page)
+const moreIn = await page.locator('[data-testid="mk-fixed-key"], [data-testid="mk-custom-input"], [data-testid="mk-week-open"], [data-testid="mk-howto-toggle"], [data-testid="mk-interest-open"], [data-testid="yt-feedline"], [data-testid="mk-more"]').count()
+check('H2b [더 보기] 한 번 → 1주일치 · 본업 주제 5 · 직접 주제 · 내 관심 분야 · 사용 방법 · 받은 때 · [자세히 보기](접힘) — 지운 것 없음', moreIn === 11 && (await more.getAttribute('data-open')) === '0' && (await page.getByTestId('radar-plan').count()) === 0, moreIn)
+await shot(page, 'H-home-more')
 await page.getByTestId('mk-howto-toggle').click()
-check('H5 [사용 방법] → 4단계 + [자세히 보기] 안내', (await page.getByTestId('mk-howto').locator('li').count()) === 5 && (await page.getByTestId('mk-howto').innerText()).includes('자세히 보기'))
+check('H5 [사용 방법] → 1 → 2 → 3 + 4단계 + [자세히 보기] 안내', (await page.getByTestId('mk-steps').locator('li').count()) === 3 && (await page.getByTestId('mk-howto').locator('li').count()) === 5 && (await page.getByTestId('mk-howto').innerText()).includes('자세히 보기'))
 await page.getByTestId('mk-howto-toggle').click()
 await more.getByTestId('fold-toggle').first().click()
 await page.waitForTimeout(400)
@@ -328,6 +350,8 @@ await page.getByTestId('mk-pack-back').click()
 await page.getByTestId('mk-home').waitFor()
 
 /* ---------------- D 직접 주제 · 없는 키 ---------------- */
+// D-630 직접 주제 칸은 [더 보기] 안 — 묶음에서 돌아오면 다시 접혀 있다
+await openMkHomeMore(page)
 await page.getByTestId('mk-custom-input').fill('가')
 check('D1 직접 주제 2자 미만 → [이 주제로 만들기] 막힘', await page.getByTestId('mk-custom-go').isDisabled())
 await page.getByTestId('mk-custom-input').fill('가업승계 2027 달라지는 점')
@@ -385,7 +409,7 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
     localStorage.removeItem('axmvp.fold.all')
     if (b) document.documentElement.style.fontSize = '130%'
   }, big)
-  await openHome(mp)
+  await openHome(mp, false)
   if (big) await mp.evaluate(() => (document.documentElement.style.fontSize = '130%'))
   const tag = `${w}${big ? ' 큰 글자' : ''}`
   const h = await mp.getByTestId('mk-key').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
@@ -487,6 +511,7 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   await shot(p, 'K-pack')
   await p.goBack()
   await p.getByTestId('mk-home').waitFor({ timeout: 10000 })
+  await openMkHomeMore(p)
   await p.locator('[data-testid="mk-fixed-key"][data-key="notice:policy_fund"]').click()
   await p.getByTestId('mk-pack').waitFor()
   await aiDone(p)
@@ -495,6 +520,7 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   check('K8 고정 키워드 정책자금 묶음 — 이번 주 공고 근거(기업마당)', (pfText + copied).includes('이번 주 새 공고 3건(기업마당)') || (pfText + copied).includes('2026 중소기업 정책자금 융자 4차 공고'), pfText.slice(0, 120))
   await p.goBack()
   await p.getByTestId('mk-home').waitFor({ timeout: 10000 })
+  await openMkHomeMore(p)
   await p.locator('[data-testid="mk-fixed-key"][data-key="notice:grant_program"]').click()
   await p.getByTestId('mk-pack').waitFor()
   await aiDone(p)
@@ -505,6 +531,7 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   await p.goBack()
   await p.getByTestId('mk-home').waitFor({ timeout: 10000 })
   await p.waitForTimeout(400)
+  await openMkHomeMore(p)
   // D-603 네모 칸 → 고정 키워드는 줄바꿈되는 칩 · 이번 주 키워드는 번호 목록 한 줄씩(휴대폰) — 칩은 화면 안 · 줄은 손가락 크기(44px)
   const cols = (sel) => p.locator(sel).evaluateAll((els) => new Set(els.slice(0, 4).map((e) => Math.round(e.getBoundingClientRect().left))).size)
   const inView = (sel) => p.locator(sel).evaluateAll((els) => els.every((e) => { const r = e.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth + 0.5 }))
@@ -528,7 +555,7 @@ for (const [w, big] of [[360, false], [390, false], [430, false], [390, true]]) 
   await p.evaluate(seedScript())
   await openHome(p)
   const before = await p.getByTestId('mk-key').evaluateAll((els) => els.map((e) => e.dataset.key))
-  check('I1 이번 주 뜨는 주제 머리에 [내 관심 분야 고르기] 한 칸 · 처음엔 접힘 · "내 관심" 표시 0', (await p.getByTestId('mk-interest-open').innerText()).includes('내 관심 분야 고르기') && (await p.getByTestId('mk-interest-panel').count()) === 0 && (await p.getByTestId('mk-key-interest').count()) === 0)
+  check('I1 [더 보기] 안 [내 관심 분야 고르기] 한 칸(D-630 — 예전 뜨는 주제 머리) · 처음엔 접힘 · "내 관심" 표시 0', (await p.getByTestId('mk-interest-open').innerText()).includes('내 관심 분야 고르기') && (await p.getByTestId('mk-interest-panel').count()) === 0 && (await p.getByTestId('mk-key-interest').count()) === 0)
   await p.getByTestId('mk-interest-open').click()
   check('I2 펼치면 관심 분야 10묶음(정부 돈 · 세금 · … · AI 도구 · 업무 자동화)', (await p.getByTestId('mk-interest-chip').count()) === 10)
   await p.locator('[data-testid="mk-interest-chip"][data-id="ai_tools"]').click()

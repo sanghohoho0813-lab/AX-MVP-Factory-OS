@@ -260,8 +260,15 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
   const syncDraft = useMemo(() => ({ ...draft, reference: '' }), [draft])
   const sync = useDraftSync<Draft>({ kind: 'threads', workspaceId, readOnly, draft: syncDraft, replace: (d) => setDraft(() => d), blocked: openedWith, empty: draftEmpty, clean: cleanDraft })
   const draftOf = (p: ThreadPost): Draft => ({ ...EMPTY_DRAFT, id: p.id, goal: p.goal, template: p.template, topic: p.topic, tag: p.tag, body: p.body, selfComment: p.selfComment, checks: p.checks, source: p.source })
+  /**
+   * D-630 📐 들어오면 1단계(무엇에 대해 쓸까요?)만 — 2단계(글 칸 · 규칙 검사)는 이번 방문에서 글을 열었을 때만 그린다
+   * (AI 완성 글 · 직접 쓰기 · 이어서 쓰기 · 기록표 · 내 콘텐츠에서 연 글). 쓰던 글이 남아 있어도 들어올 때는 한 줄 [이어서 쓰기] 로.
+   * 탭(기록표 · 글 틀)을 오가도 그대로 두려고 여기(부모)에 둔다.
+   */
+  const [editing, setEditing] = useState(false)
   const openPost = (p: ThreadPost) => {
     setDraft(() => draftOf(p))
+    setEditing(true)
     go('write')
   }
   // D-355 내 콘텐츠 '만든 것 한눈에' 에서 누르고 왔으면(?open=) 그 글을 글 칸에 — 쓰던 다른 글이 있으면 묻고 · 못 찾으면 기록표로 · 주소의 open 은 한 번 쓰고 지운다
@@ -274,6 +281,8 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
     if (p) {
       next.delete('tab')
       if (draft.id === p.id || !draft.body.trim() || window.confirm('지금 쓰던 글을 이 글로 바꿀까요? (쓰던 글은 사라집니다)')) setDraft(() => draftOf(p))
+      // D-630 글을 들고 온 길(내 콘텐츠 · 지난번 하던 것) — 글 칸을 연 채로
+      setEditing(true)
     } else next.set('tab', 'records')
     setParams(next, { replace: true })
   }, [openId, store.loaded]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -302,7 +311,7 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
       )}
       {readOnly && <p className="t-sub rounded-(--radius-control) bg-slate-50 px-3 py-2 text-slate-600" data-testid="mk-viewas-note">팀장 화면을 보는 중에는 저장하지 않습니다 — AI 단추는 팀장님 화면 그대로 눌러 볼 수 있어요(회사마다 가장 싼 모델 · 답은 글 칸에만).</p>}
       {tab === 'write' && <DraftSyncLine sync={sync} testPrefix="thr" />}
-      {tab === 'write' && <WritePanel draft={draft} setDraft={setDraft} store={store} weekRef={week.ref} brief={brief} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} onLibrary={() => go('library')} onRoutine={() => go('routine')} />}
+      {tab === 'write' && <WritePanel draft={draft} setDraft={setDraft} editing={editing} setEditing={setEditing} store={store} weekRef={week.ref} brief={brief} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} onLibrary={() => go('library')} onRoutine={() => go('routine')} />}
       {tab === 'records' && <RecordsPanel store={store} readOnly={readOnly} onOpen={openPost} />}
       {tab === 'library' && <LibraryPanel onUse={pickTemplate} />}
       {tab === 'routine' && <RoutinePanel week={week} readOnly={readOnly} onWrite={() => go('write')} onRecords={() => go('records')} />}
@@ -316,7 +325,7 @@ type Store = ReturnType<typeof useThreadPosts>
 /* ① 오늘 쓸 글                                                         */
 /* ------------------------------------------------------------------ */
 
-function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, onRecords, onLibrary, onRoutine }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; store: Store; weekRef: WeekRef | null; brief: ChannelBrief; aiOk: boolean; readOnly: boolean; onRecords: () => void; onLibrary: () => void; onRoutine: () => void }) {
+function WritePanel({ draft, setDraft, editing, setEditing, store, weekRef, brief, aiOk, readOnly, onRecords, onLibrary, onRoutine }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; /** D-630 이번 방문에서 글 칸(2단계)을 열었나 */ editing: boolean; setEditing: (on: boolean) => void; store: Store; weekRef: WeekRef | null; brief: ChannelBrief; aiOk: boolean; readOnly: boolean; onRecords: () => void; onLibrary: () => void; onRoutine: () => void }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const today = todayLocalDate()
@@ -342,14 +351,22 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
   /**
    * D-364 📐 한 단계씩 — 글이 아직 없으면 2단계(글 칸 · 규칙 검사)는 한 줄 + [직접 쓰기].
    * AI · 예시 · 빈 틀 · 기록표에서 연 글이 들어오면 펼치고, 쓰는 동안(글을 다 지워도) 접지 않는다. [모두 펼치기] 면 처음부터 펼침.
+   * D-630 대표 "'2 고치기' 부터는 안 보이는 게 낫다" — 2단계는 글을 열기 전에는 아예 그리지 않는다(한 줄도 0 · [직접 쓰기] 는 1단계 큰 단추 옆).
+   * 글이 생기면 1단계 바로 아래에 나타나고 그 자리로 내려간다. 쓰던 글이 남아 있어도 들어올 때는 맨 위 한 줄 [이어서 쓰기].
    */
   const [editorAll] = useFold('thr.editor', false)
-  const [handOpen, setHandOpen] = useState(false)
-  const hasBody = !!draft.body.trim()
+  const editorOpen = editorAll || editing
+  // 2단계가 새로 나타나면(처음 그릴 때는 빼고) 그 자리로 — 글 칸이 화면 아래에 생겨도 바로 보이게
+  const wasOpen = useRef(editorOpen)
   useEffect(() => {
-    if (hasBody) setHandOpen(true)
-  }, [hasBody])
-  const editorOpen = editorAll || handOpen || hasBody
+    if (editorOpen && !wasOpen.current) scrollAndFlash('thr-editor')
+    wasOpen.current = editorOpen
+  }, [editorOpen])
+  /** [직접 쓰기] · [이어서 쓰기] — 글 칸을 열고 바로 쓸 수 있게 */
+  const openEditor = () => {
+    setEditing(true)
+    window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-testid="thr-body"]')?.focus({ preventScroll: true }), 80)
+  }
   const factsText = `${draft.facts}\n${draft.topic}`
   const lint = useMemo(() => lintThreadPost({ body: draft.body, template: draft.template, tag: draft.tag, selfComment: draft.selfComment, recent: store.posts, id: draft.id, today, facts: factsText }), [draft.body, draft.template, draft.tag, draft.selfComment, draft.id, store.posts, today, factsText])
   // D-559 올리기 전 점수(규칙) — 규칙 검사 줄 + 공통 점검(기계 같은 말 · 긴 문장 · 첫 줄 숫자)
@@ -382,6 +399,7 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
   const startBody = (body: string, source: Draft['source'], tag?: string) => {
     if (draft.body.trim() && draft.body.trim() !== body.trim() && !window.confirm('지금 쓰던 글을 이 글로 바꿀까요? (쓰던 글은 사라집니다)')) return
     set({ body, source, ...(tag && !draft.tag ? { tag } : {}), checks: [] })
+    setEditing(true)
     document.getElementById('thr-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
   const startSkeleton = () => {
@@ -418,6 +436,7 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
         const fill = bodyNow.current === atClick
         if (fill) {
           set({ body: first.body, source: 'ai', selfComment: first.selfComment, checks: first.checks, ...(first.template ? { template: first.template, goal: goalFor(first.template, use.goal) } : {}) })
+          setEditing(true)
           const had = atClick.trim() && atClick.trim() !== first.body.trim()
           const sc = scoreOf(first)
           const polishNow = needsPolish(sc) && aiOk
@@ -467,6 +486,7 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
     if (!window.confirm('지금 글의 첫 줄을 이 첫마디로 바꿀까요? (나머지는 그대로예요)')) return
     rows[i] = line
     set({ body: rows.join('\n') })
+    setEditing(true)
     showToast('첫 줄을 바꿨어요.')
     document.getElementById('thr-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -527,6 +547,7 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
     const prev = draft.body
     if (prev.trim() === d.body.trim()) return
     set({ body: d.body, source: 'ai', selfComment: d.selfComment, checks: d.checks, ...(d.template ? { template: d.template, goal: goalFor(d.template, draft.goal) } : {}) })
+    setEditing(true)
     setFix(prev.trim() ? { busy: false, error: '', before: prev, fixed: d.body, why: 'new' } : { busy: false, error: '', before: '', fixed: '' })
   }
   const takeDraft = (d: ThreadDraft) => {
@@ -558,7 +579,7 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
       if (posted) {
         setDraft(() => ({ ...EMPTY_DRAFT }))
         setAi({ busy: false, error: '', drafts: [] })
-        setHandOpen(false)
+        setEditing(false)
         showToast('기록표에 올렸어요 — 하루 이틀 뒤 숫자를 적어 주세요.')
         onRecords()
       } else {
@@ -574,19 +595,37 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
 
   // D-507 계속 쓰기 — 글 칸이 비어 있고 쓰다 둔 글이 있으면 맨 위 한 줄 [이어서 쓰기](가장 최근에 저장한 것)
   const lastDraft = !draft.body.trim() && !draft.id ? [...store.posts].filter((p) => p.status === 'draft' && p.body.trim()).sort((a, b) => b.savedAt.localeCompare(a.savedAt))[0] : undefined
+  // D-630 쓰던 글이 이 기기에 남아 있으면(저장 전 글 · 다른 기기에서 이어 온 글) — 글 칸을 펼치는 대신 맨 위 한 줄 [이어서 쓰기]
+  const pending = !editorOpen && draft.body.trim() ? draft.body.trim().split('\n')[0].slice(0, 20) : ''
   return (
     <div className="flex flex-col gap-4" data-testid="thr-write">
-      {lastDraft && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="thr-resume">
+      {pending && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="thr-resume" data-kind="local">
+          <span className="min-w-0 flex-1 basis-48">
+            <span className="t-meta block font-semibold text-slate-600">쓰던 글</span>
+            <span className="t-sub block font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="thr-resume-line">
+              {pending}
+            </span>
+          </span>
+          <button type="button" onClick={openEditor} className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-4 font-bold text-white hover:bg-brand-700" data-testid="thr-resume-go">
+            이어서 쓰기
+          </button>
+        </div>
+      )}
+      {!pending && lastDraft && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="thr-resume" data-kind="saved">
           <span className="min-w-0 flex-1 basis-48">
             <span className="t-meta block font-semibold text-slate-600">쓰다 둔 글</span>
             <span className="t-sub block font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="thr-resume-line">
-              {lastDraft.body.trim().split('\n')[0].slice(0, 40)}
+              {lastDraft.body.trim().split('\n')[0].slice(0, 20)}
             </span>
           </span>
           <button
             type="button"
-            onClick={() => setDraft(() => ({ ...EMPTY_DRAFT, id: lastDraft.id, goal: lastDraft.goal, template: lastDraft.template, topic: lastDraft.topic, tag: lastDraft.tag, body: lastDraft.body, selfComment: lastDraft.selfComment, checks: lastDraft.checks, source: lastDraft.source }))}
+            onClick={() => {
+              setDraft(() => ({ ...EMPTY_DRAFT, id: lastDraft.id, goal: lastDraft.goal, template: lastDraft.template, topic: lastDraft.topic, tag: lastDraft.tag, body: lastDraft.body, selfComment: lastDraft.selfComment, checks: lastDraft.checks, source: lastDraft.source }))
+              openEditor()
+            }}
             className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-4 font-bold text-white hover:bg-brand-700"
             data-testid="thr-resume-go"
           >
@@ -609,6 +648,8 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
         facts={<FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="thr" what="글" />}
         ai={{ ok: aiOk, busy: ai.busy, error: ai.error, label: 'AI로 완성 글 쓰기', onRun: () => void runQuick() }}
         fallback={{ label: aiOk ? '뼈대만 받기' : '뼈대로 시작', onClick: startSkeleton }}
+        // D-630 [직접 쓰기] — 예전 2단계 한 줄에 있던 단추(같은 시험 이름) · 글 칸이 열려 있으면 숨김
+        onHand={editorOpen ? undefined : openEditor}
         more={
           <>
             {/* D-298 대표 "[형식 바꾸기] 누르면 아래에 쭉 뜨는 건 좋은데 막상 내려 보면 눈에 안 들어온다 · 색이 없다" —
@@ -822,17 +863,8 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
       </QuickStart>
 
 
-      {!editorOpen ? (
-        <Surface className="flex flex-col gap-2">
-          <div id="thr-editor" className="scroll-mt-24" data-testid="thr-editor-closed">
-            <StepTitle n="2">고치기 · 규칙 검사</StepTitle>
-          </div>
-          {/* D-627 무엇이 나오는지 긴 설명은 마우스를 올리면(title) */}
-          <Button variant="secondary" className="self-start" title="1단계에서 [AI로 완성 글 쓰기] · 예시 글 · 빈 틀로 시작하면 여기에 글이 나와요 — 첫 줄 · 글자 수 · 끝맺음을 바로 검사해요." onClick={() => (setHandOpen(true), window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-testid="thr-body"]')?.focus(), 0))} data-testid="thr-hand">
-            <NotebookPen aria-hidden="true" className="size-4" /> 직접 쓰기
-          </Button>
-        </Surface>
-      ) : (
+      {/* D-630 2단계는 글을 열기 전에는 그리지 않는다(예전: 한 줄 + [직접 쓰기] — 그 단추는 1단계 큰 단추 옆으로) */}
+      {!editorOpen ? null : (
       <Surface className="flex flex-col gap-3">
         <div id="thr-editor" className="scroll-mt-24">
           <StepTitle n="2">고치기 · 규칙 검사</StepTitle>
@@ -882,7 +914,7 @@ function WritePanel({ draft, setDraft, store, weekRef, brief, aiOk, readOnly, on
                   </Button>
                 </>
               )}
-              <Button variant="ghost" onClick={() => (draft.body.trim() && !window.confirm('지금 글을 비우고 새로 쓸까요?') ? undefined : (setDraft(() => ({ ...EMPTY_DRAFT })), setAi({ busy: false, error: '', drafts: [] }), setHandOpen(false)))} data-testid="thr-new">
+              <Button variant="ghost" onClick={() => (draft.body.trim() && !window.confirm('지금 글을 비우고 새로 쓸까요?') ? undefined : (setDraft(() => ({ ...EMPTY_DRAFT })), setAi({ busy: false, error: '', drafts: [] }), setEditing(false), window.scrollTo({ top: 0, behavior: 'smooth' })))} data-testid="thr-new">
                 새 글
               </Button>
             </div>

@@ -17,6 +17,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import fs from 'node:fs'
 import { seedScript } from './seed.mjs'
+import { visibleText } from './support/mkOpen.mjs'
 import { openTools } from './pageTools.mjs'
 
 const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
@@ -154,7 +155,9 @@ for (const [k, re] of [['library', /글의 모양 23가지/], ['routine', /매�
 }
 await page.mouse.move(5, 700)
 await page.waitForTimeout(120)
-check('H2 마우스를 떼면 설명 닫힘 · 지금 칸 한 줄(휴대폰도 보임) "오늘 쓸 글 — 주제만 고르면"', (await page.getByTestId('thr-tabtip').count()) === 0 && /오늘 쓸 글 — 주제만 고르면/.test(await page.getByTestId('thr-about').innerText()))
+// D-630 '지금 칸' 한 줄은 설명만(칸 이름은 바로 위 고른 칸 '쓰기' 가 말한다 · 화면 읽기에는 '오늘 쓸 글 — ' 그대로) · 칸 줄은 PC 도 짧은 이름 네 개
+const tabNames = (await page.locator('[role="tab"][data-testid^="thr-tab-"]').allInnerTexts()).map((t) => t.trim())
+check('H2 마우스를 떼면 설명 닫힘 · 지금 칸 한 줄(휴대폰도 보임) "주제만 고르면 글을 써 줘요" · 고른 칸 = 쓰기 · 칸 줄 = 쓰기 · 기록표 · 글 틀 · 매일(D-630)', (await page.getByTestId('thr-tabtip').count()) === 0 && /^주제만 고르면 글을 써 줘요/.test(await visibleText(page.getByTestId('thr-about'))) && /오늘 쓸 글 — 주제만 고르면/.test(((await page.getByTestId('thr-about').textContent()) ?? '').replace(/\s+/g, ' ')) && (await page.locator('[data-testid="thr-tab-write"][aria-selected="true"]').innerText()).trim() === '쓰기' && tabNames.join('|') === '쓰기|기록표|글 틀|매일', { about: await visibleText(page.getByTestId('thr-about')), tabNames })
 const tabColors = await page.locator('[role="tab"][data-testid^="thr-tab-"] svg').evaluateAll((xs) => xs.map((x) => getComputedStyle(x).color))
 // D-370 대표 '박스 · 단추 색은 하나로' — 예전(D-298) 칸마다 다른 색 대신 같은 색, 고른 칸만 강조
 check('H3 안쪽 칸 그림 색은 하나(고른 칸만 다를 수 있음) — D-370', new Set(tabColors).size <= 2, tabColors)
@@ -526,27 +529,69 @@ await page.evaluate(() => {
   localStorage.removeItem('axmvp.fold.all')
   localStorage.removeItem('axmvp.fold.thr.editor')
   localStorage.removeItem('axmvp.fold.sht.editor')
+  // D-630 앞 시험에서 쓰다 둔 글 · 대본을 비운다 — 글이 없을 때 모양부터 본다(쓰던 글이 남았을 때는 E3b · E5b)
+  localStorage.removeItem('mirae.threads.draft.v1')
+  localStorage.removeItem('mirae.shorts.draft.v1')
 })
 await page.goto(`${BASE}/marketing/threads`, { waitUntil: 'networkidle' })
 await page.getByTestId('thr-page').waitFor({ timeout: 15000 })
 if ((await page.getByTestId('thr-body').count()) && (await page.getByTestId('thr-body').inputValue()).trim()) await page.getByTestId('thr-new').click()
 await page.waitForTimeout(300)
-check('E1 스레드 — 글이 없으면 2단계 "고치기 · 규칙 검사" 는 한 줄 + [직접 쓰기](글 칸 · 규칙 검사 안 보임)', (await page.getByTestId('thr-editor-closed').count()) === 1 && (await page.getByTestId('thr-body').count()) === 0 && (await page.getByTestId('thr-hand').count()) === 1)
-await page.getByTestId('thr-hand').click()
+// D-630 대표 "'2 고치기' 부터는 안 보이는 게 낫다" — 글을 열기 전에는 2단계가 아예 없다(제목 줄도 0) · [직접 쓰기] 는 1단계 큰 단추 옆 · 뼈대 · 첫마디 10개는 [더 보기] 안
+const e1 = {
+  step2: await page.locator('#thr-editor, [data-testid="thr-editor"], [data-testid="thr-editor-closed"]').count(),
+  body: await page.getByTestId('thr-body').count(),
+  hand: await page.getByTestId('thr-qs-box').getByTestId('thr-hand').count(),
+  text: await page.locator('main').innerText(),
+  moreOpen: await page.getByTestId('thr-qs-more').getAttribute('data-open'),
+  rule: await page.getByTestId('thr-qs-rule').count(),
+  hooks: await page.getByTestId('thr-hooks-open').count(),
+}
+check('E1 스레드(D-630) — 글이 없으면 2단계 "고치기 · 규칙 검사" 는 아예 없음(제목 · 글 칸 · 규칙 검사 0) · [직접 쓰기] 는 1단계 안 하나 · [뼈대만 받기] · [첫마디 10개] 는 접힌 [더 보기] 안', e1.step2 === 0 && e1.body === 0 && e1.hand === 1 && !/고치기 · 규칙 검사/.test(e1.text) && e1.moreOpen === '0' && e1.rule === 0 && e1.hooks === 0, { ...e1, text: e1.text.slice(0, 200) })
+await page.getByTestId('thr-qs-more').getByTestId('fold-toggle').first().click()
 await page.waitForTimeout(200)
-check('E2 [직접 쓰기] → 글 칸이 열리고 바로 적을 수 있음(커서)', (await page.getByTestId('thr-body').count()) === 1 && (await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))) === 'thr-body')
+check('E1b [더 보기] 한 번 → [뼈대만 받기] · [첫마디 10개 보기] · 추천 형식 · 내 맞춤이 그 안에(지운 것 없음)', (await page.getByTestId('thr-qs-rule').count()) === 1 && (await page.getByTestId('thr-hooks-open').count()) === 1 && (await page.getByTestId('thr-qs-rec').count()) === 1 && (await page.getByTestId('thr-choose').count()) === 1)
+await page.getByTestId('thr-hand').click()
+await page.waitForTimeout(700)
+const e2top = await page.locator('#thr-editor').evaluate((e) => Math.round(e.getBoundingClientRect().top)).catch(() => -9999)
+check('E2 [직접 쓰기] → 2단계(글 칸)가 1단계 아래에 나타나고 화면 안으로 · 바로 적을 수 있음(커서) · [직접 쓰기] 단추는 사라짐', (await page.getByTestId('thr-body').count()) === 1 && (await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))) === 'thr-body' && e2top >= -10 && e2top < 700 && (await page.getByTestId('thr-hand').count()) === 0, { e2top })
 await page.getByTestId('thr-body').fill('잠깐 적었다가')
 await page.getByTestId('thr-body').fill('')
 await page.waitForTimeout(200)
 check('E3 쓰다가 다 지워도 글 칸은 그대로(갑자기 접히지 않음)', (await page.getByTestId('thr-body').count()) === 1)
+// D-630 쓰던 글을 두고 나갔다 다시 들어오면 — 글 칸을 펼쳐 놓지 않고 맨 위 한 줄 '쓰던 글 [이어서 쓰기]' · 누르면 그 글이 글 칸에(화면 안)
+await page.getByTestId('thr-body').fill('쓰다가 둔 글 첫 줄\n둘째 줄')
+await page.waitForTimeout(200)
+await page.goto(`${BASE}/marketing/threads`, { waitUntil: 'networkidle' })
+await page.getByTestId('thr-page').waitFor({ timeout: 15000 })
+await page.waitForTimeout(300)
+const e3b = { body: await page.getByTestId('thr-body').count(), line: (await page.getByTestId('thr-resume-line').innerText().catch(() => '')).trim(), kind: await page.getByTestId('thr-resume').getAttribute('data-kind').catch(() => '') }
+await page.getByTestId('thr-resume-go').click()
+await page.waitForTimeout(700)
+const e3top = await page.locator('#thr-editor').evaluate((e) => Math.round(e.getBoundingClientRect().top)).catch(() => -9999)
+check('E3b(D-630) 쓰던 글이 남아 있어도 들어오면 1단계만 — 맨 위 "쓰던 글 · 첫 줄 [이어서 쓰기]" → 누르면 그 글이 글 칸에 · 화면 안 · 그 줄은 사라짐', e3b.body === 0 && e3b.line === '쓰다가 둔 글 첫 줄' && e3b.kind === 'local' && (await page.getByTestId('thr-body').inputValue()) === '쓰다가 둔 글 첫 줄\n둘째 줄' && e3top >= -10 && e3top < 700 && (await page.getByTestId('thr-resume').count()) === 0, { ...e3b, e3top })
+await page.getByTestId('thr-new').click()
+await page.waitForTimeout(300)
+check('E3c [새 글] → 글 칸이 닫히고 다시 1단계만', (await page.getByTestId('thr-body').count()) === 0 && (await page.getByTestId('thr-hand').count()) === 1)
 await page.goto(`${BASE}/marketing/shorts`, { waitUntil: 'networkidle' })
 await page.waitForTimeout(800)
 if ((await page.getByTestId('sht-script').count()) && (await page.getByTestId('sht-script').inputValue()).trim()) await page.getByTestId('sht-new').click()
 await page.waitForTimeout(300)
-check('E4 릴스 · 틱톡도 — 대본이 없으면 2단계 한 줄 + [직접 쓰기] → 대본 칸', (await page.getByTestId('sht-editor-closed').count()) === 1 && (await page.getByTestId('sht-script').count()) === 0)
+check('E4 릴스 · 틱톡도(D-630) — 대본이 없으면 2단계 "고치고 확인하기" 는 아예 없음 · [직접 쓰기] 는 1단계 안 하나', (await page.locator('#sht-editor, [data-testid="sht-editor"], [data-testid="sht-editor-closed"]').count()) === 0 && (await page.getByTestId('sht-script').count()) === 0 && (await page.getByTestId('sht-qs-box').getByTestId('sht-hand').count()) === 1 && !/고치고 확인하기/.test(await page.locator('main').innerText()))
 await page.getByTestId('sht-hand').click()
+await page.waitForTimeout(700)
+const e5top = await page.locator('#sht-editor').evaluate((e) => Math.round(e.getBoundingClientRect().top)).catch(() => -9999)
+check('E5 [직접 쓰기] → 대본 칸이 1단계 아래에 · 화면 안 · 커서', (await page.getByTestId('sht-script').count()) === 1 && (await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))) === 'sht-script' && e5top >= -10 && e5top < 700, { e5top })
+await page.getByTestId('sht-script').fill('[0:00] 쓰다가 둔 대본')
 await page.waitForTimeout(200)
-check('E5 [직접 쓰기] → 대본 칸 · 커서', (await page.getByTestId('sht-script').count()) === 1 && (await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))) === 'sht-script')
+await page.goto(`${BASE}/marketing/shorts`, { waitUntil: 'networkidle' })
+await page.waitForTimeout(800)
+const e5b = { script: await page.getByTestId('sht-script').count(), kind: await page.getByTestId('sht-resume').getAttribute('data-kind').catch(() => '') }
+await page.getByTestId('sht-resume-go').click()
+await page.waitForTimeout(500)
+check('E5b(D-630) 쓰던 대본이 남아 있어도 들어오면 1단계만 — 맨 위 "쓰던 대본 [이어서 쓰기]" → 그 대본이 칸에', e5b.script === 0 && e5b.kind === 'local' && (await page.getByTestId('sht-script').inputValue()) === '[0:00] 쓰다가 둔 대본', e5b)
+await page.getByTestId('sht-new').click()
+await page.waitForTimeout(200)
 await page.evaluate(() => localStorage.setItem('axmvp.fold.all', 'open'))
 check('E6 JS 오류 0', errors.length === 0, errors)
 
@@ -579,7 +624,7 @@ for (const [w, scale] of [[360, ''], [390, ''], [430, ''], [360, 'extra_large']]
   await mp.getByTestId('thr-tab-library').click()
   await mp.waitForTimeout(200)
   // D-298 휴대폰은 마우스가 없어 눌러도 설명 상자가 뜨지 않는다(가리지 않게) — 대신 칸 줄 아래 '지금 칸' 한 줄 · 카드마다 쉽게 말하면
-  check(`M ${tag}: 틀 23가지 — 넘침 0 · 눌러도 설명 상자 안 뜸 · 지금 칸 한 줄 · 카드마다 쉽게 말하면`, (await overflowX(mp)) <= 0 && (await mp.locator('[role="tooltip"][data-testid="thr-tabtip"]').count()) === 0 && /틀 23가지 — 잘 된 글의 모양/.test(await mp.getByTestId('thr-about').innerText()) && (await mp.getByTestId('thr-lib-plain').count()) === (await mp.getByTestId('thr-lib-card').count()), await overflowX(mp))
+  check(`M ${tag}: 틀 23가지 — 넘침 0 · 눌러도 설명 상자 안 뜸 · 지금 칸 한 줄 · 카드마다 쉽게 말하면`, (await overflowX(mp)) <= 0 && (await mp.locator('[role="tooltip"][data-testid="thr-tabtip"]').count()) === 0 && /^잘 된 글의 모양 23가지/.test(await visibleText(mp.getByTestId('thr-about'))) && /틀 23가지 — 잘 된 글의 모양/.test(((await mp.getByTestId('thr-about').textContent()) ?? '').replace(/\s+/g, ' ')) && (await mp.getByTestId('thr-lib-plain').count()) === (await mp.getByTestId('thr-lib-card').count()), await overflowX(mp))
   await mp.getByTestId('thr-tab-routine').click()
   await mp.waitForTimeout(200)
   check(`M ${tag}: 하루 10분 — 넘침 0 · JS 오류 0`, (await overflowX(mp)) <= 0 && errs.length === 0, { over: await overflowX(mp), errs })
