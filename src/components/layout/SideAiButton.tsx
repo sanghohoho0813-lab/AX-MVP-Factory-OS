@@ -20,7 +20,7 @@ import { ArrowUpRight, Globe, PanelRight, PanelsLeftRight, Search, Sparkles, X }
 import { inFrame } from '../../lib/deviceView'
 import { useCustomerAudience } from '../../config/customerAudience'
 import { openDock, useDock } from '../../lib/sideDock'
-import { closePageDock, usePageChat } from '../../lib/pageChat'
+import { closePageDock, showFreeChat, usePageChat } from '../../lib/pageChat'
 import { CORNER_GAP, SIDE_SERVICES, SIDE_SITES, SIDE_WIDTHS, closeSideAi, cornerSpot, focusSideAi, openOsLeft, openSideAddress, openSideAi, setSidePrefs, useSideAi, type SideService, type SideWidth } from '../../lib/sideAi'
 import { fetchAssistStatus, type ProviderId } from '../../services/aiAssist/client'
 import { allowedProviders, isCheapOnly, readChoice, saveChoice } from '../../services/aiAssist/store'
@@ -88,6 +88,8 @@ export function SideAiButton() {
       }
     }
     openDock('chat')
+    // D-628 [○○ 로 대화] 는 화면과 상관없이 고른 AI 와 묻는 자유 대화 — 이 화면 대화창이 있어도 자유 대화를 보여 준다
+    showFreeChat()
     setOpen(false)
   }
   // D-265 판은 단추 바로 아래 · 오른쪽 끝을 단추에 맞춤 · 아래로는 화면 안까지만(넘치면 판 안에서 굴린다)

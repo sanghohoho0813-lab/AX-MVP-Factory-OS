@@ -330,7 +330,7 @@ export function WorkChat(p: WorkChatProps) {
     if (!started) return
     if (focusNext.current || (first && empty && !phoneNow)) {
       focusNext.current = false
-      window.setTimeout(() => inputRef.current?.focus(), 30)
+      inputRef.current?.focus({ preventScroll: true })
     }
     // 시작했을 때 한 번만 본다(대화 수 · 폭이 바뀔 때마다 커서를 옮기지 않는다)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -339,6 +339,10 @@ export function WorkChat(p: WorkChatProps) {
     focusNext.current = true
     startPageChat(scope)
   }
+  // 대화가 한 번 보였으면 그 뒤로는 시작 카드로 돌아가지 않는다(대화를 지우거나 다른 회사로 바꿔도 질문칸 그대로)
+  useEffect(() => {
+    if (!empty) startPageChat(scope)
+  }, [empty, scope])
 
   const composer = (
     <div className="flex flex-col gap-1.5" data-testid="chat-composer">
@@ -368,7 +372,8 @@ export function WorkChat(p: WorkChatProps) {
           {busy ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : aiReady ? <Sparkles aria-hidden="true" className="size-4" /> : <SendHorizontal aria-hidden="true" className="size-4" />}
         </Button>
       </div>
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
+      {/* 휴대폰에서 대화가 쌓인 뒤에는 이 줄을 접는다(아래 묶음이 화면을 많이 먹지 않게 — 모델은 처음 화면 · PC 판에서 고른다) */}
+      <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 px-1 ${empty ? '' : 'max-lg:hidden'}`}>
         {/* D-627 글자 수 한도 — 한 줄은 짧게, 무엇이 어떻게 답하는지는 마우스를 올리면(title) */}
         <p
           className="t-meta min-w-0 flex-1 basis-24 break-keep text-slate-500"
@@ -423,8 +428,9 @@ export function WorkChat(p: WorkChatProps) {
           {options}
         </select>
       </label>
-      <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setGuide(true)} data-testid="chat-guide-open">
-        <BookOpen aria-hidden="true" className="size-4" /> 사용 방법
+      {/* 휴대폰은 그림만(회사 칸을 넓게) — PC 오른쪽 판에서는 글도 */}
+      <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setGuide(true)} aria-label="사용 방법" title="사용 방법" data-testid="chat-guide-open">
+        <BookOpen aria-hidden="true" className="size-4" /> <span className="max-lg:hidden">사용 방법</span>
       </Button>
     </div>
   )

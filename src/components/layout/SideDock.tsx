@@ -18,7 +18,7 @@ import { ArrowUpRight, Copy, Globe, Loader2, MessageCircle, MessagesSquare, Rota
 import { inFrame } from '../../lib/deviceView'
 import { navPx, useNavSize } from '../../lib/navWidth'
 import { DOCK_MAX, DOCK_MIN, GOOGLE_FRAME_HOME, canFrame, dockLayout, frameUrlOf, setDock, useDock, type DockTab, type DockTurn } from '../../lib/sideDock'
-import { CHAT_TINT, autoOpenPageChat, basePageChat, closePageDock, setPageChatEnv, setPageChatGeneric, setPageChatSlot, usePageChat, type PageChatMode } from '../../lib/pageChat'
+import { CHAT_TINT, autoOpenPageChat, basePageChat, closePageDock, pageChatView, setPageChatEnv, setPageChatSlot, togglePageChatView, usePageChat, type PageChatMode } from '../../lib/pageChat'
 import { SIDE_SITES, addressLabel, addressToUrl, openInSide, useSideAi } from '../../lib/sideAi'
 import { assistOn, useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { askDock, dockTurns, setDockTurns, syncDockChat, useDockChat } from '../../services/aiAssist/dockChat'
@@ -352,7 +352,8 @@ export function SideDock() {
   const wantPage = !!base && pc.open === base.scope
   const shown = mode !== 'none' && (wantPage || (dock.open && !customer))
   const tab: DockTab = customer ? 'chat' : dock.tab
-  const pageView = !!base && !pc.generic
+  // [대화] 탭이 보여 줄 것 — 이 화면 대화창(대화창이 있는 화면 · 눌러서 연 AI 도우미) 또는 자유 대화(AI 도우미만 있는 화면 · 그림 단추로 바꿈)
+  const pageView = pageChatView(pc)
   const [dragging, setDragging] = useState(false)
   const drag = useRef<{ x: number; w: number; raf: number; next: number } | null>(null)
   const [webSeen, setWebSeen] = useState(dock.tab === 'web')
@@ -431,7 +432,7 @@ export function SideDock() {
       data-testid="side-dock"
       data-mode={lay.mode}
       data-tab={tab}
-      data-page-chat={pageView ? base.scope : ''}
+      data-page-chat={pageView && base ? base.scope : ''}
     >
       <div
         role="separator"
@@ -486,11 +487,11 @@ export function SideDock() {
         {!customer && base && tab === 'chat' && (
           <button
             type="button"
-            onClick={() => setPageChatGeneric(!pc.generic)}
-            aria-pressed={pc.generic}
-            aria-label={pc.generic ? '이 화면 대화로 돌아가기' : '자유 대화로 바꾸기'}
-            title={pc.generic ? '이 화면 대화로 돌아가기' : '자유 대화 — 화면과 상관없이 무엇이든 묻기'}
-            className={`tap flex size-11 shrink-0 items-center justify-center rounded-(--radius-control) ${pc.generic ? 'bg-violet-100 text-violet-800' : 'text-slate-500 hover:bg-slate-100'}`}
+            onClick={togglePageChatView}
+            aria-pressed={!pageView}
+            aria-label={pageView ? '자유 대화로 바꾸기' : '이 화면 대화로 바꾸기'}
+            title={pageView ? '자유 대화 — 화면과 상관없이 무엇이든 묻기' : '이 화면 대화 — 이 화면 자료로 묻기'}
+            className={`tap flex size-11 shrink-0 items-center justify-center rounded-(--radius-control) ${pageView ? 'text-slate-500 hover:bg-slate-100' : 'bg-violet-100 text-violet-800'}`}
             data-testid="dock-chat-switch"
             data-guide="fn-dock-free"
           >
@@ -503,7 +504,8 @@ export function SideDock() {
       </div>
       {/* D-628 대화 칸 — 바탕을 살짝 진하게(대화라고 보이게). 이 화면 대화창은 화면이 이 자리(slot)로 그려 보낸다 */}
       <div className={tab === 'chat' ? `flex min-h-0 flex-1 flex-col ${CHAT_TINT}` : 'hidden'} data-testid="dock-chat-area">
-        {base && <div ref={setPageChatSlot} className={pageView ? 'flex min-h-0 flex-1 flex-col' : 'hidden'} data-testid="page-chat-slot" />}
+        {/* 자리는 이 화면 대화를 보여 줄 때만 둔다 — 자유 대화를 보는 동안 화면 대화창은 그리지 않는다(이미 그린 것은 살아 있다) */}
+        {pageView && <div ref={setPageChatSlot} className="flex min-h-0 flex-1 flex-col" data-testid="page-chat-slot" />}
         {!pageView && !customer && <ChatTab />}
       </div>
       {/* 웹은 한 번 연 뒤로는 숨기기만 — 대화로 갔다 와도 보던 쪽이 처음부터 다시 열리지 않게 */}

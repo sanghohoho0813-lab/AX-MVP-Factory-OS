@@ -9,7 +9,7 @@
  * D-628: 대화창은 오른쪽 판으로 — 가운데는 늘 작업 화면('인증 한눈에' · 인증별 화면). 첫 주소(뒤에 아무것도 없음)에서만 대화창이 저절로 열린다.
  */
 import type { ReactNode } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { useModuleSection } from '../../tools/shared/ModuleRoute'
 import { toolOf } from '../../config/toolRegistry'
@@ -45,7 +45,8 @@ export default function CertPage() {
 
   // D-628 대화창(오른쪽 판) — 모든 기업인증 화면에서 같은 대화가 따라온다. 저절로 여는 것은 맨 첫 화면에서만('대화창 같이' 를 고른 사람)
   const autoPref = useChatAutoOpen()
-  const chat = <CertChat d={d} auto={autoPref && section === 'overview' && params.get('detail') !== '1'} />
+  const { pathname } = useLocation()
+  const chat = <CertChat d={d} auto={autoPref && /^\/tools\/cert-os\/?$/.test(pathname) && params.get('detail') !== '1'} />
   const wrap = (body: ReactNode, testId?: string) => (
     <>
       <div className="flex flex-col gap-5" data-testid={testId}>

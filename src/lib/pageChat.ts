@@ -9,6 +9,10 @@
  *   휴대폰(1024 아래)  오른쪽 아래 둥근 [대화] → 아래에서 올라오는 판.
  *
  * 한 화면에 여럿이면 보이는 것은 하나: 눌러서 연 AI 도우미 → 그 화면 대화창 → 그 화면 AI 도우미(대화창이 없는 화면).
+ * [대화] 탭이 처음 보여 주는 것:
+ *   대화창이 있는 화면(모듈 · 특허 · 벤처 · 기업인증 · 마케팅 — launcher) = 그 화면 대화창
+ *   AI 도우미만 있는 화면(오늘 · 고객 관리 · 영업 관리 …)              = 예전 그대로 자유 대화 — [⋯] AI 도우미를 누르면 그 도우미가 판에
+ *   판 머리의 그림 단추로 둘 사이를 오간다(그 화면에서만 · 이번 접속 동안).
  * 저장: 닫아 둔 것만 이 브라우저에(axmvp.ui.page_chat). 열림 · 시작은 이번 접속 동안만.
  */
 import { useSyncExternalStore } from 'react'
@@ -43,8 +47,8 @@ export interface PageChatState {
   closed: boolean
   /** 휴대폰 아래 판 */
   sheet: boolean
-  /** 이 화면 대화창 대신 자유 대화(화면 자료 없이 묻는 AI)를 보는 중 */
-  generic: boolean
+  /** 그림 단추로 처음 보이는 것에서 바꿔 둔 곳(scope) — 대화창이 있는 화면은 자유 대화로, AI 도우미만 있는 화면은 그 도우미로 */
+  flipped: readonly string[]
   /** [대화 시작] 을 누른 곳(scope) */
   started: readonly string[]
   mode: PageChatMode
@@ -88,7 +92,7 @@ let state: PageChatState = {
   explicit: null,
   closed: typeof window === 'undefined' ? false : readClosed(),
   sheet: false,
-  generic: false,
+  flipped: [],
   started: [],
   mode: typeof window !== 'undefined' && window.innerWidth >= 1024 ? 'over' : 'none',
   dockShown: false,
@@ -134,6 +138,41 @@ export function nextPageChatKey(): number {
   return seq
 }
 
+/** [대화] 탭이 지금 이 화면 대화창(또는 눌러서 연 AI 도우미)을 보여 주는가 — 아니면 자유 대화 */
+export function pageChatView(s: PageChatState = state): boolean {
+  const base = basePageChat(s)
+  if (!base) return false
+  if (s.explicit !== null && s.entries.some((e) => e.key === s.explicit)) return true
+  const flipped = s.flipped.includes(base.scope)
+  return base.launcher ? !flipped : flipped
+}
+
+const without = (list: readonly string[], scope: string) => (list.includes(scope) ? list.filter((x) => x !== scope) : list)
+const withScope = (list: readonly string[], scope: string) => (list.includes(scope) ? list : [...list, scope])
+/** 이 화면 대화창이 보이게(자유 대화로 바꿔 둔 것을 푼다) */
+function showPage(base: PageChatEntry): readonly string[] {
+  return base.launcher ? without(state.flipped, base.scope) : withScope(state.flipped, base.scope)
+}
+
+/** 그림 단추 — 이 화면 대화 ↔ 자유 대화 */
+export function togglePageChatView(): void {
+  const base = basePageChat()
+  if (!base) return
+  // 눌러서 연 AI 도우미가 떠 있으면 그것부터 내린다(자유 대화가 보이게)
+  if (state.explicit !== null) {
+    set({ explicit: null, flipped: base.launcher ? withScope(state.flipped, base.scope) : without(state.flipped, base.scope) })
+    return
+  }
+  set({ flipped: state.flipped.includes(base.scope) ? without(state.flipped, base.scope) : withScope(state.flipped, base.scope) })
+}
+
+/** 자유 대화를 보이게 — 머리줄 [○○ 로 대화](화면과 상관없이 고른 AI 와 대화) */
+export function showFreeChat(): void {
+  const base = basePageChat()
+  if (!base) return
+  set({ explicit: null, flipped: base.launcher ? withScope(state.flipped, base.scope) : without(state.flipped, base.scope) })
+}
+
 /** 화면이 자기 대화창을 알린다 — 돌려주는 함수로 뺀다(화면을 떠날 때) */
 export function registerPageChat(entry: PageChatEntry): () => void {
   set({ entries: [...state.entries.filter((e) => e.key !== entry.key), entry].sort((a, b) => a.key - b.key) })
@@ -171,14 +210,15 @@ export function openPageChat(opts: { start?: boolean } = {}): void {
     return
   }
   setDock({ tab: 'chat' })
-  set({ open: cur.scope, generic: false, ...(opts.start ? { started: withStarted(cur.scope) } : {}) })
+  const base = basePageChat() ?? cur
+  set({ open: base.scope, flipped: showPage(base), ...(opts.start ? { started: withStarted(cur.scope) } : {}) })
 }
 
 /** 붙일 폭이 될 때 저절로 — 닫아 둔 기억은 건드리지 않는다 */
 export function autoOpenPageChat(scope: string): void {
   if (state.open === scope) return
   setDock({ tab: 'chat' })
-  set({ open: scope, generic: false })
+  set({ open: scope, flipped: without(state.flipped, scope) })
 }
 
 /** 여는 단추([대화] · [대화로 묻기])를 눌렀다 — 닫아 둔 기억을 풀고 바로 시작 */
@@ -196,16 +236,21 @@ export function openAssistInDock(key: number): boolean {
   if (!e || state.mode === 'none') return false
   setDock({ tab: 'chat' })
   const base = basePageChat()
-  set({ explicit: key, open: (base ?? e).scope, generic: false })
+  set({ explicit: key, open: (base ?? e).scope })
   return true
 }
 
-/** 눌러서 연 AI 도우미 닫기 — 아래에 그 화면 대화창이 있으면 그리로, 없으면 판을 닫는다 */
+/**
+ * 눌러서 연 AI 도우미 닫기 — 아래에 그 화면 대화창이 있으면 그리로 돌아간다.
+ * 없으면(AI 도우미만 있는 화면) 이 도우미 때문에 열린 판은 내린다 — 머리줄에서 열어 둔 판(자유 대화)은 그대로 남는다.
+ */
 export function closeAssistInDock(key: number): void {
   if (state.explicit !== key) return
   const base = basePageChat()
-  if (base && base.kind === 'chat') set({ explicit: null })
-  else closePageDock()
+  // 이 도우미가 곧 그 화면의 대화창(마케팅 유튜브 · 스레드 · 릴스)이면 닫기 = 판 닫기
+  if (base && base.key === key && base.launcher) closePageDock()
+  else if (base && base.launcher) set({ explicit: null })
+  else set({ explicit: null, open: null })
 }
 
 /** 판 닫기(X) — 대화창이 있는 화면에서 닫았으면 기억한다(다음부터 저절로 열지 않음) */
@@ -213,20 +258,16 @@ export function closePageDock(): void {
   const cur = basePageChat()
   closeDock()
   if (cur?.launcher && !state.closed) writeClosed(true)
-  set({ open: null, explicit: null, generic: false, sheet: false, closed: cur?.launcher ? true : state.closed })
+  set({ open: null, explicit: null, sheet: false, closed: cur?.launcher ? true : state.closed })
 }
 
 export function closePageSheet(): void {
   set({ sheet: false })
 }
 
-export function setPageChatGeneric(generic: boolean): void {
-  set({ generic })
-}
-
 /** 시험 · 로그아웃 — 처음으로 */
 export function resetPageChat(): void {
-  set({ open: null, explicit: null, sheet: false, generic: false, started: [], closed: readClosed() })
+  set({ open: null, explicit: null, sheet: false, flipped: [], started: [], closed: readClosed() })
 }
 
 function subscribe(l: () => void): () => void {

@@ -1,5 +1,7 @@
 /**
- * qa:chat — D-250 특허 · 벤처 · 기업인증 첫 화면 = 대화창. 실행: npm run qa:chat -- http://localhost:4390 [사진 폴더]
+ * qa:chat — D-250 특허 · 벤처 · 기업인증 대화창. 실행: npm run qa:chat -- http://localhost:4390 [사진 폴더]
+ * D-628(2026-11-18 대표 지시) 대화창은 오른쪽 판(휴대폰은 아래 판)으로 — 가운데는 작업 화면(머리 · 단계 · 준비 현황 / 인증 한눈에).
+ *   처음(대화 없음)은 시작 카드 → [대화 시작] → 질문칸 · 큰 단추 4. 답 단추를 누르면 가운데가 바뀌고 판은 열린 채.
  *
  * 브라우저 → /api/ai-assist 는 진짜 서버 함수(api/ai-assist.js)를 이 프로세스에서 부른다(Playwright route).
  * 밖으로 나가는 것만 가짜: Supabase 로그인 확인 · 권한 RPC · AI 공급자(Gemini).
@@ -18,6 +20,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import fs from 'node:fs'
 import { seedScript } from './seed.mjs'
+import { openChat } from './pageTools.mjs'
 
 /** D-627 모듈 목차는 [목차] 단추 하나(서랍) — 목차 줄 수를 세고 서랍을 닫는다 */
 async function navCount(page) {
@@ -107,6 +110,37 @@ async function wire(page) {
 }
 
 const CLIENT = 'cli_hansol'
+/** 처음 쓰는 사람처럼 — 시드의 '화면만' · 닫아 둔 기억을 지운다(오른쪽 대화창이 저절로 열리는 길을 본다) */
+const fresh = (page) =>
+  page.evaluate(() => {
+    localStorage.removeItem('axmvp.chatfirst.v1')
+    localStorage.removeItem('axmvp.ui.page_chat')
+    localStorage.removeItem('axmvp.ui.side_dock')
+  })
+/** 오른쪽 판 — 그려져 있는지 · 어느 대화창인지 */
+const dockOf = (page) =>
+  page.evaluate(() => {
+    const d = document.querySelector('[data-testid="side-dock"]')
+    return d ? { on: true, chat: d.getAttribute('data-page-chat'), mode: d.getAttribute('data-mode') } : { on: false }
+  })
+/** 보이는 글자 수(빈칸 · 화면 읽기 전용 글 빼고) */
+const visibleChars = (page, sel) =>
+  page.evaluate((q) => {
+    const root = document.querySelector(q)
+    if (!root) return -1
+    let n = 0
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    let t
+    while ((t = w.nextNode())) {
+      const x = t.textContent.replace(/\s+/g, '')
+      const el = t.parentElement
+      if (!x || !el || !el.checkVisibility({ opacityProperty: true, visibilityProperty: true }) || el.closest('[aria-hidden="true"],.sr-only')) continue
+      const r = document.createRange()
+      r.selectNodeContents(t)
+      if ([...r.getClientRects()].some((c) => c.width > 1 && c.height > 1)) n += x.length
+    }
+    return n
+  }, sel)
 const turns = (page) => page.getByTestId('chat-turn').count()
 const lastAnswer = (page) => page.getByTestId('chat-answer').last()
 const toastText = async (page) => {
@@ -139,16 +173,27 @@ const errors = []
   await wire(page)
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
+  await fresh(page)
 
   await page.goto(BASE + '/patent-venture', { waitUntil: 'networkidle' })
   await page.getByTestId('pv-chat-page').waitFor()
+  // D-628 가운데 = 작업 화면(머리 · 회사 고르기 · 다섯 단계) · 대화창은 오른쪽 판에 저절로(시작 카드)
+  await page.getByTestId('side-dock').waitFor({ timeout: 8000 }).catch(() => {})
+  const dock0 = await dockOf(page)
+  const card = page.getByTestId('chat-start-card')
+  const cardText = await card.innerText().catch(() => '')
+  const startChars = await visibleChars(page, '[data-testid="side-dock"]')
+  check(`A0 가운데 = 작업 화면(대화창 없음 · 회사 칸 · 다섯 단계) · 오른쪽 판 저절로 · 시작 카드(무엇을 도와드릴까요? · [대화 시작]) ${startChars}자 ≤ 60`, (await page.locator('main [data-testid="chat-hero"], main [data-testid="chat-input"]').count()) === 0 && (await page.locator('main [data-testid="page-client"]').count()) === 1 && (await page.locator('main [data-testid="pv-steps"]').count()) === 1 && dock0.on && dock0.chat === 'pv' && dock0.mode === 'dock' && /무엇을 도와드릴까요/.test(cardText) && /대화 시작/.test(cardText) && startChars > 0 && startChars <= 60, { dock0, cardText, startChars })
+  await shot(page, 'pv-start-pc')
+  await page.getByTestId('chat-start').click()
   const hero = page.getByTestId('chat-hero')
+  await hero.waitFor()
   const starters = await hero.getByTestId('chat-starter').allInnerTexts()
-  check('A1 처음: 무엇을 도와드릴까요? · 질문창 · 큰 단추 4(어디까지 · 쓰기 · 점검 · 사업계획서)', (await hero.count()) === 1 && /무엇을 도와드릴까요/.test(await hero.innerText()) && starters.length === 4 && /어디까지/.test(starters[0]) && /사업계획서/.test(starters[3]), starters)
-  check('A2 제목 하나(특허 · 벤처) · [사용 방법] · [자세히] · 회사 칸', (await page.locator('h1:visible').allInnerTexts()).join('|') === '특허 · 벤처' && (await page.getByTestId('chat-guide-open').count()) === 1 && (await page.getByTestId('chat-detail').getAttribute('href')) === '/patent-venture/more' && (await page.getByTestId('chat-client').count()) === 1, await page.locator('h1:visible').allInnerTexts())
+  check('A1 [대화 시작] → 무엇을 도와드릴까요? · 질문창(커서) · 큰 단추 4(어디까지 · 쓰기 · 점검 · 사업계획서)', (await hero.count()) === 1 && /무엇을 도와드릴까요/.test(await hero.innerText()) && starters.length === 4 && /어디까지/.test(starters[0]) && /사업계획서/.test(starters[3]) && (await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))) === 'chat-input', starters)
+  check('A2 제목 하나(특허 · 벤처) · 가운데 [자세히] · 대화창 [사용 방법] · 회사 칸(대화창 1 · 가운데 1)', (await page.locator('h1:visible').allInnerTexts()).join('|') === '특허 · 벤처' && (await page.getByTestId('chat-guide-open').count()) === 1 && (await page.locator('main [data-testid="chat-detail"]').getAttribute('href')) === '/patent-venture/more' && (await page.locator('[data-testid="side-dock"] [data-testid="chat-client"]').count()) === 1, await page.locator('h1:visible').allInnerTexts())
   check('A3 대표 화면: 보내기 단추 = AI에게 묻기(보라) · AI 연결됨 안내', (await page.getByTestId('chat-send').getAttribute('data-ai')) === '1' && /AI 연결됨/.test(await page.getByTestId('chat-mode').innerText()))
-  const words = (await page.getByTestId('pv-chat-page').innerText()).replace(/\s+/g, '').length
-  check(`A4 첫 화면 글자 수 ${words}자 — 220자 이하(예전 진행판 화면보다 짧게)`, words <= 220, words)
+  const words = await visibleChars(page, '[data-testid="pv-chat-page"]')
+  check(`A4 가운데 첫 화면 글자 수 ${words}자 — 200자 이하(D-627 한도)`, words > 0 && words <= 200, words)
   await shot(page, 'pv-hero-pc')
 
   // 사용 방법
@@ -163,18 +208,19 @@ const errors = []
   check('A6 Esc → 사용 방법 닫힘', (await page.getByTestId('chat-guide').count()) === 0)
 
   // 자세히 → 예전 화면 → 대화창으로
-  await page.getByTestId('chat-detail').click()
+  await page.locator('main [data-testid="chat-detail"]').click()
   await page.getByTestId('pv-home').waitFor()
-  check('A7 [자세히] → 예전 진행판(빈 화면 안내 · 도구 카드 그대로)', page.url().endsWith('/patent-venture/more') && (await page.getByTestId('pv-empty').count()) === 1 && (await page.locator('[data-testid^="pv-card-"]').count()) >= 3, await page.locator('[data-testid^="pv-card-"]').count())
+  check('A7 가운데 [자세히] → 예전 진행판(빈 화면 안내 · 도구 카드 그대로)', page.url().endsWith('/patent-venture/more') && (await page.getByTestId('pv-empty').count()) === 1 && (await page.locator('[data-testid^="pv-card-"]').count()) >= 3, await page.locator('[data-testid^="pv-card-"]').count())
   await page.getByTestId('pv-back-chat').click()
   await page.getByTestId('pv-chat-page').waitFor()
-  check('A8 [대화창으로] → 대화창', new URL(page.url()).pathname === '/patent-venture')
+  await page.getByTestId('chat-hero').waitFor({ timeout: 6000 }).catch(() => {})
+  check('A8 [대화창으로] → 특허 · 벤처 첫 화면 · 오른쪽 대화창이 열린 채(질문칸 그대로)', new URL(page.url()).pathname === '/patent-venture' && (await dockOf(page)).chat === 'pv' && (await page.getByTestId('chat-hero').count()) === 1)
 
   // 회사 고르기
   await page.getByTestId('chat-client').selectOption(CLIENT)
   await page.waitForURL(/client=cli_hansol/)
   await page.waitForTimeout(300)
-  check('A9 회사 고르기 → 주소 ?client= · 그 회사 처음 화면', (await page.getByTestId('chat-hero').count()) === 1)
+  check('A9 대화창에서 회사 고르기 → 주소 ?client= · 그 회사 처음 화면 · 가운데 회사 칸도 같은 회사 · 준비 현황', (await page.getByTestId('chat-hero').count()) === 1 && (await page.getByTestId('page-client').inputValue()) === CLIENT && (await page.locator('main [data-testid="pv-brief"]').count()) === 1)
 
   // 단추 → 바로 답
   const llm0 = llm.length
@@ -182,7 +228,7 @@ const errors = []
   await waitTurns(page, 1)
   let a = lastAnswer(page)
   check('A10 [지금 어디까지 했나요?] → 바로 답(AI 안 부름) · 시작 전 · [새 명세서 쓰기][견본으로 연습]', (await a.getAttribute('data-source')) === 'rule' && (await a.getAttribute('data-topic')) === 'status' && llm.length === llm0 && (await a.getByTestId('chat-action').count()) === 2, await a.innerText())
-  check('A11 질문 · 답이 쌓이면 질문창은 아래(단추 줄 · 질문창)', (await page.getByTestId('chat-dock').count()) === 1 && (await page.getByTestId('chat-hero').count()) === 0)
+  check('A11 질문 · 답이 쌓이면 질문창은 판 맨 아래(단추 줄 · 질문창) · 큰 단추 칸은 사라짐', (await page.getByTestId('chat-dock').getByTestId('chat-starter').count()) === 4 && (await page.getByTestId('chat-dock').getByTestId('chat-input').count()) === 1 && (await page.getByTestId('chat-hero').count()) === 0)
   check('A12 바로 답 아래 [AI로 더 자세히](대표)', (await a.getByTestId('chat-ai-more').count()) === 1)
   await shot(page, 'pv-turn1-pc')
 
@@ -194,7 +240,7 @@ const errors = []
   const draftId = writeUrl.searchParams.get('draft')
   await page.goto(`${BASE}/patent-venture?client=${CLIENT}`, { waitUntil: 'networkidle' })
   await page.getByTestId('chat-turns').waitFor()
-  check('A14 돌아오면 대화 그대로(1개)', (await turns(page)) === 1)
+  check('A14 돌아오면 오른쪽 판에 대화 그대로(1개 · 시작 카드 없이)', (await turns(page)) === 1 && (await page.getByTestId('chat-start-card').count()) === 0 && (await dockOf(page)).chat === 'pv')
   await page.getByTestId('chat-dock').locator('[data-testid="chat-starter"][data-id="write"]').click()
   await waitTurns(page, 2)
   a = lastAnswer(page)
@@ -270,11 +316,18 @@ const errors = []
   await wire(page)
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
+  await fresh(page)
 
   // 회사 없음
   await page.goto(BASE + '/tools/cert-os', { waitUntil: 'networkidle' })
-  await page.getByTestId('cert-chat-page').waitFor()
-  check('B1 회사 없이: 대화창 · 회사 칸 "회사 고르기" · 목차 · 순서 띠 없음', (await page.getByTestId('chat-hero').count()) === 1 && /회사 고르기/.test(await page.getByTestId('chat-client').locator('option').first().innerText()) && (await page.locator('[data-section]:visible').count()) === 0)
+  await page.getByTestId('cert-pick-client').waitFor()
+  await page.getByTestId('side-dock').waitFor({ timeout: 8000 }).catch(() => {})
+  const certStart = await visibleChars(page, '[data-testid="side-dock"]')
+  const certCenter = await visibleChars(page, 'main')
+  check(`B0 가운데 = 업체 고르기(인증 한눈에) · 대화창은 오른쪽 판에 저절로 · 시작 카드 ${certStart}자 ≤ 60`, (await page.locator('main [data-testid="chat-hero"], main [data-testid="chat-input"]').count()) === 0 && (await dockOf(page)).chat === 'cert' && (await page.getByTestId('chat-start-card').count()) === 1 && certStart > 0 && certStart <= 60, { certStart, dock: await dockOf(page) })
+  await shot(page, 'cert-start-pc')
+  await openChat(page)
+  check('B1 회사 없이: [대화 시작] → 대화창 · 회사 칸 "회사 고르기" · 목차는 [목차] 단추 안(펼친 목차 없음)', (await page.getByTestId('chat-hero').count()) === 1 && /회사 고르기/.test(await page.getByTestId('chat-client').locator('option').first().innerText()) && (await page.locator('[data-section]:visible').count()) === 0)
   await page.getByTestId('chat-starter').first().click()
   await waitTurns(page, 1)
   let a = lastAnswer(page)
@@ -285,9 +338,9 @@ const errors = []
   await page.getByTestId('chat-client').selectOption(CLIENT)
   await page.waitForURL(/client=cli_hansol/)
   await page.waitForTimeout(500)
-  check('B4 회사 고르면 → 주소 ?client= · 그 회사 처음 화면', (await page.getByTestId('chat-hero').count()) === 1 && (await page.locator('h1:visible').allInnerTexts()).join('|') === '기업인증', await page.locator('h1:visible').allInnerTexts())
-  const words = (await page.getByTestId('cert-chat-page').innerText()).replace(/\s+/g, '').length
-  check(`B5 첫 화면 글자 수 ${words}자 — 200자 이하`, words <= 200, words)
+  await page.getByTestId('cert-hero').first().waitFor({ timeout: 8000 }).catch(() => {})
+  check('B4 회사 고르면 → 주소 ?client= · 대화창은 그 회사 처음 화면 · 가운데는 그 회사 인증 한눈에(제목 하나)', (await page.getByTestId('chat-hero').count()) === 1 && (await page.locator('h1:visible').count()) === 1 && /한솔.*기업인증/.test(await page.locator('h1:visible').first().innerText()) && (await page.locator('main [data-testid="cert-hero"]').count()) >= 1, await page.locator('h1:visible').allInnerTexts())
+  check(`B5 회사 고르기 전 가운데 첫 화면 글자 수 ${certCenter}자 — 200자 이하`, certCenter > 0 && certCenter <= 200, certCenter)
   await shot(page, 'cert-hero-pc')
 
   // 단추 4
@@ -333,9 +386,10 @@ const errors = []
   await a.locator('[data-testid="chat-action"][data-id="open"]').click()
   await page.waitForURL(/\/tools\/cert-os\/venture/)
   await page.waitForTimeout(500)
-  check('B12 [벤처 자세히] → 벤처 화면(목차 그대로 — [목차] 서랍)', (await navCount(page)) >= 5)
+  const turnsAtVenture = await turns(page)
+  check('B12 [벤처 자세히] → 가운데가 벤처 화면(목차 그대로 — [목차] 서랍) · 오른쪽 판은 열린 채 대화 그대로', (await navCount(page)) >= 5 && (await dockOf(page)).chat === 'cert' && turnsAtVenture >= 5, { turnsAtVenture, dock: await dockOf(page) })
   await page.goBack({ waitUntil: 'networkidle' })
-  await page.getByTestId('cert-chat-page').waitFor()
+  await page.getByTestId('cert-page').waitFor()
 
   // 전체 판정 보기 → 예전 인증 한눈에
   await page.getByTestId('chat-answer').first().locator('[data-testid="chat-action"][data-id="all"], [data-testid="chat-action"][data-id="ask"]').click()
@@ -343,16 +397,22 @@ const errors = []
   await page.getByTestId('cert-hero').first().waitFor()
   check('B13 [전체 판정 보기 · 확인 질문에 답하기] → 예전 "인증 한눈에"(1순위 · 목차 그대로 — [목차] 서랍)', (await page.getByTestId('cert-hero').count()) >= 1 && (await navCount(page)) >= 5)
   await page.goto(`${BASE}/tools/cert-os?client=${CLIENT}`, { waitUntil: 'networkidle' })
-  await page.getByTestId('chat-detail').click()
-  await page.waitForURL(/detail=1/)
   await page.getByTestId('cert-hero').first().waitFor()
-  check('B14 [자세히] → 같은 예전 화면', (await page.getByTestId('cert-hero').count()) >= 1)
+  await page.getByTestId('chat-turns').waitFor({ timeout: 8000 }).catch(() => {})
+  check('B14 맨 첫 주소의 가운데가 곧 같은 화면(인증 한눈에 — 예전 [자세히]) · 오른쪽 판에 대화 그대로', (await page.locator('main [data-testid="cert-hero"]').count()) >= 1 && (await dockOf(page)).chat === 'cert' && (await turns(page)) >= 4)
   const navFirst = await navHref(page, 'overview')
-  check("B14b 예전 화면 목차 '인증 한눈에'는 예전 화면 그대로(?detail=1) · [대화창으로] 있음", (navFirst ?? '').includes('detail=1') && (await page.getByTestId('cert-back-chat').count()) === 1, navFirst)
-  await page.getByTestId('cert-back-chat').click()
-  await page.getByTestId('cert-chat-page').waitFor()
-  check('B14c [대화창으로] → 그 회사 대화창 · 대화 그대로', page.url().includes(`client=${CLIENT}`) && !page.url().includes('detail=1') && (await turns(page)) >= 4)
+  // ?detail=1 주소에서는 저절로 열지 않는다 — 오른쪽 끝 [대화] 로 그 회사 대화를 연다(예전 [대화창으로])
+  await page.goto(`${BASE}/tools/cert-os?client=${CLIENT}&detail=1`, { waitUntil: 'networkidle' })
+  await page.getByTestId('cert-hero').first().waitFor()
+  await page.waitForTimeout(600)
+  const quiet = !(await dockOf(page)).on
+  const pill = await page.getByTestId('page-chat-launch').count()
+  check("B14b 목차 '인증 한눈에'는 ?detail=1 그대로 · 그 주소에서는 판이 저절로 안 열림 · 오른쪽 끝 [대화] 있음", (navFirst ?? '').includes('detail=1') && quiet && pill === 1, { navFirst, quiet, pill })
+  await page.getByTestId('page-chat-launch').click()
+  await page.getByTestId('chat-turns').waitFor({ timeout: 6000 }).catch(() => {})
+  check('B14c [대화] → 그 회사 대화창 · 대화 그대로(주소 그대로)', page.url().includes(`client=${CLIENT}`) && (await dockOf(page)).chat === 'cert' && (await turns(page)) >= 4)
   await page.goto(`${BASE}/tools/cert-os?client=${CLIENT}`, { waitUntil: 'networkidle' })
+  await page.getByTestId('chat-guide-open').waitFor()
   await page.getByTestId('chat-guide-open').click()
   check('B15 [사용 방법] 7단계', (await page.getByTestId('chat-guide').locator('li').count()) === 7)
   await page.keyboard.press('Escape')
@@ -381,11 +441,22 @@ for (const [w, scale] of [[360, ''], [390, ''], [430, ''], [360, 'extra_large']]
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.evaluate(seedScript())
   const tag = `${w}${scale ? '-xl' : ''}`
-  for (const [mod, url, testid] of [['pv', `/patent-venture?client=${CLIENT}`, 'pv-chat-page'], ['cert', `/tools/cert-os?client=${CLIENT}`, 'cert-chat-page']]) {
+  for (const [mod, url, testid] of [['pv', `/patent-venture?client=${CLIENT}`, 'pv-chat-page'], ['cert', `/tools/cert-os?client=${CLIENT}`, 'cert-page']]) {
     await page.goto(BASE + url, { waitUntil: 'networkidle' })
     if (scale) await page.evaluate((s) => document.documentElement.setAttribute('data-text-scale', s), scale)
     await page.getByTestId(testid).waitFor()
     await page.waitForTimeout(300)
+    // D-628 휴대폰 — 가운데는 작업 화면 · 둥근 [대화](44px 이상 · 아래 메뉴 위) → 아래 판
+    const centerOx = await overflowX(page)
+    const fab = await page.getByTestId('page-chat-launch').evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      const nav = [...document.querySelectorAll('nav')].map((n) => n.getBoundingClientRect()).filter((q) => q.bottom >= window.innerHeight - 2 && q.top > window.innerHeight / 2)[0]
+      return { w: Math.round(r.width), h: Math.round(r.height), aboveNav: nav ? r.bottom <= nav.top + 1 : true }
+    })
+    check(`C ${tag} ${mod} 가운데: 작업 화면(대화창 없음) · 가로 넘침 0 · 둥근 [대화] 44px 이상 · 아래 메뉴 위`, centerOx <= 1 && (await page.locator('main [data-testid="chat-input"]').count()) === 0 && fab.w >= 44 && fab.h >= 44 && fab.aboveNav, { centerOx, fab })
+    await shot(page, `${mod}-screen-${tag}`)
+    await openChat(page)
+    await page.waitForTimeout(450)
     const heroOx = await overflowX(page)
     const sel = await page.getByTestId('chat-client').boundingBox()
     check(`C ${tag} ${mod} 처음: 가로 넘침 0 · 회사 칸 넓게(화면 폭 70% 이상)`, heroOx <= 1 && sel && sel.width >= w * 0.7, { heroOx, sel: sel?.width })
@@ -399,14 +470,16 @@ for (const [w, scale] of [[360, ''], [390, ''], [430, ''], [360, 'extra_large']]
     await page.waitForTimeout(250)
     const geo = await page.evaluate(() => {
       const dock = document.querySelector('[data-testid="chat-dock"]').getBoundingClientRect()
-      const input = document.querySelector('[data-testid="chat-dock"] [data-testid="chat-input"]').getBoundingClientRect()
-      const nav = [...document.querySelectorAll('nav')].map((n) => n.getBoundingClientRect()).filter((r) => r.bottom >= window.innerHeight - 2 && r.top > window.innerHeight / 2)[0]
+      const inputEl = document.querySelector('[data-testid="chat-dock"] [data-testid="chat-input"]')
+      const input = inputEl.getBoundingClientRect()
+      // D-628 대화창은 아래 판 안 — 판이 아래 메뉴를 덮는다. 질문창이 화면 안에 있고 그 자리에 실제로 질문창이 보이는지(무엇에도 안 가림)를 본다
+      const top = document.elementFromPoint(input.left + input.width / 2, input.top + input.height / 2)
       const chips = [...document.querySelectorAll('[data-testid="chat-dock"] [data-testid="chat-starter"]')].map((b) => b.getBoundingClientRect().top)
-      return { dockH: dock.height, inputBottom: input.bottom, navTop: nav ? nav.top : window.innerHeight, rows: new Set(chips.map((t) => Math.round(t))).size, vh: window.innerHeight }
+      return { dockH: dock.height, inputBottom: input.bottom, uncovered: top === inputEl, rows: new Set(chips.map((t) => Math.round(t))).size, vh: window.innerHeight }
     })
     const wide = await page.evaluate(PHONE_DETECT)
     const ox = await overflowX(page)
-    check(`C ${tag} ${mod} 대화: 질문창이 아래 메뉴에 안 가림 · 단추 한 줄 · 아래 묶음 높이 화면의 ${Math.round((geo.dockH / geo.vh) * 100)}%(≤ 30%) · 넘침 0 · 칸보다 넓은 글 0`, geo.inputBottom <= geo.navTop + 1 && geo.rows === 1 && geo.dockH <= geo.vh * 0.3 && ox <= 1 && wide.length === 0, { geo, ox, wide })
+    check(`C ${tag} ${mod} 대화: 질문창이 화면 안 · 아래 메뉴 · 다른 것에 안 가림 · 단추 한 줄 · 아래 묶음 높이 화면의 ${Math.round((geo.dockH / geo.vh) * 100)}%(≤ 30%) · 넘침 0 · 칸보다 넓은 글 0`, geo.inputBottom <= geo.vh && geo.uncovered && geo.rows === 1 && geo.dockH <= geo.vh * 0.3 && ox <= 1 && wide.length === 0, { geo, ox, wide })
     await shot(page, `${mod}-turns-${tag}`)
   }
   await ctx.close()

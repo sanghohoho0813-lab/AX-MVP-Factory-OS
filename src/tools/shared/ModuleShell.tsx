@@ -62,7 +62,7 @@ const GROUP_BAR: Record<NavAccent, string> = {
 }
 
 const CHAT_HOME = new Set(['cert-os'])
-/** 대화창이 첫 화면인 모듈의 목차 첫 줄('인증 한눈에')은 예전 전체 화면(?detail=1)으로 */
+/** 목차 첫 줄('인증 한눈에')은 ?detail=1 로 — 그 주소에서는 오른쪽 대화창이 저절로 열리지 않는다(D-628 가운데 화면은 같다) */
 const detailHref = (tool: ToolDefinition, key: string, href: string) => (CHAT_HOME.has(tool.key) && key === tool.sections?.[0]?.key ? `${href}${href.includes('?') ? '&' : '?'}detail=1` : href)
 
 export interface ModuleShellProps {
@@ -101,8 +101,7 @@ export function ModuleShell({ tool, section, children }: ModuleShellProps) {
   }, [drawer])
 
   if (sections.length <= 1) return <>{children}</>
-  // D-250 대화창이 첫 화면인 모듈 — 목차 · 순서 띠 없이 대화창만([자세히] = ?detail=1 은 예전 그대로)
-  if (CHAT_HOME.has(tool.key) && section === sections[0].key && new URLSearchParams(location.search).get('detail') !== '1') return <>{children}</>
+  // D-628 대화창은 오른쪽 판으로 — 기업인증 첫 주소도 다른 모듈처럼 [목차] · 순서가 있는 작업 화면(D-250 때는 대화창만 그렸다)
 
   const current = sections.find((s) => s.key === section) ?? sections[0]
   const groups: { name: string; items: typeof sections }[] = []

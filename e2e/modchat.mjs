@@ -197,13 +197,19 @@ const dockChars = (p, sel = '[data-testid="side-dock"]') =>
     const q = document.querySelector('[data-testid="chat-q"]')
     const dock = document.querySelector('[data-testid="side-dock"]').getBoundingClientRect()
     const comp = document.querySelector('[data-testid="chat-composer"]').getBoundingClientRect()
+    // 색 값이 oklch 로 나와도 재게 — 한 점을 칠해 RGB 로 읽는다
     const lum = (c) => {
-      const m = /rgba?\((\d+), (\d+), (\d+)/.exec(c)
-      return m ? (Number(m[1]) + Number(m[2]) + Number(m[3])) / 3 : -1
+      const cv = document.createElement('canvas')
+      cv.width = cv.height = 1
+      const g = cv.getContext('2d')
+      g.fillStyle = c
+      g.fillRect(0, 0, 1, 1)
+      const d = g.getImageData(0, 0, 1, 1).data
+      return d[3] === 0 ? -1 : Math.round((d[0] + d[1] + d[2]) / 3)
     }
-    return { area: rgb(area), areaLum: lum(rgb(area)), ans: rgb(ans), q: rgb(q), qLum: lum(rgb(q)), page: rgb(body), bottomGap: Math.round(dock.bottom - comp.bottom), grad: getComputedStyle(area).backgroundImage }
+    return { area: rgb(area), areaLum: lum(rgb(area)), ansLum: lum(rgb(ans)), q: rgb(q), qLum: lum(rgb(q)), pageLum: lum(rgb(body)), bottomGap: Math.round(dock.bottom - comp.bottom), grad: getComputedStyle(area).backgroundImage }
   })
-  check('D3 대화 칸 바탕이 흰 판보다 살짝만 진함(밝기 225~250) · 그라데이션 없음 · 답 카드 흰 판 · 내 질문은 진한 말풍선 · 질문창이 판 맨 아래(60px 안)', look.areaLum >= 225 && look.areaLum < 250 && look.grad === 'none' && look.ans === 'rgb(255, 255, 255)' && look.qLum >= 0 && look.qLum < 140 && look.bottomGap >= 0 && look.bottomGap <= 60, look)
+  check('D3 대화 칸 바탕이 흰 판보다 살짝만 진함(밝기 225~250) · 그라데이션 없음 · 답 카드 흰 판 · 내 질문은 진한 말풍선 · 질문창이 판 맨 아래(60px 안)', look.areaLum >= 225 && look.areaLum < 250 && look.grad === 'none' && look.ansLum === 255 && look.qLum >= 0 && look.qLum < 140 && look.bottomGap >= 0 && look.bottomGap <= 60, look)
   await shot(page, 'pc-policy-answer')
   const action = last.getByTestId('chat-action').first()
   const href = await action.getAttribute('href')
