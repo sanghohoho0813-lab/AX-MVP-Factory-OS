@@ -1033,11 +1033,11 @@ export function ModelRow({
     <section aria-label="모델" className={slim ? 'shrink-0 border-b border-slate-200 bg-white' : 'rounded-(--radius-control) border border-slate-200'} data-testid="ai-assist-model">
       <div className={`flex flex-wrap items-center gap-2 px-3 ${slim ? 'py-1' : 'py-2'}`}>
         <span className="t-sub text-slate-600">쓰는 모델</span>
-        <button type="button" onClick={() => setOpen(!open)} title={slim ? (auto ? '물음은 가장 싼 모델 · 일은 좋은 모델' : isDefault ? '기본 · 가장 쌈' : undefined) : undefined} className="tap t-sub min-w-0 text-left font-semibold break-keep text-slate-900 hover:underline" data-testid="ai-assist-model-label" data-mode={auto ? 'auto' : 'manual'}>
+        <button type="button" onClick={() => setOpen(!open)} title={slim && auto ? '물음은 가장 싼 모델 · 일은 좋은 모델' : undefined} className="tap t-sub min-w-0 text-left font-semibold break-keep text-slate-900 hover:underline" data-testid="ai-assist-model-label" data-mode={auto ? 'auto' : 'manual'}>
           {auto ? '자동' : current}
           {/* 펼치면 바로 아래 '자동' 줄이 같은 말을 한다 — 접혀 있을 때만 뜻을 붙인다 */}
-          {/* D-634 대화 판 머리 아래 한 줄(slim)에서는 뜻을 마우스 설명으로 — 줄이 두 줄로 늘지 않게 */}
-          {slim ? null : auto ? !open && <span className="t-meta ml-1 font-normal text-slate-500">(물음은 가장 싼 모델 · 일은 좋은 모델)</span> : isDefault && <span className="t-meta ml-1 font-normal text-slate-500">(기본 · 가장 쌈)</span>}
+          {/* D-634 대화 판 머리 아래 한 줄(slim)에서는 자동의 긴 뜻만 마우스 설명으로 — 줄이 두 줄로 늘지 않게('기본 · 가장 쌈' 은 짧아 그대로) */}
+          {auto ? !open && !slim && <span className="t-meta ml-1 font-normal text-slate-500">(물음은 가장 싼 모델 · 일은 좋은 모델)</span> : isDefault && <span className="t-meta ml-1 font-normal text-slate-500">(기본 · 가장 쌈)</span>}
         </button>
         <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="tap t-sub ml-auto inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50" data-testid="ai-assist-model-toggle">
           <Settings2 aria-hidden="true" className="size-4" /> {open ? '닫기' : '모델 바꾸기'}
