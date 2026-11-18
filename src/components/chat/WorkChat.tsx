@@ -88,6 +88,8 @@ export interface WorkChatProps {
   dockOnly?: boolean
   /** D-628 붙일 폭이 되면 저절로 열까(dockOnly 가 아닐 때 — 특허 · 벤처 · 기업인증) */
   auto?: boolean
+  /** D-628 닫혀 있을 때 여는 단추(오른쪽 끝 [대화])를 보일까 — 기본 보임. false 면 이미 열린 판에만 그린다 */
+  launcher?: boolean
 }
 
 const uid = (p: string) => `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
@@ -591,7 +593,7 @@ export function WorkChat(p: WorkChatProps) {
           )}
         </div>
       )}
-      <PageChat scope={scope} auto={p.auto !== false}>
+      <PageChat scope={scope} auto={p.auto !== false} launcher={p.launcher !== false}>
         {conversation}
       </PageChat>
     </>

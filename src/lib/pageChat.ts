@@ -138,20 +138,23 @@ export function nextPageChatKey(): number {
   return seq
 }
 
+/** [대화] 탭이 처음부터 이 화면 대화창을 보여 주는 화면인가 — 대화창(chat) · 그 화면의 대화창으로 삼은 AI 도우미(launcher). 아니면 자유 대화가 먼저 */
+const pageFirst = (e: PageChatEntry) => e.kind === 'chat' || e.launcher
+
 /** [대화] 탭이 지금 이 화면 대화창(또는 눌러서 연 AI 도우미)을 보여 주는가 — 아니면 자유 대화 */
 export function pageChatView(s: PageChatState = state): boolean {
   const base = basePageChat(s)
   if (!base) return false
   if (s.explicit !== null && s.entries.some((e) => e.key === s.explicit)) return true
   const flipped = s.flipped.includes(base.scope)
-  return base.launcher ? !flipped : flipped
+  return pageFirst(base) ? !flipped : flipped
 }
 
 const without = (list: readonly string[], scope: string) => (list.includes(scope) ? list.filter((x) => x !== scope) : list)
 const withScope = (list: readonly string[], scope: string) => (list.includes(scope) ? list : [...list, scope])
 /** 이 화면 대화창이 보이게(자유 대화로 바꿔 둔 것을 푼다) */
 function showPage(base: PageChatEntry): readonly string[] {
-  return base.launcher ? without(state.flipped, base.scope) : withScope(state.flipped, base.scope)
+  return pageFirst(base) ? without(state.flipped, base.scope) : withScope(state.flipped, base.scope)
 }
 
 /** 그림 단추 — 이 화면 대화 ↔ 자유 대화 */
@@ -160,7 +163,7 @@ export function togglePageChatView(): void {
   if (!base) return
   // 눌러서 연 AI 도우미가 떠 있으면 그것부터 내린다(자유 대화가 보이게)
   if (state.explicit !== null) {
-    set({ explicit: null, flipped: base.launcher ? withScope(state.flipped, base.scope) : without(state.flipped, base.scope) })
+    set({ explicit: null, flipped: pageFirst(base) ? withScope(state.flipped, base.scope) : without(state.flipped, base.scope) })
     return
   }
   set({ flipped: state.flipped.includes(base.scope) ? without(state.flipped, base.scope) : withScope(state.flipped, base.scope) })
@@ -170,7 +173,7 @@ export function togglePageChatView(): void {
 export function showFreeChat(): void {
   const base = basePageChat()
   if (!base) return
-  set({ explicit: null, flipped: base.launcher ? withScope(state.flipped, base.scope) : without(state.flipped, base.scope) })
+  set({ explicit: null, flipped: pageFirst(base) ? withScope(state.flipped, base.scope) : without(state.flipped, base.scope) })
 }
 
 /** 화면이 자기 대화창을 알린다 — 돌려주는 함수로 뺀다(화면을 떠날 때) */
@@ -249,7 +252,7 @@ export function closeAssistInDock(key: number): void {
   const base = basePageChat()
   // 이 도우미가 곧 그 화면의 대화창(마케팅 유튜브 · 스레드 · 릴스)이면 닫기 = 판 닫기
   if (base && base.key === key && base.launcher) closePageDock()
-  else if (base && base.launcher) set({ explicit: null })
+  else if (base && pageFirst(base)) set({ explicit: null })
   else set({ explicit: null, open: null })
 }
 

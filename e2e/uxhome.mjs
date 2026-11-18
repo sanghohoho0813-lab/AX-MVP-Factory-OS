@@ -18,7 +18,7 @@ import { chromium } from 'playwright'
 import fs from 'node:fs'
 import path from 'node:path'
 import { seedScript } from './seed.mjs'
-import { openTools } from './pageTools.mjs'
+import { openChat, openTools } from './pageTools.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 const SHOTS = process.env.UXHOME_SHOTS ?? ''
@@ -179,11 +179,14 @@ let caseUrl = ''
 /* ---- P 특허 · 벤처 ---- */
 {
   await page.goto(BASE + '/patent-venture', { waitUntil: 'networkidle' })
-  await page.getByTestId('chat-panel').waitFor({ timeout: 10000 })
-  // D-511 회사 고르기 전 — 단계 판 없음 · 대화창이 머리 바로 아래(첫 화면은 대화창만)
-  const headBottom = (await page.getByTestId('chat-head').boundingBox())?.y ?? 0
-  const chatTop = (await page.getByTestId('chat-panel').boundingBox())?.y ?? 9999
-  check('P1 회사 고르기 전 — 단계 판 없음 · 대화창이 머리 바로 아래 · 첫 화면 안', (await page.getByTestId('pv-steps').count()) === 0 && chatTop > headBottom && chatTop < 900, { chatTop, headBottom })
+  await page.getByTestId('pv-steps').waitFor({ timeout: 10000 })
+  // D-628 대화창은 오른쪽 판으로 — 회사 고르기 전 가운데는 머리 + 다섯 단계 도식(머리 바로 아래 · 첫 화면 안) · 가운데에 대화창 없음
+  //       (D-511 때는 대화창이 가운데라 단계 판을 접어 두었다)
+  const headBox = await page.getByTestId('page-head').boundingBox()
+  const headBottom = (headBox?.y ?? 0) + (headBox?.height ?? 0)
+  const stepsTop = (await page.getByTestId('pv-steps').boundingBox())?.y ?? 9999
+  const stepN = await page.getByTestId('pv-steps').locator('li[data-step]').count()
+  check('P1 회사 고르기 전 — 머리 바로 아래 다섯 단계(첫 화면 안) · 가운데에 대화창 없음 · 오른쪽 끝 [대화]', stepN === 5 && stepsTop >= headBottom && stepsTop < 900 && (await page.locator('main [data-testid="chat-panel"], main [data-testid="chat-input"]').count()) === 0 && (await page.getByTestId('page-chat-launch').count()) === 1, { stepsTop, headBottom, stepN })
   await page.goto(BASE + '/patent-venture?client=cli_hansol', { waitUntil: 'networkidle' })
   await page.getByTestId('pv-brief').waitFor({ timeout: 10000 })
   const li = await page.getByTestId('pv-brief-steps').locator('li[data-step]').count()
@@ -197,7 +200,10 @@ let caseUrl = ''
   await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' })
   await page.getByTestId('mk-tabs').waitFor({ timeout: 10000 })
   const t = await page.getByTestId('mk-tabs').innerText()
-  check("G1 마케팅 첫 화면 — 대화창(무엇을 만들까요?) + 목차 두 줄 '살펴보기' · '만들기'(D-511)", t.includes('살펴보기') && t.includes('만들기') && (await page.getByTestId('mk-ask').count()) === 1)
+  // D-628 한 줄 대화창(무엇을 만들까요?)은 오른쪽 판으로 — 가운데는 목차 두 줄, 대화창은 오른쪽 끝 [대화] 를 누르면
+  const askInMain = await page.locator('main [data-testid="mk-ask"]').count()
+  await openChat(page)
+  check("G1 마케팅 첫 화면 — 가운데 목차 두 줄 '살펴보기' · '만들기'(D-511) · 대화창(무엇을 만들까요?)은 오른쪽 판에(D-628)", t.includes('살펴보기') && t.includes('만들기') && askInMain === 0 && (await page.locator('[data-testid="side-dock"] [data-testid="mk-ask"]').count()) === 1 && (await page.getByTestId('mk-ask-input').isVisible()))
   // D-511 1 → 2 → 3 · 키워드 판은 [이번 주 찍을 것] 안
   await page.goto(BASE + '/marketing?view=plan', { waitUntil: 'networkidle' })
   // D-507 첫 화면은 1 → 2 → 3, 한 번에 나오는 형식 넷은 [사용 방법] 안
@@ -239,8 +245,8 @@ let caseUrl = ''
   const screens = [
     ['AI 전략실', '/ai', 'ai', 'ai-summary', 'ai-next', 'case-list-panel', true],
     ['업체 작업실', caseUrl, 'ai', 'snapshot-fields', 'case-next', 'case-purposes', false],
-    // D-511 특허 · 벤처는 대화창이 머리 바로 아래(chatFirst) — 요약 · 지금 할 일은 대화창 아래(휴대폰은 지금 할 일 한 줄이 대화창 위)
-    ['특허 · 벤처', '/patent-venture?client=cli_hansol', 'patent-venture', 'pv-brief', 'pv-next', 'chat-panel', false, true],
+    // D-628 특허 · 벤처 — 대화창이 오른쪽 판으로 가서 다른 화면과 같은 순서(머리 → 요약 → 지금 할 일 → 보조 '주의')
+    ['특허 · 벤처', '/patent-venture?client=cli_hansol', 'patent-venture', 'pv-brief', 'pv-next', 'pv-brief-cautions', false],
     // D-548 영업 보드 요약은 한 줄 칩(SummaryChip — 칩마다 얇은 테두리)이라 '한 판(칸 테두리 0)' 숫자 칸 규칙 밖
     ['영업 보드', '/sales/board', 'sales', 'sales-summary', 'sales-next', 'sales-board-panel', false],
   ]

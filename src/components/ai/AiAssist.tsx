@@ -634,7 +634,10 @@ function AssistPanel({
             {/* D-255 모델을 먼저 — 질문을 누르기 전에 무엇으로 물을지 보이고 바꿀 수 있게(전에는 질문 단추 아래) */}
             <ModelRow status={status} effective={effective} choice={choice} open={settings} setOpen={setSettings} setChoice={setChoice} loadStatus={loadStatus} />
             <section aria-label="무엇을 도와드릴까요" className="flex flex-col gap-2">
-              <p className="t-sub font-semibold text-slate-700">무엇을 도와드릴까요? — 고른 뒤 [이대로 질문하기] 를 누르면 답해요</p>
+              {/* D-628 오른쪽 판 안은 글을 줄인다(D-627 한 번 누를 때 새로 나오는 양) — 자세한 말은 마우스를 올리면 */}
+              <p className="t-sub font-semibold text-slate-700" title={docked ? '고른 뒤 [이대로 질문하기] 를 누르면 답해요' : undefined}>
+                {docked ? '무엇을 도와드릴까요?' : '무엇을 도와드릴까요? — 고른 뒤 [이대로 질문하기] 를 누르면 답해요'}
+              </p>
               <div className={docked ? 'grid gap-2' : 'grid gap-2 sm:grid-cols-2'}>
                 {presets.map((p) => (
                   <button
@@ -645,20 +648,21 @@ function AssistPanel({
                     disabled={!!running}
                     aria-pressed={pending?.preset.id === p.id && !pending.opts.follow}
                     onClick={() => request(p, p.label)}
-                    className={`tap flex min-h-14 min-w-0 items-start gap-2 rounded-(--radius-control) border px-3 py-2.5 text-left disabled:cursor-wait ${pending?.preset.id === p.id && !pending.opts.follow ? 'border-violet-600 bg-violet-100 ring-2 ring-violet-300' : shown?.assistId === p.id ? 'border-violet-500 bg-violet-50' : 'border-violet-200 bg-white hover:bg-violet-50'}`}
+                    title={docked ? p.hint : undefined}
+                    className={`tap flex min-w-0 items-start gap-2 rounded-(--radius-control) border px-3 py-2.5 text-left disabled:cursor-wait ${docked ? 'min-h-11' : 'min-h-14'} ${pending?.preset.id === p.id && !pending.opts.follow ? 'border-violet-600 bg-violet-100 ring-2 ring-violet-300' : shown?.assistId === p.id ? 'border-violet-500 bg-violet-50' : 'border-violet-200 bg-white hover:bg-violet-50'}`}
                   >
                     {running === p.id ? <Loader2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 animate-spin text-violet-700" /> : <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-violet-600" />}
                     <span className="flex min-w-0 flex-col">
                       <span className="t-body font-semibold break-keep text-violet-950">{p.label}</span>
-                      <span className="t-meta break-keep text-slate-600">{p.hint}</span>
+                      {!docked && <span className="t-meta break-keep text-slate-600">{p.hint}</span>}
                     </span>
                   </button>
                 ))}
               </div>
               {/* D-288 직접 물어보기 — 늘 보인다(접지 않음). 기본은 단추와 상관없이 이 화면 자료로 그 질문에만 답 */}
               <div className="flex flex-col gap-2 rounded-(--radius-control) border border-violet-200 bg-violet-50/40 p-3" data-testid="ai-assist-ask-box">
-                <label htmlFor={`ai-ask-${scope}`} className="t-sub font-semibold text-violet-900">
-                  직접 물어보기 — 단추에 없는 것도 이 화면 자료로 답해요
+                <label htmlFor={`ai-ask-${scope}`} className="t-sub font-semibold text-violet-900" title={docked ? '단추에 없는 것도 이 화면 자료로 답해요' : undefined}>
+                  {docked ? '직접 물어보기' : '직접 물어보기 — 단추에 없는 것도 이 화면 자료로 답해요'}
                 </label>
                 <textarea
                   id={`ai-ask-${scope}`}
@@ -797,8 +801,8 @@ function AssistPanel({
                 </ul>
               </section>
             )}
-            <p className="t-meta break-keep text-slate-500">
-              보내는 것: 이 화면의 업체 · 일 · 숫자(사람 이름 · 연락처 · 주민번호 · 계좌는 빼고). AI 답은 틀릴 수 있어요 — 금액 · 날짜는 화면 숫자로 한 번 확인하세요.
+            <p className="t-meta break-keep text-slate-500" title={docked ? '보내는 것: 이 화면의 업체 · 일 · 숫자(사람 이름 · 연락처 · 주민번호 · 계좌는 빼고). AI 답은 틀릴 수 있어요 — 금액 · 날짜는 화면 숫자로 한 번 확인하세요.' : undefined} data-testid="ai-assist-note">
+              {docked ? '이름 · 연락처는 빼고 보내요. 숫자는 한 번 확인하세요.' : '보내는 것: 이 화면의 업체 · 일 · 숫자(사람 이름 · 연락처 · 주민번호 · 계좌는 빼고). AI 답은 틀릴 수 있어요 — 금액 · 날짜는 화면 숫자로 한 번 확인하세요.'}
             </p>
           </div>
   )

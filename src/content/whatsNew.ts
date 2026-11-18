@@ -25,6 +25,12 @@ export const WHATS_NEW_MAX = 10
 
 export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
   {
+    id: 'chat-right',
+    date: '2026-11-18',
+    title: '대화창이 화면 오른쪽으로 갔어요 — 가운데 화면을 보면서 물어봐요',
+    how: 'PC 는 화면 오른쪽에 대화창이 같이 열려요. [대화 시작] 을 누르고 한 줄만 쓰면 답이 오른쪽에 쌓이고, 가운데 화면은 그대로예요. 닫아도 오른쪽 끝 [대화] 로 다시 열려요. 휴대폰은 오른쪽 아래 둥근 [대화] 를 누르세요.',
+  },
+  {
     id: 'ask-follow',
     date: '2026-11-17',
     title: 'AI 도우미에 이어서 물을 수 있어요 — 방금 한 답을 이어받아요',
@@ -94,12 +100,6 @@ export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
     date: '2026-11-11',
     title: '휴대폰 홈 화면에 아이콘으로 넣을 수 있어요',
     how: "이 화면 아래 '휴대폰 홈 화면에 넣는 법' 을 따라 하면 아이콘 한 번으로 열려요.",
-  },
-  {
-    id: 'screen-guide-phone',
-    date: '2026-11-11',
-    title: '휴대폰에서 맨 위 화면 이름을 누르면 그 화면 안내가 떠요',
-    how: '어느 화면에서든 맨 위 이름 옆 ⓘ 를 눌러 보세요 — 무엇을 하는 곳인지 바로 나와요.',
   },
 ]
 

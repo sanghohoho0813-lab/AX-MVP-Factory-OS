@@ -237,6 +237,10 @@ const errors = []
   await page.waitForURL(/\/patent-venture\/write\?/)
   const writeUrl = new URL(page.url())
   check('A13 [견본으로 연습] → 명세서 쓰기(그 회사 · 1단계)', writeUrl.searchParams.get('client') === CLIENT && writeUrl.searchParams.get('step') === 'idea' && !!writeUrl.searchParams.get('draft'), page.url())
+  // D-628 답 단추로 다른 특허 · 벤처 화면에 가도 오른쪽 판은 열린 채 같은 대화
+  await page.getByTestId('chat-turns').waitFor({ timeout: 8000 }).catch(() => {})
+  check('A13b 명세서 쓰기 화면에서도 오른쪽 판이 열린 채 대화 그대로(1개) · 그 화면에 여는 단추는 따로 없음', (await dockOf(page)).chat === 'pv' && (await turns(page)) === 1 && (await page.getByTestId('page-chat-launch').count()) === 0, await dockOf(page))
+  await shot(page, 'pv-write-pc')
   const draftId = writeUrl.searchParams.get('draft')
   await page.goto(`${BASE}/patent-venture?client=${CLIENT}`, { waitUntil: 'networkidle' })
   await page.getByTestId('chat-turns').waitFor()

@@ -1,12 +1,13 @@
 /**
  * D-250 특허 · 벤처 첫 화면 = 대화창(대표 "LLM 채팅창처럼 · 아주 간단하게"). 예전 첫 화면(진행판 · 도구 카드)은 /patent-venture/more([자세히]).
  * D-628 대화창은 오른쪽 판으로 — 가운데는 머리(회사 고르기) · 단계 · 준비 현황 · 다음 할 일 · 이어서 할 회사(작업 화면).
+ *   답 단추로 명세서 쓰기 · 사업계획서 · 진행판으로 가도 판이 열린 채 같은 대화가 따라간다(PvChatDock — 그 화면들이 이미 열린 판에만 그린다).
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FilePen, FileSearch, ListChecks, PenLine } from 'lucide-react'
 import { useToast } from '../../components/ui/toastContext'
-import { WorkChat } from '../../components/chat/WorkChat'
+import { WorkChat, type WorkChatProps } from '../../components/chat/WorkChat'
 import { useToolClient } from '../../tools/shared/toolClientContext'
 import { useModuleBucket } from '../../tools/shared/useModuleBucket'
 import { useAiAssistAccess, useOwnerAiAccess } from '../../auth/ownerAiAccess'
@@ -38,7 +39,8 @@ const ICONS = { status: <ListChecks className="size-5" />, write: <FilePen class
 const TONES: Record<keyof typeof ICONS, FeatureTone> = { status: 'indigo', write: 'amber', check: 'amber', plan: 'amber' }
 
 
-export function PatentVentureChatPage() {
+/** 대화창이 쓰는 자료 · 새 명세서 만들기 — 첫 화면과 다른 특허 · 벤처 화면(PvChatDock)이 같이 쓴다 */
+function usePvChatCore() {
   const drafts = useModuleBucket<DraftRow>('patent-draft', 'draft')
   const works = useModuleBucket<CertWorkRow>('cert-os', 'work')
   const { clientId: urlClient, loadClients } = useToolClient()
@@ -48,8 +50,6 @@ export function PatentVentureChatPage() {
   const navigate = useNavigate()
   const [clients, setClients] = useState<ClientOpsRecord[] | null>(null)
   const today = todayLocalDate()
-  // D-628 '대화창 같이' 를 고른 사람만 오른쪽 대화창이 저절로 열린다(설정 › 내 설정)
-  const autoChat = useChatAutoOpen()
 
   useEffect(() => {
     let alive = true
@@ -77,15 +77,7 @@ export function PatentVentureChatPage() {
   const owner = access !== 'no'
 
   const specAi = useOwnerAiAccess()
-  // PV-1 회사를 고르면 대화를 시작하지 않아도 준비 현황 · 이미 있는 자료 · 다음 할 일 하나가 먼저(규칙 계산)
   const record = clients?.find((c) => c.id === clientId) ?? null
-  const brief = useMemo(
-    () => (clientId && ready ? pvBrief({ clientId, drafts: data.drafts, plans: data.plans, clients: data.clients, factLines: companyFactLines(record).length, docs: importableDocs(record).map((d) => d.label), specAi: specAi === 'yes' }) : null),
-    [clientId, ready, data, record, specAi],
-  )
-  const resumeRows = useMemo(() => (!clientId && ready ? pvBoard({ drafts: data.drafts, plans: data.plans, clients: data.clients }) : []), [clientId, ready, data])
-  // D-282 단계 표시 — 회사를 고르기 전에는 순서만(회사 고르기가 지금 단계). 고르면 준비 현황 카드 안에 같은 다섯 단계
-  const steps = useMemo(() => (ready && !clientId ? pvSteps('', null) : null), [clientId, ready])
   const createDraft = async (draft: SpecDraft, msg: string, auto = false) => {
     try {
       const r = await drafts.save({ clientId, data: { draft } })
@@ -96,6 +88,65 @@ export function PatentVentureChatPage() {
       showToast(`만들지 못했습니다: ${e instanceof Error ? e.message : '연결을 확인하세요'}`)
     }
   }
+  /** 대화창(WorkChat)에 넘길 것 — 가운데 칸(frame) · 저절로 열기만 화면마다 다르다 */
+  const chat: Omit<WorkChatProps, 'frame' | 'auto' | 'launcher'> = {
+    module: 'pv',
+    scope: 'pv',
+    title: '특허 · 벤처',
+    placeholder: '예) 이 회사 명세서 어디까지 썼어?',
+    starters: PV_STARTERS.map((s) => ({ ...s, icon: ICONS[s.id as keyof typeof ICONS], tone: TONES[s.id as keyof typeof ICONS] })),
+    clients,
+    clientId,
+    clientName,
+    needClient: false,
+    // 회사를 바꾸면 그 회사 첫 화면(준비 현황)으로 — 대화는 그 회사 것으로 바뀐다
+    onClient: (id) => navigate(id ? `${PV_HOME}?client=${encodeURIComponent(id)}` : PV_HOME, { replace: true }),
+    ready,
+    ruleAnswer: ({ starter, text }) => {
+      const topic = starter ?? topicOf(text ?? '', PV_TOPICS)
+      return topic ? pvAnswer(topic, data, owner) : pvHelpAnswer(owner)
+    },
+    actionsFor: (text) => {
+      const topic = topicOf(text, PV_TOPICS)
+      return topic ? pvAnswer(topic, data, owner).actions.slice(0, 2) : []
+    },
+    aiContext: (turns) => pvAiContext(data, turns, today),
+    assistId: 'pv.chat',
+    page: 'patent',
+    onAct: (k) => {
+      if (k === 'new-spec') void createDraft(emptyDraft(), '', true)
+      else if (k === 'sample') void createDraft(sampleDraft(), '견본을 열었습니다 — 1~4단계는 채워져 있어요. 단계를 넘기며 보고 5 본문을 직접 써 보세요')
+    },
+    onFile: async (f) => pvFileAnswer(f.name, checkSpec(await parseSpecFile(f.name, new Uint8Array(await f.arrayBuffer())))),
+    fileAccept: '.hwpx,.md,.txt,.markdown',
+    detailHref: `${PV_HOME}/more${clientId ? `?client=${encodeURIComponent(clientId)}` : ''}`,
+    guide: PV_GUIDE,
+    today,
+  }
+  return { drafts, works, clients, clientId, clientName, data, ready, record, specAi, navigate, createDraft, chat }
+}
+
+/**
+ * D-628 특허 · 벤처의 다른 화면(진행판 · 명세서 쓰기 · 사업계획서)에서 — 첫 화면에서 열어 둔 대화창을 그대로 이어 보여 준다.
+ * 여는 단추는 두지 않는다(그 화면들의 오른쪽 고정 칸과 겹치지 않게) — 이미 열린 판에만 그린다(PvChatGate 가 열려 있을 때만 부른다).
+ */
+export function PvChatDock() {
+  const c = usePvChatCore()
+  return <WorkChat {...c.chat} auto={false} launcher={false} />
+}
+
+export function PatentVentureChatPage() {
+  const { drafts, works, clientId, clientName, data, ready, record, specAi, navigate, createDraft, chat } = usePvChatCore()
+  // D-628 '대화창 같이' 를 고른 사람만 오른쪽 대화창이 저절로 열린다(설정 › 내 설정)
+  const autoChat = useChatAutoOpen()
+  // PV-1 회사를 고르면 대화를 시작하지 않아도 준비 현황 · 이미 있는 자료 · 다음 할 일 하나가 먼저(규칙 계산)
+  const brief = useMemo(
+    () => (clientId && ready ? pvBrief({ clientId, drafts: data.drafts, plans: data.plans, clients: data.clients, factLines: companyFactLines(record).length, docs: importableDocs(record).map((d) => d.label), specAi: specAi === 'yes' }) : null),
+    [clientId, ready, data, record, specAi],
+  )
+  const resumeRows = useMemo(() => (!clientId && ready ? pvBoard({ drafts: data.drafts, plans: data.plans, clients: data.clients }) : []), [clientId, ready, data])
+  // D-282 단계 표시 — 회사를 고르기 전에는 순서만(회사 고르기가 지금 단계). 고르면 준비 현황 카드 안에 같은 다섯 단계
+  const steps = useMemo(() => (ready && !clientId ? pvSteps('', null) : null), [clientId, ready])
 
   // UXS-1 화면 문법 — ① 머리(회사 고르기) ② 단계 ③ 다음 할 일 ④ 대화 판 ⑤ 보조(주의 · 이어서 할 회사)
   const doneSteps = brief ? pvSteps(clientId, brief.row, clientName).filter((st) => st.state === 'done').length : 0
@@ -140,10 +191,7 @@ export function PatentVentureChatPage() {
         </p>
       )}
       <WorkChat
-        module="pv"
-        title="특허 · 벤처"
-        placeholder="예) 이 회사 명세서 어디까지 썼어?"
-        starters={PV_STARTERS.map((s) => ({ ...s, icon: ICONS[s.id as keyof typeof ICONS], tone: TONES[s.id as keyof typeof ICONS] }))}
+        {...chat}
         frame={{
           art: 'patent-venture',
           // 회사를 안 골랐으면 한 줄 상태는 없음 — 단계 1 '위에서 회사 고르기' 가 같은 말(첫 화면 글 220자 이하 · qa:chat A4)
@@ -152,34 +200,7 @@ export function PatentVentureChatPage() {
           next,
           aside,
         }}
-        scope="pv"
         auto={autoChat}
-        clients={clients}
-        clientId={clientId}
-        clientName={clientName}
-        needClient={false}
-        onClient={(id) => navigate(id ? `${PV_HOME}?client=${encodeURIComponent(id)}` : PV_HOME, { replace: true })}
-        ready={ready}
-        ruleAnswer={({ starter, text }) => {
-          const topic = starter ?? topicOf(text ?? '', PV_TOPICS)
-          return topic ? pvAnswer(topic, data, owner) : pvHelpAnswer(owner)
-        }}
-        actionsFor={(text) => {
-          const topic = topicOf(text, PV_TOPICS)
-          return topic ? pvAnswer(topic, data, owner).actions.slice(0, 2) : []
-        }}
-        aiContext={(turns) => pvAiContext(data, turns, today)}
-        assistId="pv.chat"
-        page="patent"
-        onAct={(k) => {
-          if (k === 'new-spec') void createDraft(emptyDraft(), '', true)
-          else if (k === 'sample') void createDraft(sampleDraft(), '견본을 열었습니다 — 1~4단계는 채워져 있어요. 단계를 넘기며 보고 5 본문을 직접 써 보세요')
-        }}
-        onFile={async (f) => pvFileAnswer(f.name, checkSpec(await parseSpecFile(f.name, new Uint8Array(await f.arrayBuffer()))))}
-        fileAccept=".hwpx,.md,.txt,.markdown"
-        detailHref={`${PV_HOME}/more${clientId ? `?client=${encodeURIComponent(clientId)}` : ''}`}
-        guide={PV_GUIDE}
-        today={today}
       />
     </div>
   )

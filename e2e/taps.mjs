@@ -115,6 +115,8 @@ await flow(
   async () => {
     await tap(page.getByTestId('mobile-more'))
     await tap(page.getByTestId('more-sheet').locator('[data-testid="more-tile"][data-key="marketing"]'))
+    // D-628 한 줄 대화창(무엇을 만들까요?)은 둥근 [대화] 안 — 한 번 더 누른다(누른 수에 넣는다)
+    await tap(page.getByTestId('page-chat-launch'))
   },
   async () => /\/marketing/.test(page.url()) && (await page.getByTestId('mk-ask-input').waitFor({ timeout: 10000 }).then(() => true).catch(() => false)),
 )

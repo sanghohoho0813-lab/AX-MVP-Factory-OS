@@ -41,15 +41,13 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForURL(/\/tools\/cert-os/)
   await page.waitForTimeout(500)
   check('메뉴: 기업성장 › 기업인증', page.url().includes('/tools/cert-os'))
-  // D-250 첫 화면 = 대화창(회사 칸 '회사 고르기') · 예전 '인증 한눈에'는 [자세히](?detail=1)에 그대로
-  check('업체 없이 열면 대화창 · 회사부터 고른다', (await page.getByTestId('cert-chat-page').count()) === 1 && (await page.getByTestId('chat-client').inputValue()) === '')
-  await page.getByTestId('chat-client').selectOption('cli_hansol')
+  // D-628 대화창은 오른쪽 판으로 — 가운데는 다시 작업 화면: 업체 없이 열면 업체부터 고르고(대화창은 가운데에 없음 · 오른쪽 끝 [대화]),
+  //       고르면 바로 '인증 한눈에'(D-250 때는 대화창 [자세히] 를 한 번 더 눌러야 했다)
+  check('업체 없이 열면 가운데에서 업체부터 고른다 · 가운데에 대화창 없음 · 오른쪽 끝 [대화]', (await page.getByTestId('cert-pick-client').count()) === 1 && (await page.getByTestId('cert-client-select').inputValue()) === '' && (await page.locator('main [data-testid="chat-input"], main [data-testid="chat-hero"]').count()) === 0 && (await page.getByTestId('page-chat-launch').count()) === 1)
+  await page.getByTestId('cert-client-select').selectOption('cli_hansol')
   await page.waitForURL(/client=cli_hansol/)
-  await page.waitForTimeout(500)
-  await page.getByTestId('chat-detail').click()
-  await page.waitForURL(/detail=1/)
   await page.waitForTimeout(800)
-  check('업체 고르면 그 업체로(주소 ?client=) · [자세히] → 1순위 자리 하나', page.url().includes('client=cli_hansol') && (await page.getByTestId('cert-hero').count()) === 1)
+  check('업체 고르면 그 업체로(주소 ?client=) · 바로 인증 한눈에 — 1순위 자리 하나', page.url().includes('client=cli_hansol') && (await page.getByTestId('cert-hero').count()) === 1)
 
   // AX: 첫 화면 — 1순위 하나(또는 '판단하려면 N가지') + 나머지는 한 줄씩. 큰 카드 반복 · 혜택 칩 · 근거 목록 없음
   const heroKey = await page.getByTestId('cert-hero').getAttribute('data-key')

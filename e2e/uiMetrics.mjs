@@ -52,5 +52,6 @@ export const KEY_SCREENS = [
   ['고객 관리', '/ops/clients', '[data-testid="client-card"]'],
   ['서류', '/ops/clients/cli_hansol?tab=docs', '[data-testid="doc-shelf"]'],
   ['일정', '/ops/calendar', '[data-testid="month-calendar"]'],
-  ['마케팅', '/marketing', '[data-testid="mk-ask-input"]'],
+  // D-628 한 줄 대화창(무엇을 만들까요?)은 오른쪽 판으로 갔다 — 가운데 핵심 내용은 살펴보기 · 만들기 목록
+  ['마케팅', '/marketing', '[data-testid="yt-views"]'],
 ]
