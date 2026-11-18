@@ -277,7 +277,7 @@ function MemoView({ record, insights, asks, memo }: { record: ClientOpsRecord; i
       </p>
       {asks.length > 0 && (
         <details className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="talk-memo-asks">
-          <summary className="t-sub cursor-pointer font-semibold text-slate-800">여쭤볼 것 {asks.length}가지 보기</summary>
+          <summary className="sum-chev t-sub cursor-pointer font-semibold text-slate-800">여쭤볼 것 {asks.length}가지 보기</summary>
           <ul className="mt-2 flex flex-col gap-1">
             {asks.map((a) => (
               <li key={a} className="t-sub flex gap-1.5 break-keep text-slate-700">
@@ -327,7 +327,7 @@ function MemoView({ record, insights, asks, memo }: { record: ClientOpsRecord; i
           </Button>
         </div>
         <details className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2">
-          <summary className="t-sub cursor-pointer font-semibold text-slate-800">보낼 글 미리 보기</summary>
+          <summary className="sum-chev t-sub cursor-pointer font-semibold text-slate-800">보낼 글 미리 보기</summary>
           <pre className="t-sub mt-2 font-sans break-keep whitespace-pre-wrap text-slate-800" data-testid="talk-followup-text">
             {followUp}
           </pre>

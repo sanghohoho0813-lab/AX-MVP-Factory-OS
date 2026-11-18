@@ -72,7 +72,8 @@ export function AccountViewPanel({ children, portal = true }: { children?: React
         )}
         {/* D-580 마우스 안내 카드 — 기본은 켬. 익숙해진 사람은 끌 수 있다(사용법 안내 화면에는 그대로) */}
         <AccountViewRow label="마우스 안내 카드" hint="메뉴 · 단추에 마우스를 올리면 뜨는 설명이에요. 꺼도 사용법 안내 화면에서 볼 수 있어요." testId="settings-guide-hover">
-          <div role="radiogroup" aria-label="마우스 안내 카드" className="grid grid-cols-2 gap-1 rounded-(--radius-control) bg-slate-100 p-0.5">
+          {/* D-631 바로 위 '보기 방식' · '보는 화면' 고르개와 같은 모양(흰 바탕 + 얇은 테두리 · 고른 것은 강조색 테두리) — 이 줄만 회색 바탕 판이었다 */}
+          <div role="radiogroup" aria-label="마우스 안내 카드" className="grid h-12 w-full grid-cols-2 items-center rounded-(--radius-control) border border-slate-200 bg-white p-0.5">
             {(
               [
                 [true, '켜기'],
@@ -87,7 +88,7 @@ export function AccountViewPanel({ children, portal = true }: { children?: React
                 onClick={() => setGuideHoverOn(v)}
                 data-testid="settings-guide-hover-option"
                 data-value={v ? 'on' : 'off'}
-                className={`tap min-h-11 rounded-[8px] px-3 text-[0.9375rem] font-semibold ${guideHover === v ? 'bg-white text-slate-900 shadow-(--shadow-card)' : 'text-slate-600'}`}
+                className={`h-full rounded-[calc(var(--radius-control)-2px)] px-3 text-[0.875rem] font-semibold ${guideHover === v ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300 ring-inset' : 'text-slate-600 hover:bg-slate-100'}`}
               >
                 {l}
               </button>

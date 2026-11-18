@@ -578,7 +578,7 @@ function BatchSummary({ batch, fresh, onRetry, opened = [], dupBases = new Set<s
       )}
       {batch.placed && batch.placed.length > 0 && (
         <details open={batch.placed.length <= 8} className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="smart-placed">
-          <summary className="tap t-sub cursor-pointer font-semibold text-slate-800">
+          <summary className="sum-chev tap t-sub cursor-pointer font-semibold text-slate-800">
             서류함에 넣은 곳 {batch.placed.length}개{batch.placed.some((x) => x.other) ? ` · 확인 필요 ${batch.placed.filter((x) => x.other).length}` : ''}
           </summary>
           <ul className="mt-1.5 flex flex-col gap-1">

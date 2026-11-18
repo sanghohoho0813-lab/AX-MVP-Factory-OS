@@ -304,6 +304,8 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
           {null}
         </ArrangeItem>
         <ArrangeItem id="month" label="달력 · 선택한 날" hint="달 이동 · 종류 · 달력 · 그날 할 일 · 업체 일정">
+          {/* D-631 칸 안의 것들 사이를 띄운다 — 종류 칩 줄과 달력이 틈 없이 붙어 있었다(꾸미기 칸은 안의 간격을 주지 않는다) */}
+          <div className="flex flex-col gap-3">
           {/* 월 이동 + 종류 필터 */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             {/* 휴대폰: 달 이동 줄과 건수를 나눈다. 한 줄에 넣으면 건수 칸이 40px 로 눌린다 */}
@@ -681,6 +683,7 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
               </div>
             </>
           )}
+          </div>
         </ArrangeItem>
       </ArrangeArea>
       {quick && (

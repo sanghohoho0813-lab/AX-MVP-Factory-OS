@@ -175,7 +175,7 @@ export function SupportPage() {
             )}
             {errors.length > 0 && (
               <details className="mt-2 border-t border-slate-200 pt-3" data-testid="support-errors">
-                <summary className="t-sub cursor-pointer font-semibold text-slate-700">자동으로 전해진 화면 오류 {errors.length}건</summary>
+                <summary className="sum-chev t-sub cursor-pointer font-semibold text-slate-700">자동으로 전해진 화면 오류 {errors.length}건</summary>
                 <ul className="mt-2 flex flex-col gap-1.5">
                   {errors.map((m) => (
                     <li key={m.id} className="t-sub break-all text-slate-700">

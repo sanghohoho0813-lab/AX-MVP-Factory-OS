@@ -136,7 +136,8 @@ function ModuleStartPanelBody() {
             aria-checked={all === o.k}
             data-mode={o.k}
             onClick={() => writeChatFirst({ all: o.k, clearMods: true })}
-            className={`tap flex min-h-11 flex-col items-start rounded-(--radius-control) border bg-white px-4 py-2.5 text-left ${all === o.k ? 'border-brand-600' : 'border-slate-200 hover:border-brand-400'}`}
+            // D-631 고른 칸 모양을 위아래 '글자 크기' · '화면 색' 고르개와 같게(옅은 바탕 + 강조색 테두리) — 여기만 테두리 색만 달랐다
+            className={`tap flex min-h-11 flex-col items-start rounded-(--radius-control) border px-4 py-2.5 text-left transition-colors ${all === o.k ? 'border-brand-400 bg-brand-50 ring-1 ring-brand-300' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}
           >
             <span className={`text-[0.9375rem] font-semibold ${all === o.k ? 'text-brand-700' : 'text-slate-800'}`}>
               {all === o.k ? '● ' : ''}

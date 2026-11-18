@@ -110,31 +110,37 @@ function SalesCard({ record, today, grants, consultant = false, onOpen, onMove }
   return (
     // D-483 오래 멈춘 카드는 테두리 네 변을 주황으로(왼쪽 선만 긋던 것)
     <li data-testid="sales-card" data-stale={stale ? '' : undefined} className={`relative flex flex-col gap-1.5 overflow-hidden rounded-(--radius-control) border bg-white p-3 ${stale ? EDGE_BOX.warning : 'border-slate-200'}`}>
+      <button type="button" onClick={onOpen} className="tap flex min-w-0 items-center gap-1 text-left">
+        <span className="t-body min-w-0 truncate font-bold text-slate-900 hover:text-brand-700 hover:underline">{record.companyName || '(이름 없음)'}</span>
+        <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />
+      </button>
+      {/*
+        D-631 전화 단추는 이름 줄에서 담당자 · 날짜 두 줄 옆으로 — PC 의 좁은 칸(약 120px)에서 이름 줄에 두면
+        '다움에너지' 가 '다움…' 두 글자로 잘렸다. 이름은 한 줄을 다 쓰고, 단추는 작은 글 두 줄 높이 옆에 선다(카드 높이는 그대로).
+      */}
       <div className="flex min-w-0 items-center gap-1">
-        <button type="button" onClick={onOpen} className="tap flex min-w-0 flex-1 items-center gap-1 text-left">
-          <span className="t-body min-w-0 truncate font-bold text-slate-900 hover:text-brand-700 hover:underline">{record.companyName || '(이름 없음)'}</span>
-          <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />
-        </button>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          {(who || s?.source || consultant) && (
+            <p className="t-meta truncate text-slate-500">
+              {/* D-182: 컨설턴트 고객이면 보드에서도 보이게(대표 화면) */}
+              {consultant && <span data-testid="sales-card-consultant" className="mr-1 rounded-full bg-slate-100 px-1.5 font-semibold text-slate-600">컨설턴트</span>}
+              {[who, s?.source, s?.referrer ? `소개 ${s.referrer}` : ''].filter(Boolean).join(' · ')}
+            </p>
+          )}
+          {s && s.interests.length > 0 && stageReached(record, 'm1done') && (
+            <p className="t-meta truncate text-slate-600">{s.interests.slice(0, 3).join(' · ')}{s.interests.length > 3 ? ` 외 ${s.interests.length - 3}` : ''}</p>
+          )}
+          <p className="t-meta flex flex-wrap items-baseline gap-x-2 text-slate-500">
+            {s?.expectedFee ? <span className="font-semibold text-slate-800 tabular-nums">{formatKrwCompact(s.expectedFee)}</span> : null}
+            {days !== null && <span className={stale ? 'font-semibold text-warning-700' : ''}>{days === 0 ? '오늘 옮김' : `${days}일째`}</span>}
+            {record.nextActionDueDate && (
+              <span className={overdue ? 'font-semibold text-danger-700' : ''}>다음 {record.nextActionDueDate.slice(5).replace('-', '.')}</span>
+            )}
+          </p>
+        </div>
         {/* D-125: 카드에서 바로 전화 */}
         <CallButton phone={record.contactPhone.trim() || record.companyPhone.trim()} name={record.companyName} />
       </div>
-      {(who || s?.source || consultant) && (
-        <p className="t-meta truncate text-slate-500">
-          {/* D-182: 컨설턴트 고객이면 보드에서도 보이게(대표 화면) */}
-          {consultant && <span data-testid="sales-card-consultant" className="mr-1 rounded-full bg-slate-100 px-1.5 font-semibold text-slate-600">컨설턴트</span>}
-          {[who, s?.source, s?.referrer ? `소개 ${s.referrer}` : ''].filter(Boolean).join(' · ')}
-        </p>
-      )}
-      {s && s.interests.length > 0 && stageReached(record, 'm1done') && (
-        <p className="t-meta truncate text-slate-600">{s.interests.slice(0, 3).join(' · ')}{s.interests.length > 3 ? ` 외 ${s.interests.length - 3}` : ''}</p>
-      )}
-      <p className="t-meta flex flex-wrap items-baseline gap-x-2 text-slate-500">
-        {s?.expectedFee ? <span className="font-semibold text-slate-800 tabular-nums">{formatKrwCompact(s.expectedFee)}</span> : null}
-        {days !== null && <span className={stale ? 'font-semibold text-warning-700' : ''}>{days === 0 ? '오늘 옮김' : `${days}일째`}</span>}
-        {record.nextActionDueDate && (
-          <span className={overdue ? 'font-semibold text-danger-700' : ''}>다음 {record.nextActionDueDate.slice(5).replace('-', '.')}</span>
-        )}
-      </p>
       {/* D-143: 연락할 이유 — 이 회사 지역 · 업력 · 업종에 맞는 지원사업 */}
       {grants && grants.fit > 0 && (
         <Link to={`/grants?view=clients&client=${record.id}`} data-testid="sales-card-grants" className="tap t-meta inline-flex items-center gap-1 self-start px-1 font-semibold whitespace-nowrap text-success-700 hover:underline">
@@ -730,7 +736,8 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         ) : (
           <>
             {/* 넓은 화면 — 여섯 칸이 한눈에 */}
-            <div data-testid="sales-board" className="hidden gap-2.5 xl:grid xl:grid-cols-6">
+            {/* D-631 여섯 칸 머리 높이를 같게(두 줄 이름 기준) — '1차 미팅 예정' 처럼 두 줄이 되는 칸만 머리가 커서 카드 시작 줄이 칸마다 달랐다 */}
+            <div data-testid="sales-board" className="hidden gap-2.5 xl:grid xl:grid-cols-6 [&_[data-stage-head]]:min-h-[3.75rem] [&_[data-stage-head]]:justify-center">
               {SALES_FLOW_STAGES.map((s) => column(s, groups[s]))}
             </div>
             <div className="hidden gap-2.5 xl:grid xl:grid-cols-2">

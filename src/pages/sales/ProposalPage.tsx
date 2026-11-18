@@ -340,7 +340,7 @@ function ProposalWork({
         </div>
         {/* D-167: 추천 1 · 2 · 3 을 어떻게 골랐는지 — 대표: "어떤 기준으로 들어간지 모르겠다" */}
         <details data-testid="recommend-basis" className="t-sub rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">
-          <summary className="tap cursor-pointer font-semibold text-slate-700">추천 기준 보기</summary>
+          <summary className="sum-chev tap cursor-pointer font-semibold text-slate-700">추천 기준 보기</summary>
           <ul className="mt-1.5 flex list-disc flex-col gap-0.5 pl-5 break-keep">
             <li>미팅에서 확인한 <b>관심사</b>와 맞는 주제 +15점</li>
             <li>고민 · 메모 · 업종에 나온 <b>낱말</b>(가지급금 · 승계 · 연구소 …) +10점</li>

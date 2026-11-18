@@ -9,7 +9,7 @@
  */
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Route } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Route } from 'lucide-react'
 import type { FlowPosition, FlowStep } from '../../content/flowSteps'
 
 interface GoProps {
@@ -243,21 +243,15 @@ export function StepGuideInline({ pos, onGo, hrefOf, className = '' }: GoProps &
   )
 }
 
-/** 화면 끝 — 다 봤으면 다음 단계로(위로 다시 올라가지 않게). compact(D-627) — 설명 문장 없이 단추 하나(설명은 마우스를 올리면) */
-export function StepNext({ pos, onGo, hrefOf, className = '', compact = false }: GoProps & { pos: FlowPosition; className?: string; compact?: boolean }) {
+/**
+ * 화면 끝 — 다 봤으면 다음 단계로(위로 다시 올라가지 않게). 설명 문장 없이 단추 하나(D-627 — 설명은 마우스를 올리면 · 단계 안내 펼침에).
+ * D-631 문장 앞에 있던 화살표(→)는 문장이 빠진 뒤 혼자 남아 있었다 — 뺐다(단추 안에 › 가 있다). compact 는 예전 이름 그대로 받기만 한다(두 모양이 같아졌다).
+ */
+export function StepNext({ pos, onGo, hrefOf, className = '' }: GoProps & { pos: FlowPosition; className?: string; compact?: boolean }) {
   const { next, index } = pos
   if (index < 0 || !next) return null
-  if (compact) {
-    return (
-      <section aria-label="다음 단계" data-testid="step-next" title={`다음 단계 · ${next.label} — ${next.why}`} className={`no-print flex justify-end ${className}`}>
-        <GoButton step={next} dir="next" onGo={onGo} hrefOf={hrefOf} testId="step-next-bottom" after={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
-      </section>
-    )
-  }
   return (
-    // D-627 글자 수 한도 — 화면 끝은 단추 하나([다음: ○○]). 무엇을 하는 단계인지는 마우스를 올리면(title) · 단계 안내 펼침에
-    <section aria-label="다음 단계" data-testid="step-next" title={`다음 단계 · ${next.label} — ${next.why}`} className={`no-print flex items-center justify-end gap-2 ${className}`}>
-      <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-brand-600" />
+    <section aria-label="다음 단계" data-testid="step-next" title={`다음 단계 · ${next.label} — ${next.why}`} className={`no-print flex justify-end ${className}`}>
       <GoButton step={next} dir="next" onGo={onGo} hrefOf={hrefOf} testId="step-next-bottom" after={() => window.scrollTo({ top: 0, behavior: 'smooth' })} />
     </section>
   )

@@ -273,7 +273,7 @@ export function BulkClientPasteSheet({
                 )}
                 {skips.length > 0 && (
                   <details className="t-sub text-slate-800" data-testid="bulk-paste-skips">
-                    <summary className="min-h-10 cursor-pointer py-2 font-semibold">건너뛰는 곳 {skips.length} 보기</summary>
+                    <summary className="sum-chev min-h-10 cursor-pointer py-2 font-semibold">건너뛰는 곳 {skips.length} 보기</summary>
                     <ul className="flex flex-col gap-1 pb-1 pl-1">
                       {skips.slice(0, 30).map((s, i) => (
                         <li key={i} className="break-keep">

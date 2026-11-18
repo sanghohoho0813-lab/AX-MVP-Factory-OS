@@ -5,6 +5,7 @@
  * 글은 content/homeScreenHowTo(규칙 글 — AI 아님). 펼친 것을 기억하지 않는다(저장하는 꾸미기 이름을 늘리지 않는다).
  */
 import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { HOME_HOWTO, HOME_HOWTO_NOTE, type HomeHowToKey } from '../../content/homeScreenHowTo'
 import { InAppBrowserNotice } from './InAppBrowserNotice'
 
@@ -23,9 +24,13 @@ export function AddToHomeHowTo({ testId = 'home-howto' }: { testId?: string }) {
   const [picked, setPicked] = useState<HomeHowToKey>(guessDevice)
   const cur = HOME_HOWTO.find((h) => h.key === picked) ?? HOME_HOWTO[0]
   return (
-    <details className="rounded-(--radius-panel) border border-slate-200 bg-white" data-testid={testId}>
-      <summary className="t-body flex min-h-12 cursor-pointer flex-wrap items-center gap-x-2 rounded-(--radius-panel) px-4 py-2.5 font-bold break-keep text-slate-900 hover:bg-slate-50" data-testid={`${testId}-toggle`} data-guide="fn-home-howto">
-        매일 쓰려면 — <span className="font-semibold text-brand-700">휴대폰 홈 화면에 넣는 법</span>
+    <details className="group rounded-(--radius-panel) border border-slate-200 bg-white" data-testid={testId}>
+      {/* D-631 위 메뉴 줄과 같은 높이 · 같은 꺾쇠 — 꺾쇠가 없어 누르는 줄인지 알기 어려웠다 */}
+      <summary className="t-body flex min-h-14 cursor-pointer items-center gap-3 rounded-(--radius-panel) px-4 py-2.5 font-bold break-keep text-slate-900 hover:bg-slate-50" data-testid={`${testId}-toggle`} data-guide="fn-home-howto">
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2">
+          매일 쓰려면 — <span className="font-semibold text-brand-700">휴대폰 홈 화면에 넣는 법</span>
+        </span>
+        <ChevronDown aria-hidden="true" className="size-5 shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
       </summary>
       <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-4">
         {/* D-594 카카오톡 안에서는 홈 화면에 넣을 수 없다 — 먼저 바깥 브라우저로 */}

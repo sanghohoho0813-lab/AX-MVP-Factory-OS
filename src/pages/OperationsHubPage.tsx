@@ -1343,7 +1343,8 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                     <button
                       type="button"
                       onClick={() => setShowAllAlerts(true)}
-                      className="self-start rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-[0.9375rem] font-medium text-slate-600 hover:bg-slate-50"
+                      // D-631 다른 [n개 더 보기] 와 같은 모양(굵은 글 · 누르는 높이) — 여기만 회색 테두리 단추였다
+                      className="tap t-sub self-start rounded-(--radius-control) px-3 py-2 font-semibold text-brand-700 hover:bg-brand-50"
                     >
                       {visibleAlerts.length - shownAlerts.length}건 더 보기
                     </button>
