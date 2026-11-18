@@ -46,12 +46,15 @@ function MetricRow({ m }: { m: KpiMetric }) {
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="tap flex min-h-11 w-full items-center gap-3 py-2 text-left hover:bg-slate-50"
+        // D-631 좁은 화면 · 큰 글자에서는 값 묶음을 아랫줄로 — 값이 길면 이름 칸이 16px 로 눌려 한 글자씩 세로로 흘렀다(360px · 매우 크게)
+        className="tap flex min-h-11 w-full flex-wrap items-center gap-x-3 gap-y-1 py-2 text-left hover:bg-slate-50"
       >
-        <span className="t-body min-w-0 flex-1 break-keep text-slate-800">{m.label}</span>
-        <span className={`t-body shrink-0 font-semibold tabular-nums ${m.value === null ? 'text-slate-400' : 'text-slate-900'}`}>{m.value ?? '—'}</span>
-        <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[m.status]}`} title={KPI_STATUS_LABEL[m.status]} aria-label={KPI_STATUS_LABEL[m.status]} />
-        <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <span className="t-body min-w-0 flex-[1_1_9rem] break-keep text-slate-800">{m.label}</span>
+        <span className="ml-auto flex shrink-0 items-center gap-3">
+          <span className={`t-body font-semibold tabular-nums ${m.value === null ? 'text-slate-400' : 'text-slate-900'}`}>{m.value ?? '—'}</span>
+          <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[m.status]}`} title={KPI_STATUS_LABEL[m.status]} aria-label={KPI_STATUS_LABEL[m.status]} />
+          <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </span>
       </button>
       {open && (
         <div className="pb-3">
