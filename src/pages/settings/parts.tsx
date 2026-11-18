@@ -23,7 +23,7 @@ import { downloadLocalBackup } from '../../services/dataImport/localBackup'
 import { useStoreVersion } from '../../lib/useStoreVersion'
 import { isAdvancedVisible, setFeatureVisibility } from '../../lib/featureVisibility'
 import { brand } from '../../brand/brand.config'
-import { CHAT_FIRST_EVENT, CHAT_FIRST_KEYS, CHAT_FIRST_LABEL, readChatFirst, writeChatFirst, type ChatFirstMode } from '../../services/workChat/chatFirst'
+import { CHAT_FIRST_EVENT, CHAT_FIRST_KEYS, CHAT_FIRST_LABEL, CHAT_FIRST_MODE_LABEL, readChatFirst, writeChatFirst, type ChatFirstMode } from '../../services/workChat/chatFirst'
 
 export type TabKey = 'me' | 'workspace' | 'data' | 'system'
 
@@ -97,7 +97,8 @@ export function TextScalePanel() {
 
 /**
  * D-552 모듈 첫 화면 — 메뉴로 들어가면 대화창부터 / 예전 화면(바로 화면) 바로.
- * 전체를 고르면 모듈마다 고른 것은 비워 전체를 따른다(모듈 대화창 아래 '처음에 무엇을 보여 줄까요?' 와 같은 값).
+ * D-628 대화창은 오른쪽 판으로 갔다 — 같은 값이 이제 '오른쪽 대화창을 같이 열까 / 화면만 볼까' 를 정한다(저장 값 · 칸 이름은 그대로).
+ * 전체를 고르면 모듈마다 고른 것은 비워 전체를 따른다(모듈 대화창 안 '이 화면을 열면' 과 같은 값).
  */
 /** D-563 외부 구독 고객 계정에는 전문 모듈이 없다 — 이 칸을 그리지 않는다(대표 · 내부 팀장은 그대로) */
 export function ModuleStartPanel() {
@@ -119,15 +120,15 @@ function ModuleStartPanelBody() {
   const all: ChatFirstMode = prefs.all ?? 'chat'
   const own = CHAT_FIRST_KEYS.filter((k) => prefs.mods?.[k] && prefs.mods[k] !== all)
   const opts: { k: ChatFirstMode; label: string; sub: string }[] = [
-    { k: 'chat', label: '대화창부터', sub: '물어보면 그 업체 판정 · 숫자로 답해요' },
-    { k: 'direct', label: '바로 화면', sub: '예전처럼 목차 · 입력 칸이 바로 보여요' },
+    { k: 'chat', label: CHAT_FIRST_MODE_LABEL.chat, sub: '화면 오른쪽에 대화창이 같이 열려요' },
+    { k: 'direct', label: CHAT_FIRST_MODE_LABEL.direct, sub: '대화창은 오른쪽 끝 [대화] 를 누를 때만 열려요' },
   ]
   return (
-    <Panel title="모듈 첫 화면" fold={{ id: 'settings.modstart', summary: all === 'chat' ? '대화창부터' : '바로 화면' }}>
+    <Panel title="오른쪽 대화창" fold={{ id: 'settings.modstart', summary: CHAT_FIRST_MODE_LABEL[all] }}>
       <p className="text-[0.875rem] break-keep text-slate-600">
-        정책자금 · 고용지원금 · 연구소 · 창업감면 · 세금 계산기 · 지원사업 · 크레탑 · 홍보 글 · 홈페이지를 메뉴로 열 때 처음 보이는 화면이에요. 어느 쪽이든 화면 위 [대화로 묻기] · [바로 화면] 으로 바로 오갈 수 있어요.
+        정책자금 · 고용지원금 · 연구소 · 창업감면 · 세금 계산기 · 지원사업 · 크레탑 · 홍보 글 · 홈페이지 · 특허 · 벤처 · 기업인증 · 마케팅을 메뉴로 열 때, 가운데 작업 화면 옆에 대화창을 같이 열지 골라요(PC 넓은 화면). 어느 쪽이든 오른쪽 끝 [대화] 로 언제든 열고 닫아요.
       </p>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="모듈 첫 화면" data-testid="settings-chatfirst">
+      <div className="mt-3 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="오른쪽 대화창" data-testid="settings-chatfirst">
         {opts.map((o) => (
           <button
             key={o.k}
@@ -148,7 +149,7 @@ function ModuleStartPanelBody() {
       </div>
       {own.length > 0 && (
         <p className="mt-2 text-[0.875rem] break-keep text-slate-600" data-testid="settings-chatfirst-own">
-          따로 고른 곳 {own.length}곳 — {own.map((k) => `${CHAT_FIRST_LABEL[k]}(${prefs.mods?.[k] === 'chat' ? '대화창부터' : '바로 화면'})`).join(' · ')}. 위에서 고르면 모두 같게 바뀌어요.
+          따로 고른 곳 {own.length}곳 — {own.map((k) => `${CHAT_FIRST_LABEL[k]}(${CHAT_FIRST_MODE_LABEL[prefs.mods?.[k] === 'chat' ? 'chat' : 'direct']})`).join(' · ')}. 위에서 고르면 모두 같게 바뀌어요.
         </p>
       )}
     </Panel>

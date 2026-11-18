@@ -19,7 +19,8 @@ import { createPortal } from 'react-dom'
 import { ArrowUpRight, Globe, PanelRight, PanelsLeftRight, Search, Sparkles, X } from 'lucide-react'
 import { inFrame } from '../../lib/deviceView'
 import { useCustomerAudience } from '../../config/customerAudience'
-import { closeDock, openDock, useDock } from '../../lib/sideDock'
+import { openDock, useDock } from '../../lib/sideDock'
+import { closePageDock, usePageChat } from '../../lib/pageChat'
 import { CORNER_GAP, SIDE_SERVICES, SIDE_SITES, SIDE_WIDTHS, closeSideAi, cornerSpot, focusSideAi, openOsLeft, openSideAddress, openSideAi, setSidePrefs, useSideAi, type SideService, type SideWidth } from '../../lib/sideAi'
 import { fetchAssistStatus, type ProviderId } from '../../services/aiAssist/client'
 import { allowedProviders, isCheapOnly, readChoice, saveChoice } from '../../services/aiAssist/store'
@@ -53,6 +54,8 @@ export function SideAiButton() {
   const customer = useCustomerAudience()
   const s = useSideAi()
   const dock = useDock()
+  // D-628 판은 이 화면 대화창 때문에 열려 있을 수도 있다 — 자리 재기 · [오른쪽 판 닫기] 는 지금 그려져 있는지를 본다
+  const dockShown = usePageChat().dockShown
   const [open, setOpen] = useState(false)
   const [at, setAt] = useState<CSSProperties>({})
   const [corner, setCorner] = useState<{ spot: 'margin' | 'inline'; left: number; top: number }>({ spot: 'inline', left: 0, top: 0 })
@@ -109,7 +112,7 @@ export function SideAiButton() {
   }, [])
   useLayoutEffect(() => {
     remeasure()
-  }, [remeasure, label, s.reserve, dock.open, dock.width])
+  }, [remeasure, label, s.reserve, dock.open, dockShown, dock.width])
   useEffect(() => {
     const main = document.querySelector('main')
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => remeasure())
@@ -126,7 +129,7 @@ export function SideAiButton() {
   // 판이 열린 채 옆 창 · 오른쪽 판 · 자리가 바뀌면 판도 단추를 따라간다(옆 창 밑에 깔리지 않게)
   useLayoutEffect(() => {
     if (open) placePanel()
-  }, [open, placePanel, corner, s.reserve, dock.open, dock.width])
+  }, [open, placePanel, corner, s.reserve, dock.open, dockShown, dock.width])
   useEffect(() => {
     if (!open) return
     const away = (e: PointerEvent) => {
@@ -238,8 +241,8 @@ export function SideAiButton() {
                 </>
               )}
             </div>
-            {dock.open && (
-              <button type="button" onClick={() => closeDock()} className="tap t-meta self-start font-semibold text-violet-800 underline underline-offset-2" data-testid="side-ai-dock-close">
+            {dockShown && (
+              <button type="button" onClick={() => closePageDock()} className="tap t-meta self-start font-semibold text-violet-800 underline underline-offset-2" data-testid="side-ai-dock-close">
                 오른쪽 판 닫기
               </button>
             )}

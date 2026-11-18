@@ -7,13 +7,18 @@
  * 놓는 법(dockLayout): 본문이 768px 이상 남으면 옆에 붙이고(본문이 비킨다) · 좁으면 본문 위에 덮어 띄운다 · 1024 아래는 없음.
  * D-261 머리줄(시각 · 찾기 · 알림) 아래부터 — 머리줄은 그대로 다 보이고 본문 칸 안에만 뜬다.
  * 폭은 왼쪽 경계선을 끌어서(320~720) · 키보드 ←/→ · 두 번 누르면 처음 폭. 보기 무대(iframe) 안에서는 그리지 않는다.
+ *
+ * D-628 [대화] = 이 화면의 대화창(모듈 · 특허 · 벤처 · 기업인증 · 마케팅 · AI 도우미)이 있으면 그것, 없으면 예전 AI 대화(자유 대화).
+ *   대화창이 있는 화면에서는 붙일 폭이 되면 저절로 열린다(닫으면 기억 · 오른쪽 끝 [대화] 로 다시). 대화 칸은 바탕을 살짝 진하게.
+ *   외부 구독 고객은 이 화면 대화창만(자유 대화 · 웹 탭 없음 — D-617 그대로).
  */
 import { useCustomerAudience } from '../../config/customerAudience'
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import { ArrowUpRight, Copy, Globe, Loader2, MessageCircle, RotateCcw, SendHorizontal, Sparkles, Trash2, X } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { ArrowUpRight, Copy, Globe, Loader2, MessageCircle, MessagesSquare, RotateCcw, SendHorizontal, Sparkles, Trash2, X } from 'lucide-react'
 import { inFrame } from '../../lib/deviceView'
 import { navPx, useNavSize } from '../../lib/navWidth'
-import { DOCK_MAX, DOCK_MIN, GOOGLE_FRAME_HOME, canFrame, closeDock, dockLayout, frameUrlOf, setDock, useDock, type DockTab, type DockTurn } from '../../lib/sideDock'
+import { DOCK_MAX, DOCK_MIN, GOOGLE_FRAME_HOME, canFrame, dockLayout, frameUrlOf, setDock, useDock, type DockTab, type DockTurn } from '../../lib/sideDock'
+import { CHAT_TINT, autoOpenPageChat, basePageChat, closePageDock, setPageChatEnv, setPageChatGeneric, setPageChatSlot, usePageChat, type PageChatMode } from '../../lib/pageChat'
 import { SIDE_SITES, addressLabel, addressToUrl, openInSide, useSideAi } from '../../lib/sideAi'
 import { assistOn, useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { askDock, dockTurns, setDockTurns, syncDockChat, useDockChat } from '../../services/aiAssist/dockChat'
@@ -108,7 +113,7 @@ function ChatTab() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2">
+      <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2">
         <ModelPicker popover className="min-w-0 flex-1" testId="dock-model" />
         {turns.length > 0 && (
           <button type="button" onClick={clear} className="tap flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100" aria-label="대화 지우기" title="대화 지우기" data-testid="dock-chat-clear">
@@ -143,7 +148,7 @@ function ChatTab() {
         )}
         {turns.map((t, i) => (
           <li key={t.id} ref={i === turns.length - 1 ? endRef : undefined} className="flex min-w-0 flex-col gap-1.5" data-testid="dock-turn" data-status={t.status}>
-            <p className="t-sub ml-6 self-end rounded-(--radius-control) bg-slate-100 px-3 py-2 break-keep whitespace-pre-wrap text-slate-900 [overflow-wrap:anywhere]">{t.q}</p>
+            <p className="t-sub ml-6 self-end rounded-2xl rounded-br-md bg-brand-600 px-3 py-2 break-keep whitespace-pre-wrap text-white [overflow-wrap:anywhere]">{t.q}</p>
             {t.status === 'pending' && (
               <p className="t-sub flex items-center gap-1.5 text-slate-500" data-testid="dock-pending">
                 <Loader2 aria-hidden="true" className="size-4 animate-spin" /> 답을 쓰는 중…
@@ -324,12 +329,13 @@ function WebTab({ url }: { url: string }) {
 /* ------------------------------------------------------------------ */
 
 const TABS: { id: DockTab; label: string; icon: typeof Sparkles }[] = [
-  { id: 'chat', label: 'AI 대화', icon: Sparkles },
+  { id: 'chat', label: '대화', icon: MessageCircle },
   { id: 'web', label: '웹 · Google', icon: Globe },
 ]
 
 export function SideDock() {
   const dock = useDock()
+  const pc = usePageChat()
   const nav = useNavSize()
   const vw = useViewport()
   // D-254 옆 창(팝업)이 오른쪽을 덮고 있으면 그 왼쪽에 붙인다
@@ -337,12 +343,31 @@ export function SideDock() {
   const navW = navPx(nav) ?? (vw >= 1280 ? 288 : 256)
   const lay = dockLayout(vw - sideReserve, navW, dock.width)
   // D-617 외부 구독 고객 — 여는 단추([ChatGPT 옆에 띄우기])가 없다. 같은 브라우저에 열어 둔 판이 남아 있어도 그리지 않는다
+  //       (D-628 이 화면 대화창이 있을 때만 그 대화창을 띄운다 — 자유 대화 · 웹 탭은 그대로 없음)
   const customer = useCustomerAudience()
-  const shown = dock.open && lay.mode !== 'none' && !inFrame() && !customer
+  // D-628 이 화면의 대화창 — 있으면 [대화] 탭이 그것을 보여 준다
+  const base = basePageChat(pc)
+  // 보기 무대(iframe) 안은 판이 없다 — 그 안의 대화창은 휴대폰처럼 아래 판으로
+  const mode: PageChatMode = inFrame() ? 'none' : lay.mode
+  const wantPage = !!base && pc.open === base.scope
+  const shown = mode !== 'none' && (wantPage || (dock.open && !customer))
+  const tab: DockTab = customer ? 'chat' : dock.tab
+  const pageView = !!base && !pc.generic
   const [dragging, setDragging] = useState(false)
   const drag = useRef<{ x: number; w: number; raf: number; next: number } | null>(null)
   const [webSeen, setWebSeen] = useState(dock.tab === 'web')
   if (dock.tab === 'web' && !webSeen) setWebSeen(true)
+
+  // 놓는 법 · 지금 그려져 있는지를 알린다 — 여는 단추([대화]) · AI 도우미가 이 값을 본다
+  useLayoutEffect(() => {
+    setPageChatEnv(mode, shown)
+  }, [mode, shown])
+  useEffect(() => () => setPageChatEnv('none', false), [])
+  // D-628 대화창이 있는 화면 — 본문 옆에 붙일 폭이 되면 저절로 연다(닫아 둔 것을 기억하면 열지 않는다 · 좁은 PC 는 [대화] 를 눌러야)
+  const autoScope = base?.auto ? base.scope : null
+  useEffect(() => {
+    if (autoScope && mode === 'dock' && !pc.closed) autoOpenPageChat(autoScope)
+  }, [autoScope, mode, pc.closed])
 
   // 본문이 판만큼 비키게(옆에 붙일 때만) — 바깥 부품은 CSS 변수만 읽는다
   // 맨 위로 단추 · 알림은 덮어 띄울 때도 판 왼쪽으로(--dock-float) — 판 밑에 숨지 않게
@@ -405,7 +430,8 @@ export function SideDock() {
       style={{ width: lay.width, right: sideReserve }}
       data-testid="side-dock"
       data-mode={lay.mode}
-      data-tab={dock.tab}
+      data-tab={tab}
+      data-page-chat={pageView ? base.scope : ''}
     >
       <div
         role="separator"
@@ -429,34 +455,60 @@ export function SideDock() {
       {/* 끄는 동안 판 안 iframe 이 마우스를 먹지 않게 */}
       {dragging && <div aria-hidden="true" className="fixed inset-0 z-20 cursor-col-resize" />}
       <div className="flex h-14 shrink-0 items-center gap-1 border-b border-slate-200 px-2">
-        <div role="tablist" aria-label="오른쪽 판" className="flex min-w-0 flex-1 gap-1">
-          {TABS.map((t) => {
-            const Icon = t.icon
-            const on = dock.tab === t.id
-            return (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                aria-selected={on}
-                onClick={() => setDock({ tab: t.id })}
-                className={`tap t-sub inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-(--radius-control) px-3 font-semibold ${on ? 'bg-violet-600 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
-                data-testid="dock-tab"
-                data-id={t.id}
-              >
-                <Icon aria-hidden="true" className="size-4 shrink-0" /> <span className="truncate">{t.label}</span>
-              </button>
-            )
-          })}
-        </div>
-        <button type="button" onClick={closeDock} className="tap flex size-11 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100" aria-label="오른쪽 판 닫기" title="닫기" data-testid="dock-close">
+        {customer ? (
+          <p className="t-body flex min-w-0 flex-1 items-center gap-1.5 px-2 font-bold text-slate-900">
+            <MessageCircle aria-hidden="true" className="size-4 shrink-0 text-brand-600" /> 대화
+          </p>
+        ) : (
+          <div role="tablist" aria-label="오른쪽 판" className="flex min-w-0 flex-1 gap-1">
+            {TABS.map((t) => {
+              const Icon = t.icon
+              const on = tab === t.id
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => setDock({ tab: t.id })}
+                  // D-628 대화 탭은 테마색(보라는 AI 단추만) · 웹은 예전 그대로
+                  className={`tap t-sub inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-(--radius-control) px-3 font-semibold ${on ? (t.id === 'chat' ? 'bg-brand-600 text-white' : 'bg-violet-600 text-white') : 'text-slate-700 hover:bg-slate-100'}`}
+                  data-testid="dock-tab"
+                  data-id={t.id}
+                >
+                  <Icon aria-hidden="true" className="size-4 shrink-0" /> <span className="truncate">{t.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+        {/* D-628 이 화면 대화창 ↔ 자유 대화(화면 자료 없이 무엇이든 묻는 AI) — 대화창이 있는 화면에서만 · 그림 단추 하나 */}
+        {!customer && base && tab === 'chat' && (
+          <button
+            type="button"
+            onClick={() => setPageChatGeneric(!pc.generic)}
+            aria-pressed={pc.generic}
+            aria-label={pc.generic ? '이 화면 대화로 돌아가기' : '자유 대화로 바꾸기'}
+            title={pc.generic ? '이 화면 대화로 돌아가기' : '자유 대화 — 화면과 상관없이 무엇이든 묻기'}
+            className={`tap flex size-11 shrink-0 items-center justify-center rounded-(--radius-control) ${pc.generic ? 'bg-violet-100 text-violet-800' : 'text-slate-500 hover:bg-slate-100'}`}
+            data-testid="dock-chat-switch"
+            data-guide="fn-dock-free"
+          >
+            <MessagesSquare aria-hidden="true" className="size-5" />
+          </button>
+        )}
+        <button type="button" onClick={closePageDock} className="tap flex size-11 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100" aria-label="오른쪽 판 닫기" title="닫기" data-testid="dock-close">
           <X aria-hidden="true" className="size-5" />
         </button>
       </div>
-      {dock.tab === 'chat' && <ChatTab />}
+      {/* D-628 대화 칸 — 바탕을 살짝 진하게(대화라고 보이게). 이 화면 대화창은 화면이 이 자리(slot)로 그려 보낸다 */}
+      <div className={tab === 'chat' ? `flex min-h-0 flex-1 flex-col ${CHAT_TINT}` : 'hidden'} data-testid="dock-chat-area">
+        {base && <div ref={setPageChatSlot} className={pageView ? 'flex min-h-0 flex-1 flex-col' : 'hidden'} data-testid="page-chat-slot" />}
+        {!pageView && !customer && <ChatTab />}
+      </div>
       {/* 웹은 한 번 연 뒤로는 숨기기만 — 대화로 갔다 와도 보던 쪽이 처음부터 다시 열리지 않게 */}
-      {webSeen && (
-        <div className={dock.tab === 'web' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
+      {webSeen && !customer && (
+        <div className={tab === 'web' ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
           <WebTab url={dock.webUrl} />
         </div>
       )}

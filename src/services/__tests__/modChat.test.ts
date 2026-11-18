@@ -175,7 +175,7 @@ const ctx = JSON.stringify(modAiContext(pf, data(A), []))
 check('A16 AI 자료 — 회사 · OS 판정 · 상황 예시만, 대표 이름 · 전화 · 사업자번호 0', ctx.includes('한빛정밀(주)') && ctx.includes('가능성 높음') && ctx.includes('운전자금 필요') && !ctx.includes('김대표') && !ctx.includes('010-2345') && !ctx.includes('123-45-67890'))
 const ctxAll = JSON.stringify(modAiContext(pf, data(null), []))
 check('A17 업체 안 고르면 고객 전체 판정 한 줄씩(개인정보 0)', ctxAll.includes('두리식품') && ctxAll.includes('새봄디자인') && !ctxAll.includes('010-'))
-check('A18 사용 방법 4단계 — 직접 눌러서 하기 · 바로 화면 고르기 안내 포함', MOD_CHAT.tax && CHAT_FIRST_KEYS.every((k) => { const g = modGuide(MOD_CHAT[k]); return g.length === 4 && g[3].body.includes('바로 화면') }))
+check('A18 사용 방법 4단계 — 직접 눌러서 하기 · 화면만(D-628 대화창 닫아 두기) 고르기 안내 포함', MOD_CHAT.tax && CHAT_FIRST_KEYS.every((k) => { const g = modGuide(MOD_CHAT[k]); return g.length === 4 && g[3].body.includes('직접 눌러서 하기') && g[3].body.includes('화면만') && g[3].body.includes('[대화]') }))
 check('A19 규칙 답에는 AI 라고 쓰지 않음(정해진 답)', CHAT_FIRST_KEYS.every((k) => MOD_CHAT[k].starters.every((s) => { const a = modChatAnswer(MOD_CHAT[k], { starter: s.id }, data(A)); return a.source === 'rule' && !/\bAI\b/.test([a.title, ...a.lines].join(' ')) })))
 
 console.log(`\n${passed} passed, ${failed} failed`)

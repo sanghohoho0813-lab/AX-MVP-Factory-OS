@@ -1,9 +1,10 @@
 /**
  * D-250 대화창 — 대표 "LLM 채팅창처럼 앞에서 보이는 건 최대한 간편하게 · 처음 써 보는 사람도 바로 이해 · 사용 방법은 자세히".
  *
- *   맨 위: 화면 이름 · [사용 방법] · [자세히](예전 전체 화면) · 회사 고르기
- *   처음: '무엇을 도와드릴까요?' · 질문창 · 큰 단추 4개
- *   대화: 내가 한 말 → 답 카드(짧은 글 · 바로 가기 단추 · 복사 · [AI로 더 자세히]) · 질문창은 아래에 붙어 따라온다
+ * D-628 대화창은 오른쪽 판에(대표 2026-11-18 "가운데는 작업창, 오른쪽에서 요청") — 이 부품은 대화(회사 고르기 · 질문창 · 큰 단추 · 답)를
+ *   오른쪽 판(휴대폰은 아래 판)으로 그려 보내고, 가운데에는 화면 문법의 머리 · 요약 · 지금 할 일만 남긴다(frame 을 준 화면).
+ *   처음(대화 없음): 가벼운 시작 카드 — 제목 · 한 줄 · 큰 [대화 시작]. 누르면 질문칸(커서) · 큰 단추 4 · 이렇게 물어보세요.
+ *   대화: 내가 한 말(파란 말풍선) → 답 카드(흰 판 · 바로 가기 단추 · 복사 · [AI로 더 자세히]) · 질문창은 판 맨 아래에 붙어 있다
  *
  * 답: 단추 → 규칙 답(바로 · 비용 0). 직접 쓴 말 → 대표는 AI(/api/ai-assist · 이 회사 기록 요약만), 팀장 · AI 연결 전에는 규칙 답.
  * 대화는 모듈 · 회사마다 이 브라우저에 20개까지 남는다.
@@ -24,7 +25,9 @@ import type { AssistContext } from '../../services/aiAssist/context'
 import { copyText } from '../../services/grants/grantView'
 import { toneClass, type FeatureTone } from '../../config/featureVisual'
 import type { HeroArt } from '../../config/heroArt'
-import { PageColumns, PageHero } from '../ui/pageFrame'
+import { PageHero } from '../ui/pageFrame'
+import { ChatStartCard, PageChat } from './PageChat'
+import { startPageChat, usePageChat } from '../../lib/pageChat'
 import { HISTORY_MAX, answerFromAi, answerText, historyKey, parseHistory, type ChatActKind, type ChatAnswer, type ChatGuideStep, type ChatModule, type ChatStarter, type ChatTurn } from '../../services/workChat/chatTypes'
 import { AiConfirm } from '../ai/AiConfirm'
 
@@ -63,11 +66,10 @@ export interface WorkChatProps {
   /** D-282 회사 고르기 바로 아래 · 준비 현황 위 — 단계 표시(규칙 계산) */
   steps?: ReactNode
   /**
-   * UXS-1 화면 문법(공통 다섯 칸) — 주면 ① 머리(PageHero · 회사 고르기 · 사용 방법 · 자세히) ② summary ③ next ④ 대화 판 ⑤ aside 로 그린다.
-   * 없으면 예전 모양(가운데 좁은 칸 — 기업인증 대화창). 대화 · 답 · 저장은 두 모양이 같다.
+   * UXS-1 화면 문법(공통 다섯 칸) — 주면 가운데에 ① 머리(PageHero · 회사 고르기 · 자세히) ② summary ③ next ⑤ aside 를 그린다(D-628 대화 판은 오른쪽 판으로).
+   * 없으면 가운데는 그리지 않는다(기업인증 — 가운데는 그 화면이 직접 그린다). 대화 · 답 · 저장은 같다.
    */
-  /** chatFirst — D-511 대화창을 머리 바로 아래(요약 · 지금 할 일은 대화창 아래로) */
-  frame?: { art: HeroArt; sub?: ReactNode; summary?: ReactNode; next?: ReactNode; aside?: ReactNode; chatFirst?: boolean }
+  frame?: { art: HeroArt; sub?: ReactNode; summary?: ReactNode; next?: ReactNode; aside?: ReactNode }
   /** D-552 큰 제목 아래 한 줄 — 이 화면이 무엇을 해 주는지 */
   heroSub?: ReactNode
   /** D-627 머리 한 줄에 다 못 담은 설명 — 마우스를 올리면(title) */
@@ -80,6 +82,12 @@ export interface WorkChatProps {
   below?: ReactNode
   /** 머리 [자세히] 단추 글(없으면 '자세히') */
   detailLabel?: string
+  /** D-628 대화가 속한 곳(같은 곳 안에서 화면을 옮겨도 판이 열린 채) — 없으면 module */
+  scope?: string
+  /** D-628 이미 오른쪽 판 안에서 그리는 중(모듈 대화창) — 가운데 칸 없이 대화만 */
+  dockOnly?: boolean
+  /** D-628 붙일 폭이 되면 저절로 열까(dockOnly 가 아닐 때 — 특허 · 벤처 · 기업인증) */
+  auto?: boolean
 }
 
 const uid = (p: string) => `${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
@@ -308,7 +316,31 @@ export function WorkChat(p: WorkChatProps) {
   const clientMissing = p.needClient && !p.clientId
   const sendLabel = aiReady ? 'AI에게 묻기' : '보내기'
 
-  const composer = (docked: boolean) => (
+  // D-628 처음(대화 없음)은 시작 카드 — [대화 시작] 을 누르거나 오른쪽 끝 [대화] 로 열었으면 바로 질문칸
+  const scope = p.scope ?? p.module
+  const pc = usePageChat()
+  const started = !empty || pc.started.includes(scope)
+  const focusNext = useRef(false)
+  // PC 에서 [대화] 를 눌러 방금 열었으면(대화 없음) 질문칸에 커서 — 휴대폰은 자판이 큰 단추를 가려서 두지 않는다
+  const firstMount = useRef(true)
+  const phoneNow = pc.mode === 'none'
+  useEffect(() => {
+    const first = firstMount.current
+    firstMount.current = false
+    if (!started) return
+    if (focusNext.current || (first && empty && !phoneNow)) {
+      focusNext.current = false
+      window.setTimeout(() => inputRef.current?.focus(), 30)
+    }
+    // 시작했을 때 한 번만 본다(대화 수 · 폭이 바뀔 때마다 커서를 옮기지 않는다)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started])
+  const onStart = () => {
+    focusNext.current = true
+    startPageChat(scope)
+  }
+
+  const composer = (
     <div className="flex flex-col gap-1.5" data-testid="chat-composer">
       <div className="flex items-end gap-2 rounded-2xl border border-slate-300 bg-white p-2 shadow-(--shadow-card) focus-within:border-brand-500">
         {p.onFile && (
@@ -317,7 +349,7 @@ export function WorkChat(p: WorkChatProps) {
           </Button>
         )}
         <textarea
-          ref={docked ? undefined : inputRef}
+          ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, 500))}
           onKeyDown={(e) => {
@@ -327,20 +359,19 @@ export function WorkChat(p: WorkChatProps) {
             }
           }}
           rows={1}
-          placeholder={docked ? (clientMissing ? '먼저 회사를 고르세요' : '여기에 물어보세요') : clientMissing ? '먼저 위에서 회사를 골라 주세요' : p.placeholder}
+          placeholder={clientMissing ? '먼저 회사를 고르세요' : empty ? p.placeholder : '여기에 물어보세요'}
           aria-label="질문"
           className="t-body max-h-40 min-h-11 min-w-0 flex-1 resize-none border-0 bg-transparent px-1.5 py-2.5 leading-snug outline-none [field-sizing:content]"
           data-testid="chat-input"
         />
-        <Button variant="primary" size="sm" className={`shrink-0 ${aiReady ? 'bg-violet-600 border-violet-600 hover:bg-violet-700 hover:border-violet-700' : ''}`} onClick={send} disabled={!text.trim() || busy || !p.ready} aria-label={sendLabel} data-testid="chat-send" data-ai={aiReady ? '1' : '0'}>
+        <Button variant="primary" size="sm" className={`shrink-0 ${aiReady ? 'bg-violet-600 border-violet-600 hover:bg-violet-700 hover:border-violet-700' : ''}`} onClick={send} disabled={!text.trim() || busy || !p.ready} aria-label={sendLabel} title={sendLabel} data-testid="chat-send" data-ai={aiReady ? '1' : '0'}>
           {busy ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : aiReady ? <Sparkles aria-hidden="true" className="size-4" /> : <SendHorizontal aria-hidden="true" className="size-4" />}
-          <span className="hidden sm:inline">{sendLabel}</span>
         </Button>
       </div>
-      <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 px-2 ${docked ? 'hidden lg:flex' : ''}`}>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
         {/* D-627 글자 수 한도 — 한 줄은 짧게, 무엇이 어떻게 답하는지는 마우스를 올리면(title) */}
         <p
-          className="t-meta min-w-0 flex-1 basis-40 break-keep text-slate-500"
+          className="t-meta min-w-0 flex-1 basis-24 break-keep text-slate-500"
           data-testid="chat-mode"
           title={aiReady ? '쓴 질문은 AI가 이 회사 기록 요약을 보고 답해요(Enter)' : access === 'setup' ? 'AI 연결 준비 중 — 지금은 정해진 답으로 바로 알려 드려요' : '쓴 질문은 정해진 답으로 바로 알려 드려요(Enter)'}
         >
@@ -353,7 +384,7 @@ export function WorkChat(p: WorkChatProps) {
   )
 
   const starterButtons = (compact: boolean) => (
-    <div className={compact ? '-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden' : 'grid grid-cols-2 gap-2 sm:grid-cols-4'} data-testid="chat-starters">
+    <div className={compact ? '-mx-3 flex gap-1.5 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden' : 'grid grid-cols-2 gap-2'} data-testid="chat-starters">
       {p.starters.map((s) => (
         <button
           key={s.id}
@@ -363,60 +394,47 @@ export function WorkChat(p: WorkChatProps) {
           className={
             compact
               ? 'tap t-sub inline-flex shrink-0 items-center gap-1.5 rounded-full border whitespace-nowrap border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 hover:border-brand-400 hover:bg-brand-50 disabled:opacity-50'
-              : 'tap flex min-h-24 flex-col items-start justify-between gap-2 rounded-(--radius-panel) border border-slate-200 bg-white p-3 text-left shadow-(--shadow-card) hover:border-brand-400 hover:bg-brand-50 disabled:opacity-50'
+              : 'tap flex min-h-20 flex-col items-start justify-between gap-2 rounded-(--radius-panel) border border-slate-200 bg-white p-3 text-left hover:border-brand-400 hover:bg-brand-50 disabled:opacity-50'
           }
           data-testid="chat-starter"
           data-id={s.id}
         >
-          <span className={`grid shrink-0 place-items-center rounded-lg ${compact ? `size-5 bg-transparent ${s.tone ? toneClass(s.tone).icon : 'text-brand-700'}` : `size-10 ${s.tone ? toneClass(s.tone).tile : 'bg-brand-50 text-brand-700'}`}`} aria-hidden="true">
+          <span className={`grid shrink-0 place-items-center rounded-lg ${compact ? `size-5 bg-transparent ${s.tone ? toneClass(s.tone).icon : 'text-brand-700'}` : `size-9 ${s.tone ? toneClass(s.tone).tile : 'bg-brand-50 text-brand-700'}`}`} aria-hidden="true">
             {s.icon}
           </span>
-          <span className={`${compact ? '' : 't-body'} font-semibold break-keep text-slate-900`}>{s.label}</span>
+          <span className={`${compact ? '' : 't-sub'} font-semibold break-keep text-slate-900`}>{s.label}</span>
         </button>
       ))}
     </div>
   )
 
-  const headButtons = (
+  const options = (
     <>
-      <Button variant="ghost" size="sm" onClick={() => setGuide(true)} data-testid="chat-guide-open">
-        <BookOpen aria-hidden="true" className="size-4" /> 사용 방법
-      </Button>
-      <Link to={p.detailHref} className="tap t-sub inline-flex items-center gap-1.5 rounded-(--radius-control) px-3 py-2 font-semibold text-slate-600 hover:bg-slate-100" data-testid="chat-detail">
-        <LayoutList aria-hidden="true" className="size-4" /> {p.detailLabel ?? '자세히'}
-      </Link>
+      <option value="">{p.needClient ? '회사 고르기' : '회사 고르지 않음(전체)'}</option>
+      {p.clients && <ClientPickerOptions clients={p.clients.map((c) => ({ id: c.id, companyName: c.companyName, businessNumber: c.businessNumber ?? '', corporateNumber: c.corporateNumber ?? '' }))} />}
     </>
   )
-  const pickClient = (
-    <label className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
-      <span className={`t-sub shrink-0 font-semibold text-slate-600 ${p.frame ? 'sr-only sm:not-sr-only' : ''}`}>회사</span>
-      <select ref={pickRef} value={p.clientId} onChange={(e) => p.onClient(e.target.value)} className="tap t-body min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 sm:w-80 sm:max-w-sm sm:flex-none" data-testid="chat-client">
-        <option value="">{p.needClient ? '회사 고르기' : '회사 고르지 않음(전체)'}</option>
-        {p.clients && <ClientPickerOptions clients={p.clients.map((c) => ({ id: c.id, companyName: c.companyName, businessNumber: c.businessNumber ?? '', corporateNumber: c.corporateNumber ?? '' }))} />}
-      </select>
-    </label>
-  )
-  const head = (
-    <div className="flex flex-col gap-3" data-testid="chat-head">
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <h1 className="t-page min-w-0 break-keep text-slate-900">{p.title}</h1>
-        <div className="flex shrink-0 items-center gap-1">{headButtons}</div>
-      </div>
-      {pickClient}
+  /** 대화창의 회사 고르기 · [사용 방법] — 판 맨 위 한 줄 */
+  const dockHead = (
+    <div className="flex shrink-0 items-center gap-1.5 px-3 pt-3" data-testid="chat-head">
+      <label className="flex min-w-0 flex-1 items-center">
+        <span className="sr-only">회사</span>
+        <select ref={pickRef} value={p.clientId} onChange={(e) => p.onClient(e.target.value)} className="tap t-sub min-h-11 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2" data-testid="chat-client">
+          {options}
+        </select>
+      </label>
+      <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setGuide(true)} data-testid="chat-guide-open">
+        <BookOpen aria-hidden="true" className="size-4" /> 사용 방법
+      </Button>
     </div>
   )
 
   const lastId = useMemo(() => turns[turns.length - 1]?.id, [turns])
   const fileInput = p.onFile && <input ref={fileRef} type="file" accept={p.fileAccept} className="sr-only" onChange={(e) => void onFile(e.target.files?.[0])} data-testid="chat-file-input" />
-  const small = !!(p.frame || p.brief)
 
-  const body = empty ? (
-    <section className={`flex flex-col gap-4 ${p.frame ? '' : p.brief ? 'py-2' : 'py-4 sm:py-10'}`} data-testid="chat-hero">
-      <div className="flex flex-col gap-1">
-        <h2 className={`${small ? 't-section' : 't-page'} ${p.frame ? 'text-left' : 'text-center'} font-bold break-keep text-slate-900`}>{p.heroTitle ?? '무엇을 도와드릴까요?'}</h2>
-        {p.heroSub && <p className={`t-sub break-keep text-slate-600 ${p.frame ? '' : 'text-center'}`} data-testid="chat-hero-sub" title={p.heroHint}>{p.heroSub}</p>}
-      </div>
-      {composer(false)}
+  const hero = empty ? (
+    <section className="flex flex-col gap-3" data-testid="chat-hero">
+      <h2 className="t-body font-bold break-keep text-slate-900">{p.heroTitle ?? '무엇을 도와드릴까요?'}</h2>
       {starterButtons(false)}
       {p.examples && p.examples.length > 0 && (
         // D-552 '이렇게 물어보세요' — 누르면 질문칸에 들어간다(업체 이름만 바꿔 Enter)
@@ -427,7 +445,7 @@ export function WorkChat(p: WorkChatProps) {
             onClick={() => setExOpen((v) => !v)}
             aria-expanded={exOpen}
             title="누르면 질문칸에 들어가요"
-            className="tap t-sub inline-flex min-h-11 items-center gap-1 self-start rounded-(--radius-control) px-1 font-semibold text-slate-700 hover:bg-slate-50"
+            className="tap t-sub inline-flex min-h-11 items-center gap-1 self-start rounded-(--radius-control) px-1 font-semibold text-slate-700 hover:bg-white"
             data-testid="chat-examples-open"
           >
             이렇게 물어보세요
@@ -455,46 +473,38 @@ export function WorkChat(p: WorkChatProps) {
     </section>
   ) : null
   const turnsList = !empty && (
-      <ol className="flex flex-col gap-4" data-testid="chat-turns" aria-live="polite">
-        {turns.map((t) => (
-          <li key={t.id} ref={t.id === lastId ? endRef : undefined} className="flex scroll-mt-20 flex-col gap-2" data-testid="chat-turn" data-status={t.status}>
-            <p className="t-body max-w-[85%] self-end rounded-2xl rounded-br-md bg-brand-600 px-3.5 py-2 break-keep text-white [overflow-wrap:anywhere]" data-testid="chat-q">
-              {t.q}
+    <ol className="flex flex-col gap-4" data-testid="chat-turns" aria-live="polite">
+      {turns.map((t) => (
+        <li key={t.id} ref={t.id === lastId ? endRef : undefined} className="flex scroll-mt-2 flex-col gap-2" data-testid="chat-turn" data-status={t.status}>
+          <p className="t-body max-w-[85%] self-end rounded-2xl rounded-br-md bg-brand-600 px-3.5 py-2 break-keep text-white [overflow-wrap:anywhere]" data-testid="chat-q">
+            {t.q}
+          </p>
+          {t.status === 'pending' && (
+            <p className="t-sub flex items-center gap-2 text-slate-500" role="status" data-testid="chat-pending">
+              <Loader2 aria-hidden="true" className="size-4 animate-spin" /> AI가 답을 만드는 중…
             </p>
-            {t.status === 'pending' && (
-              <p className="t-sub flex items-center gap-2 text-slate-500" role="status" data-testid="chat-pending">
-                <Loader2 aria-hidden="true" className="size-4 animate-spin" /> AI가 답을 만드는 중…
-              </p>
-            )}
-            {t.error && <p className="t-sub break-keep text-warning-800" data-testid="chat-error">△ {t.error}</p>}
-            {t.a && <AnswerCard a={t.a} owner={owner} aiReady={aiReady} onAct={onAct} onAsk={onAsk} onAiMore={() => void askAi(`${t.q} — 이 회사 기록으로 더 자세히 알려 줘`, `${t.q} (AI로 더 자세히)`)} onCopy={(x, w) => void onCopy(x, w)} />}
-            {t.status === 'error' && !t.a && (
-              <div>
-                <AiConfirm>
-                  <Button size="sm" variant="secondary" onClick={() => void askAi(t.q)} data-testid="chat-retry">
-                    <RotateCcw aria-hidden="true" className="size-4" /> 다시 묻기
-                  </Button>
-                </AiConfirm>
-              </div>
-            )}
-          </li>
-        ))}
-      </ol>
-  )
-  // 휴대폰: 아래 메뉴 바로 위에 붙고 화면 끝까지 덮는다(뒤 글이 비치지 않게)
-  // UXS-1 공통 틀에서는 대화 판 밖(화면 맨 바깥)에 둔다 — 판 안에 두면 판 위 머리 · 요약 때문에 화면 맨 위에서 붙지 못했다(sticky 는 부모 안에서만)
-  const dock = !empty && (
-      <div className={`sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-10 -mx-4 flex flex-col gap-2 border-t border-slate-200 bg-white/95 px-4 pt-2 pb-3 backdrop-blur sm:-mx-1 sm:rounded-2xl sm:border-0 sm:px-1 lg:bottom-3 lg:pb-1 ${p.frame?.aside ? 'xl:mr-[25rem]' : ''}`} data-testid="chat-dock">
-        {starterButtons(true)}
-        {composer(true)}
-      </div>
+          )}
+          {t.error && <p className="t-sub break-keep text-warning-800" data-testid="chat-error">△ {t.error}</p>}
+          {t.a && <AnswerCard a={t.a} owner={owner} aiReady={aiReady} onAct={onAct} onAsk={onAsk} onAiMore={() => void askAi(`${t.q} — 이 회사 기록으로 더 자세히 알려 줘`, `${t.q} (AI로 더 자세히)`)} onCopy={(x, w) => void onCopy(x, w)} />}
+          {t.status === 'error' && !t.a && (
+            <div>
+              <AiConfirm>
+                <Button size="sm" variant="secondary" onClick={() => void askAi(t.q)} data-testid="chat-retry">
+                  <RotateCcw aria-hidden="true" className="size-4" /> 다시 묻기
+                </Button>
+              </AiConfirm>
+            </div>
+          )}
+        </li>
+      ))}
+    </ol>
   )
   const clearRow = !empty && (
-      <div className="flex justify-center">
-        <Button variant="ghost" size="sm" onClick={clear} data-testid="chat-clear">
-          <Trash2 aria-hidden="true" className="size-4" /> 대화 지우기
-        </Button>
-      </div>
+    <div className="flex justify-center">
+      <Button variant="ghost" size="sm" onClick={clear} data-testid="chat-clear">
+        <Trash2 aria-hidden="true" className="size-4" /> 대화 지우기
+      </Button>
+    </div>
   )
 
   const guideSheet = guide && (
@@ -515,41 +525,69 @@ export function WorkChat(p: WorkChatProps) {
     </BottomSheet>
   )
 
-  // UXS-1 공통 다섯 칸 — 머리 → 요약 → 지금 할 일 → 대화 판(본문) · 보조 칸
-  if (p.frame)
-    return (
-      <div className="flex flex-col gap-4 sm:gap-5" data-testid={`chat-${p.module}`} data-turns={turns.length}>
-        <PageHero art={p.frame.art} title={p.title} sub={p.frame.sub} context={pickClient} actions={headButtons} testId="chat-head" />
-        {!p.frame.chatFirst && p.frame.summary}
-        {!p.frame.chatFirst && p.frame.next}
-        {fileInput}
-        <PageColumns aside={p.frame.aside} asideLabel="도움 · 이어서 할 것">
-          <section className="flex min-w-0 flex-col gap-4 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5" aria-label="대화창" data-testid="chat-panel">
-            {body}
+  // D-628 대화 — 오른쪽 판(휴대폰은 아래 판) 안의 좁은 한 줄. 대화는 가운데에서 굴리고 질문창은 판 맨 아래에 붙는다
+  const conversation = (
+    <div className="flex min-h-0 flex-1 flex-col" aria-label="대화창" data-testid={`chat-${p.module}`} data-variant="dock" data-turns={turns.length} data-started={started ? '1' : '0'}>
+      {fileInput}
+      {!started ? (
+        <ChatStartCard title={p.heroTitle ?? '무엇을 도와드릴까요?'} sub={p.heroSub ?? '물어보면 바로 답해 드려요'} hint={p.heroHint} onStart={onStart} />
+      ) : (
+        <>
+          {dockHead}
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 py-3" data-testid="chat-panel">
+            {hero}
             {turnsList}
             {clearRow}
-          </section>
-        </PageColumns>
-        {p.frame.chatFirst && p.frame.next}
-        {p.frame.chatFirst && p.frame.summary}
-        {dock}
-        {guideSheet}
-      </div>
-    )
-
-  return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4" data-testid={`chat-${p.module}`} data-turns={turns.length}>
-      {head}
-      {p.steps}
-      {p.brief}
-      {fileInput}
-      {body}
-      {turnsList}
-      {clearRow}
-      {p.below}
-      {dock}
+            {p.below}
+          </div>
+          <div className="flex shrink-0 flex-col gap-2 border-t border-slate-200 px-3 pt-2 pb-3" data-testid="chat-dock">
+            {!empty && starterButtons(true)}
+            {composer}
+          </div>
+        </>
+      )}
       {guideSheet}
     </div>
   )
-}
 
+  if (p.dockOnly) return conversation
+
+  // UXS-1 가운데 = 작업 화면 — 머리(회사 고르기 · [자세히]) → 요약 → 지금 할 일 → 보조. 대화는 오른쪽 판으로 보낸다
+  return (
+    <>
+      {p.frame && (
+        <div className="flex flex-col gap-4 sm:gap-5" data-testid={`chat-${p.module}-page`}>
+          <PageHero
+            art={p.frame.art}
+            title={p.title}
+            sub={p.frame.sub}
+            context={
+              <label className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+                <span className="t-sub sr-only shrink-0 font-semibold text-slate-600 sm:not-sr-only">회사</span>
+                <select value={p.clientId} onChange={(e) => p.onClient(e.target.value)} className="tap t-body min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 sm:w-80 sm:max-w-sm sm:flex-none" data-testid="page-client">
+                  {options}
+                </select>
+              </label>
+            }
+            actions={
+              <Link to={p.detailHref} className="tap t-sub inline-flex items-center gap-1.5 rounded-(--radius-control) px-3 py-2 font-semibold text-slate-600 hover:bg-slate-100" data-testid="chat-detail">
+                <LayoutList aria-hidden="true" className="size-4" /> {p.detailLabel ?? '자세히'}
+              </Link>
+            }
+            testId="page-head"
+          />
+          {p.frame.summary}
+          {p.frame.next}
+          {p.frame.aside && (
+            <aside aria-label="도움 · 이어서 할 것" className="flex min-w-0 flex-col gap-3">
+              {p.frame.aside}
+            </aside>
+          )}
+        </div>
+      )}
+      <PageChat scope={scope} auto={p.auto !== false}>
+        {conversation}
+      </PageChat>
+    </>
+  )
+}

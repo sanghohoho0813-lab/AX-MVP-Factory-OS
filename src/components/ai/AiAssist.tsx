@@ -13,6 +13,11 @@
  *   - [할 일로 넣기] — 업무 일기 할 일로(업체 번호면 그 업체에 · 언제가 있으면 그날 기한) → 오늘 · 달력에 보인다.
  *   - 화면이 붙이는 단추(itemActions · resultActions) — 예: 마케팅 [내 콘텐츠에 담기] · [이 기획으로 대본 끝까지].
  *   - [더 잘 쓰는 모델로 다시] — 같은 회사의 한 단계 위 모델로 이번 한 번만.
+ *
+ * D-628 PC(1024~)에서는 판이 화면을 덮지 않고 오른쪽 판(SideDock)의 [대화] 자리에 뜬다 — 가운데 화면을 보면서 묻는다.
+ *   - 화면 머리의 도우미(inline 이 아닌 것)는 그 화면의 대화창으로 알린다: 그 화면에 다른 대화창이 없으면 오른쪽 판을 열 때 이 도우미가 보인다.
+ *   - dock="auto"(마케팅 유튜브 · 스레드 · 릴스) — 붙일 폭이 되면 저절로 열리고 오른쪽 끝 [대화] 단추가 생긴다. 처음은 [대화 시작] 카드.
+ *   - 휴대폰 · 창 · 카드 안(inline)은 예전처럼 아래에서 올라오는 판.
  */
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { InPageTools, MENU_ROW, useInPageTools } from '../layout/PageTools'
@@ -39,6 +44,9 @@ import { askCarry, type AiChoice, type FollowMeta, type HistoryEntry } from '../
 import { useToast } from '../ui/toastContext'
 import { ModelPicker } from './ModelPicker'
 import { josa } from '../../lib/josa'
+import { ChatStartCard, PageChat } from '../chat/PageChat'
+import { closeAssistInDock, closePageDock, nextPageChatKey, openAssistInDock, startPageChat, usePageChat } from '../../lib/pageChat'
+import { useChatAutoOpen } from '../../lib/useChatFirst'
 
 const PROVIDER_LABEL: Record<ProviderId, string> = { gemini: 'Gemini', openai: 'GPT', anthropic: 'Claude' }
 /** 서버 상태를 못 받았을 때 보일 기본 이름(서버 목록이 오면 그것으로) */
@@ -124,6 +132,8 @@ export interface AiAssistProps {
   pin?: (ask: string) => ReactNode
   /** D-627 [⋯] 이 화면 도구로 보내지 않고 그 자리에(창 · 카드 안처럼 화면 머리가 아닌 곳) */
   inline?: boolean
+  /** D-628 'auto' — 이 화면의 대화창으로(붙일 폭이 되면 오른쪽 판이 저절로 열리고 · 오른쪽 끝 [대화] 단추) */
+  dock?: 'auto'
 }
 
 export function AiAssist(props: AiAssistProps) {
@@ -136,10 +146,15 @@ export function AiAssist(props: AiAssistProps) {
 /** D-288 [직접 묻기] 로 열 때 — 단추를 누르지 않고 질문 칸에 바로 */
 const ASK_FIRST = '__ask'
 
-function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', quick = 3, label = 'AI 도우미', className = '', onSaveItem, itemActions, resultActions, record, onRecorded, defaultClientId, pin, inline = false }: AiAssistProps) {
+function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', quick = 3, label = 'AI 도우미', className = '', onSaveItem, itemActions, resultActions, record, onRecorded, defaultClientId, pin, inline = false, dock }: AiAssistProps) {
   const list = useMemo(() => presetsFor(presets), [presets])
   const key = scope ?? page
   const [open, setOpen] = useState(false)
+  // D-628 오른쪽 판에 알리는 번호 · 판 안에서 단추로 다시 열 때마다 올리는 수(같은 판이 살아 있어도 고른 질문을 다시 받게)
+  const dockKey = useRef(0)
+  if (!dockKey.current) dockKey.current = nextPageChatKey()
+  const [runTick, setRunTick] = useState(0)
+  const autoPref = useChatAutoOpen()
   const [status, setStatus] = useState<AssistStatus | null>(null)
   const [choice, setChoice] = useState<AiChoice | null>(() => readChoice())
   // D-244 한 화면에 도우미가 여럿이면(머리줄 단추 · 탭 띠) 한 곳에서 모델을 바꿔도 모두 따라오게 — 다른 탭에서 바꾼 것도
@@ -172,7 +187,43 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
 
   const openWith = (id: string | null) => {
     setPendingRun(id)
+    setRunTick((t) => t + 1)
+    // D-628 PC — 화면을 덮지 않고 오른쪽 판에(화면 머리의 도우미만 · 창 · 카드 안은 예전 판)
+    if (!inline && openAssistInDock(dockKey.current)) return
     setOpen(true)
+  }
+  const panelProps = {
+    page,
+    scope: key,
+    title,
+    presets: list,
+    build,
+    status,
+    loadStatus,
+    choice,
+    effective,
+    setChoice: (c: AiChoice | null) => {
+      setChoice(c)
+      saveChoice(c)
+    },
+    autoRun: pendingRun,
+    autoTick: runTick,
+    onSaveItem,
+    itemActions,
+    resultActions,
+    record: record ?? RECORD_PAGES.has(page),
+    defaultClientId,
+    pin,
+    onRecorded: () => {
+      recorded.current = true
+    },
+  }
+  const afterClose = () => {
+    setPendingRun(null)
+    if (recorded.current) {
+      recorded.current = false
+      onRecorded?.()
+    }
   }
 
   // D-627 화면 글자 수 한도 — 띠 · 단추는 경로 줄 오른쪽 [⋯] 이 화면 도구 안으로(질문 칩 · 직접 묻기도 메뉴 줄로). inline 이면 예전처럼 그 자리에
@@ -239,41 +290,49 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
       {/* D-627 판은 문서 맨 끝에(포털) — 머리 칸 · [⋯] 안에서 열어도 뒤 화면(카드 · 영업 보드)이 판 위로 올라오지 않게 */}
       {open && createPortal(
         <AssistPanel
-          page={page}
-          scope={key}
-          title={title}
-          presets={list}
-          build={build}
-          status={status}
-          loadStatus={loadStatus}
-          choice={choice}
-          effective={effective}
-          setChoice={(c) => {
-            setChoice(c)
-            saveChoice(c)
-          }}
-          autoRun={pendingRun}
-          onSaveItem={onSaveItem}
-          itemActions={itemActions}
-          resultActions={resultActions}
-          record={record ?? RECORD_PAGES.has(page)}
-          defaultClientId={defaultClientId}
-          pin={pin}
-          onRecorded={() => {
-            recorded.current = true
-          }}
+          {...panelProps}
           onClose={() => {
             setOpen(false)
-            setPendingRun(null)
-            if (recorded.current) {
-              recorded.current = false
-              onRecorded?.()
-            }
+            afterClose()
           }}
         />,
         document.body,
       )}
+      {/* D-628 PC — 오른쪽 판의 [대화] 자리에(화면 머리의 도우미만). 한 번 보인 뒤에는 닫아도 살아 있다(답을 기다리던 질문이 끊기지 않게) */}
+      {!inline && (
+        <PageChat entryKey={dockKey.current} scope={`assist:${key}`} kind="assist" auto={dock === 'auto' && autoPref} launcher={dock === 'auto'} openPhone={() => openWith(null)}>
+          <AssistDock entryKey={dockKey.current} chatScope={`assist:${key}`} historyScope={key} title={title} panelProps={panelProps} afterClose={afterClose} />
+        </PageChat>
+      )}
     </>
+  )
+}
+
+type PanelProps = Omit<Parameters<typeof AssistPanel>[0], 'onClose' | 'docked' | 'explicit'>
+
+/**
+ * D-628 오른쪽 판 안의 도우미 — 처음(지난 답 없음 · 저절로 열림)은 가벼운 시작 카드, [대화 시작] 을 누르거나 [⋯] 에서 눌러 열었으면 질문 판.
+ */
+function AssistDock({ entryKey, chatScope, historyScope, title, panelProps, afterClose }: { entryKey: number; chatScope: string; historyScope: string; title: string; panelProps: PanelProps; afterClose: () => void }) {
+  const pc = usePageChat()
+  const explicit = pc.explicit === entryKey
+  const [hadHistory] = useState(() => historyOf(historyScope).length > 0)
+  const [begun, setBegun] = useState(false)
+  const started = begun || explicit || hadHistory || pc.started.includes(chatScope)
+  if (started && !begun) setBegun(true)
+  if (!started) return <ChatStartCard sub="이 화면 자료로 AI가 답해요" hint={`AI 도우미 · ${title}`} onStart={() => startPageChat(chatScope)} />
+  return (
+    <AssistPanel
+      {...panelProps}
+      docked
+      explicit={explicit}
+      onClose={() => {
+        // 눌러서 연 것이면 그 화면 대화창으로 돌아가고(없으면 판을 닫는다), 그 화면의 대화창으로 떠 있던 것이면 판을 닫는다
+        if (explicit) closeAssistInDock(entryKey)
+        else closePageDock()
+        afterClose()
+      }}
+    />
   )
 }
 
@@ -366,6 +425,7 @@ function AssistPanel({
   effective,
   setChoice,
   autoRun,
+  autoTick = 0,
   onSaveItem,
   itemActions,
   resultActions,
@@ -374,7 +434,15 @@ function AssistPanel({
   pin,
   onRecorded,
   onClose,
+  docked = false,
+  explicit = false,
 }: {
+  /** D-628 오른쪽 판 안(화면을 덮지 않는다 · 뒤 화면을 그대로 쓴다) */
+  docked?: boolean
+  /** D-628 판 안에서 — [⋯] 로 눌러 연 것인가(Esc 로 닫힌다) */
+  explicit?: boolean
+  /** 같은 판이 살아 있는 채 단추로 다시 열 때마다 달라지는 수 */
+  autoTick?: number
   pin?: (ask: string) => ReactNode
   onSaveItem?: (item: AssistItem, assistId: string) => Promise<boolean>
   itemActions?: (assistId: string) => AssistItemAction[] | null
@@ -395,8 +463,8 @@ function AssistPanel({
   autoRun: string | null
   onClose: () => void
 }) {
-  useBackToClose(true, onClose)
-  useEscToClose(true, onClose)
+  useBackToClose(!docked, onClose)
+  useEscToClose(!docked || explicit, onClose)
   const { showToast } = useToast()
   const [running, setRunning] = useState<string | null>(null)
   const [error, setError] = useState<{ code: string; message: string; missing: string[]; ref?: string } | null>(null)
@@ -419,15 +487,17 @@ function AssistPanel({
   const [nowHash, setNowHash] = useState<string | null>(null)
   const resultRef = useRef<HTMLDivElement | null>(null)
   const pinRef = useRef<HTMLDivElement | null>(null)
-  const started = useRef(false)
+  const startedTick = useRef(-1)
 
+  // 화면을 덮는 판일 때만 뒤 화면 굴리기를 막는다(오른쪽 판 안에서는 가운데 화면을 그대로 쓴다)
   useEffect(() => {
+    if (docked) return
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = prev
     }
-  }, [])
+  }, [docked])
 
   useEffect(() => {
     if (!status) void loadStatus()
@@ -536,8 +606,8 @@ function AssistPanel({
 
   // 띠의 질문 단추로 열었으면 그 단추를 골라 둔다(한 번만) · D-288 [직접 묻기] 로 열었으면 질문 칸에 바로 쓰게
   useEffect(() => {
-    if (!autoRun || started.current) return
-    started.current = true
+    if (!autoRun || startedTick.current === autoTick) return
+    startedTick.current = autoTick
     if (autoRun === ASK_FIRST) {
       window.setTimeout(() => askRef.current?.focus(), 60)
       return
@@ -545,7 +615,7 @@ function AssistPanel({
     // D-289 띠의 단추로 열어도 고르기만 — [이대로 질문하기] 를 눌러야 부른다
     const p = presets.find((x) => x.id === autoRun)
     if (p) request(p, p.label)
-  }, [autoRun, presets, request])
+  }, [autoRun, autoTick, presets, request])
 
   // D-626 다음 질문에 같이 갈 앞 질문 수(이 화면 · 6시간 안 · [새로 묻기] 뒤)
   const carryCount = useMemo(() => askCarry(history, carryFrom).length, [history, carryFrom])
@@ -559,23 +629,13 @@ function AssistPanel({
 
   const stale = !!shown && !!nowHash && shown.hash !== nowHash
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-navy-950/40 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={`AI 도우미 · ${title}`} data-testid="ai-assist-panel">
-      <div className="ax-pop flex max-h-[94vh] w-full flex-col rounded-t-2xl bg-white sm:max-w-2xl sm:rounded-(--radius-panel)">
-        <div className="flex shrink-0 items-center gap-2 border-b border-violet-100 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-5 py-3.5 sm:rounded-t-(--radius-panel)">
-          <Sparkles aria-hidden="true" className="size-5 shrink-0 text-violet-700" />
-          <h2 className="t-section min-w-0 grow break-keep text-violet-950 [overflow-wrap:anywhere]">AI 도우미 · {title}</h2>
-          <button type="button" onClick={onClose} aria-label="닫기" className="tap -mr-2 flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-white hover:text-slate-800">
-            <X aria-hidden="true" className="size-5" />
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+  const body = (
           <div className="flex flex-col gap-4">
             {/* D-255 모델을 먼저 — 질문을 누르기 전에 무엇으로 물을지 보이고 바꿀 수 있게(전에는 질문 단추 아래) */}
             <ModelRow status={status} effective={effective} choice={choice} open={settings} setOpen={setSettings} setChoice={setChoice} loadStatus={loadStatus} />
             <section aria-label="무엇을 도와드릴까요" className="flex flex-col gap-2">
               <p className="t-sub font-semibold text-slate-700">무엇을 도와드릴까요? — 고른 뒤 [이대로 질문하기] 를 누르면 답해요</p>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className={docked ? 'grid gap-2' : 'grid gap-2 sm:grid-cols-2'}>
                 {presets.map((p) => (
                   <button
                     key={p.id}
@@ -741,10 +801,12 @@ function AssistPanel({
               보내는 것: 이 화면의 업체 · 일 · 숫자(사람 이름 · 연락처 · 주민번호 · 계좌는 빼고). AI 답은 틀릴 수 있어요 — 금액 · 날짜는 화면 숫자로 한 번 확인하세요.
             </p>
           </div>
-        </div>
+  )
+  const confirmBar = (
+    <>
         {/* D-289 고른 단추 확인 — 판 맨 아래에 늘 붙어 있다(어느 단추를 눌렀든 보이게). 이걸 눌러야 AI 를 부른다 */}
         {pending && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-violet-200 bg-violet-50 px-5 py-3 sm:rounded-b-(--radius-panel)" data-testid="ai-assist-confirm" data-assist={pending.preset.id}>
+          <div className={`flex shrink-0 flex-wrap items-center gap-2 border-t border-violet-200 bg-violet-50 py-3 ${docked ? 'px-3' : 'px-5 sm:rounded-b-(--radius-panel)'}`} data-testid="ai-assist-confirm" data-assist={pending.preset.id}>
             <p className="t-sub min-w-0 flex-1 break-keep text-violet-950 [overflow-wrap:anywhere]">
               <b>‘{pending.label}’</b> — 이대로 물어볼까요?
               <span className="t-meta block text-violet-800">{labelOf(status, pending.opts.choice ?? effective)} 로 · 화면 자료를 같이 보내요</span>
@@ -757,6 +819,37 @@ function AssistPanel({
             </button>
           </div>
         )}
+    </>
+  )
+
+  // D-628 오른쪽 판 안 — 뒤판 없이 판을 가득 채운다(머리 · 굴리는 본문 · 맨 아래 확인 줄)
+  if (docked)
+    return (
+      <div className="flex min-h-0 flex-1 flex-col" role="region" aria-label={`AI 도우미 · ${title}`} data-testid="ai-assist-panel" data-docked="1">
+        <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-white py-1.5 pr-1 pl-3">
+          <Sparkles aria-hidden="true" className="size-4 shrink-0 text-violet-700" />
+          <h2 className="t-body min-w-0 grow font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">AI 도우미 · {title}</h2>
+          <button type="button" onClick={onClose} aria-label="닫기" title={explicit ? '닫기 — 이 화면 대화로 돌아가요' : '닫기'} className="tap flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100 hover:text-slate-800" data-testid="ai-assist-close">
+            <X aria-hidden="true" className="size-5" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">{body}</div>
+        {confirmBar}
+      </div>
+    )
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-navy-950/40 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={`AI 도우미 · ${title}`} data-testid="ai-assist-panel">
+      <div className="ax-pop flex max-h-[94vh] w-full flex-col rounded-t-2xl bg-white sm:max-w-2xl sm:rounded-(--radius-panel)">
+        <div className="flex shrink-0 items-center gap-2 border-b border-violet-100 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-5 py-3.5 sm:rounded-t-(--radius-panel)">
+          <Sparkles aria-hidden="true" className="size-5 shrink-0 text-violet-700" />
+          <h2 className="t-section min-w-0 grow break-keep text-violet-950 [overflow-wrap:anywhere]">AI 도우미 · {title}</h2>
+          <button type="button" onClick={onClose} aria-label="닫기" className="tap -mr-2 flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-white hover:text-slate-800">
+            <X aria-hidden="true" className="size-5" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{body}</div>
+        {confirmBar}
       </div>
     </div>
   )

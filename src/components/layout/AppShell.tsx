@@ -46,6 +46,7 @@ import { SideDock } from './SideDock'
 import { SideAiButton } from './SideAiButton'
 import { ArrangeButton } from '../ui/arrange'
 import { ChatModeButton } from '../chat/ChatFirst'
+import { PageChatLauncher, PageChatSheet } from '../chat/PageChat'
 import { LayoutCloudSync } from './LayoutCloudSync'
 import { useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { setAllowedProviders, setCheapOnly } from '../../services/aiAssist/store'
@@ -211,7 +212,7 @@ export function AppShell() {
               {/* D-627 [⋯] 이 화면 도구 — 화면 꾸미기 · 대화로 묻기 · 화면이 보낸 AI 도우미(와 그 질문)를 한 곳에 */}
               <PageTools>
                 <ArrangeButton />
-                {/* D-552 대화창으로 시작하는 모듈의 예전 화면 — [대화로 묻기] */}
+                {/* D-552 · D-628 이 화면에 대화창이 있고 닫혀 있을 때 — [대화로 묻기](오른쪽 판 · 휴대폰은 아래 판을 연다) */}
                 <ChatModeButton />
               </PageTools>
               <SideAiButton />
@@ -242,6 +243,9 @@ export function AppShell() {
           </Suspense>
         )}
         <SideDock />
+        {/* D-628 이 화면의 대화창 — 닫혀 있을 때 여는 단추(PC 오른쪽 끝 · 휴대폰 오른쪽 아래) · 휴대폰 아래 판 */}
+        <PageChatLauncher />
+        <PageChatSheet />
       </div>
       </PageToolsProvider>
       </TutorialProvider>

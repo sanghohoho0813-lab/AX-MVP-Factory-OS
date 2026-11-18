@@ -20,7 +20,6 @@ import type { ClientOpsRecord } from '../../types/clientOps'
 import { setToolWorkspace } from './toolStorage'
 import { ToolClientPicker } from './ToolClientPicker'
 import { pickerOn } from './toolClientPick'
-import { chatShown, readChatFirst } from '../../services/workChat/chatFirst'
 
 export interface ToolClientValue {
   /** 주소에 실린 업체 id (없으면 null) */
@@ -59,32 +58,35 @@ export function useToolClient(): ToolClientValue {
 }
 
 /** 도구 화면을 감싸는 틀 — 모든 `/tools/*` 라우트가 이것으로 감긴다 */
-export function ToolClientFrame({ children }: { children: ReactNode }) {
+/** bare — 띠(이 업체 일로 · 업체 고르기) 없이 값만 내준다(D-628 오른쪽 판의 지원사업 대화창) */
+export function ToolClientFrame({ children, bare = false }: { children: ReactNode; bare?: boolean }) {
   return getDataModeConfig().mode === 'supabase' ? (
-    <CloudFrame>{children}</CloudFrame>
+    <CloudFrame bare={bare}>{children}</CloudFrame>
   ) : (
-    <FrameInner workspaceId={null}>{children}</FrameInner>
-  )
-}
-
-function CloudFrame({ children }: { children: ReactNode }) {
-  const { currentWorkspaceId } = useAuth()
-  // D-165: 업체 없이 쓰는 도구 칸은 작업공간마다 따로 — 작업공간이 바뀌면 도구 화면을 새로 그린다(앞 작업공간 입력이 남지 않게)
-  setToolWorkspace(currentWorkspaceId)
-  return (
-    <FrameInner key={currentWorkspaceId ?? 'none'} workspaceId={currentWorkspaceId}>
+    <FrameInner workspaceId={null} bare={bare}>
       {children}
     </FrameInner>
   )
 }
 
-function FrameInner({ workspaceId, children }: { workspaceId: string | null; children: ReactNode }) {
+function CloudFrame({ children, bare }: { children: ReactNode; bare: boolean }) {
+  const { currentWorkspaceId } = useAuth()
+  // D-165: 업체 없이 쓰는 도구 칸은 작업공간마다 따로 — 작업공간이 바뀌면 도구 화면을 새로 그린다(앞 작업공간 입력이 남지 않게)
+  setToolWorkspace(currentWorkspaceId)
+  return (
+    <FrameInner key={currentWorkspaceId ?? 'none'} workspaceId={currentWorkspaceId} bare={bare}>
+      {children}
+    </FrameInner>
+  )
+}
+
+function FrameInner({ workspaceId, children, bare }: { workspaceId: string | null; children: ReactNode; bare: boolean }) {
   const [params] = useSearchParams()
   const clientId = params.get('client')
   // D-354 업체 고르기 — 업체 숫자로 채우는 모듈(세금 계산기 · 창업감면 · 고용지원금 · 연구소 · 정책자금 · 크레탑)만
   const loc = useLocation()
-  // D-552 대화창으로 연 첫 화면은 대화창이 회사를 고른다 — 위 '어느 업체 일인가요?' 띠는 예전 화면에서만
-  const picker = pickerOn(loc.pathname) && !chatShown(loc.pathname, loc.search, readChatFirst())
+  // D-628 가운데는 늘 작업 화면 — '어느 업체 일인가요?' 띠도 늘 그 화면 것(대화창은 오른쪽 판에서 따로 회사를 고른다)
+  const picker = pickerOn(loc.pathname)
   const [client, setClient] = useState<ClientOpsRecord | null>(null)
   const cache = useRef<Promise<ClientOpsRecord[]> | null>(null)
 
@@ -137,6 +139,7 @@ function FrameInner({ workspaceId, children }: { workspaceId: string | null; chi
   )
 
   // 업체를 물고 온 때만 띠를 얹는다. D-354 업체 숫자로 채우는 모듈은 업체 없이 열면 '어느 업체 일인가요? [업체 고르기]' 한 줄.
+  if (bare) return <ToolClientCtx.Provider value={value}>{children}</ToolClientCtx.Provider>
   return (
     <ToolClientCtx.Provider value={value}>
       {clientId ? (

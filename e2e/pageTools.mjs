@@ -14,3 +14,47 @@ export async function openTools(pageOrLocator) {
     await menu.first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {})
   }
 }
+
+/** 이 가운데 하나라도 보일 때까지 기다린다(못 보면 false) */
+async function seenAny(page, ids, timeout = 8000) {
+  return page
+    .waitForFunction((list) => list.some((id) => [...document.querySelectorAll(`[data-testid="${id}"]`)].some((el) => el.checkVisibility())), ids, { timeout })
+    .then(() => true)
+    .catch(() => false)
+}
+
+/**
+ * D-628 이 화면의 대화창은 오른쪽 판(휴대폰은 아래 판)에 있다 — 대화창 안의 것을 누르기 전에 부른다.
+ * 닫혀 있으면 [대화] 단추로 열고, 시작 카드가 떠 있으면 [대화 시작] 을 누른다(이미 질문칸이 보이면 그대로).
+ */
+export async function openChat(page) {
+  const INSIDE = ['chat-input', 'mk-ask-input', 'ai-assist-panel']
+  await seenAny(page, ['chat-start', 'page-chat-launch', ...INSIDE])
+  const launch = page.getByTestId('page-chat-launch').first()
+  if (await launch.isVisible().catch(() => false)) {
+    await launch.click()
+    await seenAny(page, ['chat-start', ...INSIDE])
+  }
+  const start = page.getByTestId('chat-start').first()
+  if (await start.isVisible().catch(() => false)) {
+    await start.click()
+    await seenAny(page, INSIDE)
+  }
+}
+
+/** D-628 휴대폰 아래 판 · PC 오른쪽 판 닫기(열려 있을 때만) */
+export async function closeChat(page) {
+  for (const id of ['page-chat-sheet-close', 'dock-close']) {
+    const b = page.getByTestId(id).first()
+    if (await b.isVisible().catch(() => false)) {
+      await b.click()
+      await page.waitForTimeout(200)
+      return
+    }
+  }
+}
+
+/** D-628 대화창이 지금 보이는가(오른쪽 판 또는 아래 판 안에 이 화면 대화창) */
+export async function chatOpen(page) {
+  return page.evaluate(() => [...document.querySelectorAll('[data-testid="side-dock"] [data-page-chat], [data-testid="page-chat-sheet"] [data-page-chat]')].some((el) => el.checkVisibility()))
+}

@@ -1,5 +1,6 @@
 /**
  * D-250 특허 · 벤처 첫 화면 = 대화창(대표 "LLM 채팅창처럼 · 아주 간단하게"). 예전 첫 화면(진행판 · 도구 카드)은 /patent-venture/more([자세히]).
+ * D-628 대화창은 오른쪽 판으로 — 가운데는 머리(회사 고르기) · 단계 · 준비 현황 · 다음 할 일 · 이어서 할 회사(작업 화면).
  */
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -26,6 +27,7 @@ import { PvBriefCautions, PvBriefNext, PvBriefSummary, PvResumeCard } from './Pv
 import { pvSteps } from '../../services/patent/pvSteps'
 import { StepProgress } from '../../components/ui/visual'
 import { NextActionBar } from '../../components/ui/pageFrame'
+import { useChatAutoOpen } from '../../lib/useChatFirst'
 import type { FeatureTone } from '../../config/featureVisual'
 
 type DraftRow = { draft: SpecDraft } & Record<string, unknown>
@@ -46,6 +48,8 @@ export function PatentVentureChatPage() {
   const navigate = useNavigate()
   const [clients, setClients] = useState<ClientOpsRecord[] | null>(null)
   const today = todayLocalDate()
+  // D-628 '대화창 같이' 를 고른 사람만 오른쪽 대화창이 저절로 열린다(설정 › 내 설정)
+  const autoChat = useChatAutoOpen()
 
   useEffect(() => {
     let alive = true
@@ -99,8 +103,9 @@ export function PatentVentureChatPage() {
   const pickResume = (r: (typeof resumeRows)[number]) => (r.clientId ? navigate(`${PV_HOME}?client=${encodeURIComponent(r.clientId)}`, { replace: true }) : navigate(r.next.href))
   const summary = brief ? (
     <PvBriefSummary company={clientName || '이 회사'} clientId={clientId} brief={brief} />
-  ) : steps && clientId ? (
-    // D-511 회사를 고르기 전에는 단계 판을 그리지 않는다(1 '회사 고르기' 는 머리의 회사 칸이 같은 말 · 첫 화면은 대화창만)
+  ) : steps ? (
+    // D-628 회사를 고르기 전 — 가운데가 작업 화면이 되면서 다섯 단계 도식(1 → 5)을 다시 보여 준다(무엇을 하는 곳인지 · 어떤 순서인지)
+    //       D-511 때는 대화창이 가운데라 이 판을 접어 두었다
     <section className="rounded-(--radius-panel) border border-slate-200 bg-white px-2 py-3 sm:px-4" aria-label="특허 · 벤처 단계" data-testid="pv-steps">
       <StepProgress
         label={clientName ? `${clientName} 특허 · 벤처 단계` : '특허 · 벤처 단계'}
@@ -146,9 +151,9 @@ export function PatentVentureChatPage() {
           summary,
           next,
           aside,
-          // D-511 대표 "특허 벤처도 누르면 아직 복잡 — 진짜 심플하게 딱" — 대화창이 머리 바로 아래, 준비 현황 · 이어서 하기는 그 아래
-          chatFirst: true,
         }}
+        scope="pv"
+        auto={autoChat}
         clients={clients}
         clientId={clientId}
         clientName={clientName}
@@ -175,7 +180,6 @@ export function PatentVentureChatPage() {
         detailHref={`${PV_HOME}/more${clientId ? `?client=${encodeURIComponent(clientId)}` : ''}`}
         guide={PV_GUIDE}
         today={today}
-        heroTitle={brief || resumeRows.length ? '다른 것을 묻거나 고르세요' : undefined}
       />
     </div>
   )
