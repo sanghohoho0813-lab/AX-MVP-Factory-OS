@@ -160,7 +160,8 @@ const KEYS_N = await keys.count()
 check(`H1 첫 화면 = 이번 주 키워드 단추 ${KEYS_N}개(6개 넘게 · 10개까지) · 1번이 맨 앞(빨간 칸) · 마지막 번호 = 개수`, KEYS_N > 6 && KEYS_N <= 10 && (await keys.first().innerText()).trim().startsWith('1') && (await keys.last().innerText()).trim().startsWith(String(KEYS_N)), KEYS_N)
 const more = page.getByTestId('mk-more')
 check('H2 예전 첫 화면(1순위 카드 · 시장 신호)은 [자세히 보기] 안 — 처음엔 접힘', (await more.getAttribute('data-open')) === '0' && (await page.getByTestId('radar-plan').count()) === 0)
-check('H3 첫 화면에 AI 도우미 판 · 새로 가져오기 · CSV · 채널 설계 기준이 안 보임(그 안으로)', (await page.getByTestId('ai-assist-bar').count()) === 0 && (await page.getByTestId('yt-refresh').count()) === 0 && (await page.getByTestId('radar-brief').count()) === 0)
+// D-628 이 화면의 AI 도우미는 이제 이 화면의 대화창(오른쪽 판 · [⋯] 안) — 가운데 첫 화면에는 여전히 보이지 않는다([자세히 보기] 를 펴지 않아도 [⋯] 에 있다)
+check('H3 첫 화면에 AI 도우미 판 · 새로 가져오기 · CSV · 채널 설계 기준이 안 보임(AI 도우미는 [⋯] · 오른쪽 대화창 안 · 나머지는 [자세히 보기] 안)', (await page.locator('[data-testid="ai-assist-bar"]:visible, main [data-testid="ai-assist-panel"]').count()) === 0 && (await page.locator('[data-testid="page-tools-menu"] [data-testid="ai-assist-bar"]').count()) === 1 && (await page.getByTestId('yt-refresh').count()) === 0 && (await page.getByTestId('radar-brief').count()) === 0)
 const chars = (await page.locator('main').innerText()).replace(/\s+/g, '').length
 const firstKeyTop = (await keys.first().boundingBox())?.y ?? 9999
 check('H4 첫 화면 글자 수 1,000자 아래(전: 2,656자) · 1번 키워드가 첫 화면 안(높이 1000)', chars < 1000 && firstKeyTop < 900, { chars, firstKeyTop })
