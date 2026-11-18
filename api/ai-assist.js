@@ -14,7 +14,7 @@
  *   외부 구독 고객 · 누구인지 모를 때는 예전 그대로 Gemini 만(개인정보처리방침 초안의 국외 이전 회사가 Google 하나 — 늘리려면 방침부터).
  * D-260 영상 단추(radar.transcript) — { video: { id, start, end } } 만 받아 서버가 YouTube 주소를 만들고 Gemini 에 영상 그대로 붙인다(구간 15분까지).
  */
-import { ASSISTS, ASSIST_OUTPUT_SCHEMA, ASSIST_RULES, PACKS, RADAR_RULES, VIDEO_RULES, assistOf, assistSystem, buildAssistPrompt, topicPacks } from './_ai/assists.js'
+import { ASSISTS, ASSIST_OUTPUT_SCHEMA, ASSIST_RULES, FREEDOM_RULES, PACKS, RADAR_RULES, SAFE_AX_OWNER, SAFE_RULES, SHORTS_RULES, THREADS_RULES, VIDEO_RULES, assistOf, assistSystem, buildAssistPrompt, topicPacks } from './_ai/assists.js'
 import { CONFIDENTIAL_RULES, guardOutput, scrubBrand, scrubBrandDeep, secretIndex } from './_ai/guard.js'
 import { IDEA_JUDGE, PATENT_JUDGE, VENTURE_JUDGE } from './_ai/judge.js'
 import { ProviderError, extractJson, scrubDeep, scrubText, validate } from './_ai/core.js'
@@ -118,6 +118,12 @@ const secrets = () =>
     ...CONFIDENTIAL_RULES,
     ...ASSIST_RULES,
     ...RADAR_RULES,
+    // D-633 마케팅 지시문(성공 공식 먼저 · 꼭 지킬 것)
+    ...FREEDOM_RULES,
+    ...SAFE_RULES,
+    SAFE_AX_OWNER,
+    ...THREADS_RULES,
+    ...SHORTS_RULES,
     ...VIDEO_RULES,
     ...VENTURE_JUDGE,
     ...PATENT_JUDGE,

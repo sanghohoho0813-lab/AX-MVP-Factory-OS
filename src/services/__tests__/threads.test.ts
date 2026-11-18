@@ -1,7 +1,7 @@
 /**
  * D-273 스레드 · 릴스 · 틱톡 · 마케팅 공식 내재화 — 틀 23가지 · 숏폼 형식 5 · 규칙 검사(규칙 계산) · 기록표 점수 · AI 에 보내는 자료 · 서버 단추 · 공식 묶음.
  */
-import { ASSISTS, AX_RULES, CONSULT_RULES, PACKS, PRINCIPLE_RULES, RADAR_RULES, SHORTS_RULES, THREADS_RULES, assistSystem, buildAssistPrompt, knowledgeOf } from '../../../api/_ai/assists.js'
+import { ASSISTS, CONSULT_RULES, PACKS, PRINCIPLE_RULES, RADAR_RULES, SAFE_AX_OWNER, SAFE_RULES, SHORTS_RULES, THREADS_RULES, assistSystem, buildAssistPrompt, knowledgeOf } from '../../../api/_ai/assists.js'
 import { CONSULT_CHECKS, consultChecks, consultLint } from '../marketing/consultRules'
 import { customerNoAx } from '../../../api/_ai/customerMarketing.js'
 import { __setMarketingCustomerForTest, axShown, mkText, noAxText } from '../marketing/persona'
@@ -198,9 +198,10 @@ check('D5 아무것도 안 골라도 자료가 만들어짐 · 참고 글 칸 �
 /* ---------------- A 서버 단추 · 공식 묶음 ---------------- */
 const tw = ASSISTS['threads.write']
 check('A1 서버 threads.write — 스레드 화면 · 쓰기 · 화면 단추 이름 같음', tw?.page === 'threads' && tw?.kind === 'write' && ASSIST_PRESETS.some((p) => p.id === 'threads.write' && p.page === 'threads' && p.label === tw.label && p.kind === 'write'))
-check('A2 threads.write 에 대표 운영 원칙 + 스레드 공식 + 사실 목록이 실림', knowledgeOf(tw).map((k: { key: string }) => k.key).join() === 'mk_principles,mk_threads,mk_facts')
+// D-633 성공 공식이 먼저 · 운영 원칙 묶음은 마케팅 지시문에서 빠짐(꼭 지킬 문구는 [꼭 지킬 것])
+check('A2 threads.write 에 스레드 공식 + 사실 목록이 실림(공식 먼저 · 운영 원칙 묶음 없음)', knowledgeOf(tw).map((k: { key: string }) => k.key).join() === 'mk_threads,mk_facts')
 const sys = assistSystem(tw)
-check('A3 스레드 규칙 5줄이 지시문에 · 마케팅(유튜브) 규칙은 안 붙음', THREADS_RULES.length === 5 && THREADS_RULES.every((r: string) => sys.includes(r)) && !sys.includes('[마케팅 규칙]') && sys.includes('[스레드 규칙]'))
+check('A3 스레드 공식 5줄이 지시문에 · 유튜브 공식은 안 붙음', THREADS_RULES.length === 5 && THREADS_RULES.every((r: string) => sys.includes(r)) && !sys.includes('[성공 공식 요약 — 유튜브') && sys.includes('[성공 공식 요약 — 스레드]') && !RADAR_RULES.some((r: string) => sys.includes(r)))
 check('A4 스레드 지시 — 500자 · 본인 댓글 · 틀 글자 · 참고 글은 뼈대만', /500자/.test(sys) && /본인 댓글/.test(sys) && /틀 글자 하나\(A~X\)/.test(sys) && /뼈대.*만 빌리고/.test(sys))
 const built = buildAssistPrompt(tw, ctx, '')
 check('A5 보낼 글에 참고 글 줄 · 고른 틀 · 최근 올린 글', /참고 글/.test(built.user) && /고른틀: P 자료 나눔 조건/.test(built.user) && /최근 올린 글 4건/.test(built.user), built.user.slice(0, 600))
@@ -209,8 +210,8 @@ check('A6 공식 묶음 7개 — 공통 · 스레드 · 숏폼 · 롱폼 · 사�
 const allMk = Object.values(MK_KNOWLEDGE as Record<string, string>).join('\n')
 check('A7 공식 묶음에 출처 이름 · 남의 계정 · 파일 경로 · 차수 표시 없음', !/자청|이상한\s*AI|쓰레드나이스|@[A-Za-z]|[A-Za-z]:\\|\.md\b|\.csv\b|〔|⟲|배포자료\\/.test(allMk), (/자청|이상한\s*AI|쓰레드나이스|@[A-Za-z]|[A-Za-z]:\\|\.md\b|\.csv\b|〔|⟲|배포자료\\/.exec(allMk) ?? [''])[0])
 const kbOf = (id: string) => knowledgeOf(ASSISTS[id]).map((k: { key: string }) => k.key).join()
-check('A8 마케팅 단추마다 맞는 공식 — 모두 운영 원칙 먼저 · 기획은 공통 · 대본은 롱폼 · 쇼츠는 숏폼 · 남의 영상 보기는 판정 기준 · 블로그는 사실 목록 · 받아 적기는 없음', kbOf('radar.top5') === 'mk_principles,mk_common,mk_facts' && kbOf('radar.script') === 'mk_principles,mk_common,mk_long,mk_facts' && kbOf('radar.pack.video') === 'mk_principles,mk_common,mk_long,mk_facts' && kbOf('radar.adapt') === 'mk_principles,mk_judge,mk_common,mk_long,mk_facts' && kbOf('bench.why') === 'mk_principles,mk_judge,mk_common,mk_facts' && kbOf('rising.ref') === 'mk_principles,mk_judge,mk_common,mk_facts' && kbOf('radar.pack.short') === 'mk_principles,mk_common,mk_short,mk_facts' && kbOf('rising.shorts') === 'mk_principles,mk_common,mk_short,mk_facts' && kbOf('radar.pack.blog') === 'mk_principles,mk_facts' && kbOf('radar.transcript') === '' && kbOf('content.blog') === '')
-check('A9 마케팅 규칙에 실측 공통 법칙 3줄 더(넓은 주제 · 팔지 않기 · 첫 줄 숫자 · 증거)', RADAR_RULES.length === 8 && /넓은 주제/.test(RADAR_RULES[5]) && /팔고 시작하지 않는다/.test(RADAR_RULES[6]) && /증거/.test(RADAR_RULES[7]))
+check('A8 마케팅 단추마다 맞는 공식 — D-633 공식 먼저 · 사실 목록은 끝 · 기획은 공통 · 대본은 롱폼 · 쇼츠는 숏폼 · 남의 영상 보기는 판정 기준 · 블로그는 사실 목록 · 받아 적기는 없음', kbOf('radar.top5') === 'mk_common,mk_facts' && kbOf('radar.script') === 'mk_common,mk_long,mk_facts' && kbOf('radar.pack.video') === 'mk_common,mk_long,mk_facts' && kbOf('radar.adapt') === 'mk_common,mk_long,mk_judge,mk_facts' && kbOf('bench.why') === 'mk_common,mk_judge,mk_facts' && kbOf('rising.ref') === 'mk_common,mk_judge,mk_facts' && kbOf('radar.pack.short') === 'mk_common,mk_short,mk_facts' && kbOf('rising.shorts') === 'mk_common,mk_short,mk_facts' && kbOf('radar.pack.blog') === 'mk_facts' && kbOf('radar.transcript') === '' && kbOf('content.blog') === '')
+check('A9 유튜브 · 공통 성공 공식 요약 6줄(고르는 법 · 내 채널 참고 · 넓은 주제 · 팔지 않기 · 첫 줄 숫자 · 증거 · 본업은 이어지면 좋다 — 억지로 엮지 않음) · "반드시 따른다" 없음', RADAR_RULES.length === 6 && /자유롭게/.test(RADAR_RULES[0]) && /넓은 주제/.test(RADAR_RULES[2]) && /팔고 시작하지 않는다/.test(RADAR_RULES[3]) && /증거/.test(RADAR_RULES[4]) && /억지로 엮지 않는다/.test(RADAR_RULES[5]) && !RADAR_RULES.some((r: string) => /반드시 따른다|모든 기획은/.test(r)))
 const scriptI = ASSISTS['radar.script'].instruction.join(' ')
 check('A10 대본 지시 — 0~15초 증거 장면 · 번호형 챕터 · 마무리 V1.8(임팩트 한 줄 · CTA 한 문장 · 김팀장이었습니다 · 숙제 없이) · 썸네일 큰 글자 10자 · 60초 한도 그대로', /0~15초 증거 장면/.test(scriptI) && /번호형 챕터/.test(scriptI) && /임팩트 한 줄/.test(scriptI) && /CTA 한 문장/.test(scriptI) && /김팀장이었습니다/.test(scriptI) && /숙제/.test(scriptI) && /큰 글자 10자/.test(scriptI) && /2,500~3,500자/.test(scriptI) && /60초/.test(scriptI))
 const shortI = ASSISTS['radar.pack.short'].instruction.join(' ')
@@ -262,14 +263,15 @@ const sctx = shortsContext({ platform: 'reels', aim: 'convert', format: 'comment
 const sctxText = JSON.stringify(sctx)
 check('SH20 보낼 자료 — 플랫폼 · 목적 · 고른 형식 · 맞는 형식 · 소재 · 최근 올린 영상 · 더 쓸 사실', /인스타 릴스/.test(sctxText) && /댓글 받기/.test(sctxText) && /고른형식":"댓글형 글자 영상/.test(sctxText) && /맞는형식":"댓글형 글자 영상"/.test(sctxText) && sctx.sections[1].rows.length === 3 && (sctx.facts ?? []).length === 1)
 const sw = ASSISTS['shorts.write']
-check('SH21 서버 shorts.write — 숏폼 화면 · 쓰기 · 화면 단추 이름 같음 · 공통 + 숏폼 공식 + 사실 목록', sw?.page === 'shorts' && sw?.kind === 'write' && ASSIST_PRESETS.some((p) => p.id === 'shorts.write' && p.page === 'shorts' && p.label === sw.label) && knowledgeOf(sw).map((k: { key: string }) => k.key).join() === 'mk_principles,mk_common,mk_short,mk_facts')
+check('SH21 서버 shorts.write — 숏폼 화면 · 쓰기 · 화면 단추 이름 같음 · 공통 + 숏폼 공식 + 사실 목록', sw?.page === 'shorts' && sw?.kind === 'write' && ASSIST_PRESETS.some((p) => p.id === 'shorts.write' && p.page === 'shorts' && p.label === sw.label) && knowledgeOf(sw).map((k: { key: string }) => k.key).join() === 'mk_common,mk_short,mk_facts')
 const ssys = assistSystem(sw)
-check('SH22 숏폼 규칙 5줄이 지시문에 · 스레드 · 마케팅 규칙은 안 붙음 · 첫마디 10자 · 키워드 댓글', SHORTS_RULES.length === 5 && SHORTS_RULES.every((r: string) => ssys.includes(r)) && ssys.includes('[숏폼 규칙]') && !ssys.includes('[스레드 규칙]') && !ssys.includes('[마케팅 규칙]') && /첫마디 10자/.test(ssys) && /키워드 댓글/.test(ssys))
+check('SH22 숏폼 공식 5줄이 지시문에 · 스레드 · 유튜브 공식은 안 붙음 · 첫마디 10자 · 키워드 댓글', SHORTS_RULES.length === 5 && SHORTS_RULES.every((r: string) => ssys.includes(r)) && ssys.includes('[성공 공식 요약 — 릴스 · 틱톡]') && !ssys.includes('[성공 공식 요약 — 스레드]') && !ssys.includes('[성공 공식 요약 — 유튜브') && /첫마디 10자/.test(ssys) && /키워드 댓글/.test(ssys))
 check('SH23 첫마디 뽑기 — 빈 줄 · 시간 표시 건너뜀', firstWordsOf('\n[0:00] 이거 아직 손으로 해요?  (화면: 손)') === '이거 아직 손으로 해요?')
 
 /* ---------------- P 대표 운영 원칙 · 숫자 대조 · 나눠 줄 자료(D-274 보충본) ---------------- */
 const sysOf = (id: string) => assistSystem(ASSISTS[id])
-check('P1 운영 원칙 4줄이 김팀장 채널 단추(레이더 · 스레드 · 릴스 · 틱톡)에 — 채널 규칙보다 먼저', PRINCIPLE_RULES.length === 4 && ['radar.top5', 'radar.script', 'threads.write', 'shorts.write', 'bench.why'].every((id) => { const t = sysOf(id); return PRINCIPLE_RULES.every((r: string) => t.includes(r)) && t.indexOf('[대표 운영 원칙') < t.indexOf(id === 'threads.write' ? '[스레드 규칙]' : id === 'shorts.write' ? '[숏폼 규칙]' : '[마케팅 규칙]') }))
+// D-633 대표: "성공 공식 우선 · 자율성 있게" — 운영 원칙 4줄(대본마다 AX 순서 · 주제는 고민 순서 · 행동 입구)은 마케팅 지시문에서 빼고, 꼭 지킬 문구(AX 뜻 · 괄호 · 벤처)만 [꼭 지킬 것] 대표 줄로
+check('P1 김팀장 채널 단추(레이더 · 스레드 · 릴스 · 틱톡) — 운영 원칙 블록 없음 · [성공 공식 먼저] 가 채널 공식보다 먼저 · 대표 AX 문구는 [꼭 지킬 것] 에', PRINCIPLE_RULES.length === 4 && ['radar.top5', 'radar.script', 'threads.write', 'shorts.write', 'bench.why'].every((id) => { const t = sysOf(id); return !t.includes('[대표 운영 원칙') && !PRINCIPLE_RULES.some((r: string) => t.includes(r)) && t.indexOf('[성공 공식 먼저') < t.indexOf('[성공 공식 요약') && t.includes(SAFE_AX_OWNER) && t.indexOf('[꼭 지킬 것') < t.indexOf('[단추]') }))
 check('P2 고객 업체 글(홍보 글 만들기) · 영상 받아 적기에는 운영 원칙 · 김팀장 이야기를 붙이지 않음', !sysOf('content.blog').includes('[대표 운영 원칙') && !sysOf('content.place').includes('김팀장') && !sysOf('radar.transcript').includes('[대표 운영 원칙'))
 check('P3 운영 원칙 묶음 — AX 위치 · 우선순위 · 괄호 문장 · 벤처 문장 · 사업 기준 · 롱폼 마무리 V1.8 · 작업 메모 · 외부 계정 · 파일 경로 없음', /비슷한 회사들 사이에서 눈에 띄게/.test(PACKS.mk_principles) && /기본 컨디션/.test(PACKS.mk_principles) && /재신청·이의신청을 추가 비용 없이/.test(PACKS.mk_principles) && /3분 AX Fit 진단/.test(PACKS.mk_principles) && /김팀장이었습니다/.test(PACKS.mk_principles) && !/isanghanai|마이페이지|Claude|\.md\b|이상한/.test(PACKS.mk_principles))
 check('P4 판정 기준 묶음 — 주제 · 형식 · 후킹 · 표본 · 목적 · 끝 · 제목 공식 · 오프닝 · 원문 옮기지 않기 · 영어 지시문 · 경로 없음', ['주제:', '후킹', '표본:', '목적:', '제목 공식', '오프닝', '원문은 옮기지 않는다'].every((w) => PACKS.mk_judge.includes(w)) && !/[A-Za-z]:\\|localStorage|You classify/.test(PACKS.mk_judge))
@@ -361,9 +363,9 @@ check('QS9 이번 주 키워드 보관 — 같은 주(일요일까지)만 읽힘
   check('HK9 AI 답 읽기 — 같은 줄 · 빈 줄 버림 · 아는 방법은 번호 · 모르는 이름은 0', parsed.length === 2 && parsed[0].no === 2 && parsed[0].when === '손해 걱정' && parsed[1].no === 0 && parsed[1].name === '모르는 방법')
   const th = ASSISTS['threads.hooks']
   const shh = ASSISTS['shorts.hooks']
-  check('HK10 서버 단추 threads.hooks · shorts.hooks — 화면 단추 이름 같음 · 스레드 공식 / 숏폼 공식 · 부풀리는 말 금지 · D-558 10개 중 8~9개 숫자 · 대괄호 없이', !!th && !!shh && th.page === 'threads' && shh.page === 'shorts' && ASSIST_PRESETS.some((p) => p.id === 'threads.hooks' && p.label === th.label && p.page === 'threads') && ASSIST_PRESETS.some((p) => p.id === 'shorts.hooks' && p.label === shh.label && p.page === 'shorts') && knowledgeOf(th).map((k: { key: string }) => k.key).join() === 'mk_principles,mk_threads,mk_facts' && knowledgeOf(shh).map((k: { key: string }) => k.key).join() === 'mk_principles,mk_common,mk_short,mk_facts' && [th, shh].every((a) => /역대급/.test(a.instruction.join(' ')) && /10개 중 8~9개에 숫자/.test(a.instruction.join(' ')) && /대괄호 빈칸은 쓰지 않는다/.test(a.instruction.join(' ')) && /서로 다른 방법/.test(a.instruction.join(' '))))
+  check('HK10 서버 단추 threads.hooks · shorts.hooks — 화면 단추 이름 같음 · 스레드 공식 / 숏폼 공식 · 부풀리는 말 금지 · D-558 10개 중 8~9개 숫자 · 대괄호 없이', !!th && !!shh && th.page === 'threads' && shh.page === 'shorts' && ASSIST_PRESETS.some((p) => p.id === 'threads.hooks' && p.label === th.label && p.page === 'threads') && ASSIST_PRESETS.some((p) => p.id === 'shorts.hooks' && p.label === shh.label && p.page === 'shorts') && knowledgeOf(th).map((k: { key: string }) => k.key).join() === 'mk_threads,mk_facts' && knowledgeOf(shh).map((k: { key: string }) => k.key).join() === 'mk_common,mk_short,mk_facts' && [th, shh].every((a) => /역대급/.test(a.instruction.join(' ')) && /10개 중 8~9개에 숫자/.test(a.instruction.join(' ')) && /대괄호 빈칸은 쓰지 않는다/.test(a.instruction.join(' ')) && /서로 다른 방법/.test(a.instruction.join(' '))))
   const sys = assistSystem(th)
-  check('HK11 지시문 — 비공개 규칙 맨 앞 · 운영 원칙 · 스레드 규칙 실림', sys.indexOf('[대표 운영 원칙') > 0 && sys.includes('[스레드 규칙]') && sys.includes('(threads.hooks'))
+  check('HK11 지시문 — 비공개 규칙 맨 앞 · 성공 공식 먼저 · 스레드 공식 · 꼭 지킬 것 실림', sys.indexOf('[비공개') === 0 && sys.indexOf('[성공 공식 먼저') > 0 && sys.includes('[성공 공식 요약 — 스레드]') && sys.includes('[꼭 지킬 것') && sys.includes('(threads.hooks'))
 }
 
 /* D-554 컨설팅 · AX 글 규칙 — 점검 · AI 지시문 · 발행 전 확인 */
@@ -398,9 +400,9 @@ check('QS9 이번 주 키워드 보관 — 같은 주(일요일까지)만 읽힘
   check('R6 바꿔쓰기 표에 컨설팅 · AX 줄(숫자 늘리기 · 대행 · 성공보수 · 지어낸 사례 · 요건 · AX · 로고) · D-558 수치 후킹 줄 없음', !REWRITES.some((r) => r.no.includes('99%')) && ['250건 넘게', '동행', '성공보수', '한 대표님', '6등급', 'AX 인증', '도장'].every((w) => REWRITES.some((r) => r.no.includes(w))))
   const ownerSys = ['radar.top5', 'radar.script', 'threads.write', 'shorts.write'].map((id) => assistSystem(ASSISTS[id]))
   const custSys = assistSystem(ASSISTS['threads.write'], { customer: { brand: { name: '홍길동', company: '길동경영' } } })
-  // D-555 AX 는 대표만 하는 컨설팅 — 대표는 7줄 + AX 1줄, 대표가 아닌 계정은 AX 없는 7줄만
-  check('R7 AI 지시문 — 대표 마케팅 채널 단추에 [컨설팅 · AX 글 규칙] 7줄 + AX 1줄(채널 규칙 다음) · 대표가 아닌 계정은 [컨설팅 글 규칙] 7줄만 · 오늘 · 영상 받아 적기에는 없음',
-    CONSULT_RULES.length === 7 && AX_RULES.length === 1 && ownerSys.every((t) => [...CONSULT_RULES, ...AX_RULES].every((r: string) => t.includes(r)) && t.indexOf('[컨설팅 · AX 글 규칙') > t.search(/\[(?:마케팅|스레드|숏폼) 규칙\]/)) && custSys.includes('[컨설팅 글 규칙') && CONSULT_RULES.every((r: string) => custSys.includes(r)) && !custSys.includes('[컨설팅 · AX') && !custSys.includes(AX_RULES[0]) && !assistSystem(ASSISTS['today.top3']).includes('[컨설팅'))
+  // D-555 AX 는 대표만 하는 컨설팅 · D-633 컨설팅 글 규칙 7줄 + 완성도 규칙은 [꼭 지킬 것] 4줄로 줄였다(보장 · 지어내기 · 개인정보 · 로고 · 바로 올릴 글) — 대표는 + AX 문구 한 줄
+  check('R7 AI 지시문 — 마케팅 채널 단추에 [꼭 지킬 것](보장 · 가점 · 성공보수 · 시간 압박 · 대행 말 · 받은 숫자 그대로 · 지어낸 사례 · 로고 · 도장) · 대표는 + AX 문구 · 대표가 아닌 계정은 AX 없이 · 오늘 · 영상 받아 적기에는 없음',
+    SAFE_RULES.length === 4 && ['가점', '성공보수', '마감 임박', '대행', '이상 · 넘게', '로고', '도장', '[대괄호]'].every((w) => SAFE_RULES.join(' ').includes(w)) && ownerSys.every((t) => SAFE_RULES.every((r: string) => t.includes(r)) && t.includes(SAFE_AX_OWNER) && t.indexOf('[꼭 지킬 것') > t.indexOf('[성공 공식 요약')) && custSys.includes('[꼭 지킬 것') && !custSys.includes('AX 뜻') && !assistSystem(ASSISTS['today.top3']).includes('[꼭 지킬 것') && !assistSystem(ASSISTS['radar.transcript']).includes('[꼭 지킬 것') && !ownerSys.some((t) => t.includes('[컨설팅')))
   check('R8 지시문 규칙에 대표 개인 숫자 · 이름 없음(고객에게도 그대로 감) · 고객에게 가는 7줄에 AX 0', CONSULT_RULES.every((r: string) => !/(?<![A-Za-z])AX(?![A-Za-z])/.test(r)) && CONSULT_RULES.every((r: string) => !/김팀장|미래AI랩|250건|100억|9년/.test(r)))
   check('R9 발행 전 확인 8칸(로고 · 받은 숫자 · 지어낸 사례 · 가산점 · 공고 확인 · AX · 노출형 끝 · 직접 세기) · D-558 수치 후킹 칸 없음', CONSULT_CHECKS.length === 8 && !CONSULT_CHECKS.some((c) => c.includes('수치 후킹')) && ['로고', '받은 그대로', '지어낸 사례', '성공보수', '공고 원문', '업무 자동화', '진단 · 상담 안내', '직접 셌다'].every((w) => CONSULT_CHECKS.some((c) => c.includes(w))))
 }
@@ -412,7 +414,7 @@ check('QS9 이번 주 키워드 보관 — 같은 주(일요일까지)만 읽힘
   const leaks = Object.values(ASSISTS).filter((a) => AXW.test(assistSystem(a, { customer: { brand } }))).map((a) => a.id)
   check('D555-1 대표가 아닌 계정 — 모든 AI 단추 지시문에 AX 0(마케팅 · 기업인증 · 벤처 사업계획서 포함)', leaks.length === 0, leaks)
   const ownMk = ['radar.top5', 'radar.script', 'threads.write', 'threads.hooks', 'shorts.write'].map((id) => assistSystem(ASSISTS[id]))
-  check('D555-2 대표 계정 — 마케팅 지시문에 AX 규칙 · 채널 규칙의 AX 줄 그대로', ownMk.every((t) => t.includes(AX_RULES[0]) && t.includes('AX 를 자금 받는 수단으로')))
+  check('D555-2 대표 계정 — 마케팅 지시문에 AX 문구(D-633 꼭 지킬 것) · 채널 공식의 AX 줄 그대로', ownMk.every((t) => t.includes(SAFE_AX_OWNER) && /AX 를 자금 받는 수단으로|AX\)과 자연스럽게/.test(t)))
   const brandSys = assistSystem(ASSISTS['threads.write'], { customer: { brand: { name: 'AX컨설팅 김철수', company: 'AX 파트너스' } } })
   check('D555-3 그 사람이 직접 적은 브랜드(이름 · 회사)는 지우지 않음', brandSys.includes('AX 파트너스'))
   const swapped = customerNoAx('넣지 말 것: 승인 · 선정 보장 · AX 를 자금 받는 수단으로 쓰기 · 고객 실명\nnext = 주제 태그 하나(정책자금 · 벤처기업확인 · 정부지원사업 · AX · 경영컨설팅 가운데)\n금지 명령 | 4 | AX 처음이면 이것부터 만들지 마.\n그대로 둘 줄')

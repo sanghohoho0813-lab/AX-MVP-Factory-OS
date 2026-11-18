@@ -458,7 +458,8 @@ async function run() {
     }
   check(`M4 마케팅 단추 ${mkAssists.length}개 × (설정 없음 · 있음) — 고객 지시문에 대표 이름 · 대표 사실 · 카드뉴스 0`, mkAssists.length >= 20 && leaks.length === 0, leaks.slice(0, 8))
   const ownerSys = mkAssists.map((a) => assistSystem(a, {})).join('\n')
-  check('M5 대표 계정 마케팅 지시문은 그대로 — 김팀장 화자 · 운영 원칙 · 사실 목록 · 카드뉴스', ownerSys.includes('화자 = 김팀장') && ownerSys.includes('대표 운영 원칙') && ownerSys.includes('김팀장이었습니다') && ownerSys.includes('카드뉴스'))
+  // D-633 운영 원칙 블록 대신 [꼭 지킬 것] 의 대표 AX 문구(AX 뜻 · 괄호 · 벤처)
+  check('M5 대표 계정 마케팅 지시문은 그대로 — 김팀장 화자 · AX 문구(꼭 지킬 것) · 사실 목록 · 카드뉴스', ownerSys.includes('화자 = 김팀장') && ownerSys.includes('[꼭 지킬 것') && ownerSys.includes('AX 뜻 =') && ownerSys.includes('김팀장이었습니다') && ownerSys.includes('카드뉴스') && ownerSys.includes('사실 목록'))
   const thr = assistSystem(ASSISTS['threads.write'], { customer: { brand: cleanBrand(BRAND) } })
   check('M6 고객 스레드 지시문 — 실측 공식(틀 카드 · 첫 줄 기법 · 끝 방식)은 남고 대표 완성 예시 · 대표 계정 운영안은 빠짐', thr.includes('틀 카드') && thr.includes('첫 줄 기법') && thr.includes('끝 방식') && !thr.includes('운영안') && !thr.includes('완성 글'))
   const longCust = customerPack(MK_KNOWLEDGE.mk_long)

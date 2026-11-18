@@ -7,7 +7,7 @@ import { RefBook, safeText } from './context'
 import type { AssistBundle, AssistSection } from './context'
 import { STRENGTH_LABEL, myChannelStats, ratioLine } from '../marketing/ytRadar'
 import type { RadarPlan, RadarVideo, RisingTopic } from '../marketing/ytRadar'
-import { BRIEF_FIELDS, defaultBrief, IDEA_STATUS_LABEL, MAKE_CHECKS } from '../marketing/radarStore'
+import { AI_BRIEF_KEYS, BRIEF_FIELDS, defaultBrief, IDEA_STATUS_LABEL, MAKE_CHECKS } from '../marketing/radarStore'
 import type { ChannelBrief, ContentIdea } from '../marketing/radarStore'
 import { shootKit } from '../marketing/shootKit'
 import { linkedVideo, perfOf } from '../marketing/myPerformance'
@@ -27,7 +27,8 @@ import type { ContentProfile, ProfileSource } from '../contentStudio'
  */
 export function briefRows(brief: ChannelBrief): { 항목: string; 기준: string }[] {
   const out: { 항목: string; 기준: string }[] = []
-  for (const f of BRIEF_FIELDS) {
+  // D-633 업을 알려 주는 칸만(AI_BRIEF_KEYS) — 말투 · 형식 · 끝맺음 · 접목 원칙은 AI 에 보내지 않는다(성공 공식대로 자유롭게)
+  for (const f of BRIEF_FIELDS.filter((x) => AI_BRIEF_KEYS.includes(x.key))) {
     const text = safeText(brief[f.key], [], 800)
     if (!text) continue
     const parts: string[] = []
@@ -43,7 +44,7 @@ export function briefRows(brief: ChannelBrief): { 항목: string; 기준: string
   }
   return out
 }
-export const briefSection = (brief: ChannelBrief) => ({ name: '채널 설계 기준(대표가 정함 — 반드시 따름)', rows: briefRows(brief) })
+export const briefSection = (brief: ChannelBrief) => ({ name: '채널 설계 기준(이 사람의 업 — 이해용 · 주제 · 형식은 자유)', rows: briefRows(brief) })
 
 /**
  * D-558 스레드 · 릴스 [AI로 완성 글 쓰기] — 화면이 만든 자료에 내 채널 설계 기준(본업 · 확인된 사실 · 말 원칙)을 맨 앞에,
@@ -123,6 +124,19 @@ export function radarBundle(i: RadarInput): AssistBundle {
   const mineRecent = [...i.mine].sort((a, b) => b.publishedAt - a.publishedAt).slice(0, 20)
   const mineBest = [...i.mine].filter((v) => (v.adjusted ?? v.ratio ?? 0) > 1).sort((a, b) => (b.adjusted ?? b.ratio ?? 0) - (a.adjusted ?? a.ratio ?? 0)).slice(0, 6)
   const stats = myChannelStats(i.mine as RadarVideo[])
+  /**
+   * D-632 찍기 키트(규칙)는 주제 축마다 같은 뼈대다 — 후보 8개 중 6개에 '0:00 결과 먼저 · 화면 녹화 · 3단계' 가 그대로 되풀이돼
+   * AI 가 그 모양을 '이번 주 형식' 으로 알고 답마다 따라 했다. 같은 뼈대는 처음 나온 후보에만 싣고, 뒤에는 '○번과 같은 뼈대' 한 줄로.
+   */
+  const skeleton = (xs: readonly string[]) => xs.map((x) => x.replace(/["“][^"”]*["”]/g, '"…"').replace(/\s—\s.*$/, '')).join(' / ')
+  const seenKit = new Map<string, string>()
+  const onceKit = (kind: string, ref: string, xs: string[]): string[] | string => {
+    const key = `${kind}:${skeleton(xs)}`
+    const first = seenKit.get(key)
+    if (first) return `${first} 과 같은 뼈대(규칙) — 다시 싣지 않음`
+    seenKit.set(key, ref)
+    return xs
+  }
   const sections: AssistSection[] = [
     briefSection(brief),
     { name: '내 채널 최근 영상(새것부터)', rows: mineRecent.map(mineRow), total: i.mine.length },
@@ -131,9 +145,10 @@ export function radarBundle(i: RadarInput): AssistBundle {
       name: '이번 주 찍을 후보(지금 순위대로 · 찍기 키트는 규칙으로 만든 브리프)',
       rows: picks.slice(0, 10).map((o, n) => {
         const kit = shootKit(o)
+        const ref = book.ref('o', o.key)
         return {
           // 같은 화면이라 주소는 두지 않는다(D-241 — 예전엔 '/marketing' 으로 이어져 눌러도 아무 일이 없었다). 답의 [내 콘텐츠에 담기] 가 이 번호로 후보를 찾는다
-          ref: book.ref('o', o.key),
+          ref,
           순위: n + 1,
           주제: o.topic,
           신호: STRENGTH_LABEL[o.strength],
@@ -143,10 +158,10 @@ export function radarBundle(i: RadarInput): AssistBundle {
           [isMarketingCustomer() ? '관점_규칙' : '미래AI랩관점_규칙']: safeText(o.view, [], 300),
           잘된틀_우리제목: kit.frames.slice(0, 3).map((f) => `${f.label} → ${f.mine}`),
           첫문장_규칙: safeText(kit.hook, [], 160),
-          구성_규칙: kit.outline.map((st) => `${st.at} ${st.what}`),
-          쇼츠3컷_규칙: kit.shorts.map((st) => `${st.at} ${st.what}`),
+          구성_규칙: onceKit('구성', ref, kit.outline.map((st) => `${st.at} ${st.what}`)),
+          쇼츠3컷_규칙: onceKit('쇼츠', ref, kit.shorts.map((st) => `${st.at} ${st.what}`)),
           형식: kit.format,
-          준비: kit.prep.slice(0, 3),
+          준비: onceKit('준비', ref, kit.prep.slice(0, 3)),
         }
       }),
     },
@@ -188,9 +203,9 @@ export function radarBundle(i: RadarInput): AssistBundle {
     const longMin = stats.longMedian ? ` · 롱폼 조회 중간값 ${stats.longMedian.toLocaleString('ko-KR')}` : ''
     facts.push(`내 채널 최근 ${stats.count}편: 롱폼 ${stats.longCount} · 쇼츠 ${stats.shortCount}${longMin}${stats.cadenceDays ? ` · 평균 ${stats.cadenceDays}일마다 한 편` : ''}${stats.bestTopic ? ` · 가장 잘 된 주제 '${stats.bestTopic.label}'` : ''}${stats.bestPattern ? ` · 가장 잘 된 제목 틀 '${stats.bestPattern.label}'` : ''}`)
   } else {
-    facts.push('내 채널 영상 자료가 아직 없다 — 채널 설계 기준(형식 · 말투)만으로 맞춘다.')
+    facts.push('내 채널 영상 자료가 아직 없다 — 이 사람의 업(채널 설계 기준)과 성공 공식으로 쓴다.')
   }
-  return { links: book.links, ids: book.ids, context: { title: '마케팅 · 브랜딩 · 콘텐츠 레이더', today: todayLabel(i.today), purpose: '내 채널(채널 설계 기준)에 맞게, 지금 잘되는 주제로 이번 주 찍을 영상을 정하고 대본까지 이어 간다', sections, facts } }
+  return { links: book.links, ids: book.ids, context: { title: '마케팅 · 브랜딩 · 콘텐츠 레이더', today: todayLabel(i.today), purpose: '지금 잘되는 주제로 성공 공식대로 이번 주 찍을 영상을 정하고 대본까지 이어 간다(내 업은 채널 설계 기준 — 이해용)', sections, facts } }
 }
 
 /**

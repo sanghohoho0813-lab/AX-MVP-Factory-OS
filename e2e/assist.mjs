@@ -656,7 +656,9 @@ await shot(page, 'F-make-script')
 await openRadar(page)
 const brief = page.getByTestId('radar-brief')
 if ((await brief.getAttribute('data-open')) !== '1') await brief.getByTestId('fold-toggle').click()
-await brief.locator('textarea[data-brief="avoid"]').fill('코인 · 주식 종목 추천 · 연예 이야기는 다루지 않는다')
+// D-633 AI 는 '내가 하는 일' 칸만 읽는다 — 다루는 것(AI 칸)은 다음 기획 자료에, 말투(규칙 초안 칸)는 안 감
+await brief.locator('textarea[data-brief="covers"]').fill('가업승계 · 정책자금 이야기(코인 · 주식 종목 추천 · 연예 이야기는 다루지 않는다)')
+await brief.locator('textarea[data-brief="tone"]').fill('말투 시험 문장 — 이 칸은 AI 에 안 간다')
 await page.getByTestId('radar-brief-save').click()
 await page.waitForTimeout(800)
 await brief.scrollIntoViewIfNeeded()
@@ -666,12 +668,13 @@ await page.getByTestId('ai-assist-chip').filter({ hasText: 'TOP5' }).click()
 await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.getByTestId('ai-assist-result').waitFor({ timeout: 10000 })
 check('F16 채널 설계 기준을 고치면 다음 기획 자료에 그대로(새로고침 없이)', llm.at(-1).user.includes('코인 · 주식 종목 추천 · 연예 이야기는 다루지 않는다'))
+check("F16b D-633 AI 에는 '내가 하는 일' 칸만 — 말투 칸은 안 감 · 설계 기준 이름 '이해용' · 지시문 [성공 공식 먼저]", !llm.at(-1).user.includes('말투 시험 문장') && llm.at(-1).user.includes('채널 설계 기준(이 사람의 업') && !llm.at(-1).user.includes('반드시 따름') && llm.at(-1).sys.includes('[성공 공식 먼저') && (await brief.locator('[data-brief-group="ai"] textarea').count()) === 7)
 await page.keyboard.press('Escape')
 await page.reload({ waitUntil: 'networkidle' })
 await page.waitForTimeout(800)
 // D-295 채널 설계 기준은 열 때마다 접힌 채(가끔 고치는 칸) — 펼쳐서 본다
 if ((await page.getByTestId('radar-brief').getAttribute('data-open')) !== '1') await page.getByTestId('radar-brief').getByTestId('fold-toggle').click()
-check("F17 새로고침해도 고친 기준 그대로 · '직접 고친 기준'", (await page.getByTestId('radar-brief').locator('textarea[data-brief="avoid"]').inputValue()).includes('코인') || (await page.getByTestId('radar-brief').innerText()).includes('직접 고친 기준'))
+check("F17 새로고침해도 고친 기준 그대로 · '직접 고친 기준'", (await page.getByTestId('radar-brief').locator('textarea[data-brief="covers"]').inputValue()).includes('코인') || (await page.getByTestId('radar-brief').innerText()).includes('직접 고친 기준'))
 
 /* ---------------- E 휴대폰 ---------------- */
 for (const w of [360, 390]) {

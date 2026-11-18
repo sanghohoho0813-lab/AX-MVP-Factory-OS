@@ -6,7 +6,7 @@ import { ASSISTS, RADAR_RULES, buildAssistPrompt } from '../../../api/_ai/assist
 import { ASSIST_PRESETS } from '../aiAssist/presets'
 import { MK_ASK_CHIPS, mkRoute, mkTopicOf } from '../marketing/mkAsk'
 import { packBundle } from '../aiAssist/marketingBuilders'
-import { BRIEF_FIELDS, DEFAULT_BRIEF, listIdeas, normalizeIdea, saveIdea } from '../marketing/radarStore'
+import { AI_BRIEF_KEYS, BRIEF_FIELDS, DEFAULT_BRIEF, listIdeas, normalizeIdea, saveIdea } from '../marketing/radarStore'
 import { prepareFeed } from '../marketing/ytBench'
 import { radarPlan } from '../marketing/ytRadar'
 import { sampleFeed } from '../marketing/ytSample'
@@ -338,14 +338,18 @@ const allText = (p: ContentPack) => viewer(p).flatMap((x) => x.blocks.map((b) =>
   check('K5 여섯 갈래 — 롱폼 1(radar.pack.video) · 숏폼 2(shorts.write) · 스레드 3(threads.write) — 서버에 있는 공식 단추 그대로', reqs.map((r) => r.assistId).join() === 'radar.pack.video,shorts.write,shorts.write,threads.write,threads.write,threads.write' && reqs.every((r) => !!ASSISTS[r.assistId] && ASSISTS[r.assistId].page === r.page), reqs.map((r) => `${r.assistId}/${r.page}`))
   const sentOf = (i: number) => buildAssistPrompt(ASSISTS[reqs[i].assistId], reqs[i].context, '')
   const longU = sentOf(0).user
-  check('K6 롱폼 자료 — 짝 1 본업 · 미끼 · 접목 각도 · 채널 설계 기준 · 규칙집(AI 는 미끼, 끝은 본업) · 이번 주 계획(수요일 · 쇼츠로 자를 곳) · 줄임 0', longU.includes(p0.core.topic) && longU.includes(p0.hook!.topic) && longU.includes('접목') && longU.includes('[규칙집]') && longU.includes('AI 는 미끼, 끝은 본업') && longU.includes('11/4(수)') && longU.includes('쇼츠로 자를 곳') && sentOf(0).sent.rowsCut === 0, [longU.slice(0, 300), sentOf(0).sent])
+  // D-633 접목 규칙은 '이어지면 좋다 · 억지로 엮지 않는다'(예전: AI 는 미끼, 끝은 본업)
+  const BRIDGE = '억지로 엮지 않는다'
+  check('K6 롱폼 자료 — 짝 1 본업 · 미끼 · 접목 각도 · 채널 설계 기준 · 규칙집(이번 주 흐름 × 내 업 — 억지로 엮지 않음) · 이번 주 계획(수요일 · 쇼츠로 자를 곳) · 줄임 0', longU.includes(p0.core.topic) && longU.includes(p0.hook!.topic) && longU.includes('접목') && longU.includes('[규칙집]') && longU.includes(BRIDGE) && !longU.includes('AI 는 미끼, 끝은 본업') && longU.includes('11/4(수)') && longU.includes('쇼츠로 자를 곳') && sentOf(0).sent.rowsCut === 0, [longU.slice(0, 300), sentOf(0).sent])
   const sA = sentOf(1).user
   const sB = sentOf(2).user
-  const brief0 = BRIEF_FIELDS.filter((f) => DEFAULT_BRIEF[f.key]).map((f) => f.label)
-  check('K7 쇼츠 자료 — ① ② 짝 1 · 틱톡 · 같은 주 롱폼 제목 · 링크는 고정 댓글 / ③ 짝 2 · 릴스 · 관점 · 둘 다 채널 설계 기준 전부 · 접목 · 규칙집', sA.includes(tp.pairs[0].label) && sA.includes('틱톡 · 유튜브 쇼츠') && sA.includes('같은주롱폼') && sA.includes('고정 댓글에만') && sB.includes(tp.pairs[1].label) && sB.includes('인스타 릴스') && sB.includes('관점') && [sA, sB].every((u) => u.includes('채널 설계 기준') && brief0.every((l) => u.includes(l)) && u.includes('접목') && u.includes('AI 는 미끼, 끝은 본업')), [sA.slice(0, 200), sB.slice(0, 200), brief0.filter((l) => !sA.includes(l))])
+  // D-633 채널 설계 기준은 업을 알려 주는 7칸만(말투 · 형식 · 끝맺음 · 접목 원칙 · 말 원칙 · 다루지 않는 것은 안 감)
+  const brief0 = BRIEF_FIELDS.filter((f) => DEFAULT_BRIEF[f.key] && AI_BRIEF_KEYS.includes(f.key)).map((f) => f.label)
+  const briefOff = BRIEF_FIELDS.filter((f) => !AI_BRIEF_KEYS.includes(f.key)).map((f) => `항목: ${f.label} |`)
+  check('K7 쇼츠 자료 — ① ② 짝 1 · 틱톡 · 같은 주 롱폼 제목 · 링크는 고정 댓글 / ③ 짝 2 · 릴스 · 관점 · 둘 다 채널 설계 기준(업 7칸 · 말투 칸 없음) · 접목 · 규칙집', brief0.length === 7 && sA.includes(tp.pairs[0].label) && sA.includes('틱톡 · 유튜브 쇼츠') && sA.includes('같은주롱폼') && sA.includes('고정 댓글에만') && sB.includes(tp.pairs[1].label) && sB.includes('인스타 릴스') && sB.includes('관점') && [sA, sB].every((u) => u.includes('채널 설계 기준') && brief0.every((l) => u.includes(l)) && !briefOff.some((l) => u.includes(l)) && u.includes('접목') && u.includes(BRIDGE)), [sA.slice(0, 200), sB.slice(0, 200), brief0.filter((l) => !sA.includes(l)), briefOff.filter((l) => sA.includes(l))])
   const tU = [3, 4, 5].map((i) => sentOf(i).user)
   const tpls = tU.map((u) => [...u.matchAll(/(\d)번 ([A-X]) /g)].map((m) => m[2]).join(''))
-  check('K8 스레드 자료 — 짝 셋 · 글마다 요일 · 목적 · 틀 뼈대(ETX / DGQ / ISP) · 요일 이름 · 채널 설계 기준 · 접목 · 본업 태그', tpls.join() === 'ETX,DGQ,ISP' && tU.every((u, i) => u.includes(tp.pairs[i].label) && u.includes('채널 설계 기준') && u.includes('접목') && u.includes('AI 는 미끼, 끝은 본업')) && tU[0].includes('11/2(월) 저장 · 공유') && tU[1].includes('뼈대:'), tpls)
+  check('K8 스레드 자료 — 짝 셋 · 글마다 요일 · 목적 · 틀 뼈대(ETX / DGQ / ISP) · 요일 이름 · 채널 설계 기준 · 접목 · 본업 태그', tpls.join() === 'ETX,DGQ,ISP' && tU.every((u, i) => u.includes(tp.pairs[i].label) && u.includes('채널 설계 기준') && u.includes('접목') && u.includes(BRIDGE)) && tU[0].includes('11/2(월) 저장 · 공유') && tU[1].includes('뼈대:'), tpls)
   const leak = reqs.slice(1).filter((r) => tp.pairs.some((p) => p.hook?.facts.some((f) => JSON.stringify(r.context).includes(f))))
   check('K9 쇼츠 · 스레드 자료에 레이더 숫자(근거) 없음 · 개인정보 없음', leak.length === 0 && reqs.every((r) => !/010-|\d{6}-\d{7}/.test(JSON.stringify(r.context))), leak.map((r) => r.part))
   const d = (t: string, body = `${t} 본문`): ThreadDraft => ({ firstLine: t, template: t as ThreadDraft['template'], body, ending: '', selfComment: '', checks: [] })

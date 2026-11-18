@@ -395,6 +395,13 @@ export const BRIEF_FIELDS: ReadonlyArray<{ key: keyof ChannelBrief; label: strin
   { key: 'principles', label: '말할 때 꼭 지킬 것', hint: '쓰는 문장 · 쓰지 않는 말' },
 ]
 
+/**
+ * D-633 AI 에 보내는 칸 — 이 사람이 무슨 일을 하는지(업)만. 대표(2026-11-18): "내가 어떤 업인지만 이해하고 자율성 있게".
+ * 말투 · 형식 · 끝맺음 · 접목 원칙 · 말 원칙 · 다루지 않는 것은 규칙 초안(찍기 키트 · 1주일치 · 묶음 초안)에만 쓰고 AI 에는 보내지 않는다 —
+ * AI 는 성공 공식대로 자유롭게 쓰고, 안전 줄은 서버가 지킨다(api/_ai/assists.js SAFE_RULES).
+ */
+export const AI_BRIEF_KEYS: ReadonlyArray<keyof ChannelBrief> = ['channel', 'host', 'audience', 'covers', 'services', 'pains', 'proof']
+
 export const DEFAULT_BRIEF: ChannelBrief = {
   channel: '김팀장의 경영노트 — 미래AI랩이 운영하는 중소기업 경영 채널',
   host: '김팀장(미래AI랩) — 중소기업 대표를 수백 곳 상담해 온 경영 컨설턴트',

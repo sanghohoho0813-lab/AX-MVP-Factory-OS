@@ -5,7 +5,7 @@
  */
 import handler, { __resetAiAssistState } from '../../../api/ai-assist.js'
 import runHandler, { __resetAiRunState } from '../../../api/ai-run.js'
-import { ASSISTS, ASSIST_EXAMPLE, ASSIST_OUTPUT_SCHEMA, ASSIST_RULES, PACKS, RADAR_RULES, assistSystem, buildAssistPrompt, knowledgeOf, topicPacks } from '../../../api/_ai/assists.js'
+import { ASSISTS, ASSIST_EXAMPLE, ASSIST_OUTPUT_SCHEMA, ASSIST_RULES, FREEDOM_RULES, PACKS, RADAR_RULES, SAFE_AX_OWNER, SAFE_RULES, assistSystem, buildAssistPrompt, knowledgeOf, topicPacks } from '../../../api/_ai/assists.js'
 import { KNOWLEDGE } from '../../../api/_ai/knowledge.js'
 import { SPEC_SAMPLES, SPEC_SAMPLES_META } from '../../../api/_ai/specSamples.js'
 import { MODEL_CATALOG, PROVIDER_ORDER, defaultChoice, cleanChoice, catalogOf, classifyProviderError, tierOf } from '../../../api/_ai/providers.js'
@@ -22,7 +22,7 @@ import { __resetJudgeSkill, readJudgeSkill, saveJudgeSkill, syncJudgeSkill } fro
 import { listRows as listModuleRows, saveRow as saveModuleRow } from '../moduleData'
 import { pickScopedRow, workspaceRowId } from '../workspaceRowId'
 import type { AssistRun, AssistStatus } from '../aiAssist/client'
-import { DEFAULT_BRIEF, SCRIPT_MAX, aiPlanInput, ideaFromOpportunity, normalizeBrief, normalizeIdea, type ContentIdea } from '../marketing/radarStore'
+import { AI_BRIEF_KEYS, DEFAULT_BRIEF, SCRIPT_MAX, aiPlanInput, ideaFromOpportunity, normalizeBrief, normalizeIdea, type ContentIdea } from '../marketing/radarStore'
 import { prepareFeed } from '../marketing/ytBench'
 import { radarPlan, radarVideos } from '../marketing/ytRadar'
 import { sampleFeed } from '../marketing/ytSample'
@@ -354,8 +354,8 @@ async function serverTests() {
     // 점검: 받아 적기에 마케팅 규칙(제목 · 쓰기 규칙)이 섞이면 '들린 그대로' 와 부딪힌다 — 받아 적기엔 영상 규칙만, 우리 버전엔 마케팅 규칙 그대로
     const tSys = assistSystem(ASSISTS['radar.transcript'])
     const aSys = assistSystem(ASSISTS['radar.adapt'])
-    check('V8 받아 적기 지시문 — [영상 받아 적기] 있음 · [마케팅 규칙] 없음 · 들린 숫자는 그대로 / 우리 버전 지시문엔 [마케팅 규칙] 그대로',
-      tSys.includes('[영상 받아 적기]') && !tSys.includes('[마케팅 규칙]') && !tSys.includes(RADAR_RULES[0]) && tSys.includes('들린 그대로') && aSys.includes('[마케팅 규칙]') && !aSys.includes('[영상 받아 적기]'))
+    check('V8 받아 적기 지시문 — [영상 받아 적기] 있음 · 마케팅 성공 공식 · 꼭 지킬 것 없음 · 들린 숫자는 그대로 / 우리 버전 지시문엔 [성공 공식 요약] 그대로',
+      tSys.includes('[영상 받아 적기]') && !tSys.includes('[성공 공식') && !tSys.includes('[꼭 지킬 것') && !tSys.includes(RADAR_RULES[0]) && tSys.includes('들린 그대로') && aSys.includes('[성공 공식 요약') && !aSys.includes('[영상 받아 적기]'))
   }
   setEnv()
   {
@@ -607,8 +607,13 @@ function d241Tests() {
 
   // 서버 — 마케팅 규칙 · 대본 단추 · '자료에 없음' 채우기 금지
   const radarSys = assistSystem(ASSISTS['radar.top5'])
-  check('S1 마케팅 단추 지시문에 [마케팅 규칙](채널 설계 기준 · 내 채널 다음 편 · 후보 번호 · 미래AI랩 일 · 상투어 금지) — 다른 화면엔 없음',
-    RADAR_RULES.every((r: string) => radarSys.includes(r)) && !assistSystem(ASSISTS['today.top3']).includes('[마케팅 규칙]') && radarSys.includes('채널 설계 기준') && radarSys.includes('꿀팁') && !radarSys.includes('N분 컷') && radarSys.includes('[완성도 규칙') && radarSys.includes('10개 중 8~9개에 숫자'))
+  // D-633 대표: "성공 공식을 우선으로 · 업만 이해하고 자율성 있게" — 성공 공식 먼저 → 그 플랫폼 공식 요약 → 꼭 지킬 것(안전) → [단추]
+  const at = (t: string, k: string) => t.indexOf(k)
+  check('S1 마케팅 단추 지시문 — [성공 공식 먼저] → [성공 공식 요약](후보 번호 · 넓은 주제 · 팔지 않기 · 첫 줄 숫자) → [꼭 지킬 것](보장 · 지어내기 · 로고 · 상투어) → [단추] · 예전 겹겹 규칙(운영 원칙 · 컨설팅 글 · 완성도 숫자 할당 · 반드시 따름) 없음 · 다른 화면엔 없음',
+    RADAR_RULES.every((r: string) => radarSys.includes(r)) && FREEDOM_RULES.every((r: string) => radarSys.includes(r)) && SAFE_RULES.every((r: string) => radarSys.includes(r)) &&
+      at(radarSys, '[성공 공식 먼저') > 0 && at(radarSys, '[성공 공식 먼저') < at(radarSys, '[성공 공식 요약') && at(radarSys, '[성공 공식 요약') < at(radarSys, '[꼭 지킬 것') && at(radarSys, '[꼭 지킬 것') < at(radarSys, '[단추]') &&
+      !assistSystem(ASSISTS['today.top3']).includes('[성공 공식') && !assistSystem(ASSISTS['today.top3']).includes('[꼭 지킬 것') && radarSys.includes('채널 설계 기준') && radarSys.includes('꿀팁') && !radarSys.includes('N분 컷') &&
+      !radarSys.includes('[완성도 규칙') && !radarSys.includes('10개 중 8~9개에 숫자') && !radarSys.includes('[대표 운영 원칙') && !radarSys.includes('[컨설팅') && !radarSys.includes('반드시 따른다'))
   check('S2 [대본 끝까지 쓰기] — 서버 · 화면 단추 같은 이름 · 글쓰기 · 레이더 · 구간별 대사 · 공식 자료 확인 칸',
     ASSISTS['radar.script']?.page === 'radar' && ASSISTS['radar.script']?.kind === 'write' && ASSIST_PRESETS.some((p) => p.id === 'radar.script' && p.label === ASSISTS['radar.script'].label && p.kind === 'write') && ASSISTS['radar.script'].instruction.join(' ').includes('[공식 자료 확인'))
   check('S3 공통 규칙 — 모르는 칸은 비워 둠("자료에 없음" 으로 채우지 않음) · 없는 번호를 만들지 않음', ASSIST_RULES.some((r: string) => r.includes('빈 글로 둔다')) && ASSIST_RULES.some((r: string) => r.includes('없는 번호를 만들지 않고')) && !ASSIST_RULES.some((r: string) => r.includes('모르면 "자료에 없음"')))
@@ -620,13 +625,16 @@ function d241Tests() {
   const vids = radarVideos(prep, { now: NOW })
   const plan = radarPlan(prep, { now: NOW }, vids)
   const mine = vids.filter((v) => v.mine)
-  const brief = { ...DEFAULT_BRIEF, avoid: '연예 · 코인 · 주식 종목 추천은 다루지 않는다' }
+  const brief = { ...DEFAULT_BRIEF, covers: `${DEFAULT_BRIEF.covers} — 연예 · 코인 · 주식 종목 추천은 다루지 않는다`, tone: '말투 시험 문장(AI 에 안 감)' }
   const idea = normalizeIdea({ ...ideaFromOpportunity(plan.picks[0]), savedAt: '2026-10-18T00:00:00Z', status: 'selected', memo: '화요일 촬영', script: '0:00 오프닝 …' }, 'idea_1') as ContentIdea
   const rb = radarBundle({ today: T, view: 'plan', plan, rising: [], breakouts: [], videos: vids, ideas: [idea], mine, brief })
   const sec = (n: string) => rb.context.sections.find((x) => x.name.startsWith(n))
-  // D-347 칸 13개(긴 칸은 '(이어서)' 줄로 나눠 서버의 칸 자르기에 안 걸리게)
+  // D-347 긴 칸은 '(이어서)' 줄로 나눠 서버의 칸 자르기에 안 걸리게 · D-633 AI 에는 업을 알려 주는 7칸만(말투 · 형식 · 끝맺음 · 접목 · 말 원칙 · 다루지 않는 것은 규칙 초안에만)
   const briefRowsSent = rb.context.sections[0].rows as { 항목: string; 기준: string }[]
-  check('R1 레이더 자료 맨 앞 — 채널 설계 기준(대표가 고친 값 그대로 · 13칸 모두 · 한 줄 300자 안)', rb.context.sections[0].name.startsWith('채널 설계 기준') && new Set(briefRowsSent.map((r) => r.항목.replace('(이어서)', ''))).size === 13 && briefRowsSent.every((r) => r.기준.length <= 300) && JSON.stringify(rb.context.sections[0]).includes('코인'), briefRowsSent.length)
+  const sentLabels = new Set(briefRowsSent.map((r) => r.항목.replace('(이어서)', '')))
+  check('R1 레이더 자료 맨 앞 — 채널 설계 기준(이 사람의 업 · 이해용 — 대표가 고친 값 그대로 · 업 7칸만 · 한 줄 300자 안 · 말투 칸 안 감)',
+    rb.context.sections[0].name.startsWith('채널 설계 기준(이 사람의 업') && !rb.context.sections[0].name.includes('반드시') && sentLabels.size === 7 && sentLabels.size === AI_BRIEF_KEYS.length && briefRowsSent.every((r) => r.기준.length <= 300) && JSON.stringify(rb.context.sections[0]).includes('코인') && !JSON.stringify(rb.context.sections[0]).includes('말투 시험') && !sentLabels.has('말투') && !sentLabels.has('끝맺음'),
+    [...sentLabels])
   check('R2 내 채널 최근 영상 · 내 채널 숫자 한 줄(facts)', !!sec('내 채널 최근 영상') && (sec('내 채널 최근 영상')?.rows.length ?? 0) === Math.min(20, mine.length) && (rb.context.facts ?? []).some((f) => f.startsWith('내 채널')), { mine: mine.length })
   const cand = sec('이번 주 찍을 후보')
   check('R3 후보 — o1… 번호 · 주소 없음(같은 화면) · ids 로 후보 키 · 찍기 키트(첫 문장 · 구성 · 쇼츠 3컷)',
@@ -636,6 +644,35 @@ function d241Tests() {
   check('R4 내 콘텐츠 줄 — i1 → /marketing?view=make&idea=번호(그 줄이 펼쳐짐) · 대본 있음 표시', !!mineSec && rb.links.i1 === '/marketing?view=make&idea=idea_1' && rb.ids?.i1 === 'idea_1' && String(mineSec.rows[0].대본).startsWith('있음'), mineSec?.rows[0])
   const rb0 = radarBundle({ today: T, view: 'plan', plan, rising: [], breakouts: [], videos: vids, ideas: [], mine: [], brief: null })
   check('R5 기준을 안 고쳤으면 기본값(김팀장의 경영노트) · 내 채널 영상 없으면 그렇다고 한 줄', JSON.stringify(rb0.context.sections[0]).includes('김팀장의 경영노트') && (rb0.context.facts ?? []).some((f) => f.includes('아직 없다')))
+  // D-632 대표: "따라 할 틀 3개가 왜 계속 시연 샘플 화면 · 3단계 · 3칸 체크리스트 · 4칸 대시보드로만 나오나" — 같은 찍기 키트 뼈대가 후보마다 되풀이됐다
+  {
+    const rows = (sec('이번 주 찍을 후보')?.rows ?? []) as Record<string, unknown>[]
+    const skel = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x).replace(/["“][^"”]*["”]/g, '"…"').replace(/\s—\s.*$/, '')).join(' / ') : '')
+    const arrays = rows.map((r) => skel(r.구성_규칙)).filter(Boolean)
+    const strings = rows.filter((r) => typeof r.구성_규칙 === 'string').map((r) => String(r.구성_규칙))
+    check('R6(D-632) 찍기 키트 뼈대(구성 · 쇼츠 3컷 · 준비)는 처음 나온 후보에만 — 같은 뼈대는 뒤 후보에 "○번 과 같은 뼈대" 한 줄',
+      new Set(arrays).size === arrays.length && strings.every((t) => /^o\d+ 과 같은 뼈대/.test(t)) && Array.isArray(rows[0]?.구성_규칙),
+      { arrays: arrays.length, strings })
+    const bc = ASSISTS['bench.copy']
+    const names = rb.context.sections.map((x) => x.name)
+    const refs = [...bc.instruction.join(' ').matchAll(/\[자료 · ([^\]]+)\]/g)].map((m) => m[1])
+    check('R7(D-632) [따라 할 틀 3개] 지시 — 가리키는 자료 이름이 실제 자료에 다 있음(남의 잘 된 영상 · 많이 쓴 제목 틀 · 내 채널 잘 된 영상 · 채널 설계 기준 · 후보)',
+      refs.length >= 5 && refs.every((r) => names.some((n) => n.startsWith(r))), refs.filter((r) => !names.some((n) => n.startsWith(r))))
+    const bi = bc.instruction.join(' ')
+    check('R8(D-632) [따라 할 틀 3개] — 틀은 남의 잘 된 영상에서 · 셋은 서로 다른 틀 · 장면(같은 것은 하나까지) · 한 형식으로 묶지 않음 · 주제는 채널 설계 기준 본업 · 찍기 키트를 옮기지 않음 · 판정 기준 묶음',
+      /틀은 \[자료 · 남의 채널/.test(bi) && /서로 다른 틀 · 다른 장면/.test(bi) && /같은 것은 하나까지/.test(bi) && /한 형식으로 묶지 않는다/.test(bi) && /채널 설계 기준\] 의 본업/.test(bi) && /찍기 키트[^—]*옮기지 않는다/.test(bi) && knowledgeOf(bc).some((k: { key: string }) => k.key === 'mk_judge'))
+    const vary = FREEDOM_RULES[FREEDOM_RULES.length - 1]
+    const mkIds = ['bench.copy', 'radar.top5', 'radar.script', 'radar.pack.video', 'threads.write', 'shorts.write', 'threads.hooks', 'radar.ask']
+    check('R9(D-632 · D-633) 성공 공식 먼저 끝 줄 — 한 답 안 항목은 서로 다른 모양(같은 장면 · 장치 · N단계/N칸 꼴은 한 번까지) · 찍기 키트는 공통 뼈대 — 마케팅 단추 모두 · 대표 · 고객 지시문 모두',
+      /서로 다른 모양/.test(vary) && /한 번까지/.test(vary) && /공통 뼈대/.test(vary) && mkIds.every((id) => assistSystem(ASSISTS[id]).includes(vary)) && assistSystem(bc, { customer: { brand: null } }).includes(vary))
+    // D-633 꼭 지킬 것 — 대표 · 고객 같은 안전 줄 · AX 문구는 대표만 · 운영 원칙 묶음(대본마다 AX 순서 · 주제는 1~3번 고민에서)은 마케팅 지시문에서 빠짐 · 공식 묶음이 사실 목록보다 먼저
+    const own = assistSystem(ASSISTS['threads.write'])
+    const cust = assistSystem(ASSISTS['threads.write'], { customer: { brand: null } })
+    check('R10(D-633) 꼭 지킬 것 — 안전 4줄은 대표 · 고객 모두 · AX 문구는 대표만 · 운영 원칙 묶음 빠짐 · [기준 문서 — 성공 공식] 에서 공식 → 사실 목록 순서',
+      mkIds.every((id) => SAFE_RULES.every((r: string) => assistSystem(ASSISTS[id]).includes(r))) && SAFE_RULES.slice(1).every((r: string) => cust.includes(r)) && cust.includes('[꼭 지킬 것') &&
+        own.includes(SAFE_AX_OWNER) && !cust.includes('AX 뜻 =') && mkIds.every((id) => !knowledgeOf(ASSISTS[id]).some((k: { key: string }) => k.key === 'mk_principles')) &&
+        own.includes('[기준 문서 — 성공 공식]') && own.indexOf(PACKS.mk_threads.slice(0, 200)) < own.indexOf(PACKS.mk_facts.slice(0, 120)) && !own.includes('대본·카드뉴스·홈페이지 문구를 쓸 때 위 순서와 괄호 문장을 넣는다'))
+  }
 
   // AI 기획 → 내 콘텐츠
   const opp = plan.picks[0]

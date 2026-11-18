@@ -4,12 +4,13 @@
  * 저장은 레이더 설정(RadarPrefs.brief) 한 곳. 기본값으로 되돌리면 null 로 저장해 다음 기본값 개선을 그대로 받는다.
  * D-295 대표: "내 아이디에서는 그대로 두되 접어 두기로 · 다른 사람에게는 안 보이게(각자 알아서)" — 대표 계정만 · 열 때마다 접힌 채로.
  *   팀장 · 구독 고객은 이 카드를 보지 않는다(AI 는 그 사람의 설정 › 내 브랜드로 쓴다).
+ * D-633 대표: "업인지만 이해하고 자율성 있게" — AI 는 위쪽 '내가 하는 일' 칸(AI_BRIEF_KEYS)만 읽고, 아래 칸은 규칙 초안(찍기 키트 · 1주일치)에만 쓴다.
  */
 import { useEffect, useRef, useState } from 'react'
 import { Compass, RotateCcw, Save } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { Fold } from '../../../components/ui/fold'
-import { BRIEF_FIELDS, BRIEF_MAX, defaultBrief, normalizeBrief, type ChannelBrief } from '../../../services/marketing/radarStore'
+import { AI_BRIEF_KEYS, BRIEF_FIELDS, BRIEF_MAX, defaultBrief, normalizeBrief, type ChannelBrief } from '../../../services/marketing/radarStore'
 import { isMarketingCustomer } from '../../../services/marketing/persona'
 
 export function BriefCard({ brief, custom, readOnly, onSave, plain = false }: { brief: ChannelBrief; custom: boolean; readOnly: boolean; onSave: (next: ChannelBrief | null) => Promise<boolean>; /** D-603 다른 판 안에 놓일 때 — 테두리 칸 없이 가는 선 위 한 줄(박스 안 박스 줄이기) */ plain?: boolean }) {
@@ -40,32 +41,42 @@ export function BriefCard({ brief, custom, readOnly, onSave, plain = false }: { 
       id="radar.brief"
       icon={<Compass aria-hidden="true" className="size-4 text-violet-700" />}
       title="채널 설계 기준"
-      hint={`AI 가 기획 · 대본 · 쇼츠 · 스레드를 쓸 때 반드시 따르는 것 — 채널 · 화자 · 시청자 · 다루는 것 · 말투 · 형식 · 끝맺음 · 본업 · 시청자 고민 · 접목 원칙 · 실제 사례 · 말할 때 지킬 것${custom ? '' : isMarketingCustomer() ? ' (지금은 기본값 · 설정 › 내 브랜드에서)' : ' (지금은 기본값 · 김팀장의 경영노트)'}`}
+      hint={`AI 는 여기서 '내가 하는 일'(채널 · 화자 · 시청자 · 다루는 것 · 본업 · 시청자 고민 · 실제 사례)만 읽고, 제목 · 말투 · 형식은 성공 공식대로 자유롭게 씁니다${custom ? '' : isMarketingCustomer() ? ' (지금은 기본값 · 설정 › 내 브랜드에서)' : ' (지금은 기본값 · 김팀장의 경영노트)'}`}
       // D-627 접힌 줄은 이름 하나 — 고쳐 둔 때만 짧게 표시(기본값 이름은 ?(hint) 안)
       summary={custom ? '직접 고친 기준' : undefined}
       testId="radar-brief"
       keepClosed
     >
       <div className="flex flex-col gap-3">
-        <p className="t-sub break-keep text-slate-600">여기 적은 대로 AI 가 기획 · 대본을 맞춥니다. 내 채널 최근 영상 · 잘 된 영상도 함께 보냅니다.</p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {BRIEF_FIELDS.map((f) => (
-            <label key={f.key} className="flex min-w-0 flex-col gap-1">
-              <span className="t-sub font-semibold break-keep text-slate-800">
-                {f.label} <span className="t-meta font-normal text-slate-500">· {f.hint}</span>
-              </span>
-              <textarea
-                rows={draft[f.key].length > 200 ? 6 : 3}
-                maxLength={BRIEF_MAX}
-                value={draft[f.key]}
-                readOnly={readOnly}
-                onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))}
-                className="t-body w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 break-keep"
-                data-brief={f.key}
-              />
-            </label>
-          ))}
-        </div>
+        <p className="t-sub break-keep text-slate-600" data-testid="radar-brief-ai-note">
+          AI 는 위 칸(내가 하는 일)만 읽어요 — 주제 · 제목 · 말투 · 형식은 성공 공식대로 자유롭게 씁니다. 아래 칸은 규칙 초안에만 써요.
+        </p>
+        {[
+          { key: 'ai', title: 'AI 가 읽는 칸 — 내가 하는 일', fields: BRIEF_FIELDS.filter((f) => AI_BRIEF_KEYS.includes(f.key)) },
+          { key: 'rule', title: '규칙 초안에만 쓰는 칸(AI 에는 안 보냄)', fields: BRIEF_FIELDS.filter((f) => !AI_BRIEF_KEYS.includes(f.key)) },
+        ].map((g) => (
+          <div key={g.key} className="flex flex-col gap-2" data-brief-group={g.key}>
+            <p className="t-sub font-semibold break-keep text-slate-900">{g.title}</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {g.fields.map((f) => (
+                <label key={f.key} className="flex min-w-0 flex-col gap-1">
+                  <span className="t-sub font-semibold break-keep text-slate-800">
+                    {f.label} <span className="t-meta font-normal text-slate-500">· {f.hint}</span>
+                  </span>
+                  <textarea
+                    rows={draft[f.key].length > 200 ? 6 : 3}
+                    maxLength={BRIEF_MAX}
+                    value={draft[f.key]}
+                    readOnly={readOnly}
+                    onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))}
+                    className="t-body w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 break-keep"
+                    data-brief={f.key}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
         {!readOnly && (
           <div className="flex flex-wrap items-center justify-end gap-2">
             {custom && (
