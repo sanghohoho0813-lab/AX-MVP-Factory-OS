@@ -162,6 +162,8 @@ async function device(name, vp, mobile, seed = null) {
   // 영상 목록은 V 에서만(앞 시험은 예시 데이터로 — 이번 주 후보 카드)
   await ctx.route('**/api/yt-bench**', (r) => (feed.on ? r.fulfill(json(FEED)) : r.fallback()))
   await ctx.route('**/api/ai-assist**', async (route) => {
+    // D-629 자동 모델은 첫 질문 앞에 서버 모델 목록을 한 번 받는다(GET) — AI 를 부른 것이 아니라 세지 않는다(목록 없음 = 예전 기본)
+    if (route.request().method() !== 'POST') return route.fulfill(json({ ok: true, providers: [], defaultChoice: null }))
     const body = route.request().postDataJSON() ?? {}
     ai.push(body.assistId)
     const mm = (x) => `${Math.floor(x / 60)}:${String(x % 60).padStart(2, '0')}`
