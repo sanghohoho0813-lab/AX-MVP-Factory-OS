@@ -137,6 +137,8 @@ await page.getByTestId('ai-assist-error').waitFor({ timeout: 8000 })
 const err0 = await page.getByTestId('ai-assist-error').innerText()
 // D-628 PC — 판이 화면을 덮지 않고 오른쪽 판의 [대화] 자리에 뜬다(뒤판 없음 · 가운데 화면은 그대로 굴러간다)
 {
+  // 본문이 판만큼 비키는 움직임(0.2초)이 끝난 뒤에 잰다
+  await page.waitForTimeout(500)
   const where = await page.evaluate(() => {
     const panel = document.querySelector('[data-testid="ai-assist-panel"]')
     const dock = document.querySelector('[data-testid="side-dock"]')
