@@ -54,7 +54,7 @@ insert into auth.users (id, email) values
   ('24000000-0000-4000-8000-0000000000d1', 'cust24@x.kr') on conflict do nothing;
 SQL
 for f in supabase/migrations/*.sql; do
-  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_intake_links.sql|*_self_signup.sql) continue ;; esac
+  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_intake_links.sql|*_self_signup.sql|*_signup_approval.sql) continue ;; esac
   q < "$f" > /dev/null 2>/tmp/s24 || { echo "적용 실패 $f"; cat /tmp/s24; exit 1; }
 done
 q > /dev/null <<'SQL' || { echo "대표 작업공간 준비 실패"; exit 1; }
@@ -97,7 +97,7 @@ insert into auth.users (id, email) values
   ('24000000-0000-4000-8000-0000000000b1', 'pilot24@x.kr') on conflict do nothing;
 SQL
 for f in supabase/migrations/*.sql; do
-  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_ai_usage.sql|*_workspace_id_lock.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_intake_links.sql|*_self_signup.sql) continue ;; esac
+  case "$(basename "$f")" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_ai_usage.sql|*_workspace_id_lock.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_intake_links.sql|*_self_signup.sql|*_signup_approval.sql) continue ;; esac
   q < "$f" > /dev/null 2>/tmp/s24 || { echo "적용 실패 $f"; cat /tmp/s24; exit 1; }
 done
 q > /dev/null <<'SQL' || { echo "대표 작업공간 준비 실패"; exit 1; }
@@ -227,4 +227,32 @@ check "연습 ⑬ 되돌린 뒤 0028 다시 — 켠 설정 그대로 · 확인 5
 out2=$(blk supabase/manual/check_applied_0026_0028.sql)
 # 이 연습 DB 는 ⑨ 끝에서 0023 · 0024 를 되돌린 상태다 — '먼저' 의 0024 줄이 '없음' 으로 잡혀야 맞다(있어야 할 것이 빠지면 알려 주는지). 전부 넣은 DB 는 run.sh 가 본다.
 check "연습 ⑬ 점검 SQL(0026~0028): 셋 다 넣은 뒤 — 이번 3줄 '들어감'(12/12 · 8/8 · 10/10) · 되돌려 둔 0024 는 '없음' 으로 알림" "$(echo "$out2" | grep -cE '^2 이번\|.*\|들어감$') $(echo "$out2" | grep -E '^2 이번' | grep -oE '[0-9]+/[0-9]+' | tr '\n' ' ')$(echo "$out2" | grep -E '^1 먼저\|24\|' | cut -d'|' -f5) $(echo "$out2" | grep -cE '^1 먼저\|.*\|들어감$')" "3 12/12 8/8 10/10 없음 4"
+# ⑭ D-635 0029(가입 신청 → 대표가 앱에서 승인 · 거절) — 운영 모양(0028 까지 · 0028 켜 둔 채 · 열린 계정 1) 위에 한 덩어리로
+q > /dev/null <<'SQL' || { echo "가입 신청자 준비 실패"; exit 1; }
+insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+  ('24000000-0000-4000-8000-0000000000f1', 'req24@x.kr', now(), '{"signup_app":"internal_os","display_name":"연습 신청","company":"연습 회사"}'),
+  ('24000000-0000-4000-8000-0000000000f2', 'rej24@x.kr', now(), '{"signup_app":"internal_os","display_name":"연습 거절"}') on conflict do nothing;
+SQL
+REQ=24000000-0000-4000-8000-0000000000f1
+REJ=24000000-0000-4000-8000-0000000000f2
+OWN=24000000-0000-4000-8000-0000000000a1
+out=$(blk supabase/manual/check_applied_0029.sql)
+check "연습 ⑭ 점검 SQL(0029): 넣기 전 — 오류 0 · 읽기 전용 on · 이번 1줄 '없음' · 맨 위 set transaction read only · 만들기/고치기 문장 0" "$(echo "$out" | grep -c 'ERROR') $(echo "$out" | grep -E '^0 확인' | cut -d'|' -f5) $(echo "$out" | grep -cE '^2 이번\|29\|.*\|없음$') $(grep -v '^--' supabase/manual/check_applied_0029.sql | grep -m1 -v '^\s*$') $(grep -v '^\s*--' supabase/manual/check_applied_0029.sql | grep -ciE '\b(insert|update|delete|create|alter|drop|grant|revoke|truncate)\b')" "0 on 1 set transaction read only; 0"
+out=$(blk supabase/migrations/20261118000029_signup_approval.sql "set lock_timeout = '5s'; ")
+check "연습 ⑭ 0029 한 덩어리(lock_timeout 5초) — 오류 0 · 마지막 결과 = 표 1 · 함수 6" "$(echo "$out" | grep -c 'ERROR') $(echo "$out" | tail -1)" "0 1|6"
+out=$(blk supabase/manual/verify_after_0029.sql)
+check "연습 ⑭ 적용 뒤 확인: 1~5 '좋음' · 기다리는 신청 2 · 결정 0 · 맨 위 set transaction read only · 만들기/고치기 문장 0" "$(echo "$out" | grep -cE '^[1-5]\|.*\|좋음$') $(echo "$out" | grep -E '^6\|' | cut -d'|' -f3) $(echo "$out" | grep -E '^7\|' | cut -d'|' -f3) $(grep -v '^--' supabase/manual/verify_after_0029.sql | grep -m1 -v '^\s*$') $(grep -v '^\s*--' supabase/manual/verify_after_0029.sql | grep -ciE '\b(insert|update|delete|create|alter|drop|truncate|grant|revoke|comment on)\b')" "5 2 승인 0 · 거절 0 set transaction read only; 0"
+check "연습 ⑭ 신청자: 내 상태 pending · 팀장은 승인 막힘" "$(asr $REQ authenticated "select public.my_signup_status()->>'status';") $(su postgres -c "psql -At -d $DB" <<<"select set_config('request.jwt.claim.sub', '24000000-0000-4000-8000-0000000000b1', false); set role authenticated; select public.signup_approve('$REQ');" 2>&1 | grep -c 'not allowed')" "pending 1"
+check "연습 ⑭ 대표: 목록 2 · [승인] ok → pilot customer · 작업공간 '연습 회사' 하나 · 구성원 본인뿐 · AI customer trial" "$(asr $OWN authenticated "select count(*) from public.signup_requests();") $(asr $OWN authenticated "select public.signup_approve('$REQ')->>'status';") $(v "select tier || ' ' || audience from public.os_access where user_id = '$REQ'") $(v "select name from public.workspaces where owner_id = '$REQ'") $(v "select count(*) from public.workspace_members m join public.workspaces w on w.id = m.workspace_id where w.owner_id = '$REQ'") $(v "select kind || ' ' || plan from public.ai_entitlements where user_id = '$REQ'")" "2 ok pilot customer 연습 회사 1 customer trial"
+check "연습 ⑭ 대표: [거절] ok → 그 사람 rejected · 계정 남음 · 등급 0" "$(asr $OWN authenticated "select public.signup_reject('$REJ', '연습')->>'status';") $(asr $REJ authenticated "select public.my_signup_status()->>'status';") $(v "select count(*) from auth.users where id = '$REJ'") $(v "select count(*) from public.os_access where user_id = '$REJ'")" "ok rejected 1 0"
+out=$(blk supabase/migrations/20261118000029_signup_approval.sql)
+check "연습 ⑭ 0029 다시 실행해도 같음(오류 0 · 확인 5줄 좋음 · 결정 기록 그대로)" "$(echo "$out" | grep -c 'ERROR') $(blk supabase/manual/verify_after_0029.sql | grep -cE '^[1-5]\|.*\|좋음$') $(v "select string_agg(decision, ',' order by decision) from public.signup_decisions")" "0 5 approved,rejected"
+out=$(blkind supabase/migrations/20261118000029_signup_approval.sql "set lock_timeout = '5s'; ")
+check "연습 ⑭ 계단 들여쓰기로 붙여 넣어도(D-597) 오류 0" "$(echo "$out" | grep -c 'ERROR')" "0"
+out=$(blk supabase/manual/rollback_0029.sql)
+check "연습 ⑭ 되돌리기: false | false · 내 상태 함수 막힘 · 승인한 고객 그대로 · 결정 기록 남음 · 확인 5번 '꺼짐(되돌림)'" "$(echo "$out" | tail -1) $(asr $REJ authenticated "select public.my_signup_status();" | grep -c 'permission denied') $(v "select tier || ' ' || audience from public.os_access where user_id = '$REQ'") $(v "select count(*) from public.signup_decisions") $(blk supabase/manual/verify_after_0029.sql | grep -E '^5\|' | cut -d'|' -f4)" "f|f 1 pilot customer 2 꺼짐(되돌림)"
+out=$(blk supabase/migrations/20261118000029_signup_approval.sql)
+check "연습 ⑭ 되돌린 뒤 0029 다시 — 거절한 사람은 그대로 rejected · 확인 5줄 좋음" "$(echo "$out" | grep -c 'ERROR') $(asr $REJ authenticated "select public.my_signup_status()->>'status';") $(blk supabase/manual/verify_after_0029.sql | grep -cE '^[1-5]\|.*\|좋음$')" "0 rejected 5"
+out2=$(blk supabase/manual/check_applied_0029.sql)
+check "연습 ⑭ 점검 SQL(0029): 넣은 뒤 — 이번 1줄 '들어감'(7/7) · 되돌려 둔 0024 는 '없음' 으로 알림" "$(echo "$out2" | grep -cE '^2 이번\|.*\|들어감$') $(echo "$out2" | grep -E '^2 이번' | grep -oE '[0-9]+/[0-9]+')$(echo "$out2" | grep -E '^1 먼저\|24\|' | cut -d'|' -f5) $(echo "$out2" | grep -cE '^1 먼저\|.*\|들어감$')" "1 7/7없음 4"
 [ "$BAD" -eq 0 ]

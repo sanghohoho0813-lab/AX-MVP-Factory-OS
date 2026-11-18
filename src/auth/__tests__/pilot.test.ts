@@ -11,6 +11,7 @@ import { EMPTY_INTAKE_FORM, defaultIntakeTitle, intakeErrorText, intakeLine, int
 import { LINK_SOURCE, leadsThisMonth } from '../../services/marketing/mkPath'
 import { clampPolicyNumber, defaultWorkspaceName, isSelfSignupMissing, parseSelfSignupAccounts, parseSelfSignupAdmin, parseSelfSignupStart, parseSelfSignupState, selfSignupStartText, selfSignupSummary } from '../../services/selfSignup'
 import { functionGuidesOf } from '../../content/functionGuide'
+import { approveWorkspaceName, cleanSignupFields, decisionText, parseMySignupStatus, parseSignupDecision, parseSignupRequests, requestWho, signupDay, signupFormProblem, SIGNUP_FIELD_MAX } from '../../services/signupApproval'
 import { SALES_SOURCES } from '../../content/salesCatalog'
 import { MODULES, enabledModulesByGroup, isPilotHiddenPath } from '../../config/moduleRegistry'
 import { identityFromSession } from '../currentUser'
@@ -487,6 +488,27 @@ check('키: D-513 마케팅 쓰던 글(mirae.threads.draft · mirae.shorts.draft
   check('L7-9 0028 전 · 되돌림 → 지금 화면 / 그 밖 오류는 아님', isSelfSignupMissing({ code: 'PGRST202' }) && isSelfSignupMissing({ code: '42501', message: 'permission denied for function self_signup_state' }) && !isSelfSignupMissing({ code: '08006' }) && !isSelfSignupMissing(null))
   check('L7-10 시작 결과 → 사람 말(ok 는 빈칸 · 자리 참 · 메일 확인 · 잠시 뒤)', selfSignupStartText('ok') === '' && selfSignupStartText('closed').includes('자리') && selfSignupStartText('unconfirmed').includes('메일') && selfSignupStartText('busy').includes('잠시') && selfSignupStartText('not_eligible').includes('담당자'))
   check('L7-11 기능 안내 — 대표 설정에만(팀장 · 고객 사용법 안내에는 없음)', functionGuidesOf('settings').some((x) => x.key === 'fn-self-signup') && !functionGuidesOf('settings', { pilot: true }).some((x) => x.key === 'fn-self-signup') && !functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-self-signup'))
+}
+
+// ---------- D-635 가입 신청 → 대표가 앱에서 승인 · 거절(0029) — 화면 쪽 규칙 ----------
+{
+  check('SG-1 내 상태 — 서버가 준 값만 · 모르면 outside(예전 승인 전 화면)', parseMySignupStatus({ status: 'pending' }) === 'pending' && parseMySignupStatus({ status: 'rejected' }) === 'rejected' && parseMySignupStatus({ status: 'has_access' }) === 'has_access' && parseMySignupStatus({ status: 'hack' }) === 'outside' && parseMySignupStatus('pending') === 'outside' && parseMySignupStatus(null) === 'outside')
+  check('SG-2 승인 · 거절 결과 — status 만 · 모르면 not_found', parseSignupDecision({ status: 'ok', workspace: 'w' }) === 'ok' && parseSignupDecision({ status: 'unconfirmed' }) === 'unconfirmed' && parseSignupDecision({ status: 'x' }) === 'not_found' && parseSignupDecision(undefined) === 'not_found')
+  const rows = parseSignupRequests([
+    { user_id: 'u1', email: 'a@x.kr', person_name: '김신청', company: '신청 컨설팅', intro: '정책자금 10년', signed_up_at: '2026-11-18T01:00:00Z', email_confirmed: true, status: 'pending', decided_at: null, note: '' },
+    { user_id: 'u2', email: 'b@x.kr', person_name: '', company: '', intro: '', signed_up_at: '2026-11-17T01:00:00Z', email_confirmed: false, status: 'rejected', decided_at: '2026-11-18T02:00:00Z', note: '메모' },
+    { email: 'no-id@x.kr' },
+    null,
+  ])
+  check('SG-3 목록 — user_id 없는 줄은 버림 · 확인 여부 · 상태 · 메모', rows.length === 2 && rows[0].emailConfirmed && rows[0].status === 'pending' && rows[1].status === 'rejected' && !rows[1].emailConfirmed && rows[1].note === '메모' && rows[0].decidedAt === '')
+  check('SG-4 줄 이름 — 이름 · 소속 · 없으면 이메일 앞부분', requestWho(rows[0]) === '김신청 · 신청 컨설팅' && requestWho(rows[1]) === 'b')
+  check('SG-5 승인할 때 작업공간 이름 — 소속 → "<이름> 작업공간" → 내 작업공간(서버와 같은 순서)', approveWorkspaceName({ company: '  신청   컨설팅 ', personName: '김' }) === '신청 컨설팅' && approveWorkspaceName({ company: '', personName: ' 박  고객 ' }) === '박 고객 작업공간' && approveWorkspaceName({ company: '', personName: '' }) === '내 작업공간')
+  check('SG-6 가입 화면 확인 — 이름 · 소속 · 이메일 · 6자 · 같은 비밀번호(쉬운 말)', signupFormProblem({ name: '', company: 'a', email: 'a@x.kr', password: '123456', confirm: '123456' }).includes('이름') && signupFormProblem({ name: '김', company: ' ', email: 'a@x.kr', password: '123456', confirm: '123456' }).includes('소속') && signupFormProblem({ name: '김', company: '개인', email: 'ax.kr', password: '123456', confirm: '123456' }).includes('이메일') && signupFormProblem({ name: '김', company: '개인', email: 'a@x.kr', password: '123', confirm: '123' }).includes('6자') && signupFormProblem({ name: '김', company: '개인', email: 'a@x.kr', password: '123456', confirm: '123457' }).includes('같은') && signupFormProblem({ name: '김', company: '개인', email: ' a@x.kr ', password: '123456', confirm: '123456' }) === '')
+  const f = cleanSignupFields({ name: '  김   신청 ', company: 'c'.repeat(80), intro: ' 한\n줄 ' })
+  check('SG-7 가입 칸 정리 — 빈칸 하나 · 길이 한도(이름 40 · 소속 60 · 소개 120)', f.name === '김 신청' && f.company.length === SIGNUP_FIELD_MAX.company && f.intro === '한 줄')
+  check('SG-8 결과 → 대표가 볼 한 줄(지운 것 없음 · 메일 확인 · 이미 열림)', decisionText('approve', 'ok', '김').includes('열었어요') && decisionText('reject', 'ok', '김').includes('지운 것은 없어요') && decisionText('approve', 'unconfirmed', '김').includes('확인 링크') && decisionText('approve', 'has_access', '김').includes('이미'))
+  check('SG-9 날짜 — 한국 시각(밤 11시 UTC = 다음 날)', signupDay('2026-11-17T23:30:00Z') === '2026.11.18' && signupDay('x') === '')
+  check('SG-10 기능 안내 — 대표 설정에만(팀장 · 고객 사용법 안내에는 없음)', functionGuidesOf('settings').some((x) => x.key === 'fn-signup-requests') && !functionGuidesOf('settings', { pilot: true }).some((x) => x.key === 'fn-signup-requests') && !functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-signup-requests'))
 }
 
 console.log(`pilot: ${passed} passed, ${failed} failed`)

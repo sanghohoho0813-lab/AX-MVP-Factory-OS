@@ -98,6 +98,8 @@ export function AuthField({
   placeholder,
   required = true,
   disabled = false,
+  maxLength,
+  hint,
 }: {
   id: string
   label: string
@@ -108,11 +110,15 @@ export function AuthField({
   placeholder?: string
   required?: boolean
   disabled?: boolean
+  maxLength?: number
+  /** D-635 칸 이름 옆 작은 말(예: '골라서') */
+  hint?: string
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="text-[0.9375rem] font-medium text-slate-700">
         {label}
+        {hint && <span className="ml-1.5 font-normal text-slate-600">{hint}</span>}
       </label>
       <input
         id={id}
@@ -123,6 +129,7 @@ export function AuthField({
         placeholder={placeholder}
         required={required}
         disabled={disabled}
+        maxLength={maxLength}
         className="h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[1rem] text-slate-900 outline-none placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:bg-slate-50"
       />
     </div>

@@ -3,7 +3,7 @@
  */
 
 import { useIsPilot, useViewingPilot } from '../../auth/osAccess'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Panel } from '../../components/ui/Panel'
@@ -38,6 +38,7 @@ import { useSupportState } from '../../components/support/useSupport'
 import { setModelPickShown, useModelPickShown } from '../../lib/modelPickPref'
 import { ViewConsentPanel } from '../../components/layout/ViewConsent'
 import { SelfSignupPanel } from './SelfSignupPanel'
+import { SignupRequestsPanel } from './SignupRequestsPanel'
 
 /** D-163: 이름 · 직함 고치기 — 사이드바 · 머리줄 · 고객에게 가는 글 서명이 같이 바뀐다(대표 · Pilot 같은 화면) */
 function NameEditor() {
@@ -276,7 +277,13 @@ export function SupabaseSettingsView() {
   // D-550 알림 줄이 ?tab=data&focus=overwritten 으로 데려온다 — 처음 탭만 정하고 그 뒤는 누른 탭
   const [params] = useSearchParams()
   const focus = params.get('focus') ?? ''
-  const [tab, setTab] = useState<TabKey>(() => (params.get('tab') === 'data' ? 'data' : 'me'))
+  // D-635 종 '가입 신청' 은 ?tab=workspace&focus=signup 으로 데려온다
+  const [tab, setTab] = useState<TabKey>(() => (params.get('tab') === 'data' ? 'data' : params.get('tab') === 'workspace' ? 'workspace' : 'me'))
+  // 설정 화면을 연 채로 종을 눌러도(같은 화면 · 주소만 바뀜) 그 탭으로
+  const tabParam = params.get('tab')
+  useEffect(() => {
+    if (tabParam === 'data' || tabParam === 'workspace') setTab(tabParam)
+  }, [tabParam])
   const { session, workspaces, currentWorkspaceId } = useAuth()
   const current = workspaces.find((w) => w.workspaceId === currentWorkspaceId)
   const roleLabel: Record<string, string> = { owner: '소유자', admin: '관리자', editor: '편집자', viewer: '뷰어' }
@@ -333,6 +340,8 @@ export function SupabaseSettingsView() {
           <Panel title={`작업공간 · ${current?.workspace?.name ?? ''}`}>
             <WorkspaceMembersPanel />
           </Panel>
+          {/* D-635 가입 신청 승인 · 거절 — 대표(운영자)에게만 · 서버 0029 뒤에만 보인다 */}
+          <SignupRequestsPanel focus={focus === 'signup'} />
           {/* L-7 · D-610 가입하면 바로 쓰기 — 대표(운영자)에게만 · 서버 0028 뒤에만 보인다 */}
           <SelfSignupPanel />
         </>

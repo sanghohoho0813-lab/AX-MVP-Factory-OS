@@ -9,7 +9,7 @@ DB=axqa22own
 q() { su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB"; }
 su postgres -c "dropdb --if-exists $DB; createdb $DB" || exit 1
 q < scripts/db-local/supabase-shim.sql > /dev/null || exit 1
-for f in $(ls supabase/migrations/*.sql | grep -v -E '_ai_usage.sql|_self_signup.sql'); do q < "$f" > /dev/null 2>/tmp/s22own || { echo "적용 실패 $f"; cat /tmp/s22own; exit 1; }; done
+for f in $(ls supabase/migrations/*.sql | grep -v -E '_ai_usage.sql|_self_signup.sql|_signup_approval.sql'); do q < "$f" > /dev/null 2>/tmp/s22own || { echo "적용 실패 $f"; cat /tmp/s22own; exit 1; }; done
 q > /dev/null <<'SQL' || { echo "역할 준비 실패"; exit 1; }
 do $$ begin if not exists (select 1 from pg_roles where rolname = 'qa_admin') then create role qa_admin nologin nosuperuser nobypassrls; end if; end $$;
 alter role qa_admin nosuperuser nobypassrls;
