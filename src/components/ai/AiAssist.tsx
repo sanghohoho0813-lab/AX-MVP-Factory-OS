@@ -7,6 +7,7 @@
  * 누르면 그 화면 자료를 작은 묶음으로 만들어(사람 이름 · 연락처 빼고) 서버 함수(/api/ai-assist)로 보낸다.
  * 브라우저는 AI 공급자를 직접 부르지 않는다. 대표 계정에서만 보인다(팀장 화면 · 팀장 보기에는 없음).
  * 기본 모델은 Gemini 의 가장 싼 모델 — 판 안 '모델 바꾸기' 에서 GPT · Claude 로 바꿀 수 있다(이 브라우저에 기억).
+ * D-629 대표 화면의 기본은 '자동' — 물음은 가장 싼 모델 · 일을 시킬 때는 좋은 모델(요청마다 callAssist 가 정한다). 고른 모델이 있으면 그 모델 그대로.
  *
  * D-241 답은 다음 단계로 이어진다 — 대표: "열어보기를 누르면 진짜 뭔가 열리던지 뭔가 기록이 되든지 해야".
  *   - 번호 단추는 무엇이 열리는지 이름으로(업체 열기 · 공고 보기 …). 지금 보고 있는 화면과 같으면 내지 않는다.
@@ -28,7 +29,7 @@ import { useEscToClose } from '../../lib/escStack'
 import { activityTimeText } from '../../services/clientOpsActivity'
 import { createJournalEntry } from '../../services/journalService'
 import { betterModel, dueFromWhen, isSamePage, pointsAtTodo, refKind, refLabel, todoText, unalias, unaliasAnswer } from '../../services/aiAssist/actions'
-import { AssistError, PROVIDER_NAME, assistMessage, callAssist, fetchAssistStatus, providerMessage, type ProviderProbe } from '../../services/aiAssist/client'
+import { AssistError, PROVIDER_NAME, assistMessage, callAssist, fetchAssistStatus, peekAssistStatus, providerMessage, type ProviderProbe } from '../../services/aiAssist/client'
 import type { AssistAnswer, AssistItem, AssistRun, AssistStatus, ModelInfo, ProviderId } from '../../services/aiAssist/client'
 import { normRef, safeText } from '../../services/aiAssist/context'
 import type { AssistBundle } from '../../services/aiAssist/context'
@@ -36,6 +37,8 @@ import { askPresetOf, presetsFor } from '../../services/aiAssist/presets'
 import type { AssistPage, AssistPreset } from '../../services/aiAssist/presets'
 import { CHOICE_EVENT, contextHash, historyOf, markDone, newRequestId, pushHistory, readChoice, saveChoice, allowedProviders, isCheapOnly } from '../../services/aiAssist/store'
 import { askCarry, type AiChoice, type FollowMeta, type HistoryEntry } from '../../services/aiAssist/store'
+import { classifyAsk } from '../../services/aiAssist/autoModel'
+import { autoPlanFor, showsAuto, useLastAutoPick } from '../../lib/modelPickPref'
 import { useToast } from '../ui/toastContext'
 import { ModelPicker } from './ModelPicker'
 import { josa } from '../../lib/josa'
@@ -140,7 +143,8 @@ function AiAssistInner({ page, scope, title, presets, build, variant = 'bar', qu
   const list = useMemo(() => presetsFor(presets), [presets])
   const key = scope ?? page
   const [open, setOpen] = useState(false)
-  const [status, setStatus] = useState<AssistStatus | null>(null)
+  // D-629 다른 AI 단추가 이미 받아 둔 서버 모델 목록이 있으면 그것부터(판을 열자마자 '자동' 이 어느 모델인지 보이게)
+  const [status, setStatus] = useState<AssistStatus | null>(() => peekAssistStatus())
   const [choice, setChoice] = useState<AiChoice | null>(() => readChoice())
   // D-244 한 화면에 도우미가 여럿이면(머리줄 단추 · 탭 띠) 한 곳에서 모델을 바꿔도 모두 따라오게 — 다른 탭에서 바꾼 것도
   useEffect(() => {
@@ -446,6 +450,7 @@ function AssistPanel({
 
   /**
    * opts.choice — 이번 한 번만 다른 모델(더 잘 쓰는 모델로 다시) · opts.follow — 고른 항목을 자료 맨 앞에 붙여 이어 쓰기.
+   * D-629 고른 모델이 없으면(자동) 그대로 null 을 넘긴다 — 물음인지 일인지 보고 callAssist 가 모델을 정한다.
    * 지문(hash)은 화면 자료로만 — 이어 쓴 답도 '화면 자료가 바뀌었어요' 를 같은 기준으로 판단한다.
    */
   const run = useCallback(
@@ -465,7 +470,7 @@ function AssistPanel({
         // D-626 직접 물어보기는 이어서 — 이 화면에서 방금 주고받은 것을 '앞선 대화' 로 같이 보낸다(단추 · 이어 쓰기는 그대로)
         const carry = !opts.follow && preset.id.endsWith('.ask') ? askCarry(historyOf(scope), carryFromRef.current) : []
         const context = opts.follow ? { ...bundle.context, sections: [opts.follow.section, ...bundle.context.sections] } : carry.length ? { ...bundle.context, sections: [{ name: '앞선 대화', rows: carry }, ...bundle.context.sections] } : bundle.context
-        const runResult: AssistRun = await callAssist({ requestId, assistId: preset.id, page, choice: opts.choice ?? choice ?? (status ? status.defaultChoice : null), context, ask: masked })
+        const runResult: AssistRun = await callAssist({ requestId, assistId: preset.id, page, choice: opts.choice ?? choice, context, ask: masked })
         const label = opts.follow ? `${preset.label} · ${opts.follow.title}` : preset.id.endsWith('.ask') ? '직접 물어본 것' : preset.label
         const entry: HistoryEntry & { links: Record<string, string> } = { scope, assistId: preset.id, label, ask: masked, hash, run: runResult, links: bundle.links, ids: bundle.ids ?? {}, ...(bundle.aliases ? { aliases: bundle.aliases } : {}), ...(opts.follow ? { follow: opts.follow } : {}) }
         pushHistory(entry)
@@ -481,7 +486,7 @@ function AssistPanel({
         setRunning(null)
       }
     },
-    [running, build, page, choice, status, scope],
+    [running, build, page, choice, scope],
   )
 
   /** 판의 단추에 없는 질문(이어 쓰기 전용 — 예: 대본 끝까지)도 찾는다 */
@@ -558,6 +563,15 @@ function AssistPanel({
   }
 
   const stale = !!shown && !!nowHash && shown.hash !== nowHash
+
+  // D-629 [이대로 질문하기] 전에 어느 모델로 물을지 — 자동이면 이 단추가 물음인지 일인지에 따라(가장 싼 모델 · 좋은 모델)
+  const pendingModel = useMemo(() => {
+    if (!pending) return ''
+    if (pending.opts.choice || choice) return labelOf(status, pending.opts.choice ?? effective)
+    const plan = autoPlanFor(status)
+    if (!plan?.upgrades) return labelOf(status, effective)
+    return `자동 · ${labelOf(status, classifyAsk({ assistId: pending.preset.id, ask: pending.ask }) === 'heavy' ? plan.heavy : plan.light)}`
+  }, [pending, choice, status, effective])
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-navy-950/40 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={`AI 도우미 · ${title}`} data-testid="ai-assist-panel">
@@ -747,7 +761,7 @@ function AssistPanel({
           <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-violet-200 bg-violet-50 px-5 py-3 sm:rounded-b-(--radius-panel)" data-testid="ai-assist-confirm" data-assist={pending.preset.id}>
             <p className="t-sub min-w-0 flex-1 break-keep text-violet-950 [overflow-wrap:anywhere]">
               <b>‘{pending.label}’</b> — 이대로 물어볼까요?
-              <span className="t-meta block text-violet-800">{labelOf(status, pending.opts.choice ?? effective)} 로 · 화면 자료를 같이 보내요</span>
+              <span className="t-meta block text-violet-800" data-testid="ai-assist-confirm-model">{pendingModel} 로 · 화면 자료를 같이 보내요</span>
             </p>
             <button type="button" onClick={() => setPending(null)} className="tap t-sub min-h-11 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-700 hover:bg-slate-50" data-testid="ai-assist-confirm-cancel">
               취소
@@ -804,13 +818,22 @@ export function ModelRow({
   const provider = status?.providers.find((p) => p.id === tab)
   const current = labelOf(status, effective)
   const isDefault = !choice
+  // D-629 자동 — 대표 화면만(올려 쓸 좋은 모델이 있을 때). 팀장 · 구독 고객 화면은 아래가 예전 모양 그대로다
+  const canAuto = showsAuto(status)
+  const auto = canAuto && !choice
+  const plan = canAuto ? autoPlanFor(status) : null
+  // [가장 싼 모델] · [좋은 모델] 은 지금 고른 회사 안에서(Claude 를 쓰고 있으면 Claude 의 싼 모델 · 좋은 모델)
+  const quick = canAuto ? autoPlanFor(status, choice?.provider) : null
+  const last = useLastAutoPick()
+  const isPick = (c: AiChoice | undefined) => !!c && !!choice && choice.provider === c.provider && choice.model === c.model
   return (
     <section aria-label="모델" className="rounded-(--radius-control) border border-slate-200" data-testid="ai-assist-model">
       <div className="flex flex-wrap items-center gap-2 px-3 py-2">
         <span className="t-sub text-slate-600">쓰는 모델</span>
-        <button type="button" onClick={() => setOpen(!open)} className="tap t-sub min-w-0 text-left font-semibold break-keep text-slate-900 hover:underline" data-testid="ai-assist-model-label">
-          {current}
-          {isDefault && <span className="t-meta ml-1 font-normal text-slate-500">(기본 · 가장 쌈)</span>}
+        <button type="button" onClick={() => setOpen(!open)} className="tap t-sub min-w-0 text-left font-semibold break-keep text-slate-900 hover:underline" data-testid="ai-assist-model-label" data-mode={auto ? 'auto' : 'manual'}>
+          {auto ? '자동' : current}
+          {/* 펼치면 바로 아래 '자동' 줄이 같은 말을 한다 — 접혀 있을 때만 뜻을 붙인다 */}
+          {auto ? !open && <span className="t-meta ml-1 font-normal text-slate-500">(물음은 가장 싼 모델 · 일은 좋은 모델)</span> : isDefault && <span className="t-meta ml-1 font-normal text-slate-500">(기본 · 가장 쌈)</span>}
         </button>
         <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="tap t-sub ml-auto inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50" data-testid="ai-assist-model-toggle">
           <Settings2 aria-hidden="true" className="size-4" /> {open ? '닫기' : '모델 바꾸기'}
@@ -818,6 +841,56 @@ export function ModelRow({
       </div>
       {open && (
         <div className="flex flex-col gap-2.5 border-t border-slate-100 px-3 py-3" data-testid="ai-assist-settings">
+          {/* D-629 맨 위 — 자동(기본) · 한 번에 고르기 둘. 누르면 바로 다음 질문부터 그 방식으로 */}
+          {canAuto && (
+            <div className="flex flex-col gap-2" data-testid="ai-model-auto-box">
+              <button
+                type="button"
+                data-testid="ai-model-auto"
+                aria-pressed={auto}
+                onClick={() => setChoice(null)}
+                className={`tap flex w-full min-w-0 items-start gap-2 rounded-(--radius-control) border px-3 py-2 text-left ${auto ? 'border-violet-500 bg-violet-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+              >
+                <span className={`mt-1 flex size-4 shrink-0 items-center justify-center rounded-full border ${auto ? 'border-violet-600 bg-violet-600 text-white' : 'border-slate-300'}`}>{auto && <Check aria-hidden="true" className="size-3" />}</span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="t-sub font-semibold break-keep text-slate-900">자동 — 물음은 가장 싼 모델 · 일을 시킬 때는 좋은 모델</span>
+                  <span className="t-meta break-keep text-slate-500" data-testid="ai-model-auto-status">
+                    {plan ? `물음 ${labelOf(status, plan.light)} · 일 ${labelOf(status, plan.heavy)}` : '모델 목록을 받으면 어느 모델인지 보여요'}
+                    {auto && last && (
+                      <span className="text-violet-800" data-testid="ai-model-auto-last" data-weight={last.weight} data-model={last.model}>
+                        {' '}
+                        · 방금: {last.weight === 'heavy' ? '좋은 모델' : '가장 싼 모델'}로 답함
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </button>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="t-meta text-slate-500">한 번에 고르기</span>
+                {(
+                  [
+                    ['cheap', '가장 싼 모델', quick?.light],
+                    ['good', '좋은 모델', quick?.heavy],
+                  ] as const
+                ).map(([key, text, c]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    data-testid="ai-model-quick"
+                    data-pick={key}
+                    data-model={c?.model ?? ''}
+                    disabled={!c}
+                    aria-pressed={isPick(c)}
+                    title={c ? labelOf(status, c) : undefined}
+                    onClick={() => c && setChoice(c)}
+                    className={`tap t-sub inline-flex min-h-10 items-center rounded-full border px-3 font-semibold disabled:cursor-wait disabled:opacity-55 ${isPick(c) ? 'border-violet-600 bg-violet-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+                  >
+                    {text}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="AI 회사">
             {allowedProviders().filter((id) => !status || status.providers.some((x) => x.id === id)).map((id) => {
               const p = status?.providers.find((x) => x.id === id)
@@ -850,7 +923,8 @@ export function ModelRow({
             <ul className="flex flex-col gap-1.5">
               {/* D-614 내부 팀장은 회사마다 가장 싼 모델 하나만(대표가 팀장 화면으로 볼 때도 같은 모양) */}
               {provider.models.filter((m) => !isCheapOnly() || m.tier === 'cheap').map((m) => {
-                const on = effective.provider === provider.id && effective.model === m.id
+                // D-629 자동이면 목록의 어느 모델도 고른 것이 아니다(맨 위 '자동' 줄이 골라져 있다)
+                const on = !auto && effective.provider === provider.id && effective.model === m.id
                 return (
                   <li key={m.id}>
                     <button
@@ -903,7 +977,7 @@ export function ModelRow({
             </button>
             {!isDefault && (
               <button type="button" onClick={() => setChoice(null)} className="tap t-sub min-h-10 rounded-(--radius-control) px-2.5 font-semibold text-violet-800 hover:underline" data-testid="ai-assist-model-reset">
-                기본(가장 싼 Gemini)으로
+                {canAuto ? '자동으로 되돌리기' : '기본(가장 싼 Gemini)으로'}
               </button>
             )}
           </div>
@@ -921,6 +995,7 @@ export function ModelRow({
           <p className="t-meta break-keep text-slate-500">
             {/* D-257 팀장 화면에는 없는 마케팅 · AI 전략실은 말하지 않는다 */}
             고른 모델은 이 브라우저에 기억돼 모든 화면의 AI 단추(도우미 · 대화창 · 명세서 · 사업계획서{allowedProviders().length > 1 && !isCheapOnly() ? ' · 마케팅 · AI 전략실' : ' · 마케팅 · 오른쪽 판 AI 대화'})가 같이 써요.
+            {canAuto && ' 바꾸면 바로 다음 질문부터 그 모델로 답해요.'}
             {allowedProviders().length === 1 && ' 이 계정은 지금 Gemini 모델만 쓸 수 있어요.'}
             {isCheapOnly() && ' 팀장 계정은 회사마다 가장 싼 모델 하나씩 쓸 수 있어요.'}
           </p>

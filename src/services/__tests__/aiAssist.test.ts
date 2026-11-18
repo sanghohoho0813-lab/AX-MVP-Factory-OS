@@ -15,7 +15,8 @@ import { SKILLS, COMMON_RULES } from '../../../api/_ai/skills.js'
 import { ASSIST_PRESETS, askPresetOf } from '../aiAssist/presets'
 import { safeText, personNames, RefBook, clientRow, normRef } from '../aiAssist/context'
 import { betterModel, dueFromWhen, isSamePage, pointsAtTodo, refLabel, todoText, unaliasAnswer } from '../aiAssist/actions'
-import { AssistError, callAssist, providerMessage } from '../aiAssist/client'
+import { AssistError, __resetAssistStatusCache, callAssist, fetchAssistStatus, peekAssistStatus, providerMessage } from '../aiAssist/client'
+import { askWeight, autoPlan, classifyAsk, pickAuto, presetWeight } from '../aiAssist/autoModel'
 import { __setRetryTimes, callAssistRetry } from '../aiAssist/retry'
 import { __resetJudgeSkill, readJudgeSkill, saveJudgeSkill, syncJudgeSkill } from '../aiAssist/judgeSkill'
 import { listRows as listModuleRows, saveRow as saveModuleRow } from '../moduleData'
@@ -28,7 +29,7 @@ import { sampleFeed } from '../marketing/ytSample'
 import { agentsBundle, calendarBundle, clientsBundle, inboxBundle, maskStaff, salesBundle } from '../aiAssist/builders'
 import { moduleBundle } from '../aiAssist/moduleBuilders'
 import { radarBundle } from '../aiAssist/marketingBuilders'
-import { allowedProviders, contextHash, historyOf, isCheapOnly, markDone, noteCheapModels, pushHistory, readChoice, setAllowedProviders, setCheapOnly } from '../aiAssist/store'
+import { accountEpoch, allowedProviders, autoUpgradeAllowed, contextHash, historyOf, isCheapOnly, lastAutoPick, markDone, noteAutoPick, noteCheapModels, pushHistory, readChoice, readMode, saveChoice, setAllowedProviders, setCheapOnly } from '../aiAssist/store'
 import { aiAssistAccessOf, ownerAiAccessOf } from '../../auth/ownerAiAccess'
 import { normalizeClientOps } from '../clientOpsService'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -720,7 +721,8 @@ async function d263Tests() {
   calls = []
   reply = () => ({ status: 200, body: { ok: true, run: { status: 'succeeded', structured: { headline: 'h', items: [] } } } })
   await callAssist({ requestId: rid(), assistId: 'venture.judge', page: 'venture', choice: null, context: CTX as never, skill: readJudgeSkill() })
-  check('DS8 화면이 부를 때 정의를 같이 보냄(skill)', calls[0]?.body.skill === '/자체점검 정의\n둘째 줄', calls[0]?.body)
+  const ds8 = calls.find((c) => c.body.assistId === 'venture.judge')
+  check('DS8 화면이 부를 때 정의를 같이 보냄(skill)', ds8?.body.skill === '/자체점검 정의\n둘째 줄', ds8?.body)
   await saveJudgeSkill(null, '')
   __resetJudgeSkill()
   check('DS9 지우면 다시 기본', (await syncJudgeSkill(null)) === '')
@@ -747,6 +749,8 @@ async function d263Tests() {
   __resetJudgeSkill()
 
   // 다시 부르기 — 답 모양 어긋남 · 잠깐 끊김 · 많이 부름
+  // D-629 자동이면 요청 앞에 서버 모델 목록을 한 번 받는다 — 여기는 요청 수를 세므로 직접 고른 모델로 둔다(자동은 d629Tests 가 본다)
+  saveChoice({ provider: 'gemini', model: 'gemini-3.1-flash-lite' })
   __setRetryTimes(0, 0)
   const good = { ok: true, run: { status: 'succeeded', structured: { headline: 'h', items: [{ title: 'score', amount: '91' }] } } }
   const empty = { ok: true, run: { status: 'succeeded', structured: { headline: 'h', items: [] } } }
@@ -996,6 +1000,274 @@ function askTests() {
   check('Q5 최근 30일 기록 — 새것부터 · 종류 이름 · 사람 이름 · 전화번호는 가림', (recent?.rows.length ?? 0) === 6 && (recent?.rows[0] as Record<string, unknown>).날짜 === '2026-10-22' && txt.includes('통화') && !txt.includes('010-1111-2222') && !txt.includes('홍길동'), txt.slice(0, 300))
 }
 
+
+/* ------------------------------------------------------------------ */
+/* D-629 자동 모델 — 물음은 가장 싼 모델 · 일을 시킬 때는 좋은 모델            */
+/* ------------------------------------------------------------------ */
+
+async function d629Tests() {
+  const KEY = 'axmvp.ai.choice.v1'
+
+  /* ---- 1. 물음인가 일인가(적은 말) ---- */
+  const LIGHT = [
+    '이거 어떻게 해야 돼?',
+    '사업자등록증 들어가 있나?',
+    '뭐야?',
+    '알려 줘',
+    '',
+    '   ',
+    '한솔정밀 서류 뭐 빠졌어?',
+    '오늘 할 일 정리해 줘',
+    '이 내용 요약해 줘',
+    '추천해 줘',
+    '정책자금 얼마까지 돼?',
+    '연구소 설립 가능해?',
+    '제안서 어떻게 써야 돼?',
+    '사업계획서 들어가 있나?',
+    '대본 초안 있어?',
+    '제안서 보냈어',
+    '급여명세서 올렸어',
+    '한솔정밀 거래명세서',
+    '사업계획서 올려 놨어 봐 줘',
+    '아까 써 준 제안서 어디 있어?',
+    '제안서 써 줘야 해?',
+    '어떻게 고쳐 봐야 해?',
+    '언제 시작해?',
+    '기획이 뭐야',
+    '제안서 초안 확인해 줘',
+    '신경 써 줘',
+    '이 양식 써 봐도 돼?',
+    '보험설계사 연락처 알려 줘',
+    '기획재정부 공고 나왔나',
+    '명세서 작성일이 언제야',
+    '제안서 초안 써 줘서 고마워',
+    '이 대본을 릴스 20초로 줄이면?',
+    '표로 정리해 줘',
+    '이번 달에 메모가 가장 많았던 업체는?',
+  ]
+  const HEAVY = [
+    '이제 기획 시작해 줘',
+    '기획 시작해 줘 — 한솔정밀 정책자금 제안',
+    '시작해 줘',
+    '기획해 줘',
+    '설계해 줘',
+    '제안서 초안 써 줘',
+    '사업계획서 작성해 주세요',
+    '명세서 써줘',
+    '대본 써 줘',
+    '블로그 글 써 줘',
+    '글 써 줘',
+    '정리해서 만들어 줘',
+    '제안서 써 주실 수 있나요?',
+    '사업계획서 작성좀 해줘',
+    '블로그 글 좀 써줘요',
+    '이대로 진행해 줘',
+    '한솔정밀 제안서 초안',
+    '이 내용으로 사업계획서 작성 부탁',
+    '제안서 써 줄 수 있어?',
+    '블로그 글 써 줄래?',
+    '초안 잡아 줘',
+    '다시 써 줘',
+    '더 길게 고쳐 줘',
+    '기획 들어가자',
+    '이걸로 쓰자',
+    '카톡 문구 만들어 줘',
+    '홍보 글 하나 부탁해',
+    '대본 써 봐',
+  ]
+  const wrongLight = LIGHT.filter((q) => askWeight(q) !== 'light')
+  const wrongHeavy = HEAVY.filter((q) => askWeight(q) !== 'heavy')
+  check(`AM1 물음 · 확인 · 짧은 설명은 가장 싼 모델 쪽(${LIGHT.length}가지 — 대표 예: "이거 어떻게 해야 돼?" · "사업자등록증 들어가 있나?")`, wrongLight.length === 0, wrongLight)
+  check(`AM2 만들라고 시키는 말은 좋은 모델 쪽(${HEAVY.length}가지 — 대표 예: "이제 기획 시작해 줘")`, wrongHeavy.length === 0, wrongHeavy)
+  const chats = ASSIST_PRESETS.filter((x) => /\.(ask|chat)$/.test(x.id))
+  check(`AM3 대화 · 직접 묻기 단추 ${chats.length}개 — 적은 말로 가른다: 물음은 가벼움 · "기획 시작해 줘" 는 일 · 빈 말은 가벼움`,
+    chats.length >= 18 && chats.every((x) => classifyAsk({ assistId: x.id, ask: '사업자등록증 들어가 있나?' }) === 'light' && classifyAsk({ assistId: x.id, ask: '이제 기획 시작해 줘' }) === 'heavy' && classifyAsk({ assistId: x.id, ask: '' }) === 'light'),
+    chats.filter((x) => classifyAsk({ assistId: x.id, ask: '' }) !== 'light').map((x) => x.id))
+
+  /* ---- 2. 단추 서재로 가른다(손으로 적은 목록 없이) ---- */
+  const writes = ASSIST_PRESETS.filter((x) => x.kind === 'write')
+  const lightWrites = writes.filter((x) => presetWeight(x.id) !== 'heavy').map((x) => x.id)
+  check(`AM4 쓰기 단추 ${writes.length}개는 적은 말이 없어도 일(좋은 모델) — 옮겨 적기만 하는 '영상 대본 받아 적기' 하나만 가벼움`, lightWrites.join() === 'radar.transcript', lightWrites)
+  const heavyLists = ASSIST_PRESETS.filter((x) => x.kind === 'list' && presetWeight(x.id) === 'heavy').map((x) => x.id).sort()
+  check('AM5 목록형이어도 기획 대화 · 명세서 · 사업계획서 단계는 일 — 그 밖 목록 단추(오늘 3개 · 답장 나누기 · 제목 후보 …)는 가벼움',
+    heavyLists.join() === ['spec.ideaRank', 'spec.research', 'spec.talk', 'venture.market', 'venture.planRank', 'venture.talk'].sort().join() && ['today.top3', 'cert.reply', 'content.titles', 'client.brief', 'money.top', 'bench.why'].every((id) => presetWeight(id) === 'light'), heavyLists)
+  check('AM6 자체점검 기준이 같이 가는 작업은 일 · 서재에 없는 단추는 가벼움 · 가벼운 단추에 "초안 써 줘" 를 덧붙이면 일',
+    classifyAsk({ assistId: 'pv.chat', skill: '/자체점검 정의', ask: '' }) === 'heavy' && classifyAsk({ assistId: 'no.such', ask: '' }) === 'light' && classifyAsk({ assistId: 'today.top3', ask: '이걸로 제안서 초안 써 줘' }) === 'heavy' && classifyAsk({ assistId: 'today.top3', ask: '마감 급한 것만' }) === 'light')
+
+  /* ---- 3. 어느 모델로(순수 계산) ---- */
+  const m = (id: string, price: [number, number] | null, tier: 'cheap' | 'standard' | 'deep' | null) => ({ id, label: id, note: '', price, verified: null, tier })
+  const prov = (id: 'gemini' | 'openai' | 'anthropic', configured: boolean, models: ReturnType<typeof m>[]) => ({ id, label: id, configured, keyName: 'K', checked: false, models })
+  const full: AssistStatus = {
+    role: 'owner',
+    defaultChoice: { provider: 'gemini', model: 'g-cheap' },
+    providers: [
+      prov('gemini', true, [m('g-cheap', [0.25, 1.5], 'cheap'), m('g-old', [0.1, 0.4], null), m('g-std', [0.75, 3.75], 'standard'), m('g-deep', [2, 10], 'deep'), m('g-pro', [2, 12], null)]),
+      prov('openai', false, [m('o-cheap', [0.05, 0.4], 'cheap'), m('o-std', [0.75, 4.5], 'standard')]),
+      prov('anthropic', true, [m('a-cheap', [0.1, 0.5], 'cheap'), m('a-std', [2, 10], 'standard'), m('a-deep', [4, 20], 'deep'), m('a-top', [10, 50], null)]),
+    ],
+  }
+  const id = (c: { provider: string; model: string } | null) => (c ? `${c.provider}:${c.model}` : 'null')
+  check('AP1 물음 → 서버 기본 회사의 가장 싼 모델(서버가 정한 빠르게 칸 — 더 싸지만 예전 키만 되는 모델로 가지 않음) · 일 → 한 단계 위(보통) · 가장 비싼 단계로는 안 감',
+    id(pickAuto(full, 'light')) === 'gemini:g-cheap' && id(pickAuto(full, 'heavy')) === 'gemini:g-std' && autoPlan(full)?.upgrades === true, [id(pickAuto(full, 'light')), id(pickAuto(full, 'heavy'))])
+  check('AP2 일에 쓰는 모델 = [더 잘 쓰는 모델로 다시] 가 가장 싼 모델에서 권하는 그 모델(회사마다)',
+    (['gemini', 'anthropic'] as const).every((pid) => {
+      const plan = autoPlan(full, { prefer: pid })
+      return !!plan && plan.light.provider === pid && plan.heavy.model === betterModel(full, plan.light)?.model
+    }))
+  check('AP3 서버 목록을 못 받음 · 키가 있는 회사 없음 → null(고른 것 없이 보냄 = 예전 기본 그대로)',
+    pickAuto(null, 'heavy') === null && pickAuto(null, 'light') === null && pickAuto({ ...full, providers: full.providers.map((x) => ({ ...x, configured: false })) }, 'heavy') === null && pickAuto({ defaultChoice: full.defaultChoice, providers: [] }, 'light') === null)
+  const one: AssistStatus = { role: 'owner', defaultChoice: { provider: 'gemini', model: 'only' }, providers: [prov('gemini', true, [m('only', [0.25, 1.5], 'cheap')])] }
+  check('AP4 모델이 하나뿐인 계정 — 물음 · 일 모두 그 모델 · 자동이라고 말하지 않음(upgrades false)', id(pickAuto(one, 'light')) === 'gemini:only' && id(pickAuto(one, 'heavy')) === 'gemini:only' && autoPlan(one)?.upgrades === false)
+  const pilot: AssistStatus = { ...full, role: 'pilot' }
+  check('AP5 서버가 팀장 등급(pilot)이라고 한 계정 · 올려 쓰지 않는 화면(upgrade false)은 일도 가장 싼 모델',
+    id(pickAuto(pilot, 'heavy')) === 'gemini:g-cheap' && autoPlan(pilot)?.upgrades === false && id(pickAuto(full, 'heavy', { upgrade: false })) === 'gemini:g-cheap' && autoPlan(full, { upgrade: false })?.upgrades === false)
+  const noStd: AssistStatus = { role: 'owner', defaultChoice: { provider: 'gemini', model: 'c' }, providers: [prov('gemini', true, [m('c', [0.25, 1.5], 'cheap'), m('d', [2, 10], 'deep')])] }
+  const noStd2: AssistStatus = { role: 'owner', defaultChoice: { provider: 'gemini', model: 'c' }, providers: [prov('gemini', true, [m('c', [0.25, 1.5], 'cheap'), m('d', [2, 10], 'deep'), m('mid', [0.5, 3], null)])] }
+  check('AP6 보통 단계가 없는 회사 — 더 나은 것이 가장 비싼 단계 하나뿐이면 그것 · 다른 것이 있으면 더 나은 것 중 가장 싼 것', id(pickAuto(noStd, 'heavy')) === 'gemini:d' && id(pickAuto(noStd2, 'heavy')) === 'gemini:mid', [id(pickAuto(noStd, 'heavy')), id(pickAuto(noStd2, 'heavy'))])
+  const noTier: AssistStatus = { role: 'owner', defaultChoice: { provider: 'gemini', model: 'x2' }, providers: [prov('gemini', true, [m('x2', [1, 5], null), m('x1', [0.2, 1], null), m('x3', null, null)])] }
+  check('AP7 단계 표시가 없는 목록 — 가격표에서 가장 싼 것이 물음 · 그보다 비싼 것 중 가장 싼 것이 일', id(pickAuto(noTier, 'light')) === 'gemini:x1' && id(pickAuto(noTier, 'heavy')) === 'gemini:x2', [id(pickAuto(noTier, 'light')), id(pickAuto(noTier, 'heavy'))])
+  const defOff: AssistStatus = { ...full, defaultChoice: { provider: 'openai', model: 'o-cheap' } }
+  check('AP8 서버 기본 회사에 키가 없으면 키가 있는 첫 회사 · 이 화면에서 못 쓰는 회사는 고르지 않음 · [가장 싼 모델] · [좋은 모델] 단추는 지금 고른 회사 안에서',
+    id(pickAuto(defOff, 'light')) === 'gemini:g-cheap' && id(pickAuto(full, 'heavy', { providers: ['anthropic'] })) === 'anthropic:a-std' && id(pickAuto(full, 'light', { prefer: 'anthropic' })) === 'anthropic:a-cheap' && id(pickAuto(full, 'heavy', { prefer: 'anthropic' })) === 'anthropic:a-std' && id(pickAuto(full, 'heavy', { prefer: 'openai' })) === 'gemini:g-std')
+
+  /* ---- 4. 저장 — 방식(자동 · 직접)을 고른 모델과 함께 ---- */
+  setAllowedProviders(null)
+  setCheapOnly(false)
+  localStorage.removeItem(KEY)
+  check('AS1 한 번도 고르지 않은 계정 → 자동(고른 모델 없음) · 대표 화면은 올려 쓸 수 있음', readMode() === 'auto' && readChoice() === null && autoUpgradeAllowed())
+  localStorage.setItem(KEY, JSON.stringify({ provider: 'openai', model: 'gpt-5.4-mini' }))
+  check('AS2 예전에 저장된 선택({ provider, model })은 직접 고른 것으로 그대로', readMode() === 'manual' && id(readChoice()) === 'openai:gpt-5.4-mini')
+  saveChoice({ provider: 'anthropic', model: 'claude-haiku-5-5' })
+  const savedManual = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Record<string, string>
+  saveChoice(null)
+  const savedAuto = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Record<string, string>
+  check('AS3 고르면 { mode: manual, provider, model } · 자동으로 돌리면 { mode: auto } — 방식을 선택과 함께 적는다', savedManual.mode === 'manual' && savedManual.provider === 'anthropic' && savedManual.model === 'claude-haiku-5-5' && savedAuto.mode === 'auto' && readMode() === 'auto' && readChoice() === null, { savedManual, savedAuto })
+  const e0 = accountEpoch()
+  setAllowedProviders(['gemini'])
+  const e1 = accountEpoch()
+  setAllowedProviders(['gemini'])
+  const customerScreen = autoUpgradeAllowed()
+  setAllowedProviders(['gemini', 'openai', 'anthropic'])
+  setCheapOnly(true)
+  const pilotScreen = autoUpgradeAllowed()
+  setAllowedProviders(null)
+  setCheapOnly(false)
+  check('AS4 구독 고객 화면 · 팀장 화면은 올려 쓰지 않음 — 대표 화면만 · 화면 모양이 바뀔 때만 계정 번호가 바뀜(같은 값이면 그대로)', !customerScreen && !pilotScreen && autoUpgradeAllowed() && e1 === e0 + 1 && accountEpoch() === e1 + 4, { e0, e1, now: accountEpoch() })
+
+  /* ---- 5. 한 곳에서 정한다 — 화면 → callAssist → 진짜 서버 함수 → 가짜 공급자 ---- */
+  setEnv()
+  const baseFetch = globalThis.fetch
+  let who = OWNER
+  let statusGets = 0
+  let statusDown = false
+  const posted: Record<string, unknown>[] = []
+  globalThis.fetch = (async (input: unknown, init?: { method?: string; headers?: Record<string, string>; body?: string }) => {
+    const url = String(input)
+    if (!url.startsWith('/api/ai-assist')) return baseFetch(input as never, init as never)
+    const method = String(init?.method ?? 'GET').toUpperCase()
+    if (method === 'GET') {
+      statusGets += 1
+      if (statusDown) return new Response('<html>Bad gateway</html>', { status: 502 })
+    } else posted.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>)
+    const res = mkRes()
+    await handler({ method, url, headers: { authorization: who }, body: init?.body }, res)
+    return new Response(res.raw, { status: res.statusCode, headers: { 'content-type': 'application/json' } })
+  }) as typeof fetch
+  const fresh = () => {
+    __resetAiAssistState()
+    __resetAssistStatusCache()
+    noteAutoPick(null)
+    calls = []
+    posted.length = 0
+    statusGets = 0
+  }
+  const llmUrls = () => calls.filter((c) => /:generateContent|\/v1\/messages/.test(c.url)).map((c) => (c.url.includes('/v1/messages') ? `claude:${String(c.body.model)}` : (/models\/([^:]+):generateContent/.exec(c.url)?.[1] ?? c.url)))
+  const ask = (assistId: string, page: string, text: string, choice: { provider: 'gemini' | 'openai' | 'anthropic'; model: string } | null = readChoice()) => callAssist({ requestId: rid(), assistId, page: page as never, choice, context: CTX as never, ask: text })
+
+  localStorage.removeItem(KEY)
+  fresh()
+  const a1 = await ask('home.chat', 'today', '사업자등록증 들어가 있나?')
+  const a1pick = lastAutoPick()
+  const a2 = await ask('home.chat', 'today', '이제 기획 시작해 줘 — 한솔정밀 정책자금 제안')
+  const a2pick = lastAutoPick()
+  check('AC1 자동 · 단순 질문 → 가장 싼 모델(Gemini 3.1 Flash-Lite)로 보내고 답도 그 모델 · 판에 "방금: 가장 싼 모델"',
+    a1.model === 'gemini-3.1-flash-lite' && id(posted[0].choice as never) === 'gemini:gemini-3.1-flash-lite' && llmUrls()[0] === 'gemini-3.1-flash-lite' && a1pick?.weight === 'light' && a1pick.model === 'gemini-3.1-flash-lite', { model: a1.model, sent: posted[0]?.choice, urls: llmUrls(), a1pick })
+  check('AC2 자동 · "이제 기획 시작해 줘 …" → 좋은 모델(Gemini 3.8 Flash — 가장 비싼 단계 아님)로 보내고 답도 그 모델 · 판에 "방금: 좋은 모델"',
+    a2.model === 'gemini-3.8-flash' && id(posted[1].choice as never) === 'gemini:gemini-3.8-flash' && llmUrls()[1] === 'gemini-3.8-flash' && a2pick?.weight === 'heavy' && a2pick.model === 'gemini-3.8-flash', { model: a2.model, sent: posted[1]?.choice, urls: llmUrls(), a2pick })
+  const a3 = await callAssist({ requestId: rid(), assistId: 'content.blog', page: 'content', choice: readChoice(), context: CTX as never })
+  const a4 = await callAssist({ requestId: rid(), assistId: 'today.top3', page: 'today', choice: readChoice(), context: CTX as never })
+  check('AC3 자동 · 쓰기 단추(블로그 글 한 번에)는 좋은 모델 · 목록 단추(오늘 3개)는 가장 싼 모델 · 서버 모델 목록은 한 번만 받음(요청 넷에 한 번)', a3.model === 'gemini-3.8-flash' && a4.model === 'gemini-3.1-flash-lite' && statusGets === 1 && !llmUrls().some((u) => /argon|pro/.test(u)), { a3: a3.model, a4: a4.model, statusGets, urls: llmUrls() })
+  check('AC4 받아 둔 서버 목록을 모델 고르기 단추가 같이 씀 · 서버가 본 계정(대표)이 같이 옴', peekAssistStatus()?.role === 'owner' && (peekAssistStatus()?.providers.length ?? 0) === 3)
+
+  // 직접 고른 모델 — 그대로(일을 시켜도 · 물어도)
+  saveChoice({ provider: 'anthropic', model: 'claude-haiku-5-5' })
+  fresh()
+  // 앞서 자동이 남긴 '방금: 좋은 모델' 줄이 있어도 — 직접 고른 모델로 답하면 지운다(방금 답은 자동이 고른 것이 아니다)
+  noteAutoPick({ weight: 'heavy', provider: 'gemini', model: 'gemini-3.8-flash', at: Date.now() })
+  const m1 = await ask('home.chat', 'today', '이제 기획 시작해 줘')
+  const m2 = await ask('home.chat', 'today', '기획 시작해 줘', null)
+  const m3 = await ask('home.chat', 'today', '뭐야?', { provider: 'gemini', model: 'gemini-4-argon' })
+  check('AC5 직접 고른 모델(Claude Haiku)은 일을 시켜도 그대로 · 부른 쪽이 안 읽어 와도(null) 그대로 · 이번 한 번만 다른 모델(더 잘 쓰는 모델로 다시)은 그 모델 · 서버 목록 안 받음 · "방금" 줄 없음',
+    m1.provider === 'anthropic' && m1.model === 'claude-haiku-5-5' && m2.model === 'claude-haiku-5-5' && m3.model === 'gemini-4-argon' && statusGets === 0 && lastAutoPick() === null && llmUrls().join() === 'claude:claude-haiku-5-5,claude:claude-haiku-5-5,gemini-4-argon', { urls: llmUrls(), statusGets })
+  // 실시간 — 자동으로 돌리면 바로 다음 질문부터
+  saveChoice(null)
+  const m4 = await ask('home.chat', 'today', '사업자등록증 들어가 있나?')
+  saveChoice({ provider: 'gemini', model: 'gemini-3.8-flash' })
+  const m5 = await ask('home.chat', 'today', '사업자등록증 들어가 있나?')
+  check('AC6 바꾸면 바로 다음 질문부터 — 자동으로 돌린 뒤 단순 질문은 가장 싼 모델 · 다시 Gemini 3.8 Flash 를 고르면 단순 질문도 그 모델', m4.model === 'gemini-3.1-flash-lite' && m5.model === 'gemini-3.8-flash', [m4.model, m5.model])
+
+  // 서버 기본 회사를 Claude 로 둔 운영 — 자동도 그 회사 안에서
+  localStorage.removeItem(KEY)
+  setEnv({ AI_DEFAULT_PROVIDER: 'anthropic' })
+  fresh()
+  const d1 = await ask('side.chat', 'side', '이거 어떻게 해야 돼?')
+  const d2 = await ask('side.chat', 'side', '제안서 초안 써 줘')
+  check('AC7 서버 기본 회사가 Claude 면 자동도 Claude 안에서 — 물음 Haiku · 일 Sonnet(Opus · 가장 비싼 모델 아님)', d1.model === 'claude-haiku-5-5' && d2.model === 'claude-sonnet-5-5', [d1.model, d2.model])
+
+  // 서버 목록을 못 받음 → 예전 기본 그대로(고른 것 없이 보냄)
+  setEnv()
+  fresh()
+  statusDown = true
+  const f1 = await ask('home.chat', 'today', '이제 기획 시작해 줘')
+  const f2 = await ask('home.chat', 'today', '이제 기획 시작해 줘')
+  statusDown = false
+  check('AC8 서버 모델 목록을 못 받으면 — 고른 것 없이 보냄(서버 기본 = 가장 싼 Gemini · 예전 그대로) · 실패한 뒤 요청마다 다시 묻지 않음(한 번)', posted.length === 2 && posted.every((b) => b.choice === null) && f1.model === 'gemini-3.1-flash-lite' && f2.model === 'gemini-3.1-flash-lite' && statusGets === 1 && lastAutoPick() === null, { sent: posted.map((b) => b.choice), statusGets })
+
+  // 팀장 — 화면(회사마다 가장 싼 모델 하나)도 서버도 가장 싼 모델
+  who = PILOT
+  setAllowedProviders(['gemini', 'openai', 'anthropic'])
+  setCheapOnly(true)
+  fresh()
+  const p1 = await ask('home.chat', 'today', '이제 기획 시작해 줘 — 한솔정밀 정책자금 제안')
+  check('AC9 팀장 화면 · 자동 — 일을 시켜도 고른 것 없이 보냄(서버 목록도 안 받음 = 예전 그대로) → 서버가 가장 싼 Gemini 로 부름', p1.model === 'gemini-3.1-flash-lite' && posted[0].choice === null && statusGets === 0 && llmUrls().join() === 'gemini-3.1-flash-lite' && lastAutoPick() === null, { model: p1.model, sent: posted[0]?.choice, statusGets })
+  // 화면이 대표 모양으로 잘못 알고 있어도(권한이 방금 바뀜) — 서버가 팀장이라고 하면 올려 쓰지 않는다 · 비싼 모델을 보내도 서버가 바꿔 부른다
+  setAllowedProviders(null)
+  setCheapOnly(false)
+  fresh()
+  const p2 = await ask('home.chat', 'today', '이제 기획 시작해 줘')
+  const p2sent = id(posted[0].choice as never)
+  const p3 = await ask('home.chat', 'today', '이제 기획 시작해 줘', { provider: 'gemini', model: 'gemini-3.8-flash' })
+  const pst = await fetchAssistStatus()
+  check('AC10 팀장 계정 — 화면이 잘못 알아도 서버 목록(role pilot · 회사마다 한 모델)으로 가장 싼 모델만 고름 · 좋은 모델을 직접 보내도 서버가 가장 싼 모델로 · 끝은 늘 가장 싼 모델',
+    p2sent === 'gemini:gemini-3.1-flash-lite' && p2.model === 'gemini-3.1-flash-lite' && p3.model === 'gemini-3.1-flash-lite' && pst.role === 'pilot' && autoPlan(pst)?.upgrades === false && llmUrls().every((u) => u === 'gemini-3.1-flash-lite'), { p2sent, p2: p2.model, p3: p3.model, urls: llmUrls() })
+  // 구독 고객 — 서버 목록에 Gemini 모델이 여럿 있어도 자동은 올려 쓰지 않는다(사용량을 단계로 세는 계정)
+  audienceCustomer = true
+  fresh()
+  const cst = await fetchAssistStatus()
+  const gem = cst.providers.find((x) => x.id === 'gemini')
+  check('AC11 구독 고객 — 회사는 Gemini 하나 · 모델은 여럿이어도 자동은 일도 가장 싼 모델(올려 쓰지 않음 · 자동이라고 말하지 않음)',
+    cst.role === 'pilot' && cst.providers.length === 1 && (gem?.models.length ?? 0) >= 3 && id(pickAuto(cst, 'heavy', { providers: ['gemini'], upgrade: false })) === 'gemini:gemini-3.1-flash-lite' && id(pickAuto(cst, 'heavy')) === 'gemini:gemini-3.1-flash-lite' && autoPlan(cst)?.upgrades === false, { role: cst.role, n: gem?.models.length })
+  audienceCustomer = false
+
+  who = OWNER
+  setAllowedProviders(null)
+  setCheapOnly(false)
+  localStorage.removeItem(KEY)
+  globalThis.fetch = baseFetch
+  fresh()
+  setEnv()
+}
+
 await serverTests()
 askTests()
 bundleTests()
@@ -1003,5 +1275,6 @@ d241Tests()
 await d263Tests()
 await kbContractTests()
 await lockTests()
+await d629Tests()
 console.log(`\naiAssist: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

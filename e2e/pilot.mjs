@@ -842,6 +842,13 @@ try {
   const tabs = await page.locator('[data-testid="ai-assist-settings"] [role="tab"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-provider')))
   check('팀장(D-614): 모델 바꾸기 — 회사 탭은 Gemini · GPT · Claude 셋(내부 팀장)', tabs.join() === 'gemini,openai,anthropic', tabs.join())
   {
+    // D-629 자동 모델은 대표 화면만 — 팀장 화면에는 '자동' 줄 · [가장 싼 모델] · [좋은 모델] 이 없고, 쓰는 모델은 예전처럼 그 모델 이름(더 좋은 모델을 약속하는 말 없음)
+    const mLabel = await page.getByTestId('ai-assist-model-label').first().innerText().catch(() => '')
+    const settingsText = await page.getByTestId('ai-assist-settings').first().innerText().catch(() => '')
+    check('팀장(D-629): 모델 판에 자동 줄 · 한 번에 고르기 없음 · 쓰는 모델은 Gemini 3.1 Flash-Lite(기본 · 가장 쌈) 그대로 · "자동" · "좋은 모델" 이라는 말 0',
+      (await page.getByTestId('ai-model-auto').count()) === 0 && (await page.getByTestId('ai-model-quick').count()) === 0 && /Gemini 3\.1 Flash-Lite/.test(mLabel) && /기본 · 가장 쌈/.test(mLabel) && !/자동/.test(mLabel) && !/자동 —|좋은 모델/.test(settingsText), { mLabel, auto: await page.getByTestId('ai-model-auto').count() })
+  }
+  {
     // D-614 회사마다 가장 싼 모델 하나만 — Claude 탭을 눌러도 Haiku 하나
     await page.locator('[data-testid="ai-assist-settings"] [role="tab"][data-provider="anthropic"]').first().click().catch(() => {})
     await page.waitForTimeout(300)
@@ -2183,6 +2190,9 @@ try {
     await go(ps, '/')
     await ps.waitForTimeout(1200)
     const pickOn = await ps.getByTestId('model-picker').count()
+    // D-629 자동 모델은 대표 화면만 — 고객이 모델 단추를 보이게 해도 [모델 · 자동] 이 아니라 예전처럼 그 모델 이름(가장 싼 Gemini)
+    const custChips = await ps.getByTestId('model-picker').evaluateAll((els) => els.map((e) => (e.textContent ?? '').replace(/\s+/g, ' ').trim()))
+    check('고객(D-629): 모델 단추를 보이게 해도 [모델 · 자동] 이 아님 — 예전처럼 가장 싼 Gemini 이름 그대로', custChips.length >= 1 && custChips.every((t) => /모델 · Gemini 3\.1 Flash-Lite/.test(t) && !/자동/.test(t)), custChips)
     await go(ps, '/settings')
     await ps.waitForTimeout(700)
     await ps.locator('[data-testid="settings-model-pick-option"][data-value="hide"]').click()
@@ -2310,7 +2320,9 @@ try {
     check('내부 팀장(D-568) 설정: [개발자에게 피드백] 그대로 · 모델 숨기기 줄 없음(고객 화면에만)', (await pt.getByTestId('feedback-open').count()) >= 1 && (await pt.getByTestId('settings-model-pick').count()) === 0)
     await go(pt, '/')
     await pt.waitForTimeout(1200)
-    check('내부 팀장(D-570): 오늘 화면의 [모델 · ○○] 단추는 예전 그대로', (await pt.getByTestId('model-picker').count()) >= 1)
+    // D-629 팀장 화면의 모델 단추도 [모델 · 자동] 이 아니다 — 예전처럼 그 모델 이름
+    const teamChips = await pt.getByTestId('model-picker').evaluateAll((els) => els.map((e) => (e.textContent ?? '').replace(/\s+/g, ' ').trim()))
+    check('내부 팀장(D-570 · D-629): 오늘 화면의 [모델 · ○○] 단추는 예전 그대로(모델 이름 · "자동" 아님)', teamChips.length >= 1 && teamChips.every((t) => /모델 · Gemini 3\.1 Flash-Lite/.test(t) && !/자동/.test(t)), teamChips)
     const atkP = await attack(pt)
     check('내부 팀장 공격(D-568 · 진짜 RLS): 고객 문의 0줄 · 받은함 0줄 · 답장 · 읽음 · 직접 쓰기 막힘', blocked(atkP) && !atkP.users.includes(CUSTOMER.id), JSON.stringify(atkP))
     await cT.close()

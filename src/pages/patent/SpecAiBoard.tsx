@@ -26,6 +26,7 @@ import { MATERIAL_CHARS, MATERIAL_MAX, SECTION_KEYS, SECTION_LABEL, checkDraft, 
 import { CARD_STAGES, PLAN_BODY, applyIdea, backToIdeas, bodyWritten, cardState, clearAfterIdea, companyThin, hasLaterWork, partsHuman, planAll, planParts, rankLabel, specPhase, stageBlock, stageOf, type AgentCard, type AgentCompany, type AgentStage, type SpecPhase } from '../../services/patent/specAgent'
 import { modelsOf, prettyModel, specRun, specRunVersion, startSpecRun, subscribeSpecRun, type StageRow } from '../../services/patent/specRun'
 import { useAiChoice } from '../../components/ai/ModelPicker'
+import { autoUpgradeAllowed } from '../../services/aiAssist/store'
 import { PlanTalk } from '../../components/ai/PlanTalk'
 import { talkFinished, withAnswer } from '../../services/aiAssist/talk'
 import { SpecFullText, downloadPlain } from './SpecFullText'
@@ -482,7 +483,7 @@ export function SpecAiBoard({
             </li>
           </ul>
           <p className="t-meta break-keep text-slate-600" data-testid="spec-board-models" data-models={models.join(',')}>
-            지금 고른 모델 <b className="font-semibold text-slate-800">{choice ? prettyModel(choice.model) : '기본(Gemini 가장 싼 모델)'}</b> — 바꾸면 다음 단계부터 그 모델로 씁니다
+            지금 고른 모델 <b className="font-semibold text-slate-800">{choice ? prettyModel(choice.model) : autoUpgradeAllowed() ? '자동(일을 시킬 때는 좋은 모델)' : '기본(Gemini 가장 싼 모델)'}</b> — 바꾸면 다음 단계부터 그 모델로 씁니다
             {models.length > 0 && (
               <>
                 {' · '}이 명세서를 쓴 모델 <b className="font-semibold text-slate-800">{models.map(prettyModel).join(' · ')}</b>
