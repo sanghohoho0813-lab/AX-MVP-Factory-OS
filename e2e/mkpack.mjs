@@ -177,7 +177,9 @@ const entry = {
   strengthWords: await page.getByTestId('mk-keys').evaluate((e) => (e.innerText.match(/신호 (강함|보통)|초기 신호/g) ?? []).length),
 }
 check('H2(D-630) 들어오면 판 하나 = "이번 주 뜨는 주제" + 한 줄 + 다섯 줄 · [더 보기] 는 접힘 · 본업 주제 · 직접 주제 · 1주일치 · 사용 방법 · 관심 분야 · 받은 때 · [자세히 보기] 는 그 안(처음엔 0)', entry.title === '이번 주 뜨는 주제' && entry.about.length > 0 && entry.about.replace(/\s/g, '').length <= 30 && entry.moreOpen === '0' && entry.inside === 0 && entry.shownRows === Math.min(5, KEYS_N) && (await page.getByTestId('radar-plan').count()) === 0, entry)
-check('H3 첫 화면에 AI 도우미 판 · 새로 가져오기 · CSV · 채널 설계 기준이 안 보임(그 안으로)', (await page.getByTestId('ai-assist-bar').count()) === 0 && (await page.getByTestId('yt-refresh').count()) === 0 && (await page.getByTestId('radar-brief').count()) === 0)
+// D-628 유튜브의 AI 도우미는 이 화면의 대화창 — [⋯] 안 · 오른쪽 판으로 옮겨 그려진다(접힌 [더 보기] 밖). 첫 화면 본문에 '보이는' 띠가 없으면 된다
+const shownBars = await page.locator('[data-testid="ai-assist-bar"]').evaluateAll((els) => els.filter((e) => e.getBoundingClientRect().height > 0).length)
+check('H3 첫 화면에 AI 도우미 판 · 새로 가져오기 · CSV · 채널 설계 기준이 안 보임(그 안으로)', shownBars === 0 && (await page.getByTestId('yt-refresh').count()) === 0 && (await page.getByTestId('radar-brief').count()) === 0)
 const chars = (await page.locator('main').innerText()).replace(/\s+/g, '').length
 const firstKeyTop = (await keys.first().boundingBox())?.y ?? 9999
 // D-630 화면 읽기용 글(신호 세기 이름 등)까지 넣어 센 숫자 — 눈에 보이는 글자 수는 qa:chars '유튜브 · 주제 받은 뒤'(100자 안)
