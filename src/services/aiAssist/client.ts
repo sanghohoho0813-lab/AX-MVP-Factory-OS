@@ -7,7 +7,7 @@ import { getSupabaseClient } from '../../lib/supabase/client'
 import type { AssistContext } from './context'
 import type { AssistPage } from './presets'
 import { brandForRequest } from '../brandProfile'
-import { accountEpoch, allowedProviders, autoUpgradeAllowed, noteAutoPick, noteCheapModels, readChoice } from './store'
+import { accountEpoch, allowedProviders, autoUpgradeAllowed, lastAutoPick, noteAutoPick, noteCheapModels, readChoice } from './store'
 import { classifyAsk, pickAuto, type AskWeight } from './autoModel'
 
 export const ASSIST_ENDPOINT = '/api/ai-assist'
@@ -338,5 +338,7 @@ export async function callAssist(req: { requestId: string; assistId: string; pag
   if (!b || !b.run) throw new AssistError('provider_error', MESSAGE.provider_error)
   // D-629 자동이 고른 것 — 모델 고르기 판에 '방금: 좋은 모델로 답함' 한 줄(서버가 실제로 부른 모델로 — 답 아래 'AI 답 · 모델' 과 같은 이름)
   if (auto && isProvider(b.run.provider)) noteAutoPick({ weight: auto, provider: b.run.provider, model: String(b.run.model || choice?.model || ''), at: Date.now() })
+  // 방금 답은 자동이 고른 것이 아니다(직접 고른 모델 · 이번 한 번만 다른 모델) — 앞의 '방금' 줄을 남겨 두지 않는다
+  else if (lastAutoPick()) noteAutoPick(null)
   return b.run
 }

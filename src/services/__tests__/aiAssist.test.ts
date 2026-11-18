@@ -1202,6 +1202,8 @@ async function d629Tests() {
   // 직접 고른 모델 — 그대로(일을 시켜도 · 물어도)
   saveChoice({ provider: 'anthropic', model: 'claude-haiku-5-5' })
   fresh()
+  // 앞서 자동이 남긴 '방금: 좋은 모델' 줄이 있어도 — 직접 고른 모델로 답하면 지운다(방금 답은 자동이 고른 것이 아니다)
+  noteAutoPick({ weight: 'heavy', provider: 'gemini', model: 'gemini-3.8-flash', at: Date.now() })
   const m1 = await ask('home.chat', 'today', '이제 기획 시작해 줘')
   const m2 = await ask('home.chat', 'today', '기획 시작해 줘', null)
   const m3 = await ask('home.chat', 'today', '뭐야?', { provider: 'gemini', model: 'gemini-4-argon' })
