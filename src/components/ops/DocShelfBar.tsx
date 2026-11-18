@@ -37,7 +37,8 @@ export function DocShelfBar({ summary, onJump, onReview }: { summary: DocShelfSu
   const none = summary.other.length + dupKeys.length + summary.expired.length + summary.missingNow.length + review.length === 0
   const st = summary.stages
   return (
-    <div className="flex flex-col gap-1.5" data-testid="doc-shelf-wrap">
+    // D-631 받음 줄과 손볼 것 칩을 한 줄에(좁으면 칩이 아랫줄로) — 한 칸씩 두 줄로 쌓이던 것
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5" data-testid="doc-shelf-wrap">
       {/* D-518 서류 단계 한 줄 — 받음 · 요청함(고객이 아직 안 보냄) · 확인할 정보(읽은 값 확인 전) */}
       {st && st.received + st.requested > 0 && (
         <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-0.5 text-slate-600" data-testid="doc-stages">

@@ -308,6 +308,7 @@ export function Fold({
   tour,
   panel = false,
   summary,
+  summaryBelow = false,
   forceOpen = false,
   keepClosed = false,
   children,
@@ -329,6 +330,8 @@ export function Fold({
   panel?: boolean
   /** 접혀 있을 때 제목 옆 한 줄 요약(예: 계약 1,200만원 · 3개월째) — 펼치지 않고도 핵심만 */
   summary?: ReactNode
+  /** D-631 요약을 늘 제목 줄 아래로 — 반쪽 칸에 긴 요약이 제목 옆 좁은 틈에 세 줄로 끼던 것(옆 칸 목차와 같은 모양으로) */
+  summaryBelow?: boolean
   /** 이 목차로 데려온 경우(#주소 등) — 기억과 상관없이 펼친 채로 */
   forceOpen?: boolean
   /** D-295 열 때마다 접힌 채로(펼친 것을 기억하지 않고 [모두 펼치기] 도 따르지 않는다) — 가끔 고치는 설정 칸 */
@@ -341,7 +344,7 @@ export function Fold({
   const bodyId = useId()
   const headRef = useRef<HTMLDivElement>(null)
   // 요약이 보일 때만 잰다(펼친 판 · 요약 없는 판은 재지 않는다)
-  const wide = useWideHead(headRef, !!summary && !open)
+  const wide = useWideHead(headRef, !!summary && !open && !summaryBelow)
   const tip = hint ?? hintFor(title)
   const tone =
     countTone === 'danger' ? 'bg-danger-50 text-danger-700' : countTone === 'warning' ? 'bg-warning-50 text-warning-800' : countTone === 'brand' ? 'bg-brand-50 text-brand-700' : 'bg-slate-100 text-slate-600'

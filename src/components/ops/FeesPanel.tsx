@@ -88,6 +88,13 @@ function FeeLine({
   const service = fee.serviceKey ? SERVICES.find((s) => s.key === fee.serviceKey)?.shortLabel : null
   const patch = (p: Partial<FeeItem>) => onChange(withFee(record, fee.id, p))
 
+  // D-631 고치기(연필) 단추 — 입금된 줄은 상태 줄 오른쪽 끝에, 아직인 줄은 [입금 확인] 줄 오른쪽 끝에
+  const editBtn = (
+    <button type="button" aria-expanded={edit} aria-label={`${fee.label} 고치기`} title={edit ? '접기' : '고치기'} onClick={() => setEdit((v) => !v)} className="tap ml-auto inline-flex size-9 items-center justify-center rounded-(--radius-control) text-slate-600 hover:bg-slate-50 hover:text-brand-700">
+      {edit ? <ChevronDown aria-hidden="true" className="size-4 rotate-180" /> : <Pencil aria-hidden="true" className="size-3.5" />}
+    </button>
+  )
+
   return (
     <li className="flex flex-col gap-2 px-4 py-3.5 sm:px-5" data-testid="fee-line" data-fee-id={fee.id}>
       {/* 1줄 — 이름 · 금액 */}
@@ -120,18 +127,22 @@ function FeeLine({
             {m.marginPct !== null && <span className="ml-1 font-bold text-brand-700">{marginText(m.marginPct)}</span>}
           </span>
         )}
-      </div>
-
-      {/* 3줄 — 누를 것 */}
-      {confirm === null ? (
-        <div className="flex flex-wrap items-center gap-2">
-          {state === 'received' ? (
+        {/* D-631 입금된 줄은 되돌리기 · 고치기를 이 줄에 — 작은 아이콘 둘만 따로 한 줄을 차지하고 있었다 */}
+        {state === 'received' && confirm === null && (
+          <>
             <button type="button" onClick={() => setConfirm('undo')} aria-label={`${fee.label} 입금 되돌리기`} title="입금 되돌리기" className="tap inline-flex size-9 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-50 hover:text-slate-800">
               {/* D-627 글 대신 아이콘(이름은 마우스 · 화면 읽기로) */}
               <Undo2 aria-hidden="true" className="size-4" />
             </button>
-          ) : (
-            <>
+            {editBtn}
+          </>
+        )}
+      </div>
+
+      {/* 3줄 — 누를 것(아직 안 들어온 돈만 — 입금된 줄의 단추는 위 상태 줄에) */}
+      {confirm === null ? (
+        state !== 'received' && (
+        <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 aria-label={`${fee.label} 입금`}
@@ -145,12 +156,9 @@ function FeeLine({
                   조건 충족됨
                 </button>
               )}
-            </>
-          )}
-          <button type="button" aria-expanded={edit} aria-label={`${fee.label} 고치기`} title={edit ? '접기' : '고치기'} onClick={() => setEdit((v) => !v)} className="tap ml-auto inline-flex size-9 items-center justify-center rounded-(--radius-control) text-slate-600 hover:bg-slate-50 hover:text-brand-700">
-            {edit ? <ChevronDown aria-hidden="true" className="size-4 rotate-180" /> : <Pencil aria-hidden="true" className="size-3.5" />}
-          </button>
+          {editBtn}
         </div>
+        )
       ) : (
         <div role="alertdialog" aria-label={confirm === 'in' ? '입금 확인' : '입금 되돌리기'} className="flex flex-wrap items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="fee-confirm">
           <span className="t-body min-w-0 break-keep font-semibold text-slate-900">
@@ -348,7 +356,8 @@ export function FeesPanel({
   const empty = record.fees.length === 0
   return (
     <section aria-labelledby="fees" className="flex flex-col gap-3" data-testid="fees-panel">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      {/* D-631 제목 글이 빠진 뒤(D-627) 왼쪽 끝에 ? 만 떨어져 있었다 — 단추 옆(오른쪽 한 묶음)으로 */}
+      <div className={`flex flex-wrap items-center gap-2 ${empty ? '' : 'justify-end'}`}>
         <HintTip tip={hintFor('계약 · 수금')} label="계약 · 수금">
           {/* D-627 바로 위 탭이 '수금' — 제목 글은 화면 읽기에만(ⓘ 설명은 그대로) */}
           <h2 id="fees" className="text-[1.2rem] font-bold text-slate-900">

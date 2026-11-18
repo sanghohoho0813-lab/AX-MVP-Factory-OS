@@ -111,7 +111,8 @@ const TodayPosts = lazy(() => import('./marketing/radar/TodayPosts'))
 const weekDataNow = () => hasWeekData()
 
 /** D-159: 할 일이 4건 넘으면 휴대폰에서도 두 칸 — 여섯 건이면 세 줄로 끝난다 */
-const todoGridClass = (n: number) => `ax-stagger grid gap-2 ${n >= 4 ? 'grid-cols-2' : 'grid-cols-1'} lg:grid-cols-2`
+/** D-631: PC 에서 할 일이 하나뿐이면 넓게 — 반쪽에 몰리고 오른쪽 반이 비어 있었다(D-522 아래 약속 칸과 같은 규칙) */
+const todoGridClass = (n: number) => `ax-stagger grid gap-2 ${n >= 4 ? 'grid-cols-2' : 'grid-cols-1'} lg:grid-cols-2 lg:[&>*:only-child]:col-span-2`
 
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토']
 
@@ -933,7 +934,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                   {/* D-377 박스 색은 하나로 — 급한 것은 제목 · 날짜의 빨간 글자가 말한다 */}
                   <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200 bg-white">
                     {hardDue.map((a) => (
-                      <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                      <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 lg:min-h-14 lg:py-1.5">
                         <span className="t-sub w-20 shrink-0 font-semibold whitespace-nowrap text-danger-700">{a.reason.startsWith('오늘') ? '오늘까지' : a.reason.split(' — ')[0]}</span>
                         <Link to={a.href} className="tap t-body inline-flex items-center font-bold text-slate-900 hover:text-brand-700 hover:underline">
                           {a.clientName}
@@ -960,7 +961,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                     {(phone && !showAllAppts ? appointments.slice(0, PHONE_ROWS) : appointments).map((e) => {
                       const late = (e.daysLeft ?? 0) < 0
                       return (
-                        <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                        // D-631 PC 줄 높이를 같게(56px) — 전화 단추가 있는 줄만 68px, 없는 줄은 50px 이라 목록이 들쭉날쭉했다
+                        <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 lg:min-h-14 lg:py-1.5">
                           <span className={`t-sub w-20 shrink-0 font-semibold whitespace-nowrap ${late ? 'text-danger-700' : 'text-brand-700'}`}>
                             {e.daysLeft === 0 ? '오늘' : e.daysLeft === 1 ? '내일' : `${Math.abs(e.daysLeft ?? 0)}일 지남`}
                           </span>
@@ -1053,6 +1055,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             // D-357 첫 화면은 단순하게 — 접힌 채로 숫자만(밀린 것 · 오늘 약속은 위 할 일 칸에 이미 있다)
             // D-365 접혀 있어도 돈 숫자는 한 줄에(안의 '못 받은 내 돈 · 미수금' 칸과 같은 숫자)
             summary={`${agenda.length ? `2주 안 ${agenda.length}건 — 누르면 날짜 순으로` : '2주 안에 잡힌 마감 · 약속 없음'}${money.scheduled.total + money.overdue.total > 0 ? ` · ${moneyWords.unpaid} ${krwTile(money.scheduled.total + money.overdue.total)}${money.overdue.count > 0 ? `(연체 ${money.overdue.count}건)` : ''}` : ''}`}
+            // D-631 PC 반쪽 칸에서 긴 요약이 제목과 [모두 보기] 사이 좁은 틈에 세 줄로 끼었다 — 옆 칸('무슨 일이 있었나요?')처럼 제목 아래 한 줄로
+            summaryBelow
             icon={<SectionChip icon={CalendarClock} accent="urgent" />}
             count={agenda.length}
             countTone={agenda.length > 0 ? 'danger' : 'neutral'}

@@ -340,7 +340,7 @@ function ProposalWork({
         </div>
         {/* D-167: 추천 1 · 2 · 3 을 어떻게 골랐는지 — 대표: "어떤 기준으로 들어간지 모르겠다" */}
         <details data-testid="recommend-basis" className="t-sub rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2 text-slate-600">
-          <summary className="tap cursor-pointer font-semibold text-slate-700">추천 기준 보기</summary>
+          <summary className="sum-chev tap cursor-pointer font-semibold text-slate-700">추천 기준 보기</summary>
           <ul className="mt-1.5 flex list-disc flex-col gap-0.5 pl-5 break-keep">
             <li>미팅에서 확인한 <b>관심사</b>와 맞는 주제 +15점</li>
             <li>고민 · 메모 · 업종에 나온 <b>낱말</b>(가지급금 · 승계 · 연구소 …) +10점</li>
@@ -414,9 +414,10 @@ function ProposalWork({
       {/* 문서 */}
       <Surface className="flex flex-col gap-3">
         <HelpHeading className="t-section text-slate-900">문서 · 문구</HelpHeading>
-        <div role="group" aria-label="문서 종류" data-testid="proposal-docs" className="grid grid-cols-2 gap-1 sm:grid-cols-4 xl:grid-cols-7">
+        {/* D-631 종류가 둘뿐일 때(D-167)는 일곱 칸 격자 대신 글자 폭 단추 — 좁은 칸에 갇혀 '필요 서류 · 요청 자료' 가 두 줄로 접히고 단추 높이가 커졌다 */}
+        <div role="group" aria-label="문서 종류" data-testid="proposal-docs" className={DOCS.length <= 3 ? 'flex flex-wrap gap-1.5' : 'grid grid-cols-2 gap-1 sm:grid-cols-4 xl:grid-cols-7'}>
           {DOCS.map((x) => (
-            <button key={x.key} type="button" aria-pressed={doc === x.key} onClick={() => setDoc(x.key)} className={`tap rounded-(--radius-control) border px-2 py-2 text-[0.875rem] font-semibold break-keep ${doc === x.key ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+            <button key={x.key} type="button" aria-pressed={doc === x.key} onClick={() => setDoc(x.key)} className={`tap rounded-(--radius-control) border ${DOCS.length <= 3 ? 'px-3.5' : 'px-2'} py-2 text-[0.875rem] font-semibold break-keep ${doc === x.key ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
               {x.label}
             </button>
           ))}

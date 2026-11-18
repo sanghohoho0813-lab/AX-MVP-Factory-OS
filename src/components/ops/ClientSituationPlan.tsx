@@ -365,7 +365,7 @@ function PlanBlockRow({ b }: { b: PlanBlock }) {
         </Link>
         {b.assumptions.length > 0 && (
           <details className="min-w-0">
-            <summary className="tap t-meta cursor-pointer text-slate-500">계산에 둔 가정 {b.assumptions.length}</summary>
+            <summary className="sum-chev tap t-meta cursor-pointer text-slate-500">계산에 둔 가정 {b.assumptions.length}</summary>
             <ul className="mt-1 flex flex-col gap-0.5">
               {b.assumptions.map((a) => (
                 <li key={a} className="t-meta break-keep text-slate-500">

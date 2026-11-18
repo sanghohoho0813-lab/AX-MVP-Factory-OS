@@ -5,7 +5,7 @@
  * 글은 content/whatsNew(규칙 글 — AI 아님). 펼친 것 · 읽은 것을 기억하지 않는다(저장하는 꾸미기 이름을 늘리지 않는다).
  */
 import { Link } from 'react-router-dom'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, ChevronDown } from 'lucide-react'
 import { useIsPilot } from '../../auth/osAccess'
 import { usePilotMarketingScreens } from '../../config/pilotMarketing'
 import { whatsNewDateLabel, whatsNewFor } from '../../content/whatsNew'
@@ -16,9 +16,13 @@ export function WhatsNew({ testId = 'whats-new' }: { testId?: string }) {
   const items = whatsNewFor({ marketingOpen: !pilot || pilotMarketing })
   if (items.length === 0) return null
   return (
-    <details className="rounded-(--radius-panel) border border-slate-200 bg-white" data-testid={testId}>
-      <summary className="t-body flex min-h-12 cursor-pointer flex-wrap items-center gap-x-2 rounded-(--radius-panel) px-4 py-2.5 font-bold break-keep text-slate-900 hover:bg-slate-50" data-testid={`${testId}-toggle`} data-guide="fn-whats-new">
-        새로 생긴 것 — <span className="font-semibold text-brand-700">최근 {items.length}가지</span>
+    <details className="group rounded-(--radius-panel) border border-slate-200 bg-white" data-testid={testId}>
+      {/* D-631 위 메뉴 줄과 같은 높이 · 같은 꺾쇠 — 꺾쇠가 없어 누르는 줄인지 알기 어려웠다 */}
+      <summary className="t-body flex min-h-14 cursor-pointer items-center gap-3 rounded-(--radius-panel) px-4 py-2.5 font-bold break-keep text-slate-900 hover:bg-slate-50" data-testid={`${testId}-toggle`} data-guide="fn-whats-new">
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2">
+          새로 생긴 것 — <span className="font-semibold text-brand-700">최근 {items.length}가지</span>
+        </span>
+        <ChevronDown aria-hidden="true" className="size-5 shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
       </summary>
       <ol className="flex flex-col divide-y divide-slate-100 border-t border-slate-100" aria-label="새로 생긴 것" data-testid={`${testId}-list`}>
         {items.map((x) => (

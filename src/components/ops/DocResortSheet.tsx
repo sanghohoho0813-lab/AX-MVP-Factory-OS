@@ -191,7 +191,7 @@ export function DocResortSheet({
 
         {stays.length > 0 && !reading && (
           <details className="rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2">
-            <summary className="tap t-sub cursor-pointer font-medium text-slate-700">그대로 두는 것 {stays.length}개</summary>
+            <summary className="sum-chev tap t-sub cursor-pointer font-medium text-slate-700">그대로 두는 것 {stays.length}개</summary>
             <ul className="mt-2 flex flex-col gap-1">
               {stays.map((x) => (
                 <li key={x.fromKey} className="t-sub break-keep text-slate-600">

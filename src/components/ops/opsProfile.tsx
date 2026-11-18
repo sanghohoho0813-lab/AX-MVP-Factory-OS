@@ -342,8 +342,26 @@ export function CompanyProfileCard({
                     >
                       {canEdit(f) ? '+ 입력' : '미입력'}
                     </button>
-                  ) : (
-                    <span className="inline-flex max-w-full flex-wrap items-center gap-1.5">
+                  ) : (() => {
+                    /*
+                      D-631 연필(고치기)이 혼자 다음 줄로 떨어지지 않게.
+                      - 글자 값: 줄을 바꾸지 않는 묶음 — 값이 길면 값만 줄을 바꾸고 연필은 그 옆에 남는다.
+                      - 번호(조각 + [숫자만]): 연필을 [숫자만] 과 한 덩어리로 — 자리가 모자라면 둘이 같이 아랫줄로.
+                    */
+                    const hasDigits = !!f.copyable && !!f.numberKind && digitsOf(f.value) !== f.value
+                    const pencil = canEdit(f) ? (
+                      <button
+                        type="button"
+                        aria-label={`${f.label} 고치기`}
+                        title="고치기"
+                        onClick={() => startEdit(f)}
+                        className="tap shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-brand-600"
+                      >
+                        <Pencil aria-hidden="true" className="size-3.5" />
+                      </button>
+                    ) : null
+                    return (
+                    <span className={`inline-flex max-w-full items-center gap-1.5 ${segmentsOf(f).length > 0 ? 'flex-wrap' : ''}`}>
                       {f.copyable ? (
                         <span className="inline-flex min-w-0 flex-wrap items-center justify-start gap-1 sm:justify-end">
                           {/*
@@ -413,7 +431,8 @@ export function CompanyProfileCard({
                             번호는 쓰는 곳마다 모양이 다르다 — 서류에는 하이픈을 넣고,
                             홈택스·공공 신청서 입력칸은 숫자만 받는 곳이 많다.
                           */}
-                          {f.numberKind && digitsOf(f.value) !== f.value && (
+                          {hasDigits && (
+                            <span className="inline-flex shrink-0 items-center gap-1.5">
                             <button
                               type="button"
                               onClick={() => void copy(`${f.key}__digits`, digitsOf(f.value))}
@@ -423,24 +442,17 @@ export function CompanyProfileCard({
                             >
                               {copiedKey === `${f.key}__digits` ? '복사됨' : '숫자만'}
                             </button>
+                            {pencil}
+                            </span>
                           )}
                         </span>
                       ) : (
                         <span className="min-w-0 text-[1rem] font-semibold break-keep [overflow-wrap:anywhere] text-slate-800">{f.value}</span>
                       )}
-                      {canEdit(f) && (
-                        <button
-                          type="button"
-                          aria-label={`${f.label} 고치기`}
-                          title="고치기"
-                          onClick={() => startEdit(f)}
-                          className="tap shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-brand-600"
-                        >
-                          <Pencil aria-hidden="true" className="size-3.5" />
-                        </button>
-                      )}
+                      {!hasDigits && pencil}
                     </span>
-                  )}
+                    )
+                  })()}
                   {/* D-309 직접 만든 칸인데 같은 이름의 기본 칸이 비어 있으면 — 한 번 눌러 기본 칸으로(다른 화면도 읽게). 번호 줄을 밀지 않게 따로 한 줄 */}
                   {editingKey !== f.key && f.custom && f.moveTo && onMoveCustomField && (
                     <span className="t-meta mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-500 sm:justify-end">

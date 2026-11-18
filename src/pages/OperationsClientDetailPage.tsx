@@ -1191,7 +1191,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {tab === 'work' && (
       <section aria-labelledby="svc" className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        {/* D-631 제목 글이 빠진 뒤(D-627) 왼쪽 끝에 ? 만 떨어져 있었다 — 단추 옆(오른쪽 한 묶음)으로 */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <HintTip tip={hintFor('진행 업무')} label="진행 업무">
             {/* D-627 바로 위 탭이 '업무' — 제목 글은 화면 읽기에만(ⓘ 설명은 그대로) */}
             <h2 id="svc" className="t-section text-slate-900">
@@ -1226,7 +1227,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             </Button>
           </div>
         )}
-        <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2 xl:items-start">
+        {/* D-631 한 줄의 두 카드는 같은 높이로(이름이 두 줄인 카드 옆 카드만 낮아 아래가 들쭉날쭉했다) — 펼친 카드는 두 칸을 다 쓰니 옆 카드가 없다 */}
+        <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
           {SERVICES.filter((meta, i) => workAll || i < 5 || meta.key === focusedService).map((meta) => {
             const state = record.services[meta.key]
             const missing = missingDocumentsFor(record, meta.key, today)
@@ -1268,22 +1270,29 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     aria-expanded={expanded}
                     onClick={() => toggleCard(meta.key, auto)}
                     // UIX-2(D-548) 휴대폰은 누르는 높이 40px 넘게 — 바깥 여백을 같은 만큼 빼서 카드 높이는 그대로
-                    className="-my-2.5 flex w-full min-w-0 items-center gap-2 py-2.5 text-left sm:my-0 sm:w-auto sm:flex-1 sm:py-0"
+                    className="-my-2.5 flex w-full min-w-0 items-start gap-2 py-2.5 text-left sm:my-0 sm:w-auto sm:flex-1 sm:py-0"
                   >
-                    <ChevronDown
-                      aria-hidden="true"
-                      className={`size-4 shrink-0 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
-                    />
+                    {/* D-631 꺾쇠 · 점은 이름 첫 줄 높이(1lh)에 맞춘다 — 이름이 길어 두 줄이 되면 점이 혼자 윗줄로 올라가고 꺾쇠가 줄 사이에 떠 있었다 */}
+                    <span className="t-card flex h-[1lh] shrink-0 items-center">
+                      <ChevronDown
+                        aria-hidden="true"
+                        className={`size-4 shrink-0 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                      />
+                    </span>
                     <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                      <Dot tone={statusTone(state.status)} />
+                      <span className="t-card flex min-w-0 items-start gap-1.5">
+                      <span className="flex h-[1lh] shrink-0 items-center">
+                        <Dot tone={statusTone(state.status)} />
+                      </span>
                       <span
-                        className={`t-card break-keep ${
+                        className={`min-w-0 break-keep ${
                           state.status === 'not_applicable'
                             ? 'text-slate-400 line-through decoration-slate-300'
                             : 'text-slate-900'
                         }`}
                       >
                         {meta.label}
+                      </span>
                       </span>
                       {/* 서류는 경고가 아니라 상태다 — 회색으로 조용히 */}
                       {/* D-627 아래 줄 '서류 n/m' 과 같은 말 — 자물쇠만(몇 개 빠졌는지는 마우스 · 화면 읽기로) */}
@@ -1462,7 +1471,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       {tab === 'docs' && (
       <section aria-labelledby="docs" className="flex flex-col gap-3">
         {/* U4(D-544) 제목 · 단추 한 줄(휴대폰도) — '서류 다시 분류' 는 휴대폰에서 '다시 분류' */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        {/* D-631 제목 글이 빠진 뒤(D-627) 왼쪽 끝에 ? 만, 그 아래 줄에 저장 표시만 혼자 남아 있었다 — ? · 저장 표시 · 단추를 오른쪽 한 묶음으로 */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {/* D-192: '발급일을 넣으면 유효기간…' 설명은 목차 설명(ⓘ)으로 */}
           <HintTip tip={hintFor('서류함')} label="서류함">
             {/* D-627 바로 위 탭이 '서류' — 제목 글은 화면 읽기에만(ⓘ 설명은 그대로) */}
@@ -1470,7 +1480,14 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               <span className="sr-only">서류함</span>
             </h2>
           </HintTip>
-          <div className="flex flex-wrap items-center gap-2">
+          {!uploadable && (
+            // U4(D-544) 상자 대신 한 줄 글(클라우드에 연결한 화면에는 없는 안내)
+            // D-627 글자 수 한도 — 한 줄 글 대신 작은 표시(마우스 · 화면 읽기에는 그대로)
+            <p className="t-sub inline-flex h-10 shrink-0 items-center px-1 text-slate-500" data-testid="docs-local-note" title="이 브라우저에만 저장 중 — 받음 · 발급일은 기록되고, 파일 첨부는 클라우드 연결 뒤에 켜집니다.">
+              <HardDrive aria-hidden="true" className="size-4" />
+              <span className="sr-only">이 브라우저에만 저장 중</span>
+            </p>
+          )}
             {/* D-558 대표: '한꺼번에 올리기' 대신 그냥 '서류 올리기' */}
             {/* D-627 머리줄에 같은 [서류 올리기] 가 있어 여기는 아이콘만(이름은 마우스 · 화면 읽기로) */}
             <Button variant="secondary" size="sm" data-testid="docs-upload" title="서류 올리기" onClick={() => { setBulkOpen(true); setBulkShow((n) => n + 1) }}>
@@ -1491,7 +1508,6 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 <span>원본<span className="max-sm:hidden"> 내려받기</span></span>
               </Button>
             )}
-          </div>
         </div>
 
         {resortOpen && (
@@ -1507,15 +1523,6 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               }}
             />
           </Suspense>
-        )}
-
-        {!uploadable && (
-          // U4(D-544) 상자 대신 한 줄 글(클라우드에 연결한 화면에는 없는 안내)
-          // D-627 글자 수 한도 — 한 줄 글 대신 작은 표시(마우스 · 화면 읽기에는 그대로)
-          <p className="t-sub inline-flex items-center gap-1 self-start text-slate-500" data-testid="docs-local-note" title="이 브라우저에만 저장 중 — 받음 · 발급일은 기록되고, 파일 첨부는 클라우드 연결 뒤에 켜집니다.">
-            <HardDrive aria-hidden="true" className="size-4" />
-            <span className="sr-only">이 브라우저에만 저장 중</span>
-          </p>
         )}
 
         {/* D-512 보낸 요청 문구가 남아 — 며칠째 · n/m 받음 · 남은 것만 다시 요청 · 다 받으면 할 일까지 끝내기 */}
@@ -1551,6 +1558,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           }}
         />
 
+        {/* D-631 손볼 것 한 줄 · 보기 방식을 한 줄에(왼쪽 · 오른쪽) — 받음 줄 · 칩 · 보기 방식이 한 칸씩 세 줄로 쌓여 있었다. 좁으면 보기 방식이 아랫줄로 */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         {/* D-147: 손볼 것만 한 줄 — 누르면 그 칸으로 */}
         <DocShelfBar
           summary={docShelfSummary(record, today, urgentDocs)}
@@ -1589,6 +1598,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               {name}
             </button>
           ))}
+        </div>
         </div>
 
         {docView === 'folder' ? (
@@ -1669,7 +1679,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     />
                   )}
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <label className="flex min-h-11 min-w-0 items-start gap-2.5 py-1">
+                    {/* D-631 이름 줄을 누르는 칸(44px) 가운데로 — 위에 붙어 있어 이름 아래만 비어 보였다(안 받은 칸) · 받은 칸은 이름과 '받음' 줄 사이가 36px 로 벌어져 있었다 */}
+                    <label className="flex min-h-11 min-w-0 items-start gap-2.5 py-2.5">
                       <input
                         type="checkbox"
                         aria-label={`${meta.label} 받음`}
@@ -1678,7 +1689,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           if (e.target.checked) setOpenDocs((cur) => new Set(cur).add(meta.key))
                           void commit(withDocument(record, meta.key, { received: e.target.checked }))
                         }}
-                        className="mt-1 size-5 shrink-0 accent-brand-600"
+                        className="mt-0.5 size-5 shrink-0 accent-brand-600"
                       />
                       <span className="min-w-0">
                         <span className="flex flex-wrap items-center gap-1.5">
@@ -1756,7 +1767,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   </div>
 
                   {compact ? (
-                    <div data-doc-compact={meta.key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-[1.9rem]">
+                    <div data-doc-compact={meta.key} className="-mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-[1.9rem]">
                       <span className="t-sub font-medium text-success-700">받음</span>
                       {meta.needsFile && !state.fileName && <span className="sr-only" data-testid={`doc-compact-nofile-${meta.key}`}>파일 없음</span>}
                       {view.expiresOn && (
@@ -2073,9 +2084,6 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           />
         </>
       )}
-
-      <StepNext pos={flowPos} onGo={(k) => setTab(k as DetailTab)} />
-
 
       {reportOpen && (
         <ClientReportSheet
@@ -2486,6 +2494,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       </section>
 
       )}
+
+      {/* D-631 [다음: ○○] 은 화면 맨 끝에 — 개요에서는 '업체 정보 수정' 목차가 이 단추 아래에 따로 떨어져 있었다 */}
+      <StepNext pos={flowPos} onGo={(k) => setTab(k as DetailTab)} />
 
       {importOpen && (
         <Suspense fallback={null}>

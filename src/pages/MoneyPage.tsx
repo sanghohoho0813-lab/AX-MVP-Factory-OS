@@ -174,6 +174,8 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
           <AiAssist page="money" title="매출 · 비용" presets={['money.top', 'money.year', 'money.cut', 'money.in']} build={assistBuild} />
         </ArrangeItem>
         <ArrangeItem id="summary" label="이 달 돈" hint="달 고르기 · 들어온 돈 · 예상 · 쓴 돈">
+          {/* D-631 칸 안의 것들 사이를 띄운다 — 달 고르기와 숫자 칸이 2px 로 붙어 있었다(꾸미기 칸은 안의 간격을 주지 않는다) */}
+          <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2" data-testid="money-month">
             <button type="button" aria-label="이전 달" onClick={() => setParam('m', addMonths(ym, -1))} className="tap flex size-11 items-center justify-center rounded-(--radius-control) border border-slate-200 bg-white text-slate-600 hover:bg-slate-50">
               <ChevronLeft aria-hidden="true" className="size-5" />
@@ -210,8 +212,10 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
               tone={(isPast ? sum.netSoFar : sum.netExpected) < 0 ? 'danger' : 'neutral'}
             />
           </section>
+          </div>
         </ArrangeItem>
         <ArrangeItem id="main" label="매출 · 비용 · 정기 결제" hint="탭과 목록">
+          <div className="flex flex-col gap-3">
           <div role="tablist" className="flex max-w-xl rounded-(--radius-control) border border-slate-200 bg-slate-50 p-0.5">
             {(
               [
@@ -481,6 +485,7 @@ function MoneyContent({ workspaceId }: { workspaceId: string | null }) {
               )}
             </>
           )}
+          </div>
         </ArrangeItem>
       </ArrangeArea>
       {sheet?.kind === 'income' && (

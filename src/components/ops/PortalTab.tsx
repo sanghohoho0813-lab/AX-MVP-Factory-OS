@@ -178,7 +178,7 @@ export function PortalTab({
         <p className="text-[1rem] font-semibold text-warning-700">고객 플랫폼 연결을 아직 켜지 않았습니다</p>
         <p className="mt-1 text-[0.9375rem] break-keep text-slate-700">연결이 켜지면 이 탭에서 고객에게 소식 · 서류 요청을 보낼 수 있습니다. 관리자에게 '고객 플랫폼 연결을 켜 달라' 고 알려 주세요.</p>
         <details className="mt-2 text-[0.875rem] text-slate-500">
-          <summary className="cursor-pointer">관리자용 안내</summary>
+          <summary className="sum-chev cursor-pointer">관리자용 안내</summary>
           <p className="mt-1 break-keep">클라우드에 브릿지 테이블이 없습니다. docs/SETUP.md 의 순서대로 마이그레이션을 적용하면 켜집니다.</p>
         </details>
       </div>

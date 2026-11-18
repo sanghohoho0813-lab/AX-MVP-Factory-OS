@@ -221,7 +221,8 @@ function LibraryContent({ workspaceId }: { workspaceId: string | null }) {
         </ul>
         {/* D-122: 한 번에 늘어놓지 않는다 — 찾기로 좁히거나 더 보기 */}
         {list.length > LIB_FIRST && (
-          <button type="button" data-testid="library-more" onClick={() => setShowAll((v) => !v)} className="tap t-sub self-start rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50">
+          // D-631 다른 [n개 더 보기] 와 같은 모양(테두리 없는 굵은 글) — 여기만 테두리 단추였다
+          <button type="button" data-testid="library-more" onClick={() => setShowAll((v) => !v)} className="tap t-sub self-start rounded-(--radius-control) px-3 py-2 font-semibold text-brand-700 hover:bg-brand-50">
             {showAll ? '접기' : `${list.length - LIB_FIRST}개 더 보기`}
           </button>
         )}

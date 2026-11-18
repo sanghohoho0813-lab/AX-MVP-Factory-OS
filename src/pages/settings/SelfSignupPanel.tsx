@@ -104,7 +104,7 @@ export function SelfSignupPanel() {
         </div>
 
         <details className="mt-4 border-t border-slate-100 pt-3" data-testid="self-signup-settings">
-          <summary className="cursor-pointer text-[0.9375rem] font-semibold text-slate-800">받을 사람 수 · AI 시험 기간 · 한도 바꾸기</summary>
+          <summary className="sum-chev cursor-pointer text-[0.9375rem] font-semibold text-slate-800">받을 사람 수 · AI 시험 기간 · 한도 바꾸기</summary>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <label className="text-[0.9375rem] text-slate-700">
               받을 사람 수(명)
@@ -132,7 +132,7 @@ export function SelfSignupPanel() {
         </details>
 
         <details className="mt-3 border-t border-slate-100 pt-3" data-testid="self-signup-accounts">
-          <summary className="cursor-pointer text-[0.9375rem] font-semibold text-slate-800">이 길로 연 계정 {accounts.length}명</summary>
+          <summary className="sum-chev cursor-pointer text-[0.9375rem] font-semibold text-slate-800">이 길로 연 계정 {accounts.length}명</summary>
           {accounts.length === 0 ? (
             <p className="mt-2 text-[0.9375rem] text-slate-600">아직 없어요.</p>
           ) : (

@@ -286,7 +286,8 @@ export function ClientBoardCard({
               {kindBadge}
             </span>
           )}
-          <div className="flex shrink-0 items-center gap-2">
+          {/* D-631 ml-auto — 펼친 카드(휴대폰)에서 이 묶음이 아랫줄로 넘어가면 왼쪽 끝으로 붙어, 접기 화살표 자리가 접힌 때(오른쪽 끝)와 달라졌다 */}
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             {criticalCount > 0 ? (
               <Badge tone={tone}>지금 {criticalCount}</Badge>
             ) : warningCount > 0 ? (
@@ -305,7 +306,8 @@ export function ClientBoardCard({
               aria-label={open ? `${record.companyName} 접기` : `${record.companyName} 펼쳐보기`}
               title={open ? '접기' : '펼쳐보기'}
               data-testid="card-toggle"
-              className="tap inline-flex size-10 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-brand-700"
+              // D-631 전화 단추(44px)와 같은 크기 — 40px 이라 전화 번호가 없는 업체 카드만 4px 낮았다
+              className="tap inline-flex size-11 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-brand-700"
             >
               <ChevronDown aria-hidden="true" className={`size-5 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
@@ -503,13 +505,15 @@ export function ClientBoardCard({
                 서류 {p.documentsUsable}/{p.documentsTotal}
               </span>
             ))}
+          {/* D-631 [서류 올리기] · [업체 열기] 는 한 묶음으로 오른쪽 끝에 — 줄이 모자라면 [업체 열기] 만 아랫줄 왼쪽으로 떨어졌다 */}
+          <span className="ml-auto flex shrink-0 items-center gap-2">
           {/* 서류는 목록에서 바로 올린다 — 업체를 열고 서류 탭까지 가는 두 번을 줄인다 (D-84) */}
           {onBulkDocs && (
             <button
               type="button"
               onClick={onBulkDocs}
               aria-label={`${record.companyName} 서류 올리기`}
-              className="tap t-meta ml-auto inline-flex items-center gap-1 rounded-(--radius-control) px-2 py-1.5 font-medium text-slate-600 hover:text-brand-700 hover:underline"
+              className="tap t-meta inline-flex items-center gap-1 rounded-(--radius-control) px-2 py-1.5 font-medium text-slate-600 hover:text-brand-700 hover:underline"
             >
               <FileUp aria-hidden="true" className="size-3.5" />
               서류 올리기
@@ -518,11 +522,12 @@ export function ClientBoardCard({
           <button
             type="button"
             onClick={onOpen}
-            className={`tap t-meta inline-flex items-center gap-1 rounded-(--radius-control) px-2 py-1.5 font-medium text-brand-700 hover:underline ${onBulkDocs ? '' : 'ml-auto'}`}
+            className="tap t-meta inline-flex items-center gap-1 rounded-(--radius-control) px-2 py-1.5 font-medium text-brand-700 hover:underline"
           >
             업체 열기
             <ArrowRight aria-hidden="true" className="size-3.5" />
           </button>
+          </span>
         </div>
         </div>
         </>
