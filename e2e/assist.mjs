@@ -684,6 +684,15 @@ for (const w of [360, 390]) {
   const wide = await mp.evaluate(() => [...document.querySelectorAll('[data-testid="ai-assist-panel"] *')].filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1).length)
   check(`E ${w} 판 열고 답까지 — 화면 밖으로 나간 칸 0`, wide === 0, wide)
   if (w === 390) await shot(mp, 'E-390-panel')
+  // D-629 휴대폰은 판 안 '쓰는 모델' 줄에서 고른다 — 자동 줄 · [가장 싼 모델] · [좋은 모델] 을 펼쳐도 폭 안에 · 손가락으로 누를 높이
+  await mp.getByTestId('ai-assist-model-toggle').click()
+  await mp.getByTestId('ai-model-auto').waitFor({ timeout: 5000 })
+  await mp.getByTestId('ai-model-auto').scrollIntoViewIfNeeded()
+  const wideM = await mp.evaluate(() => [...document.querySelectorAll('[data-testid="ai-assist-panel"] *')].filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1).length)
+  const quickH = await mp.getByTestId('ai-model-quick').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+  check(`E ${w} 모델 고르기 펼침(자동 · 가장 싼 모델 · 좋은 모델) — 화면 밖으로 나간 칸 0 · 단추 높이 40px 이상`, wideM === 0 && quickH.length === 2 && quickH.every((h) => h >= 40) && /자동/.test(await mp.getByTestId('ai-assist-model-label').innerText()), { wideM, quickH })
+  if (w === 390) await shot(mp, 'E-390-model')
+  await mp.getByTestId('ai-assist-model-toggle').click()
   // D-241 마케팅 답(줄마다 담기 · 대본 단추)도 휴대폰 폭 안에
   await mp.keyboard.press('Escape')
   await openRadar(mp)

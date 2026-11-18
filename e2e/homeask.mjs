@@ -74,7 +74,7 @@ globalThis.fetch = async (input, init = {}) => {
     const body = JSON.parse(String(init.body ?? '{}'))
     const sys = String(body.systemInstruction?.parts?.[0]?.text ?? '')
     const user = String(body.contents?.[0]?.parts?.[0]?.text ?? '')
-    llm.push({ sys, user })
+    llm.push({ sys, user, model: /models\/([^:]+):generateContent/.exec(url)?.[1] ?? '' })
     const ans = sys.includes('(home.chat') ? HOME_ANSWER : { headline: '오늘은 서류 마감부터', items: [], next: [] }
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(ans) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 2100, candidatesTokenCount: 320 } }), { status: 200 })
   }
@@ -426,6 +426,20 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('D-506 읽을 것이 없는 메모는 카드 없음(메모만)', (await page.getByTestId('capture-talk').count()) === 0)
   await page.goto(BASE + '/', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
+  // D-629 자동 모델 — 대화창도 물음은 가장 싼 모델 · 일을 시키면 좋은 모델. 답 아래 'AI 답 · 모델' 은 실제로 답한 모델
+  {
+    await page.getByTestId('home-ask-input').click()
+    const chip = page.getByTestId('home-ask-model')
+    const chipText = (await chip.innerText()).trim()
+    await ask(page, '사업자등록증 들어가 있나?')
+    const easy = llm.at(-1)
+    const easySrc = await lastTurn(page).getByTestId('home-ask-source').innerText()
+    check('D-629 대화창 [모델 · 자동] · 단순 질문("사업자등록증 들어가 있나?")은 가장 싼 모델 · 답 아래 "AI 답 · gemini-3.1-flash-lite"', chipText === '모델 · 자동' && (await chip.getAttribute('data-mode')) === 'auto' && easy.model === 'gemini-3.1-flash-lite' && /AI 답 · gemini-3\.1-flash-lite/.test(easySrc), `${chipText} / ${easy.model} / ${easySrc}`)
+    await ask(page, '기획 시작해 줘 — 한솔테크 정책자금 제안')
+    const work = llm.at(-1)
+    const workSrc = await lastTurn(page).getByTestId('home-ask-source').innerText()
+    check('D-629 대화창 "기획 시작해 줘 …" 는 좋은 모델(Gemini 3.8 Flash) · 답 아래 "AI 답 · gemini-3.8-flash" · 모델 단추는 그대로 자동', work.model === 'gemini-3.8-flash' && /AI 답 · gemini-3\.8-flash/.test(workSrc) && (await chip.innerText()).trim() === '모델 · 자동', `${work.model} / ${workSrc}`)
+  }
   check('1440: 오류 0', errors.length === 0, errors)
   await ctx.close()
 }

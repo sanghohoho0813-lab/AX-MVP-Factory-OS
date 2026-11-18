@@ -832,7 +832,8 @@ export function ModelRow({
         <span className="t-sub text-slate-600">쓰는 모델</span>
         <button type="button" onClick={() => setOpen(!open)} className="tap t-sub min-w-0 text-left font-semibold break-keep text-slate-900 hover:underline" data-testid="ai-assist-model-label" data-mode={auto ? 'auto' : 'manual'}>
           {auto ? '자동' : current}
-          {auto ? <span className="t-meta ml-1 font-normal text-slate-500">(물음은 가장 싼 모델 · 일은 좋은 모델)</span> : isDefault && <span className="t-meta ml-1 font-normal text-slate-500">(기본 · 가장 쌈)</span>}
+          {/* 펼치면 바로 아래 '자동' 줄이 같은 말을 한다 — 접혀 있을 때만 뜻을 붙인다 */}
+          {auto ? !open && <span className="t-meta ml-1 font-normal text-slate-500">(물음은 가장 싼 모델 · 일은 좋은 모델)</span> : isDefault && <span className="t-meta ml-1 font-normal text-slate-500">(기본 · 가장 쌈)</span>}
         </button>
         <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="tap t-sub ml-auto inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50" data-testid="ai-assist-model-toggle">
           <Settings2 aria-hidden="true" className="size-4" /> {open ? '닫기' : '모델 바꾸기'}
