@@ -42,6 +42,13 @@ const check = (n, c, d) => {
     console.log('FAIL ', n, d === undefined ? '' : String(typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 600))
   }
 }
+// D-634 답 항목(1 · 2 · 3)은 접힌 채 온다 — 항목 안 단추를 누르기 전에 [모두 펼치기]
+const expandAll = async (page) => {
+  const b = page.getByTestId('ai-assist-expand-all')
+  if ((await b.count()) && (await b.getAttribute('aria-expanded')) !== 'true') await b.click()
+}
+// D-634 지난 답은 머리 [지난 대화 n] 단추 — 수는 단추의 data-count
+const historyCount = async (page) => Number((await page.getByTestId('ai-assist-history-open').getAttribute('data-count').catch(() => '0')) ?? 0)
 const shot = async (page, name) => {
   if (!SHOTS) return
   fs.mkdirSync(SHOTS, { recursive: true })
@@ -167,6 +174,9 @@ check('A4 단추 지시문 · 공통 규칙이 system 에', call.sys.includes('�
 const meta = await page.getByTestId('ai-assist-meta').innerText()
 check('A5 답 아래 — 회사 · 모델 · 걸린 시간 · 토큰 · 비용(원) · 보낸 줄', /Gemini · gemini-3\.1-flash-lite/.test(meta) && /토큰 2,420/.test(meta) && /보낸 줄 \d+/.test(meta), meta)
 await shot(page, 'A-today-answer')
+check('A1b D-634 답 항목은 접힌 채(2개 → 둘 다 접힘) · [모두 펼치기]', (await page.locator('[data-testid="ai-assist-item"][data-open="0"]').count()) === 2 && (await page.getByTestId('ai-assist-expand-all').count()) === 1)
+await expandAll(page)
+check('A1c D-634 [모두 펼치기] → 둘 다 펼침', (await page.locator('[data-testid="ai-assist-item"][data-open="1"]').count()) === 2)
 const refLink = page.getByTestId('ai-assist-ref').first()
 if (await refLink.count()) {
   await refLink.click()
@@ -196,7 +206,13 @@ await page.waitForTimeout(400)
 await openTools(page)
 await page.getByTestId('ai-assist-open').first().click()
 await page.waitForTimeout(400)
+check('B4a D-634 판을 새로 열면 새 대화(지난 답은 대화에 안 쌓임) · 머리 [지난 대화 n]', (await page.getByTestId('ai-assist-result').count()) === 0 && (await historyCount(page)) >= 2, await historyCount(page))
+await page.getByTestId('ai-assist-history-open').click()
 check('B4 새로고침해도 고른 모델 기억 · 지난 답 2개', (await page.getByTestId('ai-assist-model-label').innerText()).includes('Claude Haiku 5.5') && (await page.getByTestId('ai-assist-history').locator('li').count()) >= 2)
+await page.getByTestId('ai-assist-history').locator('li button').first().click()
+await page.getByTestId('ai-assist-result').waitFor({ timeout: 5000 }).catch(() => {})
+check('B4b D-634 지난 대화에서 하나 누르면 판이 닫히고 그 답이 대화에(내 말풍선 + AI 말풍선)', (await page.getByTestId('ai-assist-history').count()) === 0 && (await page.getByTestId('ai-assist-result').count()) === 1 && (await page.getByTestId('ai-assist-result').locator('[data-chat="me"]').count()) === 1 && (await page.getByTestId('ai-assist-result').locator('[data-chat="bot"]').count()) === 1)
+await shot(page, 'B-history-reopen')
 await page.getByTestId('ai-assist-model-toggle').click()
 await page.getByTestId('ai-assist-model-reset').click()
 // D-629 고른 모델을 되돌리면 '자동' — 물음에는 예전 기본(가장 싼 Gemini) · 일에는 한 단계 위 모델
@@ -555,6 +571,8 @@ check("D2 '미래AI랩으로 만들기' → 늘 같은 자리(trial_miraeailab)"
 await openTools(page)
 await page.getByTestId('ai-assist-chip').filter({ hasText: '블로그 글 한 번에' }).click()
 await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
+await page.getByTestId('ai-assist-result').waitFor({ timeout: 10000 })
+await expandAll(page)
 await page.getByTestId('ai-assist-body').first().waitFor({ timeout: 10000 })
 await shot(page, 'D-blog-answer')
 const blogCall = llm.at(-1)
@@ -582,6 +600,7 @@ await openTools(page)
 await page.getByTestId('ai-assist-chip').filter({ hasText: '오늘 제일 중요한 것 3개만' }).click()
 await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.getByTestId('ai-assist-result').waitFor({ timeout: 10000 })
+await expandAll(page)
 const refText = await page.getByTestId('ai-assist-ref').first().innerText()
 check("F1 번호 단추는 무엇이 열리는지 — c1 → '업체 열기'(예전 '열어 보기')", refText.includes('업체 열기') && !refText.includes('열어 보기'), refText)
 const item1 = page.getByTestId('ai-assist-item').first()
@@ -607,6 +626,7 @@ const plan5 = llm.at(-1)
 check('F6 TOP5 기획 지시문 — [성공 공식 먼저](채널 설계 기준 = 업 이해용) · [성공 공식 요약] · [꼭 지킬 것](상투어 금지) · 운영 원칙 · 완성도 규칙 블록 없음', plan5.sys.includes('[성공 공식 먼저') && plan5.sys.includes('[성공 공식 요약 — 유튜브') && plan5.sys.includes('채널 설계 기준') && plan5.sys.includes('꿀팁') && plan5.sys.includes('[꼭 지킬 것') && !plan5.sys.includes('[완성도 규칙') && !plan5.sys.includes('[대표 운영 원칙') && !plan5.sys.includes('N분 컷'), plan5.sys.slice(0, 300))
 check('F7 보낸 자료 맨 앞 — 채널 설계 기준(김팀장의 경영노트) · 내 채널 최근 영상 · 후보 번호 o1 · 찍기 키트', plan5.user.includes('[자료 · 채널 설계 기준') && plan5.user.includes('김팀장의 경영노트') && plan5.user.includes('[자료 · 내 채널 최근 영상') && /o1/.test(plan5.user) && plan5.user.includes('첫문장_규칙'), plan5.user.slice(0, 600))
 check("F8 마케팅 답에는 판만 닫던 '열어 보기' 가 없음 · 할 일 단추 대신 [내 콘텐츠에 담기] · [이 기획으로 대본 끝까지] 가 줄마다", (await page.getByTestId('ai-assist-ref').count()) === 0 && (await page.locator('[data-testid="ai-assist-item"] [data-action="take"]').count()) === 3 && (await page.locator('[data-testid="ai-assist-item"] [data-action="script"]').count()) === 3 && (await page.locator('[data-testid="ai-assist-item"] [data-action="todo"]').count()) === 0)
+await expandAll(page)
 await shot(page, 'F-radar-top5-actions')
 const take1 = page.getByTestId('ai-assist-item').first()
 await take1.locator('[data-action="take"]').click()
@@ -626,6 +646,7 @@ await openTools(page)
 await page.getByTestId('ai-assist-chip').filter({ hasText: 'TOP5' }).click()
 await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'radar.top5', null, { timeout: 10000 })
+await expandAll(page)
 await page.getByTestId('ai-assist-item').nth(1).locator('[data-action="script"]').click()
 await page.getByTestId('ai-assist-confirm-go').click() // D-289 이어 쓰기 · 다시도 [이대로 질문하기]
 await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'radar.script', null, { timeout: 10000 })
@@ -640,7 +661,7 @@ check('F13 [더 잘 쓰는 모델로 다시] — 지금(Gemini 3.8 Flash) 한 �
 const nBefore = llm.length
 await better.click()
 await page.getByTestId('ai-assist-confirm-go').click() // D-289 이어 쓰기 · 다시도 [이대로 질문하기]
-await page.waitForFunction((n) => document.querySelectorAll('[data-testid="ai-assist-history"] li').length >= n, 4, { timeout: 10000 })
+await page.waitForFunction((n) => Number(document.querySelector('[data-testid="ai-assist-history-open"]')?.getAttribute('data-count') ?? 0) >= n, 4, { timeout: 10000 })
 await page.waitForTimeout(400)
 const re = llm.at(-1)
 check('F14 다시 만든 대본은 그 한 단계 위 모델로(이번 한 번만) · 같은 고른 기획 그대로 · 고른 모델 설정은 안 바뀜(자동 그대로)', llm.length === nBefore + 1 && re.url.includes('/models/gemini-4-argon:generateContent') && re.user.includes('[자료 · 고른 기획') && (await page.getByTestId('ai-assist-model-label').innerText()).includes('자동') && (await page.getByTestId('ai-assist-model-label').getAttribute('data-mode')) === 'auto', re.url)

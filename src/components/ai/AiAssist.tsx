@@ -20,12 +20,12 @@
  *   - dock="auto"(마케팅 유튜브 · 스레드 · 릴스) — 붙일 폭이 되면 저절로 열리고 오른쪽 끝 [대화] 단추가 생긴다. 처음은 [대화 시작] 카드.
  *   - 휴대폰 · 창 · 카드 안(inline)은 예전처럼 아래에서 올라오는 판.
  */
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { InPageTools, MENU_ROW, useInPageTools } from '../layout/PageTools'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation } from 'react-router-dom'
-import { AlertTriangle, ArrowRight, Check, ClipboardList, Copy, ExternalLink, History, Loader2, RefreshCw, Settings2, Sparkles, Wand2, X } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Check, ChevronDown, ClipboardList, Copy, ExternalLink, History, Loader2, RefreshCw, Send, Settings2, Sparkles, Wand2, X } from 'lucide-react'
 import { AuthContext } from '../../auth/authContext'
 import { useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { todayLocalDate } from '../../lib/appClock'
@@ -48,7 +48,9 @@ import { useToast } from '../ui/toastContext'
 import { ModelPicker } from './ModelPicker'
 import { josa } from '../../lib/josa'
 import { ChatStartCard, PageChat } from '../chat/PageChat'
-import { closeAssistInDock, closePageDock, nextPageChatKey, openAssistInDock, startPageChat, usePageChat } from '../../lib/pageChat'
+import { CHAT_TINT, closeAssistInDock, closePageDock, nextPageChatKey, openAssistInDock, startPageChat, usePageChat } from '../../lib/pageChat'
+import { BotAvatar, BotBubble, BotRow, ChatNotice, MeBubble, TypingBubble } from '../chat/bubbles'
+import { chatTime } from '../../lib/chatTime'
 import { useChatAutoOpen } from '../../lib/useChatFirst'
 
 const PROVIDER_LABEL: Record<ProviderId, string> = { gemini: 'Gemini', openai: 'GPT', anthropic: 'Claude' }
@@ -417,6 +419,13 @@ export function labelOf(status: AssistStatus | null, c: AiChoice): string {
 /* 판                                                                    */
 /* ------------------------------------------------------------------ */
 
+/**
+ * D-634 판 = 카카오톡 같은 대화 — 대표: "대화가 핑퐁 하듯이 · 지난 답은 따로 버튼으로 · 1번 2번 3번은 접혀서".
+ *   맨 위   머리(제목 · [지난 대화 n] · 닫기) + 쓰는 모델 한 줄
+ *   가운데 대화 — AI 인사 말풍선 + 질문 단추(빠른 답장) → 내 말풍선(오른쪽) → AI 말풍선(왼쪽 · 항목은 접힌 채)
+ *   맨 아래 질문창(Enter 로 보내기) · 고른 단추 확인 줄
+ * 이 판에서 주고받은 것만 대화에 쌓인다 — 지난 대화는 머리 [지난 대화] 에서 골라 다시 본다.
+ */
 function AssistPanel({
   page,
   scope,
@@ -472,14 +481,16 @@ function AssistPanel({
   const { showToast } = useToast()
   const [running, setRunning] = useState<string | null>(null)
   const [error, setError] = useState<{ code: string; message: string; missing: string[]; ref?: string } | null>(null)
-  const [shown, setShown] = useState<Shown>(null)
+  // D-634 이 판에서 주고받은 대화(오래된 것 먼저). 맨 끝이 지금 답 — 판을 새로 열면 새 대화(지난 대화는 머리 [지난 대화])
+  const [turns, setTurns] = useState<NonNullable<Shown>[]>([])
+  // 보내는 중(또는 못 받은) 질문 — 답을 기다리는 동안 내 말풍선으로 먼저 보인다
+  const [asking, setAsking] = useState<{ preset: AssistPreset; label: string; ask: string; at: string; opts: { choice?: AiChoice; follow?: FollowMeta } } | null>(null)
   const [history, setHistory] = useState<HistoryEntry[]>(() => historyOf(scope))
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [ask, setAsk] = useState('')
   // D-626 [새로 묻기] 를 누른 때 — 그 앞의 질문은 이어받지 않는다
   const [carryFrom, setCarryFrom] = useState('')
   const carryFromRef = useRef('')
-  // D-618 지금 보고 있는 질문 — 그 화면이 규칙으로 아는 답(pin)을 AI 답보다 먼저 보여 준다(AI 가 실패해도 남는다)
-  const [liveAsk, setLiveAsk] = useState('')
   // D-288 적은 질문은 기본으로 '직접 질문'(이 화면 자료로 그 질문에만 답) — 예전에는 첫 단추(예: 이번 주 일정 한눈에)에 묶여 그 단추 답만 나왔다
   const askDirect = useMemo(() => askPresetOf(page), [page])
   const DIRECT = '__direct'
@@ -489,9 +500,11 @@ function AssistPanel({
   const [pending, setPending] = useState<{ preset: AssistPreset; ask: string; opts: { choice?: AiChoice; follow?: FollowMeta }; label: string } | null>(null)
   const [settings, setSettings] = useState(false)
   const [nowHash, setNowHash] = useState<string | null>(null)
-  const resultRef = useRef<HTMLDivElement | null>(null)
-  const pinRef = useRef<HTMLDivElement | null>(null)
+  // 지금 답(또는 보내는 질문)의 첫 줄 — 답이 오면 내 질문부터 보이게 그 자리로
+  const turnRef = useRef<HTMLDivElement | null>(null)
+  const endRef = useRef<HTMLDivElement | null>(null)
   const startedTick = useRef(-1)
+  const live = turns.length ? turns[turns.length - 1] : null
 
   // 화면을 덮는 판일 때만 뒤 화면 굴리기를 막는다(오른쪽 판 안에서는 가운데 화면을 그대로 쓴다)
   useEffect(() => {
@@ -518,6 +531,9 @@ function AssistPanel({
     }
   }, [build])
 
+  const toEnd = () => window.setTimeout(() => endRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }), 40)
+  const toTurn = () => window.setTimeout(() => turnRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 40)
+
   /**
    * opts.choice — 이번 한 번만 다른 모델(더 잘 쓰는 모델로 다시) · opts.follow — 고른 항목을 자료 맨 앞에 붙여 이어 쓰기.
    * D-629 고른 모델이 없으면(자동) 그대로 null 을 넘긴다 — 물음인지 일인지 보고 callAssist 가 모델을 정한다.
@@ -530,7 +546,9 @@ function AssistPanel({
       setError(null)
       // D-244 직접 적은 질문도 보내기 전에 가린다(연락처 · 이메일 · 주민번호) — 지난 답에도 가린 글만 남긴다
       const masked = askText ? safeText(askText, [], 500) : ''
-      setLiveAsk(masked)
+      const label = opts.follow ? `${preset.label} · ${opts.follow.title}` : preset.id.endsWith('.ask') ? '직접 물어본 것' : preset.label
+      setAsking({ preset, label, ask: masked, at: new Date().toISOString(), opts })
+      toEnd()
       // NX-2 실패하면 이 번호 끝 6자리를 '문의 번호' 로 보여 준다(서버 함수 기록과 같은 번호)
       const requestId = newRequestId()
       try {
@@ -541,17 +559,18 @@ function AssistPanel({
         const carry = !opts.follow && preset.id.endsWith('.ask') ? askCarry(historyOf(scope), carryFromRef.current) : []
         const context = opts.follow ? { ...bundle.context, sections: [opts.follow.section, ...bundle.context.sections] } : carry.length ? { ...bundle.context, sections: [{ name: '앞선 대화', rows: carry }, ...bundle.context.sections] } : bundle.context
         const runResult: AssistRun = await callAssist({ requestId, assistId: preset.id, page, choice: opts.choice ?? choice, context, ask: masked })
-        const label = opts.follow ? `${preset.label} · ${opts.follow.title}` : preset.id.endsWith('.ask') ? '직접 물어본 것' : preset.label
         const entry: HistoryEntry & { links: Record<string, string> } = { scope, assistId: preset.id, label, ask: masked, hash, run: runResult, links: bundle.links, ids: bundle.ids ?? {}, ...(bundle.aliases ? { aliases: bundle.aliases } : {}), ...(opts.follow ? { follow: opts.follow } : {}) }
         pushHistory(entry)
         setHistory(historyOf(scope))
-        setShown(entry)
-        // D-618 판정 줄이 붙어 있으면 그 줄부터 보이게(답만 보이고 판정 줄이 위로 밀려 안 보이지 않게)
-        window.setTimeout(() => (pinRef.current?.childElementCount ? pinRef.current : resultRef.current)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 40)
+        setTurns((t) => [...t.filter((x) => x.run.requestId !== entry.run.requestId), entry])
+        setAsking(null)
+        // 내 질문부터(D-618 판정 줄 → AI 답 순서로 읽히게)
+        toTurn()
       } catch (e) {
         const ref = requestId.slice(-6)
         if (e instanceof AssistError) setError({ code: e.code, message: e.message, missing: e.missing, ref })
         else setError({ code: 'provider_error', message: assistMessage('provider_error'), missing: [], ref })
+        toEnd()
       } finally {
         setRunning(null)
       }
@@ -598,13 +617,13 @@ function AssistPanel({
     [presetOf, request, onClose],
   )
 
-  const better = useMemo(() => (shown ? betterModel(status, shown.run) : null), [status, shown])
+  const better = useMemo(() => (live ? betterModel(status, live.run) : null), [status, live])
 
-  // D-244 할 일로 넣은 항목을 지난 답에 적었으면 목록 · 보이는 답을 새것으로(다시 눌러도 같은 할 일이 두 번 안 생기게)
+  // D-244 할 일로 넣은 항목을 지난 답에 적었으면 목록 · 대화 속 답을 새것으로(다시 눌러도 같은 할 일이 두 번 안 생기게)
   const onMarked = useCallback(
     (updated: HistoryEntry) => {
       setHistory(historyOf(scope))
-      setShown((s) => (s && s.run.requestId === updated.run.requestId ? { ...s, done: updated.done } : s))
+      setTurns((ts) => ts.map((s) => (s.run.requestId === updated.run.requestId ? { ...s, done: updated.done } : s)))
     },
     [scope],
   )
@@ -629,10 +648,24 @@ function AssistPanel({
     const text = ask.trim()
     if (!text || running) return
     const p = askPreset === DIRECT ? askDirect : (presets.find((x) => x.id === askPreset) ?? presets[0])
-    if (p) void run(p, text)
+    if (!p) return
+    // 카카오톡처럼 — 보내면 질문창은 비고 내 말풍선으로 올라간다(못 받으면 그 말풍선 옆 [다시 보내기])
+    setAsk('')
+    void run(p, text)
   }
 
-  const stale = !!shown && !!nowHash && shown.hash !== nowHash
+  /** 지난 대화에서 하나 고르면 — 대화 맨 끝으로 가져와 지금 답으로 */
+  const reopen = (h: HistoryEntry) => {
+    setTurns((t) => [...t.filter((x) => x.run.requestId !== h.run.requestId), { ...h, links: h.links ?? {} }])
+    setHistoryOpen(false)
+    if (!running) {
+      setAsking(null)
+      setError(null)
+    }
+    toTurn()
+  }
+
+  const stale = !!live && !!nowHash && live.hash !== nowHash
 
   // D-629 [이대로 질문하기] 전에 어느 모델로 물을지 — 자동이면 이 단추가 물음인지 일인지에 따라(가장 싼 모델 · 좋은 모델)
   const pendingModel = useMemo(() => {
@@ -643,234 +676,304 @@ function AssistPanel({
     return `자동 · ${labelOf(status, classifyAsk({ assistId: pending.preset.id, ask: pending.ask }) === 'heavy' ? plan.heavy : plan.light)}`
   }, [pending, choice, status, effective])
 
-  const body = (
-          <div className="flex flex-col gap-4">
-            {/* D-255 모델을 먼저 — 질문을 누르기 전에 무엇으로 물을지 보이고 바꿀 수 있게(전에는 질문 단추 아래) */}
-            <ModelRow status={status} effective={effective} choice={choice} open={settings} setOpen={setSettings} setChoice={setChoice} loadStatus={loadStatus} />
-            <section aria-label="무엇을 도와드릴까요" className="flex flex-col gap-2">
-              {/* D-628 오른쪽 판 안은 글을 줄인다(D-627 한 번 누를 때 새로 나오는 양) — 자세한 말은 마우스를 올리면 */}
-              <p className="t-sub font-semibold text-slate-700" title={docked ? '고른 뒤 [이대로 질문하기] 를 누르면 답해요' : undefined}>
-                {docked ? '무엇을 도와드릴까요?' : '무엇을 도와드릴까요? — 고른 뒤 [이대로 질문하기] 를 누르면 답해요'}
-              </p>
-              <div className={docked ? 'grid gap-2' : 'grid gap-2 sm:grid-cols-2'}>
-                {presets.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    data-testid="ai-assist-preset"
-                    data-assist={p.id}
-                    disabled={!!running}
-                    aria-pressed={pending?.preset.id === p.id && !pending.opts.follow}
-                    onClick={() => request(p, p.label)}
-                    title={docked ? p.hint : undefined}
-                    className={`tap flex min-w-0 items-start gap-2 rounded-(--radius-control) border px-3 py-2.5 text-left disabled:cursor-wait ${docked ? 'min-h-11' : 'min-h-14'} ${pending?.preset.id === p.id && !pending.opts.follow ? 'border-violet-600 bg-violet-100 ring-2 ring-violet-300' : shown?.assistId === p.id ? 'border-violet-500 bg-violet-50' : 'border-violet-200 bg-white hover:bg-violet-50'}`}
-                  >
-                    {running === p.id ? <Loader2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 animate-spin text-violet-700" /> : <Sparkles aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-violet-600" />}
-                    <span className="flex min-w-0 flex-col">
-                      <span className="t-body font-semibold break-keep text-violet-950">{p.label}</span>
-                      {!docked && <span className="t-meta break-keep text-slate-600">{p.hint}</span>}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              {/* D-288 직접 물어보기 — 늘 보인다(접지 않음). 기본은 단추와 상관없이 이 화면 자료로 그 질문에만 답 */}
-              <div className="flex flex-col gap-2 rounded-(--radius-control) border border-violet-200 bg-violet-50/40 p-3" data-testid="ai-assist-ask-box">
-                <label htmlFor={`ai-ask-${scope}`} className="t-sub font-semibold text-violet-900" title={docked ? '단추에 없는 것도 이 화면 자료로 답해요' : undefined}>
-                  {docked ? '직접 물어보기' : '직접 물어보기 — 단추에 없는 것도 이 화면 자료로 답해요'}
-                </label>
-                <textarea
-                  id={`ai-ask-${scope}`}
-                  ref={askRef}
-                  value={ask}
-                  maxLength={500}
-                  onChange={(e) => setAsk(e.target.value)}
-                  onKeyDown={(e) => {
-                    // Enter = 보내기 · Shift+Enter = 줄바꿈(한글 조합 중에는 보내지 않음)
-                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                      e.preventDefault()
-                      sendAsk()
-                    }
-                  }}
-                  rows={2}
-                  placeholder={ASK_EXAMPLE[page] ?? '예: 이번 달에 메모가 가장 많았던 업체는?'}
-                  className="t-body w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2"
-                  data-testid="ai-assist-ask"
-                />
-                <div className="flex flex-wrap items-center gap-2">
-                  <select
-                    aria-label="어떻게 물을까요"
-                    className="t-sub min-h-10 max-w-full min-w-0 flex-1 rounded-(--radius-control) border border-slate-300 bg-white px-2 sm:flex-none"
-                    data-testid="ai-assist-ask-preset"
-                    value={askPreset}
-                    onChange={(e) => setAskPreset(e.target.value)}
-                  >
-                    {askDirect && <option value={DIRECT}>직접 질문 — 단추와 상관없이</option>}
-                    {presets.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        ‘{p.label}’ 에 덧붙여 묻기
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    disabled={!ask.trim() || !!running}
-                    onClick={sendAsk}
-                    className="tap t-sub ml-auto min-h-10 rounded-(--radius-control) bg-violet-700 px-4 font-semibold text-white disabled:opacity-50"
-                    data-testid="ai-assist-ask-send"
-                  >
-                    {askPreset === DIRECT ? '물어보기' : '같이 보내기'}
-                  </button>
-                </div>
-                {/* D-626 이어서 묻기 — 방금 주고받은 것을 같이 보낸다는 것을 보여 주고, 끊고 싶으면 [새로 묻기] */}
-                {askPreset === DIRECT && carryCount > 0 && (
-                  <p className="t-sub flex flex-wrap items-center gap-x-2 gap-y-1 break-keep text-violet-900" data-testid="ai-assist-carry">
-                    <span>이어서 묻기 — 방금 물은 {carryCount}개와 답을 같이 보내요</span>
-                    <button
-                      type="button"
-                      className="tap t-sub rounded-full border border-violet-300 bg-white px-2.5 py-0.5 font-semibold text-violet-800 hover:bg-violet-50"
-                      onClick={() => {
-                        const at = new Date().toISOString()
-                        carryFromRef.current = at
-                        setCarryFrom(at)
-                      }}
-                      data-testid="ai-assist-carry-reset"
-                    >
-                      새로 묻기
-                    </button>
-                  </p>
-                )}
-              </div>
-            </section>
+  // D-618 판정 줄은 지금 질문 하나에만(보내는 중 · 못 받은 질문 · 지금 답)
+  const focusAsk = asking ? asking.ask : (live?.ask ?? '')
+  const pinNode = pin ? (
+    <div className="scroll-mt-2 pl-10 empty:hidden" data-chat="pin">
+      {pin(focusAsk)}
+    </div>
+  ) : null
 
-            {error && <ErrorBox error={error} />}
-
-            {running && !shown && (
-              <div className="flex items-center gap-2 rounded-(--radius-control) border border-violet-200 bg-violet-50/60 px-3 py-3" data-testid="ai-assist-running">
-                <Loader2 aria-hidden="true" className="size-4 animate-spin text-violet-700" />
-                <span className="t-body text-violet-900">화면 자료를 보내고 답을 기다리는 중…(보통 5~20초)</span>
-              </div>
-            )}
-
-            {running && shown && (
-              <div className="flex items-center gap-2 rounded-(--radius-control) border border-violet-200 bg-violet-50/60 px-3 py-2.5" data-testid="ai-assist-running">
-                <Loader2 aria-hidden="true" className="size-4 animate-spin text-violet-700" />
-                <span className="t-sub text-violet-900">{presetOf(running)?.label ?? '답'} — 만드는 중…(긴 글은 20~60초)</span>
-              </div>
-            )}
-
-            {/* D-618 물어본 것에 대해 화면이 이미 아는 답(모듈 판정 그대로) — 기다리는 동안에도 보이고, AI 답은 그 아래 */}
-            <div ref={pinRef} className="scroll-mt-2 empty:hidden">
-              {pin?.(liveAsk)}
-            </div>
-
-            {shown && (
-              <div ref={resultRef} className="scroll-mt-2">
-                <ResultView
-                  key={shown.run.requestId}
-                  entry={shown}
-                  stale={stale}
-                  running={!!running}
-                  onClose={onClose}
-                  onSaveItem={onSaveItem}
-                  onSaved={(ok) => showToast(ok ? '보관함에 저장했어요 — 화면 아래 보관함에 쌓여요' : '저장하지 못했어요. 다시 눌러 주세요.')}
-                  onRerun={() => rerun(shown)}
-                  better={better}
-                  onBetter={() => better && rerun(shown, { provider: better.provider, model: better.model }, better.label)}
-                  onCopied={() => showToast('복사했어요')}
-                  ctx={ctxFor(shown)}
-                  itemActions={itemActions?.(shown.assistId) ?? []}
-                  resultActions={resultActions?.(shown.assistId) ?? []}
-                  record={record}
-                  defaultClientId={defaultClientId}
-                  onRecorded={onRecorded}
-                  onMarked={onMarked}
-                  toast={showToast}
-                />
-              </div>
-            )}
-
-            {history.length > 0 && (
-              <section aria-label="지난 답" className="flex flex-col gap-1.5" data-testid="ai-assist-history">
-                <p className="t-sub flex items-center gap-1 font-semibold text-slate-700">
-                  <History aria-hidden="true" className="size-4" /> 지난 답(이 브라우저에만)
-                </p>
-                <ul className="flex flex-col divide-y divide-slate-100 rounded-(--radius-control) border border-slate-200">
-                  {history.map((h) => (
-                    <li key={h.run.requestId}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShown({ ...h, links: h.links ?? {} })
-                          setLiveAsk(h.ask ?? '')
-                        }}
-                        className={`tap flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-2 text-left hover:bg-slate-50 ${shown?.run.requestId === h.run.requestId ? 'bg-violet-50' : ''}`}
-                      >
-                        <span className="t-sub min-w-0 grow font-semibold break-keep text-slate-800">{h.label}</span>
-                        <span className="t-meta shrink-0 text-slate-500">
-                          {activityTimeText(h.run.createdAt)} · {PROVIDER_LABEL[h.run.provider] ?? h.run.provider}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-            <p className="t-meta break-keep text-slate-500" title={docked ? '보내는 것: 이 화면의 업체 · 일 · 숫자(사람 이름 · 연락처 · 주민번호 · 계좌는 빼고). AI 답은 틀릴 수 있어요 — 금액 · 날짜는 화면 숫자로 한 번 확인하세요.' : undefined} data-testid="ai-assist-note">
-              {docked ? '이름 · 연락처는 빼고 보내요. 숫자는 한 번 확인하세요.' : '보내는 것: 이 화면의 업체 · 일 · 숫자(사람 이름 · 연락처 · 주민번호 · 계좌는 빼고). AI 답은 틀릴 수 있어요 — 금액 · 날짜는 화면 숫자로 한 번 확인하세요.'}
-            </p>
-          </div>
+  // 질문 단추 — 대화가 비면 인사 말풍선 아래, 대화가 있으면 맨 끝 답 아래(카카오톡 빠른 답장처럼 · 한 곳에만)
+  const presetChips = (
+    <div className="flex flex-col items-start gap-1.5 pl-10" data-chat="quick">
+      {turns.length > 0 && <p className="t-meta text-slate-600">다른 것도 물어보세요</p>}
+      <div className="flex max-w-full flex-wrap gap-1.5">
+        {presets.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            data-testid="ai-assist-preset"
+            data-assist={p.id}
+            disabled={!!running}
+            aria-pressed={pending?.preset.id === p.id && !pending.opts.follow}
+            onClick={() => request(p, p.label)}
+            title={p.hint}
+            className={`tap t-sub inline-flex min-h-10 max-w-full min-w-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-left font-semibold break-keep disabled:cursor-wait ${pending?.preset.id === p.id && !pending.opts.follow ? 'border-violet-600 bg-violet-600 text-white' : live?.assistId === p.id ? 'border-violet-400 bg-white text-violet-900' : 'border-violet-200 bg-white text-violet-900 hover:bg-violet-50'}`}
+          >
+            {running === p.id ? <Loader2 aria-hidden="true" className="size-4 shrink-0 animate-spin" /> : null}
+            <span className="min-w-0 [overflow-wrap:anywhere]">{p.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
   )
+
+  const thread = (
+    <div className="flex flex-col gap-4" data-testid="ai-assist-thread" data-turns={turns.length}>
+      {/* 첫 말 — 무엇을 하는 곳인지 한 줄 + 질문 단추 */}
+      <BotRow>
+        <BotBubble first>
+          <p className="t-body break-keep">
+            {docked ? '무엇을 도와드릴까요?' : `무엇을 도와드릴까요? ${title} 자료로 답해요.`}
+            <span className="t-sub block text-slate-600">단추를 고르거나 아래에 물어보세요</span>
+          </p>
+        </BotBubble>
+      </BotRow>
+      {turns.length === 0 && presetChips}
+      <ChatNotice testId="ai-assist-note" title="보내는 것: 이 화면의 업체 · 일 · 숫자(사람 이름 · 연락처 · 주민번호 · 계좌는 빼고). AI 답은 틀릴 수 있어요 — 금액 · 날짜는 화면 숫자로 한 번 확인하세요.">
+        이름 · 연락처는 빼고 보내요
+      </ChatNotice>
+
+      {turns.map((t, i) => {
+        const isLive = i === turns.length - 1
+        return (
+          <LiveCtx.Provider key={t.run.requestId} value={isLive && !asking}>
+            <div ref={isLive ? turnRef : undefined} className="flex scroll-mt-2 flex-col gap-3">
+              <ResultView
+                entry={t}
+                stale={isLive && stale}
+                last={isLive}
+                running={!!running}
+                onClose={onClose}
+                onSaveItem={onSaveItem}
+                onSaved={(ok) => showToast(ok ? '보관함에 저장했어요 — 화면 아래 보관함에 쌓여요' : '저장하지 못했어요. 다시 눌러 주세요.')}
+                onRerun={() => rerun(t)}
+                better={isLive ? better : null}
+                onBetter={() => better && rerun(t, { provider: better.provider, model: better.model }, better.label)}
+                onCopied={() => showToast('복사했어요')}
+                ctx={ctxFor(t)}
+                itemActions={itemActions?.(t.assistId) ?? []}
+                resultActions={resultActions?.(t.assistId) ?? []}
+                record={record}
+                defaultClientId={defaultClientId}
+                onRecorded={onRecorded}
+                onMarked={onMarked}
+                toast={showToast}
+                pinNode={isLive && !asking ? pinNode : null}
+              />
+            </div>
+          </LiveCtx.Provider>
+        )
+      })}
+
+      {/* 보내는 중 · 못 받은 질문 — 내 말풍선 → (판정 줄) → 점 세 개 또는 오류 */}
+      {asking && (
+        <div className="flex flex-col gap-3" data-testid="ai-assist-asking">
+          <MeBubble time={chatTime(asking.at)} testId={running ? undefined : 'ai-assist-failed-q'}>
+            {myText(asking.label, asking.ask, asking.preset.id)}
+          </MeBubble>
+          {pinNode}
+          {running ? (
+            <TypingBubble testId="ai-assist-running" note={live ? `${presetOf(running)?.label ?? '답'} — 만드는 중…(긴 글은 20~60초)` : '화면 자료를 보내고 답을 기다리는 중…(보통 5~20초)'} />
+          ) : (
+            error && (
+              <BotRow>
+                <ErrorBox error={error} />
+                <button
+                  type="button"
+                  onClick={() => void run(asking.preset, asking.ask, asking.opts)}
+                  className="tap t-sub inline-flex min-h-10 items-center gap-1 rounded-full border border-violet-300 bg-white px-3 font-semibold text-violet-800 hover:bg-violet-50"
+                  data-testid="ai-assist-retry"
+                >
+                  <RefreshCw aria-hidden="true" className="size-4" /> 다시 보내기
+                </button>
+              </BotRow>
+            )
+          )}
+        </div>
+      )}
+      {!asking && error && <ErrorBox error={error} />}
+
+      {turns.length > 0 && !asking && presetChips}
+      <div ref={endRef} aria-hidden="true" />
+    </div>
+  )
+
+  // 질문창 — 카카오톡처럼 맨 아래(이어서 묻기 한 줄 · 단추에 덧붙이기는 그 위 작은 줄)
+  const composer = (
+    <div className={`flex shrink-0 flex-col gap-1.5 border-t border-slate-200 bg-white pt-2 pb-2.5 ${docked ? 'px-3' : 'px-4'}`} data-testid="ai-assist-ask-box">
+      {/* D-626 이어서 묻기 — 방금 주고받은 것을 같이 보낸다는 것을 보여 주고, 끊고 싶으면 [새로 묻기] */}
+      {askPreset === DIRECT && carryCount > 0 && (
+        <p className="t-meta flex flex-wrap items-center gap-x-2 gap-y-1 break-keep text-violet-900" data-testid="ai-assist-carry">
+          <span>이어서 묻기 — 방금 물은 {carryCount}개와 답을 같이 보내요</span>
+          <button
+            type="button"
+            className="tap t-meta rounded-full border border-violet-300 bg-white px-2.5 py-0.5 font-semibold text-violet-800 hover:bg-violet-50"
+            onClick={() => {
+              const at = new Date().toISOString()
+              carryFromRef.current = at
+              setCarryFrom(at)
+            }}
+            data-testid="ai-assist-carry-reset"
+          >
+            새로 묻기
+          </button>
+        </p>
+      )}
+      <div className="flex items-end gap-2">
+        <label htmlFor={`ai-ask-${scope}`} className="sr-only">
+          직접 물어보기 — 단추에 없는 것도 이 화면 자료로 답해요
+        </label>
+        <textarea
+          id={`ai-ask-${scope}`}
+          ref={askRef}
+          value={ask}
+          maxLength={500}
+          onChange={(e) => setAsk(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter = 보내기 · Shift+Enter = 줄바꿈(한글 조합 중에는 보내지 않음)
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault()
+              sendAsk()
+            }
+          }}
+          rows={1}
+          placeholder={ASK_EXAMPLE[page] ?? '예: 이번 달에 메모가 가장 많았던 업체는?'}
+          className="t-body max-h-36 min-h-11 w-full min-w-0 flex-1 resize-none rounded-2xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 [field-sizing:content] focus:bg-white"
+          data-testid="ai-assist-ask"
+        />
+        <button
+          type="button"
+          disabled={!ask.trim() || !!running}
+          onClick={sendAsk}
+          aria-label={askPreset === DIRECT ? '물어보기' : '같이 보내기'}
+          title={askPreset === DIRECT ? '물어보기(Enter)' : '고른 단추에 덧붙여 같이 보내기(Enter)'}
+          className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full bg-violet-700 px-3.5 font-semibold text-white hover:bg-violet-800 disabled:opacity-45"
+          data-testid="ai-assist-ask-send"
+        >
+          <Send aria-hidden="true" className="size-4" />
+          <span className={docked ? 'sr-only' : 'max-sm:sr-only'}>{askPreset === DIRECT ? '물어보기' : '같이 보내기'}</span>
+        </button>
+      </div>
+      {/* 단추에 덧붙여 묻기 — 작은 한 줄(기본은 단추와 상관없이 직접 질문) */}
+      <select
+        aria-label="어떻게 물을까요"
+        className="t-meta min-h-9 max-w-full min-w-0 self-start rounded-full border border-slate-200 bg-white px-2 text-slate-600"
+        data-testid="ai-assist-ask-preset"
+        value={askPreset}
+        onChange={(e) => setAskPreset(e.target.value)}
+      >
+        {askDirect && <option value={DIRECT}>직접 질문 — 단추와 상관없이</option>}
+        {presets.map((p) => (
+          <option key={p.id} value={p.id}>
+            ‘{p.label}’ 에 덧붙여 묻기
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+
   const confirmBar = (
     <>
-        {/* D-289 고른 단추 확인 — 판 맨 아래에 늘 붙어 있다(어느 단추를 눌렀든 보이게). 이걸 눌러야 AI 를 부른다 */}
-        {pending && (
-          <div className={`flex shrink-0 flex-wrap items-center gap-2 border-t border-violet-200 bg-violet-50 py-3 ${docked ? 'px-3' : 'px-5 sm:rounded-b-(--radius-panel)'}`} data-testid="ai-assist-confirm" data-assist={pending.preset.id}>
-            <p className="t-sub min-w-0 flex-1 break-keep text-violet-950 [overflow-wrap:anywhere]">
-              <b>‘{pending.label}’</b> — 이대로 물어볼까요?
-              <span className="t-meta block text-violet-800" data-testid="ai-assist-confirm-model">{pendingModel} 로 · 화면 자료를 같이 보내요</span>
-            </p>
-            <button type="button" onClick={() => setPending(null)} className="tap t-sub min-h-11 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-700 hover:bg-slate-50" data-testid="ai-assist-confirm-cancel">
-              취소
-            </button>
-            <button type="button" disabled={!!running} onClick={confirmPending} className="tap t-body inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) bg-violet-700 px-4 font-semibold text-white hover:bg-violet-800 disabled:opacity-60" data-testid="ai-assist-confirm-go">
-              <Sparkles aria-hidden="true" className="size-4" /> 이대로 질문하기
-            </button>
-          </div>
-        )}
+      {/* D-289 고른 단추 확인 — 판 맨 아래에 늘 붙어 있다(어느 단추를 눌렀든 보이게). 이걸 눌러야 AI 를 부른다 */}
+      {pending && (
+        <div className={`flex shrink-0 flex-wrap items-center gap-2 border-t border-violet-200 bg-violet-50 py-3 ${docked ? 'px-3' : 'px-5 sm:rounded-b-(--radius-panel)'}`} data-testid="ai-assist-confirm" data-assist={pending.preset.id}>
+          <p className="t-sub min-w-0 flex-1 break-keep text-violet-950 [overflow-wrap:anywhere]">
+            <b>‘{pending.label}’</b> — 이대로 물어볼까요?
+            <span className="t-meta block text-violet-800" data-testid="ai-assist-confirm-model">{pendingModel} 로 · 화면 자료를 같이 보내요</span>
+          </p>
+          <button type="button" onClick={() => setPending(null)} className="tap t-sub min-h-11 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-700 hover:bg-slate-50" data-testid="ai-assist-confirm-cancel">
+            취소
+          </button>
+          <button type="button" disabled={!!running} onClick={confirmPending} className="tap t-body inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) bg-violet-700 px-4 font-semibold text-white hover:bg-violet-800 disabled:opacity-60" data-testid="ai-assist-confirm-go">
+            <Sparkles aria-hidden="true" className="size-4" /> 이대로 질문하기
+          </button>
+        </div>
+      )}
     </>
   )
 
-  // D-628 오른쪽 판 안 — 뒤판 없이 판을 가득 채운다(머리 · 굴리는 본문 · 맨 아래 확인 줄)
+  // 지난 대화 — 머리 단추로 여는 판(대화 위를 덮는다 · 고르면 대화 맨 끝으로)
+  const historySheet = historyOpen && (
+    <section aria-label="지난 대화" className="absolute inset-0 z-10 flex flex-col bg-white" data-testid="ai-assist-history">
+      <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-3 py-1.5">
+        <History aria-hidden="true" className="size-4 shrink-0 text-slate-600" />
+        <p className="t-body min-w-0 grow font-bold text-slate-900">
+          지난 대화 <span className="t-meta font-normal text-slate-500">· 이 브라우저에만</span>
+        </p>
+        <button type="button" onClick={() => setHistoryOpen(false)} aria-label="지난 대화 닫기" className="tap flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100 hover:text-slate-800" data-testid="ai-assist-history-close">
+          <X aria-hidden="true" className="size-5" />
+        </button>
+      </div>
+      <ul className="flex min-h-0 flex-1 flex-col divide-y divide-slate-100 overflow-y-auto">
+        {history.map((h) => (
+          <li key={h.run.requestId}>
+            <button type="button" onClick={() => reopen(h)} className={`tap flex w-full min-w-0 flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-slate-50 ${live?.run.requestId === h.run.requestId ? 'bg-violet-50' : ''}`}>
+              <span className="t-sub min-w-0 font-semibold break-keep text-slate-800 [overflow-wrap:anywhere]">{h.ask && h.assistId.endsWith('.ask') ? h.ask : h.label}</span>
+              <span className="t-meta text-slate-500">
+                {activityTimeText(h.run.createdAt)} · {PROVIDER_LABEL[h.run.provider] ?? h.run.provider}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+
+  const historyButton = (
+    <button
+      type="button"
+      onClick={() => setHistoryOpen((v) => !v)}
+      disabled={history.length === 0}
+      aria-expanded={historyOpen}
+      title={history.length ? '지난 대화 보기(이 브라우저에만)' : '아직 지난 대화가 없어요'}
+      className="tap t-sub inline-flex min-h-10 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-45"
+      data-testid="ai-assist-history-open"
+      data-count={history.length}
+    >
+      <History aria-hidden="true" className="size-4" />
+      지난 대화{history.length ? ` ${history.length}` : ''}
+    </button>
+  )
+
+  const head = (
+    <div className={`flex shrink-0 items-center gap-2 border-b border-slate-200 bg-white ${docked ? 'py-1.5 pr-1 pl-3' : 'px-4 py-2.5 sm:rounded-t-(--radius-panel)'}`}>
+      <BotAvatar className={docked ? 'size-7' : ''} />
+      <h2 className={`${docked ? 't-body' : 't-section'} min-w-0 grow truncate font-bold text-slate-900`} title={`AI 도우미 · ${title}`}>
+        AI 도우미 · {title}
+      </h2>
+      {historyButton}
+      <button type="button" onClick={onClose} aria-label="닫기" title={docked && explicit ? '닫기 — 이 화면 대화로 돌아가요' : '닫기'} className="tap flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100 hover:text-slate-800" data-testid="ai-assist-close">
+        <X aria-hidden="true" className="size-5" />
+      </button>
+    </div>
+  )
+
+  // 머리 · 모델 한 줄 · (굴리는) 대화 · 질문창 · 확인 줄 — 오른쪽 판과 창이 같은 모양
+  const inner = (
+    <>
+      {head}
+      {/* D-255 모델을 먼저 — 질문을 누르기 전에 무엇으로 물을지 보이고 바꿀 수 있게 */}
+      <ModelRow slim status={status} effective={effective} choice={choice} open={settings} setOpen={setSettings} setChoice={setChoice} loadStatus={loadStatus} />
+      <div className={`relative flex min-h-0 flex-1 flex-col ${CHAT_TINT}`}>
+        <div className={`min-h-0 flex-1 overflow-y-auto ${docked ? 'px-3 py-3' : 'px-4 py-4'}`}>{thread}</div>
+        {historySheet}
+      </div>
+      {composer}
+      {confirmBar}
+    </>
+  )
+
+  // D-628 오른쪽 판 안 — 뒤판 없이 판을 가득 채운다
   if (docked)
     return (
       <div className="flex min-h-0 flex-1 flex-col" role="region" aria-label={`AI 도우미 · ${title}`} data-testid="ai-assist-panel" data-docked="1">
-        <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-white py-1.5 pr-1 pl-3">
-          <Sparkles aria-hidden="true" className="size-4 shrink-0 text-violet-700" />
-          <h2 className="t-body min-w-0 grow font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">AI 도우미 · {title}</h2>
-          <button type="button" onClick={onClose} aria-label="닫기" title={explicit ? '닫기 — 이 화면 대화로 돌아가요' : '닫기'} className="tap flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100 hover:text-slate-800" data-testid="ai-assist-close">
-            <X aria-hidden="true" className="size-5" />
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">{body}</div>
-        {confirmBar}
+        {inner}
       </div>
     )
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-navy-950/40 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={`AI 도우미 · ${title}`} data-testid="ai-assist-panel">
-      <div className="ax-pop flex max-h-[94vh] w-full flex-col rounded-t-2xl bg-white sm:max-w-2xl sm:rounded-(--radius-panel)">
-        <div className="flex shrink-0 items-center gap-2 border-b border-violet-100 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-5 py-3.5 sm:rounded-t-(--radius-panel)">
-          <Sparkles aria-hidden="true" className="size-5 shrink-0 text-violet-700" />
-          <h2 className="t-section min-w-0 grow break-keep text-violet-950 [overflow-wrap:anywhere]">AI 도우미 · {title}</h2>
-          <button type="button" onClick={onClose} aria-label="닫기" className="tap -mr-2 flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-white hover:text-slate-800">
-            <X aria-hidden="true" className="size-5" />
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{body}</div>
-        {confirmBar}
-      </div>
+      <div className="ax-pop flex h-[94dvh] max-h-[94vh] w-full flex-col overflow-hidden rounded-t-2xl bg-white sm:h-[88vh] sm:max-w-2xl sm:rounded-(--radius-panel)">{inner}</div>
     </div>
   )
+}
+
+/** 내 말풍선 글 — 직접 물은 것은 그 말 · 단추는 단추 이름 · 단추에 덧붙인 것은 둘 다 */
+function myText(label: string, ask: string, assistId: string): string {
+  if (!ask) return label
+  return assistId.endsWith('.ask') ? ask : `${label} — ${ask}`
 }
 
 /* ------------------------------------------------------------------ */
@@ -889,6 +992,7 @@ export function ModelRow({
   setOpen,
   setChoice,
   loadStatus,
+  slim = false,
 }: {
   status: AssistStatus | null
   effective: AiChoice
@@ -897,6 +1001,8 @@ export function ModelRow({
   setOpen: (v: boolean) => void
   setChoice: (c: AiChoice | null) => void
   loadStatus: (withModels?: boolean, probe?: boolean) => Promise<AssistStatus | null>
+  /** D-634 대화 판 머리 아래 한 줄(테두리 칸 없이) — 펼친 설정은 판 높이의 절반까지만(대화가 가려지지 않게) */
+  slim?: boolean
 }) {
   const [tab, setTab] = useState<ProviderId>(effective.provider)
   const [checking, setChecking] = useState(false)
@@ -924,20 +1030,21 @@ export function ModelRow({
   const last = useLastAutoPick()
   const isPick = (c: AiChoice | undefined) => !!c && !!choice && choice.provider === c.provider && choice.model === c.model
   return (
-    <section aria-label="모델" className="rounded-(--radius-control) border border-slate-200" data-testid="ai-assist-model">
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+    <section aria-label="모델" className={slim ? 'shrink-0 border-b border-slate-200 bg-white' : 'rounded-(--radius-control) border border-slate-200'} data-testid="ai-assist-model">
+      <div className={`flex flex-wrap items-center gap-2 px-3 ${slim ? 'py-1' : 'py-2'}`}>
         <span className="t-sub text-slate-600">쓰는 모델</span>
-        <button type="button" onClick={() => setOpen(!open)} className="tap t-sub min-w-0 text-left font-semibold break-keep text-slate-900 hover:underline" data-testid="ai-assist-model-label" data-mode={auto ? 'auto' : 'manual'}>
+        <button type="button" onClick={() => setOpen(!open)} title={slim ? (auto ? '물음은 가장 싼 모델 · 일은 좋은 모델' : isDefault ? '기본 · 가장 쌈' : undefined) : undefined} className="tap t-sub min-w-0 text-left font-semibold break-keep text-slate-900 hover:underline" data-testid="ai-assist-model-label" data-mode={auto ? 'auto' : 'manual'}>
           {auto ? '자동' : current}
           {/* 펼치면 바로 아래 '자동' 줄이 같은 말을 한다 — 접혀 있을 때만 뜻을 붙인다 */}
-          {auto ? !open && <span className="t-meta ml-1 font-normal text-slate-500">(물음은 가장 싼 모델 · 일은 좋은 모델)</span> : isDefault && <span className="t-meta ml-1 font-normal text-slate-500">(기본 · 가장 쌈)</span>}
+          {/* D-634 대화 판 머리 아래 한 줄(slim)에서는 뜻을 마우스 설명으로 — 줄이 두 줄로 늘지 않게 */}
+          {slim ? null : auto ? !open && <span className="t-meta ml-1 font-normal text-slate-500">(물음은 가장 싼 모델 · 일은 좋은 모델)</span> : isDefault && <span className="t-meta ml-1 font-normal text-slate-500">(기본 · 가장 쌈)</span>}
         </button>
         <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="tap t-sub ml-auto inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50" data-testid="ai-assist-model-toggle">
           <Settings2 aria-hidden="true" className="size-4" /> {open ? '닫기' : '모델 바꾸기'}
         </button>
       </div>
       {open && (
-        <div className="flex flex-col gap-2.5 border-t border-slate-100 px-3 py-3" data-testid="ai-assist-settings">
+        <div className={`flex flex-col gap-2.5 border-t border-slate-100 px-3 py-3 ${slim ? 'max-h-[45vh] overflow-y-auto' : ''}`} data-testid="ai-assist-settings">
           {/* D-629 맨 위 — 자동(기본) · 한 번에 고르기 둘. 누르면 바로 다음 질문부터 그 방식으로 */}
           {canAuto && (
             <div className="flex flex-col gap-2" data-testid="ai-model-auto-box">
@@ -1195,9 +1302,21 @@ function costText(run: AssistRun): string {
   return krw < 1 ? ' · 1원 안 됨' : ` · 약 ${Math.round(krw).toLocaleString('ko-KR')}원`
 }
 
+/**
+ * D-634 대화 맨 끝(지금 답)만 시험 이름표(ai-assist-*)를 단다 — 위로 밀린 지난 답은 이름표 없이(같은 단추가 여럿 잡히지 않게).
+ * 보내는 중이면 지금 답도 이름표를 내려놓는다(새 답이 오면 그것이 지금 답).
+ */
+const LiveCtx = createContext(true)
+function useTid() {
+  const live = useContext(LiveCtx)
+  return (id: string) => (live ? id : undefined)
+}
+
 interface ResultViewProps {
   entry: NonNullable<Shown>
   stale: boolean
+  /** 대화의 맨 끝 답 — [다시 만들기] · [더 잘 쓰는 모델로 다시] · 기록 줄은 맨 끝 답에만 */
+  last: boolean
   running: boolean
   onRerun: () => void
   better: (AiChoice & { label: string }) | null
@@ -1214,9 +1333,13 @@ interface ResultViewProps {
   onRecorded?: () => void
   onMarked?: (updated: HistoryEntry) => void
   toast: (msg: string) => void
+  /** D-618 내 질문과 AI 답 사이에 끼울 판정 줄(지금 답에만) */
+  pinNode?: ReactNode
 }
 
-function ResultView({ entry, stale, running, onRerun, better, onBetter, onClose, onCopied, onSaveItem, onSaved, ctx, itemActions, resultActions, record, defaultClientId, onRecorded, onMarked, toast }: ResultViewProps) {
+/** 대화 한 번 — 내 말풍선(오른쪽) → (판정 줄) → AI 말풍선들(왼쪽: 한 줄 결론 · 접힌 항목 · 바로 할 일) → 단추 */
+function ResultView({ entry, stale, last, running, onRerun, better, onBetter, onClose, onCopied, onSaveItem, onSaved, ctx, itemActions, resultActions, record, defaultClientId, onRecorded, onMarked, toast, pinNode }: ResultViewProps) {
+  const tid = useTid()
   const { run } = entry
   // D-244 별칭(영업자 A)은 보여 줄 때 실제 이름으로 — 이 브라우저에서만
   const a = useMemo(() => unaliasAnswer(run.structured, entry.aliases), [run.structured, entry.aliases])
@@ -1225,6 +1348,18 @@ function ResultView({ entry, stale, running, onRerun, better, onBetter, onClose,
   const here = useLocation()
   // 로컬 모드에는 AuthProvider 가 없다 — 그때는 작업공간 · 사용자 없이(업무 일기는 이 브라우저에)
   const auth = useContext(AuthContext)
+  const items = a?.items ?? []
+  // D-634 1번 2번 3번은 접힌 채 — 하나뿐이면 펼쳐 둔다. 접어도 단추 상태(담음 · 저장됨)는 그대로(숨기기만)
+  const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set(items.length === 1 ? [0] : []))
+  const allOpen = items.length > 0 && open.size === items.length
+  const toggle = (i: number) =>
+    setOpen((s) => {
+      const n = new Set(s)
+      if (n.has(i)) n.delete(i)
+      else n.add(i)
+      return n
+    })
+  const time = chatTime(run.createdAt)
 
   /** 답 한 줄 → 업무 일기 할 일(업체 번호면 그 업체에 · 언제가 있으면 그날 기한). key = 지난 답에 '했음' 으로 적을 이름 */
   const addTodo = async (item: Pick<AssistItem, 'title' | 'detail' | 'ref' | 'when'>, key: string): Promise<AssistActionResult> => {
@@ -1251,164 +1386,206 @@ function ResultView({ entry, stale, running, onRerun, better, onBetter, onClose,
     }
   }
 
+  const pill = 'tap t-sub inline-flex min-h-10 items-center gap-1 rounded-full border px-3 font-semibold disabled:opacity-60'
+
   return (
-    <section aria-label="AI 답" className="flex flex-col gap-3 rounded-(--radius-panel) border border-violet-300 bg-white p-3.5 shadow-sm" data-testid="ai-assist-result" data-assist={entry.assistId}>
-      {/* D-282 AI 결과 공통 머리 — 작업 아이콘 · 무슨 작업 · 쓴 모델(아래 줄의 자세한 기록은 그대로) */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
-          <Sparkles className="size-4" />
-        </span>
-        <span className="t-body min-w-0 font-bold break-keep text-slate-900" data-testid="ai-assist-task">
-          {entry.label}
-        </span>
-        <span className="t-meta shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-600" data-testid="ai-assist-model">
-          {prettyModel(run.model)}
-        </span>
-        {entry.ask && (
-          <p className="t-sub w-full break-keep text-slate-600 [overflow-wrap:anywhere]" data-testid="ai-assist-asked">
-            물어본 것 · “{entry.ask}”
-          </p>
-        )}
-        {stale && (
-          <span className="t-meta rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-900" data-testid="ai-assist-stale">
-            그 뒤로 화면 자료가 바뀌었어요 — 다시 만들면 새 자료로
+    <section aria-label="AI 답" className="flex flex-col gap-3" data-testid={tid('ai-assist-result')} data-assist={entry.assistId} data-chat="turn">
+      <MeBubble time={time} testId={entry.ask ? tid('ai-assist-asked') : tid('ai-assist-task')}>
+        {myText(entry.label, entry.ask, entry.assistId)}
+      </MeBubble>
+      {pinNode}
+      <BotRow
+        time={time}
+        tag={
+          <span className="t-meta rounded-full border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-600" data-testid={tid('ai-assist-model')}>
+            {prettyModel(run.model)}
           </span>
-        )}
-      </div>
-      {a ? (
-        <>
-          <p className="t-card font-bold break-keep text-slate-900" data-testid="ai-assist-headline">
-            {a.headline}
-          </p>
-          <ol className="flex flex-col gap-2.5">
-            {a.items.map((it, i) => (
-              <li key={i} className="flex flex-col gap-1 rounded-(--radius-control) border border-slate-200 bg-slate-50/50 px-3 py-2.5" data-testid="ai-assist-item">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="t-meta flex size-6 shrink-0 items-center justify-center rounded-full bg-violet-600 font-bold text-white">{i + 1}</span>
-                  <span className="t-body min-w-0 grow font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{it.title}</span>
-                  {it.tag && <span className="t-meta shrink-0 rounded-full bg-white px-2 py-0.5 font-semibold text-violet-800 ring-1 ring-violet-200">{it.tag}</span>}
-                </div>
-                {(it.amount || it.when) && (
-                  <p className="t-sub break-keep text-slate-700">
-                    {it.amount && <b className="font-semibold">{it.amount}</b>}
-                    {it.amount && it.when && ' · '}
-                    {it.when}
-                  </p>
-                )}
-                {it.detail && <p className="t-body break-keep whitespace-pre-line text-slate-800 [overflow-wrap:anywhere]">{it.detail}</p>}
-                {it.outline && it.outline.length > 0 && (
-                  <ul className="t-sub list-disc pl-5 break-keep text-slate-700">
-                    {it.outline.map((o, j) => (
-                      <li key={j}>{o}</li>
-                    ))}
-                  </ul>
-                )}
-                {it.body && (
-                  <div className="flex flex-col gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white p-2.5">
-                    <p className="t-body break-keep whitespace-pre-line text-slate-900 [overflow-wrap:anywhere]" data-testid="ai-assist-body">
-                      {it.body}
-                    </p>
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {onSaveItem && <SaveItemButton onSave={() => onSaveItem(it, entry.assistId)} onSaved={onSaved} />}
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (await copy(`${it.title}\n\n${it.body}`)) onCopied()
-                        }}
-                        className="tap t-sub inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) border border-slate-300 px-2.5 font-semibold text-slate-700 hover:bg-slate-50"
-                      >
-                        <Copy aria-hidden="true" className="size-4" /> 이 글 복사
-                      </button>
-                    </div>
+        }
+      >
+        {a ? (
+          <>
+            <BotBubble first>
+              <p className="t-body font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid={tid('ai-assist-headline')}>
+                {a.headline}
+              </p>
+              {stale && (
+                <p className="t-meta mt-1 break-keep text-warning-800" data-testid={tid('ai-assist-stale')}>
+                  그 뒤로 화면 자료가 바뀌었어요 — 다시 만들면 새 자료로
+                </p>
+              )}
+            </BotBubble>
+            {items.length > 0 && (
+              <BotBubble wide tight>
+                {items.length > 1 && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1.5 pt-0.5 pb-1">
+                    <span className="t-meta text-slate-600">{items.length}개 — 누르면 펼쳐져요</span>
+                    <button
+                      type="button"
+                      onClick={() => setOpen(allOpen ? new Set() : new Set(items.map((_, i) => i)))}
+                      className="tap t-meta inline-flex min-h-9 items-center gap-1 rounded-full px-2 font-semibold text-brand-700 hover:bg-slate-50"
+                      data-testid={tid('ai-assist-expand-all')}
+                      aria-expanded={allOpen}
+                    >
+                      {allOpen ? '모두 접기' : '모두 펼치기'}
+                    </button>
                   </div>
                 )}
-                <ItemActionRow
-                  item={it}
-                  entry={entry}
-                  here={here}
-                  onClose={onClose}
-                  actions={itemActions}
-                  ctx={ctx}
-                  onTodo={record && !pointsAtTodo(it.ref, entry.links) ? () => addTodo(it, `item:${i}`) : undefined}
-                  todoDone={done.has(`item:${i}`)}
-                  toast={toast}
-                />
-              </li>
+                <ol className="flex flex-col divide-y divide-slate-100">
+                  {items.map((it, i) => {
+                    const isOpen = open.has(i)
+                    return (
+                      <li key={i} className="flex min-w-0 flex-col" data-testid={tid('ai-assist-item')} data-open={isOpen ? '1' : '0'}>
+                        <button
+                          type="button"
+                          aria-expanded={isOpen}
+                          onClick={() => toggle(i)}
+                          className="tap flex w-full min-w-0 items-center gap-2 rounded-xl px-1.5 py-2 text-left hover:bg-slate-50"
+                          data-testid={tid('ai-assist-item-toggle')}
+                        >
+                          <span className="t-meta flex size-6 shrink-0 items-center justify-center rounded-full bg-violet-600 font-bold text-white">{i + 1}</span>
+                          {/* 꼬리표는 제목 아래 — 좁은 판에서 제목이 한 글자씩 꺾이지 않게 */}
+                          <span className="flex min-w-0 grow flex-col items-start gap-1">
+                            <span className="t-body min-w-0 font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{it.title}</span>
+                            {it.tag && <span className="t-meta max-w-full rounded-full bg-white px-2 py-0.5 font-semibold break-keep text-violet-800 ring-1 ring-violet-200">{it.tag}</span>}
+                          </span>
+                          <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                        <div className={isOpen ? 'flex min-w-0 flex-col gap-1.5 pr-1.5 pb-2.5 pl-9' : 'hidden'}>
+                          {(it.amount || it.when) && (
+                            <p className="t-sub break-keep text-slate-700">
+                              {it.amount && <b className="font-semibold">{it.amount}</b>}
+                              {it.amount && it.when && ' · '}
+                              {it.when}
+                            </p>
+                          )}
+                          {it.detail && <p className="t-body break-keep whitespace-pre-line text-slate-800 [overflow-wrap:anywhere]">{it.detail}</p>}
+                          {it.outline && it.outline.length > 0 && (
+                            <ul className="t-sub list-disc pl-5 break-keep text-slate-700">
+                              {it.outline.map((o, j) => (
+                                <li key={j}>{o}</li>
+                              ))}
+                            </ul>
+                          )}
+                          {it.body && (
+                            <div className="flex flex-col gap-1.5 rounded-xl bg-slate-50 p-2.5">
+                              <p className="t-body break-keep whitespace-pre-line text-slate-900 [overflow-wrap:anywhere]" data-testid={tid('ai-assist-body')}>
+                                {it.body}
+                              </p>
+                              <div className="flex flex-wrap justify-end gap-2">
+                                {onSaveItem && <SaveItemButton onSave={() => onSaveItem(it, entry.assistId)} onSaved={onSaved} />}
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (await copy(`${it.title}\n\n${it.body}`)) onCopied()
+                                  }}
+                                  className={`${pill} border-slate-300 bg-white text-slate-700 hover:bg-slate-50`}
+                                >
+                                  <Copy aria-hidden="true" className="size-4" /> 이 글 복사
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          <ItemActionRow
+                            item={it}
+                            entry={entry}
+                            here={here}
+                            onClose={onClose}
+                            actions={itemActions}
+                            ctx={ctx}
+                            onTodo={record && !pointsAtTodo(it.ref, entry.links) ? () => addTodo(it, `item:${i}`) : undefined}
+                            todoDone={done.has(`item:${i}`)}
+                            toast={toast}
+                          />
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ol>
+              </BotBubble>
+            )}
+            {a.next && a.next.length > 0 && (
+              <BotBubble>
+                <p className="t-sub font-semibold text-slate-700">바로 할 일</p>
+                <ul className="mt-1 flex flex-col gap-1">
+                  {a.next.map((n, i) => (
+                    <li key={i} className="t-body flex flex-wrap items-start gap-x-1.5 gap-y-1 break-keep text-slate-900" data-testid={tid('ai-assist-next')}>
+                      <Check aria-hidden="true" className="mt-1 size-4 shrink-0 text-violet-700" />
+                      <span className="min-w-0 grow basis-40 [overflow-wrap:anywhere]">{n}</span>
+                      {record && <ActionButton id="todo-next" label="할 일로" doneLabel="할 일에 넣음" once small initiallyDone={done.has(`next:${i}`)} onRun={() => addTodo({ title: n }, `next:${i}`)} toast={toast} />}
+                    </li>
+                  ))}
+                </ul>
+              </BotBubble>
+            )}
+            {a.caution && (
+              <BotBubble>
+                <p className="t-sub break-keep text-warning-800">△ 확인할 점 · {a.caution}</p>
+              </BotBubble>
+            )}
+          </>
+        ) : (
+          <BotBubble first>
+            <p className="t-meta text-slate-600">정리된 모양으로 오지 않아 받은 글을 그대로 보여 드려요.</p>
+            <p className="t-body mt-1 break-keep whitespace-pre-line text-slate-900 [overflow-wrap:anywhere]">{raw}</p>
+          </BotBubble>
+        )}
+        {resultActions.length > 0 && (
+          <div className="flex flex-wrap gap-2" data-testid={tid('ai-assist-result-actions')}>
+            {resultActions.map((act) => (
+              <ActionButton key={act.id} id={act.id} label={act.label} doneLabel={act.doneLabel} primary once onRun={() => act.run({ structured: a, raw }, ctx)} onNavigate={onClose} toast={toast} />
             ))}
-          </ol>
-          {a.next && a.next.length > 0 && (
-            <div className="flex flex-col gap-1 rounded-(--radius-control) bg-violet-50 px-3 py-2.5">
-              <p className="t-sub font-semibold text-violet-900">바로 할 일</p>
-              <ul className="flex flex-col gap-1">
-                {a.next.map((n, i) => (
-                  <li key={i} className="t-body flex flex-wrap items-start gap-x-1.5 gap-y-1 break-keep text-violet-950" data-testid="ai-assist-next">
-                    <Check aria-hidden="true" className="mt-1 size-4 shrink-0 text-violet-700" />
-                    <span className="min-w-0 grow basis-40">{n}</span>
-                    {record && <ActionButton id="todo-next" label="할 일로" doneLabel="할 일에 넣음" once small initiallyDone={done.has(`next:${i}`)} onRun={() => addTodo({ title: n }, `next:${i}`)} toast={toast} />}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {a.caution && <p className="t-sub break-keep rounded-(--radius-control) bg-amber-50 px-3 py-2 text-amber-900">확인할 점 · {a.caution}</p>}
-        </>
-      ) : (
-        <div className="flex flex-col gap-1">
-          <p className="t-sub text-slate-600">정리된 모양으로 오지 않아 받은 글을 그대로 보여 드려요.</p>
-          <p className="t-body break-keep whitespace-pre-line text-slate-900">{raw}</p>
-        </div>
-      )}
-      {resultActions.length > 0 && (
-        <div className="flex flex-wrap gap-2 rounded-(--radius-control) border border-violet-200 bg-violet-50/60 p-2.5" data-testid="ai-assist-result-actions">
-          {resultActions.map((act) => (
-            <ActionButton key={act.id} id={act.id} label={act.label} doneLabel={act.doneLabel} primary once onRun={() => act.run({ structured: a, raw }, ctx)} onNavigate={onClose} toast={toast} />
-          ))}
-        </div>
-      )}
-      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2.5">
-        <button
-          type="button"
-          onClick={async () => {
-            if (await copy(answerText(a, raw))) onCopied()
-          }}
-          className="tap t-sub inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50"
-          data-testid="ai-assist-copy"
-        >
-          <Copy aria-hidden="true" className="size-4" /> 전체 복사
-        </button>
-        <button type="button" disabled={running} onClick={onRerun} className="tap t-sub inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) border border-violet-300 bg-white px-2.5 font-semibold text-violet-800 hover:bg-violet-50 disabled:opacity-60" data-testid="ai-assist-rerun">
-          <RefreshCw aria-hidden="true" className={`size-4 ${running ? 'animate-spin' : ''}`} /> 다시 만들기
-        </button>
-        {better && (
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
-            disabled={running}
-            onClick={onBetter}
-            title={`이번 한 번만 ${better.label} 로 — 고른 모델은 그대로`}
-            className="tap t-sub inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) border border-violet-400 bg-violet-50 px-2.5 font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-60"
-            data-testid="ai-assist-better"
-            data-model={better.model}
+            onClick={async () => {
+              if (await copy(answerText(a, raw))) onCopied()
+            }}
+            className={`${pill} border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}
+            data-testid={tid('ai-assist-copy')}
           >
-            <Wand2 aria-hidden="true" className="size-4" /> 더 잘 쓰는 모델로 다시 · {better.label}
+            <Copy aria-hidden="true" className="size-4" /> 복사
           </button>
+          {last && (
+            <button type="button" disabled={running} onClick={onRerun} className={`${pill} border-violet-200 bg-white text-violet-800 hover:bg-violet-50`} data-testid={tid('ai-assist-rerun')}>
+              <RefreshCw aria-hidden="true" className={`size-4 ${running ? 'animate-spin' : ''}`} /> 다시 만들기
+            </button>
+          )}
+          {last && better && (
+            <button
+              type="button"
+              disabled={running}
+              onClick={onBetter}
+              title={`이번 한 번만 ${better.label} 로 — 고른 모델은 그대로`}
+              className={`${pill} border-violet-300 bg-white text-violet-900 hover:bg-violet-50`}
+              data-testid={tid('ai-assist-better')}
+              data-model={better.model}
+            >
+              <Wand2 aria-hidden="true" className="size-4" /> 더 잘 쓰는 모델로 다시 · {better.label}
+            </button>
+          )}
+        </div>
+        {last && (
+          <p className="t-meta break-keep text-slate-500" data-testid={tid('ai-assist-meta')}>
+            {PROVIDER_LABEL[run.provider] ?? run.provider} · {run.model} · {(run.ms / 1000).toFixed(1)}초 · 토큰 {run.usage.total.toLocaleString('ko-KR')}
+            {costText(run)} · 보낸 줄 {run.sent.rows}
+          </p>
         )}
-        <span className="t-meta ml-auto break-keep text-slate-500" data-testid="ai-assist-meta">
-          {PROVIDER_LABEL[run.provider] ?? run.provider} · {run.model} · {(run.ms / 1000).toFixed(1)}초 · 토큰 {run.usage.total.toLocaleString('ko-KR')}
-          {costText(run)} · 보낸 줄 {run.sent.rows}
-        </span>
-      </div>
+      </BotRow>
     </section>
   )
 }
 
 /** 한 번만 저장(두 번 눌러도 한 번) — 저장한 뒤에는 '저장됨' */
 function SaveItemButton({ onSave, onSaved }: { onSave: () => Promise<boolean>; onSaved: (ok: boolean) => void }) {
+  const tid = useTid()
   const [state, setState] = useState<'idle' | 'busy' | 'done'>('idle')
   return (
     <button
       type="button"
       disabled={state !== 'idle'}
-      data-testid="ai-assist-save"
+      data-testid={tid('ai-assist-save')}
       onClick={async () => {
         setState('busy')
         const ok = await onSave().catch(() => false)
@@ -1450,13 +1627,14 @@ function ItemActionRow({
   todoDone?: boolean
   toast: (msg: string) => void
 }) {
+  const tid = useTid()
   const r = normRef(item.ref)
   const href = r ? entry.links[r] : undefined
   const external = !!href && /^https:\/\//.test(href)
   const showRef = !!href && (external || !isSamePage(href, here))
   if (!showRef && !onTodo && actions.length === 0) return null
   return (
-    <div className="flex flex-wrap items-center gap-2 pt-1" data-testid="ai-assist-item-actions">
+    <div className="flex flex-wrap items-center gap-2 pt-1" data-testid={tid('ai-assist-item-actions')}>
       {actions.map((act) => (
         <ActionButton key={act.id} id={act.id} label={act.label} doneLabel={act.doneLabel} primary={act.primary} once={act.once} onRun={() => act.run(item, ctx)} onNavigate={onClose} toast={toast} />
       ))}
@@ -1464,11 +1642,11 @@ function ItemActionRow({
       {showRef &&
         href &&
         (external ? (
-          <a href={href} target="_blank" rel="noopener noreferrer" className="tap t-sub inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) px-1.5 font-semibold text-brand-700 hover:underline" data-testid="ai-assist-ref">
+          <a href={href} target="_blank" rel="noopener noreferrer" className="tap t-sub inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) px-1.5 font-semibold text-brand-700 hover:underline" data-testid={tid('ai-assist-ref')}>
             {refKind(r) === 'v' ? '영상 보기' : '새 창에서 보기'} <ExternalLink aria-hidden="true" className="size-3.5" />
           </a>
         ) : (
-          <Link to={href} onClick={onClose} className="tap t-sub inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) px-1.5 font-semibold text-brand-700 hover:underline" data-testid="ai-assist-ref" data-ref={r}>
+          <Link to={href} onClick={onClose} className="tap t-sub inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) px-1.5 font-semibold text-brand-700 hover:underline" data-testid={tid('ai-assist-ref')} data-ref={r}>
             {refLabel(r)} <ArrowRight aria-hidden="true" className="size-3.5" />
           </Link>
         ))}
@@ -1501,6 +1679,7 @@ function ActionButton({
   onNavigate?: () => void
   toast: (msg: string) => void
 }) {
+  const tid = useTid()
   const [state, setState] = useState<'idle' | 'busy' | 'done'>(once && initiallyDone ? 'done' : 'idle')
   const [go, setGo] = useState<{ to: string; label: string } | null>(null)
   const done = once && state === 'done'
@@ -1510,7 +1689,7 @@ function ActionButton({
       <button
         type="button"
         disabled={state === 'busy' || done}
-        data-testid="ai-assist-action"
+        data-testid={tid('ai-assist-action')}
         data-action={id}
         data-state={state}
         onClick={async () => {
@@ -1544,11 +1723,11 @@ function ActionButton({
       </button>
       {go &&
         (/^https:\/\//.test(go.to) ? (
-          <a href={go.to} target="_blank" rel="noopener noreferrer" className="tap t-sub inline-flex min-h-10 items-center gap-1 font-semibold text-brand-700 hover:underline" data-testid="ai-assist-action-go">
+          <a href={go.to} target="_blank" rel="noopener noreferrer" className="tap t-sub inline-flex min-h-10 items-center gap-1 font-semibold text-brand-700 hover:underline" data-testid={tid('ai-assist-action-go')}>
             {go.label} <ExternalLink aria-hidden="true" className="size-3.5" />
           </a>
         ) : (
-          <Link to={go.to} onClick={onNavigate} className="tap t-sub inline-flex min-h-10 items-center gap-1 font-semibold text-brand-700 hover:underline" data-testid="ai-assist-action-go">
+          <Link to={go.to} onClick={onNavigate} className="tap t-sub inline-flex min-h-10 items-center gap-1 font-semibold text-brand-700 hover:underline" data-testid={tid('ai-assist-action-go')}>
             {go.label} <ArrowRight aria-hidden="true" className="size-3.5" />
           </Link>
         ))}

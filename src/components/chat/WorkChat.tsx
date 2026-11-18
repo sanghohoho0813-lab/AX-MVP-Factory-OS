@@ -27,6 +27,8 @@ import { toneClass, type FeatureTone } from '../../config/featureVisual'
 import type { HeroArt } from '../../config/heroArt'
 import { PageHero } from '../ui/pageFrame'
 import { ChatStartCard, PageChat } from './PageChat'
+import { BotRow, MeBubble, TypingBubble } from './bubbles'
+import { chatTime } from '../../lib/chatTime'
 import { startPageChat, usePageChat } from '../../lib/pageChat'
 import { HISTORY_MAX, answerFromAi, answerText, historyKey, parseHistory, type ChatActKind, type ChatAnswer, type ChatGuideStep, type ChatModule, type ChatStarter, type ChatTurn } from '../../services/workChat/chatTypes'
 import { AiConfirm } from '../ai/AiConfirm'
@@ -115,7 +117,7 @@ const TONE_EDGE: Record<ChatAnswer['tone'], string> = { ok: 'border-success-200'
 
 function AnswerCard({ a, owner, aiReady, onAct, onAsk, onAiMore, onCopy }: { a: ChatAnswer; owner: boolean; aiReady: boolean; onAct: (k: ChatActKind) => void; onAsk: (text: string) => void; onAiMore: () => void; onCopy: (text: string, what: string) => void }) {
   return (
-    <div className={`flex min-w-0 flex-col gap-2 rounded-(--radius-panel) border bg-white px-3.5 py-3 shadow-(--shadow-card) ${TONE_EDGE[a.tone]}`} data-testid="chat-answer" data-source={a.source} data-topic={a.topic ?? ''}>
+    <div className={`flex w-full min-w-0 flex-col gap-2 rounded-2xl rounded-tl-md border bg-white px-3.5 py-3 ${TONE_EDGE[a.tone]}`} data-testid="chat-answer" data-source={a.source} data-topic={a.topic ?? ''}>
       <p className="t-meta flex items-center gap-1 font-semibold text-slate-500">
         {a.source === 'ai' ? (
           <>
@@ -481,18 +483,23 @@ export function WorkChat(p: WorkChatProps) {
     <ol className="flex flex-col gap-4" data-testid="chat-turns" aria-live="polite">
       {turns.map((t) => (
         <li key={t.id} ref={t.id === lastId ? endRef : undefined} className="flex scroll-mt-2 flex-col gap-2" data-testid="chat-turn" data-status={t.status}>
-          <p className="t-body max-w-[85%] self-end rounded-2xl rounded-br-md bg-brand-600 px-3.5 py-2 break-keep text-white [overflow-wrap:anywhere]" data-testid="chat-q">
+          {/* D-634 카카오톡처럼 — 내 말은 오른쪽 말풍선 · 답은 왼쪽 프로필 아래 말풍선 */}
+          <MeBubble testId="chat-q" time={chatTime(t.at)}>
             {t.q}
-          </p>
-          {t.status === 'pending' && (
-            <p className="t-sub flex items-center gap-2 text-slate-500" role="status" data-testid="chat-pending">
-              <Loader2 aria-hidden="true" className="size-4 animate-spin" /> AI가 답을 만드는 중…
+          </MeBubble>
+          {t.status === 'pending' && <TypingBubble testId="chat-pending" note="AI가 답을 만드는 중…" />}
+          {t.error && (
+            <p className="t-sub pl-10 break-keep text-warning-800" data-testid="chat-error">
+              △ {t.error}
             </p>
           )}
-          {t.error && <p className="t-sub break-keep text-warning-800" data-testid="chat-error">△ {t.error}</p>}
-          {t.a && <AnswerCard a={t.a} owner={owner} aiReady={aiReady} onAct={onAct} onAsk={onAsk} onAiMore={() => void askAi(`${t.q} — 이 회사 기록으로 더 자세히 알려 줘`, `${t.q} (AI로 더 자세히)`)} onCopy={(x, w) => void onCopy(x, w)} />}
+          {t.a && (
+            <BotRow ai={t.a.source === 'ai'}>
+              <AnswerCard a={t.a} owner={owner} aiReady={aiReady} onAct={onAct} onAsk={onAsk} onAiMore={() => void askAi(`${t.q} — 이 회사 기록으로 더 자세히 알려 줘`, `${t.q} (AI로 더 자세히)`)} onCopy={(x, w) => void onCopy(x, w)} />
+            </BotRow>
+          )}
           {t.status === 'error' && !t.a && (
-            <div>
+            <div className="pl-10">
               <AiConfirm>
                 <Button size="sm" variant="secondary" onClick={() => void askAi(t.q)} data-testid="chat-retry">
                   <RotateCcw aria-hidden="true" className="size-4" /> 다시 묻기

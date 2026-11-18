@@ -26,6 +26,7 @@ import { copyText } from '../../services/grants/grantView'
 import { useToast } from '../ui/toastContext'
 import { ModelPicker } from '../ai/ModelPicker'
 import { AiConfirm } from '../ai/AiConfirm'
+import { BotBubble, BotRow, MeBubble, TypingBubble } from '../chat/bubbles'
 
 const DOCK_DEFAULT_W = 420
 const STEP = 24
@@ -124,9 +125,14 @@ function ChatTab() {
       <ol className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-3" data-testid="dock-chat-list" aria-live="polite">
         {turns.length === 0 && (
           <li className="flex flex-col gap-2" data-testid="dock-chat-empty">
-            <p className="t-body font-bold text-slate-900">무엇이든 물어보세요</p>
-            <p className="t-sub break-keep text-slate-600">OS 화면을 보면서 옆에서 바로 묻는 AI 예요. 회사 기록은 보내지 않고, 적은 질문과 앞선 대화 몇 줄만 보냅니다.</p>
-            <div className="flex flex-col gap-1.5 pt-1">
+            {/* D-634 첫 말 — AI 인사 말풍선 + 바로 물을 것(빠른 답장) */}
+            <BotRow>
+              <BotBubble first>
+                <p className="t-body font-bold text-slate-900">무엇이든 물어보세요</p>
+                <p className="t-sub break-keep text-slate-600">OS 화면을 보면서 옆에서 바로 묻는 AI 예요. 회사 기록은 보내지 않고, 적은 질문과 앞선 대화 몇 줄만 보냅니다.</p>
+              </BotBubble>
+            </BotRow>
+            <div className="flex flex-col gap-1.5 pl-10">
               {STARTERS.map((s) => (
                 <AiConfirm><button
                   key={s}
@@ -148,14 +154,13 @@ function ChatTab() {
         )}
         {turns.map((t, i) => (
           <li key={t.id} ref={i === turns.length - 1 ? endRef : undefined} className="flex min-w-0 flex-col gap-1.5" data-testid="dock-turn" data-status={t.status}>
-            <p className="t-sub ml-6 self-end rounded-2xl rounded-br-md bg-brand-600 px-3 py-2 break-keep whitespace-pre-wrap text-white [overflow-wrap:anywhere]">{t.q}</p>
-            {t.status === 'pending' && (
-              <p className="t-sub flex items-center gap-1.5 text-slate-500" data-testid="dock-pending">
-                <Loader2 aria-hidden="true" className="size-4 animate-spin" /> 답을 쓰는 중…
-              </p>
-            )}
+            {/* D-634 카카오톡처럼 — 내 말은 오른쪽 · AI 답은 왼쪽 프로필 아래 말풍선 */}
+            <MeBubble small className="pl-6">
+              {t.q}
+            </MeBubble>
+            {t.status === 'pending' && <TypingBubble testId="dock-pending" note="답을 쓰는 중…" />}
             {t.status === 'error' && (
-              <div className="t-sub flex flex-wrap items-center gap-2 rounded-(--radius-control) bg-amber-50 px-3 py-2 text-amber-900" role="alert" data-testid="dock-error">
+              <div className="t-sub ml-10 flex flex-wrap items-center gap-2 rounded-2xl rounded-tl-md bg-amber-50 px-3 py-2 text-amber-900" role="alert" data-testid="dock-error">
                 <span className="min-w-0 flex-1 break-keep">{t.error}</span>
                 <AiConfirm><button type="button" onClick={() => ask(t.q)} disabled={busy} className="tap inline-flex min-h-9 items-center gap-1 rounded-(--radius-control) border border-amber-300 bg-white px-2.5 font-semibold disabled:opacity-50" data-testid="dock-retry">
                   <RotateCcw aria-hidden="true" className="size-4" /> 다시
@@ -163,7 +168,8 @@ function ChatTab() {
               </div>
             )}
             {t.status === 'done' && (
-              <div className="flex min-w-0 flex-col gap-2 rounded-(--radius-panel) border border-violet-200 bg-white px-3 py-2.5" data-testid="dock-answer">
+              <BotRow>
+              <div className="flex w-full min-w-0 flex-col gap-2 rounded-2xl rounded-tl-md border border-slate-200 bg-white px-3 py-2.5" data-testid="dock-answer">
                 <p className="t-meta flex items-center gap-1 font-semibold text-slate-500">
                   <Sparkles aria-hidden="true" className="size-3.5 text-violet-600" /> AI 답{t.model ? ` · ${t.model}` : ''}
                 </p>
@@ -196,6 +202,7 @@ function ChatTab() {
                   </button>
                 </div>
               </div>
+              </BotRow>
             )}
           </li>
         ))}

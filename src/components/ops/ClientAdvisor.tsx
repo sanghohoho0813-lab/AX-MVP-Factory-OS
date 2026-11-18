@@ -22,6 +22,7 @@ import { AiAssist } from '../ai/AiAssist'
 import { clientBundle } from '../../services/aiAssist/builders'
 import { useToast } from '../ui/toastContext'
 import { TermText } from '../ui/TermText'
+import { BotRow, MeBubble } from '../chat/bubbles'
 
 const TONE: Record<InsightTone, Tone> = { good: 'success', maybe: 'brand', done: 'neutral', need: 'warning', no: 'neutral' }
 
@@ -146,21 +147,22 @@ export function ClientAdvisor({
 
         {/* 대화 */}
         <div className="flex min-w-0 flex-col gap-3">
-          <div className="flex min-h-40 flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-slate-50/60 p-3 sm:p-4 lg:max-h-[44rem] lg:overflow-y-auto" data-testid="advisor-log">
+          <div className="flex min-h-40 flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-slate-100 p-3 sm:p-4 lg:max-h-[44rem] lg:overflow-y-auto" data-testid="advisor-log">
             {turns.length === 0 ? (
               <p className="t-sub my-auto break-keep text-center text-slate-500">왼쪽 목차에서 질문을 누르거나 아래에 직접 적어 보세요. 이 회사 정보 · 모듈 판정으로 바로 답해요.</p>
             ) : (
               turns.map((t, i) => (
                 <div key={t.id} className="flex flex-col gap-2">
-                  <p className="t-body self-end rounded-2xl rounded-br-md bg-brand-600 px-3.5 py-2 break-keep text-white [overflow-wrap:anywhere]" data-testid="advisor-question">
-                    {t.text}
-                  </p>
-                  <AnswerCard
-                    a={answers[i]}
-                    onAsk={(qid) => ask(qid, ALL_QUESTIONS.find((x) => x.id === qid)?.label ?? '')}
-                    onCopy={async (text) => showToast((await copyText(text)) ? '복사했습니다 — 카톡 · 메모에 붙여 넣으세요' : '복사하지 못했습니다')}
-                    onSetNext={onSetNext}
-                  />
+                  {/* D-634 카카오톡처럼 — 내 질문은 오른쪽 · 답(규칙 계산)은 왼쪽 '도우미' 말풍선 */}
+                  <MeBubble testId="advisor-question">{t.text}</MeBubble>
+                  <BotRow ai={false}>
+                    <AnswerCard
+                      a={answers[i]}
+                      onAsk={(qid) => ask(qid, ALL_QUESTIONS.find((x) => x.id === qid)?.label ?? '')}
+                      onCopy={async (text) => showToast((await copyText(text)) ? '복사했습니다 — 카톡 · 메모에 붙여 넣으세요' : '복사하지 못했습니다')}
+                      onSetNext={onSetNext}
+                    />
+                  </BotRow>
                 </div>
               ))
             )}

@@ -514,6 +514,8 @@ await bar.getByTestId('ai-assist-open').click()
 await page.getByTestId('ai-assist-preset').filter({ hasText: '스레드 글 3개 쓰기' }).click()
 await page.getByTestId('ai-assist-confirm-go').click()
 await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'threads.write', null, { timeout: 10000 }).catch(() => {})
+// D-634 답 항목은 접힌 채 — [모두 펼치기] 뒤 항목 안 단추
+if (await page.getByTestId('ai-assist-expand-all').count()) await page.getByTestId('ai-assist-expand-all').click()
 const useBtn = page.locator('[data-testid="ai-assist-action"][data-action="thr-use"]').first()
 check('L5 판에서 [스레드 글 3개 쓰기] → 답마다 [글 칸에 넣기]', (await page.locator('[data-testid="ai-assist-action"][data-action="thr-use"]').count()) >= 1)
 await useBtn.click()

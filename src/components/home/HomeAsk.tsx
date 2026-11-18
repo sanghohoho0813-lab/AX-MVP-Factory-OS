@@ -15,6 +15,7 @@ import { addDaysLocal } from '../../services/clientOpsNextAction'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, ArrowUp, Building2, Calculator, CalendarClock, Check, ChevronRight, Copy, FileText, FileUp, Lightbulb, ListChecks, Loader2, Mic, MicOff, Paperclip, Phone, Plus, ThumbsDown, ThumbsUp, Trash2, Wallet, X } from 'lucide-react'
 import { Button } from '../ui/Button'
+import { BotRow, MeBubble, TypingBubble } from '../chat/bubbles'
 import { handDocsTo, handNewClientDocs } from '../../services/docHandoff'
 import { CHAT_DOC_MAX, defaultDocQuestion, labelOfDoc, type ChatDoc, type DocCompany } from '../../services/homeAsk/homeDocs'
 import { ModelPicker } from '../ai/ModelPicker'
@@ -435,9 +436,8 @@ function Turn({ turn, names, record, onRecorded, onRecordTalk }: { turn: HomeTur
   }
   return (
     <article className="flex flex-col gap-2" data-testid="home-ask-turn" data-status={turn.status}>
-      <p className="t-body max-w-[85%] self-end rounded-2xl bg-slate-100 px-3.5 py-2 break-keep whitespace-pre-wrap text-slate-900" data-testid="home-ask-q">
-        {turn.q}
-      </p>
+      {/* D-634 카카오톡처럼 — 내 말은 오른쪽 말풍선(다른 대화창과 같은 색) */}
+      <MeBubble testId="home-ask-q">{turn.q}</MeBubble>
       {names.length > 0 && (
         <p className="t-meta flex flex-wrap items-baseline justify-end gap-x-1 self-end text-right text-slate-500" data-testid="home-ask-clients">
           이 업체 자료로:
@@ -467,11 +467,11 @@ function Turn({ turn, names, record, onRecorded, onRecordTalk }: { turn: HomeTur
         </p>
       )}
       {turn.status === 'pending' ? (
-        <p className="t-body inline-flex items-center gap-2 text-slate-500" data-testid="home-ask-pending">
-          <Loader2 aria-hidden="true" className="size-4 animate-spin" /> 자료를 모아 답을 쓰는 중…
-        </p>
+        <TypingBubble testId="home-ask-pending" name="도우미" label="자료를 모아 답을 쓰는 중" note="자료를 모아 답을 쓰는 중…" />
       ) : a ? (
-        <div className="flex flex-col gap-2.5" data-testid="home-ask-answer">
+        // D-634 답은 왼쪽 프로필 아래 말풍선 — AI 가 쓴 답만 'AI 도우미'(규칙으로 정리한 답은 '도우미')
+        <BotRow ai={turn.status === 'ai'}>
+        <div className="flex w-full min-w-0 flex-col gap-2.5 rounded-2xl rounded-tl-md border border-slate-200 bg-white px-3.5 py-3" data-testid="home-ask-answer">
           <p className="t-meta font-semibold" data-testid="home-ask-source">
             {turn.status === 'ai' ? (
               <span className="text-violet-700">AI 답{turn.model ? ` · ${turn.model}` : ''}</span>
@@ -642,6 +642,7 @@ function Turn({ turn, names, record, onRecorded, onRecordTalk }: { turn: HomeTur
             )}
           </div>
         </div>
+        </BotRow>
       ) : null}
     </article>
   )

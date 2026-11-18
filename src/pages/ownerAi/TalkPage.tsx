@@ -30,6 +30,7 @@ import { fmtShort } from './parts/runStatus'
 import { skillIcon } from './skillVisual'
 import { AiSetupBanner, Md, OwnerAiGate, copyToClipboard, useAiSetup, useFindClient, useOwnerAiIdentity, useOwnerAiRepo } from './shared'
 import { downloadBlob, safeFileName } from './studioShared'
+import { BotRow, MeBubble, TypingBubble } from '../../components/chat/bubbles'
 
 export default function TalkPage() {
   const { caseId = '' } = useParams()
@@ -329,24 +330,23 @@ function Talk({ caseId }: { caseId: string }) {
       <ol className="flex flex-col gap-4" data-testid="talk-turns" aria-live="polite">
         {turns.map((r) => (
           <li key={r.id} className="flex scroll-mt-20 flex-col gap-2" data-testid="talk-turn" data-mode={modeOfRun(r)} data-status={r.status}>
-            <p className="t-body max-w-[85%] self-end rounded-2xl rounded-br-md bg-brand-600 px-3.5 py-2 break-keep whitespace-pre-wrap text-white [overflow-wrap:anywhere]" data-testid="talk-q">
-              {str(r.input?.task) || MODE_DEFAULT_ASK[modeOfRun(r)]}
-            </p>
-            <TurnCard run={r} board={board} onCopy={copy} onAsk={(q) => { setMode('talk'); setText(q); inputRef.current?.focus() }} onAdopt={adopt} onShowBoard={() => setPane('board')} saving={saving} />
+            {/* D-634 카카오톡처럼 — 내 말은 오른쪽 · AI 답은 왼쪽 프로필 아래 */}
+            <MeBubble testId="talk-q">{str(r.input?.task) || MODE_DEFAULT_ASK[modeOfRun(r)]}</MeBubble>
+            <BotRow name="AI 기획 파트너">
+              <TurnCard run={r} board={board} onCopy={copy} onAsk={(q) => { setMode('talk'); setText(q); inputRef.current?.focus() }} onAdopt={adopt} onShowBoard={() => setPane('board')} saving={saving} />
+            </BotRow>
           </li>
         ))}
         {pending && pending.thread === activeId && (
           <li className="flex flex-col gap-2" data-testid="talk-pending">
-            <p className="t-body max-w-[85%] self-end rounded-2xl rounded-br-md bg-brand-600 px-3.5 py-2 break-keep whitespace-pre-wrap text-white [overflow-wrap:anywhere]">{pending.ask}</p>
-            <p className="t-sub flex items-center gap-2 text-slate-500" role="status">
-              <Loader2 aria-hidden="true" className="size-4 animate-spin" /> {MODE_LABEL[pending.mode]} — AI가 앞 대화를 이어받아 답을 만드는 중…{pending.mode === 'judge' || pending.mode === 'lock' || pending.mode === 'prompt' ? ' (깊게 보는 일이라 1분쯤 걸려요)' : ''}
-            </p>
+            <MeBubble>{pending.ask}</MeBubble>
+            <TypingBubble name="AI 기획 파트너" note={`${MODE_LABEL[pending.mode]} — AI가 앞 대화를 이어받아 답을 만드는 중…${pending.mode === 'judge' || pending.mode === 'lock' || pending.mode === 'prompt' ? ' (깊게 보는 일이라 1분쯤 걸려요)' : ''}`} />
           </li>
         )}
         {failed && failed.thread === activeId && (
           <li className="flex flex-col gap-2" data-testid="talk-failed">
-            <p className="t-sub break-keep text-warning-800" role="alert">△ {failed.message}</p>
-            <div>
+            <p className="t-sub pl-10 break-keep text-warning-800" role="alert">△ {failed.message}</p>
+            <div className="pl-10">
               <Button size="sm" variant="secondary" onClick={() => void send(failed.mode, failed.ask)} disabled={busy || !aiReady} data-testid="talk-retry">다시 보내기</Button>
             </div>
           </li>

@@ -161,6 +161,9 @@ const runPreset = async (page, label) => {
   await page.getByTestId('ai-assist-preset').filter({ hasText: label }).click()
   await page.getByTestId('ai-assist-confirm-go').click()
   await page.getByTestId('ai-assist-result').waitFor({ timeout: 10000 })
+  // D-634 답 항목은 접힌 채 — 항목 안 [이 블록에 넣기] 를 누르기 전에 펼친다
+  const all = page.getByTestId('ai-assist-expand-all')
+  if (await all.count()) await all.click()
   await wait(200)
 }
 const act = (page, id) => page.locator(`[data-testid="ai-assist-action"][data-action="${id}"]`)

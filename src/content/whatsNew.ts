@@ -25,6 +25,12 @@ export const WHATS_NEW_MAX = 10
 
 export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
   {
+    id: 'chat-bubbles',
+    date: '2026-11-18',
+    title: '대화창이 카카오톡처럼 바뀌었어요 — 내 말은 오른쪽, 답은 왼쪽',
+    how: '물어보면 내 말이 오른쪽 말풍선으로 올라가고, 답은 왼쪽에 쌓여요. 답이 여러 개(1 · 2 · 3)면 접힌 채로 와요 — 궁금한 것만 눌러 펼치세요. 예전 답은 대화창 위쪽 [지난 대화] 에서 다시 볼 수 있어요.',
+  },
+  {
     id: 'chat-right',
     date: '2026-11-18',
     title: '대화창이 화면 오른쪽으로 갔어요 — 가운데 화면을 보면서 물어봐요',
@@ -94,12 +100,6 @@ export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
     path: '/marketing/basics',
     cta: '소개 글 만들어 보기',
     marketing: true,
-  },
-  {
-    id: 'home-screen',
-    date: '2026-11-11',
-    title: '휴대폰 홈 화면에 아이콘으로 넣을 수 있어요',
-    how: "이 화면 아래 '휴대폰 홈 화면에 넣는 법' 을 따라 하면 아이콘 한 번으로 열려요.",
   },
 ]
 
