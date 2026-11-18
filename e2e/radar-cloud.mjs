@@ -10,6 +10,7 @@
  *   node e2e/radar-cloud.mjs            (dist-qa-radar 로 따로 빌드하고 4536 에 띄운다)
  */
 import { chromium } from 'playwright'
+import { keepPlanInsideOpen } from './support/mkOpen.mjs'
 import { spawn, execSync } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -165,6 +166,8 @@ async function open(vp, o) {
     return route.fulfill(json([]))
   })
   const page = await ctx.newPage()
+  // D-630 [자세히 보기] 는 판 맨 아래 [더 보기] 안 · 들어올 때마다 접힌 채(펼침 기억 axmvp.fold.mk-more 는 이제 읽지 않는다) — 유튜브 화면을 열 때마다 두 줄을 펼친다
+  keepPlanInsideOpen(page)
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
   await page.route('https://i.ytimg.com/**', (r) => r.fulfill({ status: 404, body: '' }))

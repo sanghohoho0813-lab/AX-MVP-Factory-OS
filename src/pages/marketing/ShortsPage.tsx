@@ -76,7 +76,7 @@ type Tab = 'write' | 'records' | 'guide'
 // D-298 대표 "릴스 · 틱톡도 글자가 구구절절 — 처음 보는 사람은 이게 뭐지 싶다 · 색도 더" — 칸마다 색 · 마우스를 올리면(휴대폰은 아래 한 줄) 무엇을 하는 곳인지
 // D-627 칸 줄 아래 '지금 칸' 한 줄은 짧게(about) — 긴 설명(tip)은 칸에 마우스를 올리면
 const TABS: ReadonlyArray<{ key: Tab; label: string; short: string; icon: typeof Clapperboard; tone: Tone; tip: string; about: string }> = [
-  { key: 'write', label: '오늘 만들 영상', short: '만들기', icon: Clapperboard, tone: 'rose', tip: '주제만 고르면 릴스 · 틱톡 대본(영상에서 할 말)을 써 주는 곳이에요.', about: '주제만 고르면 써 줘요.' },
+  { key: 'write', label: '오늘 만들 영상', short: '만들기', icon: Clapperboard, tone: 'rose', tip: '주제만 고르면 릴스 · 틱톡 대본(영상에서 할 말)을 써 주는 곳이에요.', about: '주제만 고르면 대본을 써 줘요.' },
   { key: 'records', label: '기록표', short: '기록표', icon: CalendarCheck, tone: 'emerald', tip: '올린 영상의 조회 · 좋아요 숫자를 적는 곳이에요. 어떤 형식이 잘 되는지 숫자로 알려 줘요.', about: '올린 영상의 숫자를 적는 곳이에요.' },
   { key: 'guide', label: '형식 · 공식', short: '설명서', icon: BookOpen, tone: 'violet', tip: '영상 형식 5가지와 잘 되는 규칙을 모은 설명서예요.', about: '영상 형식 5가지 설명서예요.' },
 ]
@@ -520,7 +520,7 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, brief, aiOk, 
   // D-507 계속 쓰기 — 대본 칸이 비어 있고 써 둔 대본이 있으면 맨 위 한 줄 [이어서 쓰기](가장 최근에 저장한 것)
   const lastDraft = !draft.script.trim() && !draft.id ? [...store.posts].filter((p) => p.status === 'draft' && p.script.trim()).sort((a, b) => b.savedAt.localeCompare(a.savedAt))[0] : undefined
   // D-630 쓰던 대본이 이 기기에 남아 있으면(저장 전 대본 · 다른 기기에서 이어 온 대본) — 대본 칸을 펼치는 대신 맨 위 한 줄 [이어서 쓰기]
-  const pending = !editorOpen && draft.script.trim() ? (draft.topic.trim() || draft.script.trim().split('\n')[0]).slice(0, 24) : ''
+  const pending = !editorOpen && draft.script.trim() ? (draft.topic.trim() || draft.script.trim().split('\n')[0]).slice(0, 20) : ''
   return (
     <div className="flex flex-col gap-4" data-testid="sht-write">
       {pending && (
@@ -541,7 +541,7 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, brief, aiOk, 
           <span className="min-w-0 flex-1 basis-48">
             <span className="t-meta block font-semibold text-slate-600">써 둔 대본</span>
             <span className="t-sub block font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="sht-resume-line">
-              {(lastDraft.topic.trim() || lastDraft.script.trim().split('\n')[0]).slice(0, 24)}
+              {(lastDraft.topic.trim() || lastDraft.script.trim().split('\n')[0]).slice(0, 20)}
             </span>
           </span>
           <button

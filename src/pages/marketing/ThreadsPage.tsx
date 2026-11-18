@@ -596,7 +596,7 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, weekRef, brie
   // D-507 계속 쓰기 — 글 칸이 비어 있고 쓰다 둔 글이 있으면 맨 위 한 줄 [이어서 쓰기](가장 최근에 저장한 것)
   const lastDraft = !draft.body.trim() && !draft.id ? [...store.posts].filter((p) => p.status === 'draft' && p.body.trim()).sort((a, b) => b.savedAt.localeCompare(a.savedAt))[0] : undefined
   // D-630 쓰던 글이 이 기기에 남아 있으면(저장 전 글 · 다른 기기에서 이어 온 글) — 글 칸을 펼치는 대신 맨 위 한 줄 [이어서 쓰기]
-  const pending = !editorOpen && draft.body.trim() ? draft.body.trim().split('\n')[0].slice(0, 24) : ''
+  const pending = !editorOpen && draft.body.trim() ? draft.body.trim().split('\n')[0].slice(0, 20) : ''
   return (
     <div className="flex flex-col gap-4" data-testid="thr-write">
       {pending && (
@@ -617,7 +617,7 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, weekRef, brie
           <span className="min-w-0 flex-1 basis-48">
             <span className="t-meta block font-semibold text-slate-600">쓰다 둔 글</span>
             <span className="t-sub block font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="thr-resume-line">
-              {lastDraft.body.trim().split('\n')[0].slice(0, 24)}
+              {lastDraft.body.trim().split('\n')[0].slice(0, 20)}
             </span>
           </span>
           <button

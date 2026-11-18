@@ -7,6 +7,11 @@
  *   - 빈칸은 세지 않는다. 접힌 칸 · 숨긴 칸 · 화면 읽기 전용 글(sr-only) · 창(dialog) 안은 세지 않는다.
  *   - 목록 자료(업체 · 공고 이름)도 센다 — 견본 업체 5곳 기준(e2e/seed.mjs). 그래서 목록은 5줄 + [더 보기].
  * 목표는 PC 200자 · 휴대폰 150자. 화면마다 한도를 두고(아직 못 고친 화면은 지금 숫자), 고치면 목표로 내린다 — 올리지 않는다.
+ * D-630(2026-11-18 대표 지시) 마케팅 · 브랜딩은 더 엄격하게 — "들어갔을 때 딱 한 가지만(이름 · 한 줄 · 첫 단계나 목록 하나)".
+ *   유튜브 · 스레드 · 릴스/틱톡은 100자 안, 나머지 마케팅 화면은 PC 120자 · 휴대폰 110자 안(화면마다 지금 잰 숫자를 한도로 — 올리지 않는다).
+ *   유튜브 자료를 받은 뒤 모양(대표가 실제로 보는 화면)도 잰다 — 준비 'sample' = [예시로 보기] 를 눌러 예시 채널 · 영상으로 채운 뒤.
+ *   한 곳만 120 · 110 을 넘는다: '남의 인기 영상 · 받은 뒤'(129 · 126) — 영상 세 편의 제목 · 조회수 · 급상승 표시가 목록 자료라서(제목 38자 + 예시 띠 8자).
+ *   더 줄이려면 영상을 두 편만 보이거나 제목을 가려야 한다 — 그러면 '많이 본 영상 1 · 2 · 3위' 가 안 보여 그대로 둔다(늘리지는 않는다).
  *
  *   node e2e/chars.mjs <baseUrl> [--json <file>] [--shots <dir>] [--only <이름 일부>] [--top <n>]
  */
@@ -31,8 +36,10 @@ export const TARGET = { PC: 200, phone: 150 }
 const T = 'T'
 
 /**
- * [묶음, 이름, 주소, PC 한도, 휴대폰 한도] — T = 목표(PC 200 · 휴대폰 150).
+ * [묶음, 이름, 주소, PC 한도, 휴대폰 한도, 준비] — T = 목표(PC 200 · 휴대폰 150).
  * 숫자 한도는 아직 못 고친 화면의 지금 글자 수(2026-11-18 [⋯] 모은 뒤 기준선) — 늘어나면 실패, 고치면 T 로 바꾼다.
+ * 마케팅 줄의 숫자는 D-630 한도(목표보다 낮다 — 2026-11-18 잰 숫자 · 올리지 않는다).
+ * 준비 'sample' = 유튜브 자료를 받은 뒤 모양([예시로 보기] 를 누른 뒤 — 예시 띠 '예시 데이터예요.' 8자가 더 들어 있다).
  */
 export const CHAR_SCREENS = [
   ['오늘', '확인할 것', '/ops/decide', T, T],
@@ -49,16 +56,18 @@ export const CHAR_SCREENS = [
   ['영업', '영업자 정산', '/ops/agents', T, T],
   ['영업', '매출 · 비용', '/money', T, T],
   ['영업', '1차 미팅 체크리스트', '/sales/first-meeting', T, T],
-  ['마케팅', '마케팅 첫 화면', '/marketing', T, T],
-  ['마케팅', '유튜브', '/marketing?view=plan', T, T],
-  ['마케팅', '내 콘텐츠', '/marketing?view=make', T, T],
-  ['마케팅', '1주일치', '/marketing?week=1', T, T],
-  ['마케팅', '스레드', '/marketing/threads', T, T],
-  ['마케팅', '릴스 · 틱톡', '/marketing/shorts', T, T],
-  ['마케팅', '남의 인기 영상', '/marketing/youtube?view=top', T, T],
-  ['마케팅', '기초 7가지', '/marketing/basics', T, T],
-  ['마케팅', '홍보 글', '/tools/content', T, T],
-  ['마케팅', '홈페이지', '/tools/homepage', T, T],
+  ['마케팅', '마케팅 첫 화면', '/marketing', 104, 102],
+  ['마케팅', '유튜브', '/marketing?view=plan', 63, 63],
+  ['마케팅', '유튜브 · 주제 받은 뒤', '/marketing?view=plan', 100, 100, 'sample'],
+  ['마케팅', '내 콘텐츠', '/marketing?view=make', 99, 99],
+  ['마케팅', '1주일치', '/marketing?week=1', 89, 82],
+  ['마케팅', '스레드', '/marketing/threads', 83, 83],
+  ['마케팅', '릴스 · 틱톡', '/marketing/shorts', 87, 87],
+  ['마케팅', '남의 인기 영상', '/marketing/youtube?view=top', 67, 64],
+  ['마케팅', '남의 인기 영상 · 받은 뒤', '/marketing/youtube?view=top', 129, 126, 'sample'],
+  ['마케팅', '기초 7가지', '/marketing/basics', 95, 95],
+  ['마케팅', '홍보 글', '/tools/content', 109, 109],
+  ['마케팅', '홈페이지', '/tools/homepage', 105, 105],
   ['전문 모듈', '정책자금', '/tools/policy-funding', T, T],
   ['전문 모듈', '고용지원금', '/tools/employment', T, T],
   ['전문 모듈', '연구소', '/tools/labcare', T, T],
@@ -134,7 +143,14 @@ for (const vp of [
     const limit = raw === T ? TARGET[vp.tag] : raw
     await page.goto(BASE + path, { waitUntil: 'networkidle' }).catch(() => {})
     await page.waitForTimeout(800)
+    // D-630 준비 'sample' — 유튜브 자료를 받은 뒤 모양(예시 채널 · 영상). 단추를 누른 자리에 줄이 생겨 마우스 미리 보기가 뜨지 않게 마우스를 치우고 잰다
+    if (s[5] === 'sample') {
+      const sample = page.getByTestId('yt-sample')
+      if (await sample.count()) await (vp.width < 768 ? sample.first().tap() : sample.first().click())
+      await page.waitForTimeout(900)
+    }
     await page.mouse.move(0, 0)
+    if (s[5]) await page.waitForTimeout(600)
     await page.evaluate(() => window.scrollTo(0, 0))
     const m = await page.evaluate(countChars, TOPN)
     if (!m) {
@@ -142,7 +158,8 @@ for (const vp of [
       continue
     }
     out.push({ vp: vp.tag, group, name, path, limit, target: raw === T, ...m })
-    const tag = raw === T ? '목표' : '아직(기준선)'
+    // 숫자 한도가 목표보다 낮으면 '더 엄격한 한도'(D-630 마케팅), 목표보다 높으면 아직 못 내린 기준선
+    const tag = raw === T ? '목표' : raw <= TARGET[vp.tag] ? '목표보다 엄격' : '아직(기준선)'
     check(`${vp.tag} ${name} ${m.all}자 ≤ ${limit}자 [${tag}]`, m.all <= limit, { path, top: m.top })
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/${vp.tag}-${name.replace(/[^가-힣a-z0-9]+/gi, '_')}.png`, fullPage: true })
   }
@@ -150,7 +167,7 @@ for (const vp of [
   await ctx.close()
 }
 await browser.close()
-const done = CHAR_SCREENS.filter((s) => s[3] === T && s[4] === T).length
+const done = CHAR_SCREENS.filter((s) => (s[3] === T || s[3] <= TARGET.PC) && (s[4] === T || s[4] <= TARGET.phone)).length
 console.log(`\n목표(PC ${TARGET.PC} · 휴대폰 ${TARGET.phone})까지 내린 화면: ${done} / ${CHAR_SCREENS.length}`)
 if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify(out, null, 2))
 console.log(`chars: ${pass} passed, ${fail} failed`)

@@ -155,10 +155,20 @@ const openThreads = async (page, q = '') => {
   await page.goto(`${BASE}/marketing/threads${q}`, { waitUntil: 'networkidle' })
   await page.getByTestId('thr-write').waitFor({ timeout: 15000 })
 }
-const startHand = async (page) => {
-  if ((await page.getByTestId('thr-body').count()) === 0) await page.getByTestId('thr-hand').click()
-  await page.getByTestId('thr-body').waitFor()
+/**
+ * D-630 들어오면 1단계만 — 글 칸(2단계)은 [직접 쓰기](글이 없을 때) 또는 맨 위 '쓰던 글 [이어서 쓰기]'(글이 남아 있거나 다른 기기에서 왔을 때)를 눌러야 열린다.
+ * pre: thr(스레드 · 글 칸 thr-body) · sht(릴스/틱톡 · 대본 칸 sht-script). wait: 다른 기기 글이 내려와 [이어서 쓰기] 줄이 생길 때까지 기다릴 시간.
+ */
+const openEditor = async (page, pre = 'thr', wait = 0) => {
+  const box = page.getByTestId(pre === 'thr' ? 'thr-body' : 'sht-script')
+  if (await box.count()) return
+  const go = page.getByTestId(`${pre}-resume-go`)
+  if (wait) await go.waitFor({ timeout: wait }).catch(() => {})
+  if (await go.count()) await go.click()
+  else await page.getByTestId(`${pre}-hand`).click()
+  await box.waitFor({ timeout: 8000 }).catch(() => {})
 }
+const startHand = (page) => openEditor(page, 'thr')
 
 const errorsAll = []
 try {
@@ -175,11 +185,16 @@ try {
 
   // C2
   await openThreads(ph.page)
-  await ph.page.getByTestId('thr-body').waitFor({ timeout: 8000 }).catch(() => {})
+  // D-630 다른 기기 글이 내려와도 글 칸을 펼쳐 놓지 않는다 — 맨 위 한 줄 '쓰던 글 · 첫 줄 [이어서 쓰기]' + 알림. 누르면 그 글이 글 칸에
+  await ph.page.getByTestId('thr-resume-go').waitFor({ timeout: 8000 }).catch(() => {})
+  const c2entry = { body: await ph.page.getByTestId('thr-body').count(), line: ((await ph.page.getByTestId('thr-resume-line').innerText().catch(() => '')) ?? '').trim(), kind: await ph.page.getByTestId('thr-resume').getAttribute('data-kind').catch(() => '') }
+  await shot(ph.page, 'draft-phone-resume')
+  await openEditor(ph.page, 'thr')
   const phBody = await ph.page.getByTestId('thr-body').inputValue().catch(() => '')
   const note = await ph.page.getByTestId('thr-sync-note').innerText().catch(() => '')
   await shot(ph.page, 'draft-phone-note')
-  check('C2 휴대폰(빈 브라우저)에서 열면 PC 글이 그대로 · 이어서 열었어요 · PC · 되돌리기 없음', phBody === PC_TEXT && /다른 기기에서 쓰던 글을 이어서 열었어요 · .* PC/.test(note) && (await ph.page.getByTestId('thr-sync-undo').count()) === 0, { phBody, note })
+  check('C2a(D-630) 휴대폰(빈 브라우저)에서 열면 글 칸은 접힌 채 — 맨 위 "쓰던 글 · PC 글 첫 줄 [이어서 쓰기]"', c2entry.body === 0 && c2entry.kind === 'local' && PC_TEXT.startsWith(c2entry.line) && c2entry.line.length >= 10, c2entry)
+  check('C2 [이어서 쓰기] → PC 글이 그대로 · 이어서 열었어요 · PC · 되돌리기 없음', phBody === PC_TEXT && /다른 기기에서 쓰던 글을 이어서 열었어요 · .* PC/.test(note) && (await ph.page.getByTestId('thr-sync-undo').count()) === 0, { phBody, note })
 
   // C3
   const PH_TEXT = PC_TEXT + '\n휴대폰에서 덧붙인 줄'
@@ -209,6 +224,7 @@ try {
   check('C5a 저장 실패 → \'이 기기에만 남겼어요\' 한 줄 · 클라우드는 예전 글', failShown && /이 기기에만 남겼어요/.test(failText) && draftRow('threads')?.payload?.draft?.body === PC_TEXT, failText)
   await pc.page.reload({ waitUntil: 'networkidle' })
   await pc.page.getByTestId('thr-write').waitFor()
+  await openEditor(pc.page, 'thr', 5000) // D-630 새로 고치면 글 칸은 접힌 채 — 맨 위 [이어서 쓰기]
   await pc.page.getByTestId('thr-body').waitFor()
   const kept = await pc.page.getByTestId('thr-body').inputValue()
   check('C5b 새로 고쳐도(클라우드 읽기도 실패) 적은 글 그대로', kept === OFF_TEXT && (await pc.page.getByTestId('thr-sync-failed').count()) === 1, kept.slice(-20))
@@ -233,6 +249,7 @@ try {
   await pc.page.getByTestId('sht-script').fill(SH)
   const up7 = await waitFor(() => draftRow('shorts')?.payload?.draft?.script === SH)
   await ph.page.goto(`${BASE}/marketing/shorts`, { waitUntil: 'networkidle' })
+  await openEditor(ph.page, 'sht', 8000) // D-630 PC 대본이 내려오면 맨 위 '쓰던 대본 [이어서 쓰기]'
   await ph.page.getByTestId('sht-script').waitFor({ timeout: 8000 }).catch(() => {})
   const phSh = await ph.page.getByTestId('sht-script').inputValue().catch(() => '')
   check('C7 릴스/틱톡 대본도 PC → 클라우드 → 휴대폰 · 이어서 열었어요', up7 && phSh === SH && (await ph.page.getByTestId('sht-sync-note').count()) === 1, { phSh })
@@ -245,6 +262,7 @@ try {
   await pc.page.getByTestId('thr-ref-box').locator('summary').click()
   const REF_TEXT = '남의 잘 된 글 — 올라가면 안 됨'
   await pc.page.getByTestId('thr-ref-box').locator('textarea').fill(REF_TEXT)
+  await openEditor(pc.page, 'thr')
   await pc.page.getByTestId('thr-body').fill('참고 글 시험 본문')
   await waitFor(() => draftRow('threads')?.payload?.draft?.body === '참고 글 시험 본문')
   const leaked = cloud.writes.some((w) => JSON.stringify(w.payload).includes(REF_TEXT))
@@ -264,6 +282,7 @@ try {
   const upA = await waitFor(() => draftRow('threads')?.payload?.draft?.body === A_TEXT)
   const atA = draftRow('threads')?.payload?.at ?? ''
   await openThreads(B.page)
+  await openEditor(B.page, 'thr', 8000)
   await B.page.getByTestId('thr-body').waitFor({ timeout: 8000 }).catch(() => {})
   const B_TEXT = A_TEXT + '\n휴대폰이 그 뒤 고친 줄'
   await B.page.getByTestId('thr-body').fill(B_TEXT)

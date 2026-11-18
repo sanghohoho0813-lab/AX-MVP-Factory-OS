@@ -18,6 +18,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { openTools } from './pageTools.mjs'
+import { openMkEntryFolds } from './support/mkOpen.mjs'
 
 const SHOTS = process.argv[2] ?? ''
 if (SHOTS) mkdirSync(SHOTS, { recursive: true })
@@ -1239,6 +1240,8 @@ try {
     for (const p of ['/marketing', '/marketing/youtube', '/marketing/youtube?view=analysis', '/marketing/threads', '/marketing/shorts', '/marketing/basics']) {
       await go(page, p)
       await page.waitForTimeout(600)
+      // D-630 마케팅은 들어오면 한 가지만 — 예전에 첫 화면에 있던 본업 주제 · 직접 주제 · 형식 고르기는 접힌 [더 보기] 안. 펼친 채로 본다(시험을 약하게 하지 않는다)
+      await openMkEntryFolds(page)
       const t = await bodyText(page)
       const main = (await page.locator('main').innerText().catch(() => '')) ?? ''
       const ow = main.match(OWNER_WORDS)?.[0] ?? ''
@@ -1909,6 +1912,8 @@ try {
     await shot(pk, 'customer-06-marketing-start')
     await go(pk, '/marketing/youtube?view=plan')
     await pk.waitForTimeout(900)
+    // D-630 [더 보기] › [자세히 보기] 까지 펼친 뒤에 본다 — 접힌 채로는 AI 키워드 판 · 본업 주제가 원래 안 보여서 시험이 약해진다
+    await openMkEntryFolds(pk)
     const planK = await mainText(pk)
     check('고객 마케팅(D-564): 이번 주 찍을 것 — AI 키워드 판 · AI 주제 줄 없음(스스로 AI 분야를 고르기 전) · 대표 이름 0 · AX 0', (await pk.getByTestId('radar-ai-keywords').count()) === 0 && (await pk.locator('[data-testid="radar-opp"][data-axis="axai"], [data-testid="radar-opp"][data-axis="bridge"]').count()) === 0 && !OWNER_WORDS.test(planK) && (await axIn(pk)).length === 0, `${(planK.match(OWNER_WORDS) ?? []).join()} ai-board=${await pk.getByTestId('radar-ai-keywords').count()}`)
     await shot(pk, 'customer-07-marketing-plan')

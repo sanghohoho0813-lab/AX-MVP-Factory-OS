@@ -159,11 +159,13 @@ export function WeekView({
   }
   const postedN = [...posts.values()].filter((p) => p.status === 'posted').length
   // D-356 탭은 주소에(?wt=) — 뒤로 가기 · 새로 고침에도 보던 탭 그대로
+  // D-630 대표 "마케팅은 들어갔을 때 아직 많다 — 딱 한 가지만" — 들어오면 묶음 머리 + 탭 넷만(고른 탭 없음).
+  //   탭을 누르면 그 형식이 아래에 나온다(주소에 ?wt= — 긴 영상도 wt=long). 고른 탭을 한 번 더 누르면 접힌다.
   const [params, setParams] = useSearchParams()
-  const tab: WeekTab = WEEK_TABS.includes(params.get('wt') as WeekTab) ? (params.get('wt') as WeekTab) : 'long'
-  const pickTab = (t: WeekTab) => {
+  const tab: WeekTab | '' = WEEK_TABS.includes(params.get('wt') as WeekTab) ? (params.get('wt') as WeekTab) : ''
+  const pickTab = (t: WeekTab, toggle = false) => {
     const next = new URLSearchParams(params)
-    if (t === 'long') next.delete('wt')
+    if (toggle && t === tab) next.delete('wt')
     else next.set('wt', t)
     setParams(next, { replace: true })
   }
@@ -171,6 +173,11 @@ export function WeekView({
   const goTo = (kind: 'long' | 'short' | 'thread', anchor: string) => {
     pickTab(kind === 'long' ? 'long' : kind === 'short' ? 'shorts' : 'threads')
     window.setTimeout(() => scrollTo(anchor), 60)
+  }
+  /** D-630 [AI로 1주일치 다 쓰기] — 고른 탭이 없으면 첫 탭(긴 영상)을 펼친다(한 번 누르면 쓰는 글이 바로 아래에 보이게) */
+  const runAiOpen = () => {
+    runAi()
+    if (canAi && !tab) pickTab('long')
   }
 
   if (past && !saved)
@@ -276,7 +283,7 @@ export function WeekView({
                   ) : (
                     <>
                       <AiConfirm>
-                        <Button size="sm" variant={saved ? 'secondary' : 'primary'} onClick={runAi} title="긴 영상 · 쇼츠 · 스레드를 검증된 방법대로 한 번에 써요. 누르기 전에는 부르지 않아요." data-testid="mk-week-run" data-guide="fn-mk-week-run">
+                        <Button size="sm" variant={saved ? 'secondary' : 'primary'} onClick={runAiOpen} title="긴 영상 · 쇼츠 · 스레드를 검증된 방법대로 한 번에 써요. 누르기 전에는 부르지 않아요." data-testid="mk-week-run" data-guide="fn-mk-week-run">
                           {saved ? <RotateCcw aria-hidden="true" className="size-4" /> : <Sparkles aria-hidden="true" className="size-4" />}
                           {saved ? 'AI로 다시 쓰기' : 'AI로 1주일치 다 쓰기'}
                         </Button>
@@ -376,7 +383,7 @@ export function WeekView({
               type="button"
               role="tab"
               aria-selected={on}
-              onClick={() => pickTab(t.key)}
+              onClick={() => pickTab(t.key, true)}
               className={`tap flex min-h-14 min-w-0 items-center gap-2 rounded-(--radius-control) border px-3 py-2 text-left ${on ? 'border-brand-600 bg-brand-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-800 hover:border-brand-200'}`}
               data-testid="mk-week-tab"
               data-tab={t.key}
@@ -397,6 +404,8 @@ export function WeekView({
         })}
       </div>
 
+      {/* D-630 탭을 고르기 전에는 아래 칸을 그리지 않는다(들어오면 묶음 머리 + 탭 넷) */}
+      {tab && (
       <div role="tabpanel" className="flex min-w-0 flex-col gap-3" data-testid="mk-week-panel" data-tab={tab}>
         {tab === 'long' && (
           <section id="mk-week-long" className="scroll-mt-32" data-testid="mk-week-long" data-ai={week.long.ai ? '1' : '0'}>
@@ -495,6 +504,7 @@ export function WeekView({
           </section>
         )}
       </div>
+      )}
 
       {/* 도구 · 점검 요약 — 탭 아래 한 줄. D-627 접힌 한 줄(전체 복사 · 내려받기 · 점수) — 누르면 그 안에(같은 시험 이름) */}
       <details className="border-t border-slate-200 pt-2" data-testid="mk-week-tools" open={toolsOpen} onToggle={(e) => setToolsOpen((e.currentTarget as HTMLDetailsElement).open)}>

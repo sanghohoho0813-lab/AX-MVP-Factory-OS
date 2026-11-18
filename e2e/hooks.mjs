@@ -16,6 +16,7 @@ import { chromium } from 'playwright'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { seedScript } from './seed.mjs'
+import { openQsMore } from './support/mkOpen.mjs'
 
 const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
 const { default: handler, __resetAiAssistState } = await fromRoot('api/ai-assist.js')
@@ -105,11 +106,14 @@ await clearDrafts(page)
 /* ---------------- H 스레드 ---------------- */
 await page.goto(BASE + '/marketing/threads', { waitUntil: 'networkidle' })
 await page.getByTestId('thr-qs').waitFor({ timeout: 15000 })
+// D-630 첫마디 10개 단추는 1단계 맨 아래 접힌 [더 보기] 안 — 들어왔을 때는 없고, 한 번 펼치면 단추 한 줄
+const hooksAtEntry = await page.getByTestId('thr-hooks').count()
+await openQsMore(page, 'thr')
 const prim = await page.evaluate(() => {
   const ed = document.getElementById('thr-editor')?.getBoundingClientRect().top ?? Infinity
   return [...document.querySelectorAll('main button.bg-brand-600')].filter((b) => b.getBoundingClientRect().height > 0 && b.getBoundingClientRect().top < ed).map((b) => b.getAttribute('data-testid'))
 })
-check('H1 평소엔 단추 한 줄(접힘) · 글 칸 위 주 단추는 [AI로 바로 쓰기] 하나 그대로 · 첫마디 목록은 아직 없음', (await page.getByTestId('thr-hooks').getAttribute('data-open')) === '0' && (await page.getByTestId('thr-hooks-open').isVisible()) && prim.join() === 'thr-qs-ai' && (await page.getByTestId('thr-hook').count()) === 0, prim)
+check('H1 들어오면 첫마디 단추 0(D-630 [더 보기] 안) · 펼치면 단추 한 줄(접힘) · 글 칸 위 주 단추는 [AI로 바로 쓰기] 하나 그대로 · 첫마디 목록은 아직 없음', hooksAtEntry === 0 && (await page.getByTestId('thr-hooks').getAttribute('data-open')) === '0' && (await page.getByTestId('thr-hooks-open').isVisible()) && prim.join() === 'thr-qs-ai' && (await page.getByTestId('thr-hook').count()) === 0, prim)
 const aiY0 = await page.getByTestId('thr-qs-ai').evaluate((e) => Math.round(e.getBoundingClientRect().top + window.scrollY))
 await page.getByTestId('thr-hooks-open').click()
 check('H2 펼치면 — 주제가 없으면 "주제를 먼저" 안내 · 누구에게 칩 · 방향 6가지 · [AI로 바로 쓰기] 자리 그대로', (await page.getByTestId('thr-hooks').getAttribute('data-open')) === '1' && (await page.getByTestId('thr-hooks-empty').isVisible()) && (await page.getByTestId('thr-hooks-target').count()) >= 3 && (await page.getByTestId('thr-hooks-aim').count()) === 6 && (await page.getByTestId('thr-qs-ai').evaluate((e) => Math.round(e.getBoundingClientRect().top + window.scrollY))) === aiY0)
@@ -171,6 +175,7 @@ check('A5 [닫기] → 다시 단추 한 줄', (await page.getByTestId('thr-hook
 await page.goto(BASE + '/marketing/shorts', { waitUntil: 'networkidle' })
 await page.getByTestId('sht-qs').waitFor({ timeout: 15000 })
 await page.getByTestId('sht-qs-topic').fill('벤처기업확인')
+await openQsMore(page, 'sht')
 await page.getByTestId('sht-hooks-open').click()
 const sl = await lineTexts(page, 'sht')
 check('S1 릴스 · 틱톡 — 짧은 첫마디 10개(평균 18자 안) · 누구에게는 이 기기에 기억(스레드에서 고른 것)', sl.length === 10 && sl.reduce((a, l) => a + l.length, 0) / sl.length < 18 && (await page.getByTestId('sht-hooks-target').nth(1).getAttribute('aria-pressed')) === 'true', sl)
@@ -198,6 +203,7 @@ for (const [w, big] of [[390, false], [360, true]]) {
   await mp.getByTestId('thr-qs').waitFor({ timeout: 15000 })
   if (big) await mp.evaluate(() => document.documentElement.setAttribute('data-text-scale', 'extra_large'))
   await mp.getByTestId('thr-qs-topic').fill('창업 3년 안 벤처기업확인 세금')
+  await openQsMore(mp, 'thr')
   await mp.getByTestId('thr-hooks-open').click()
   await mp.getByTestId('thr-hook').first().waitFor({ timeout: 5000 })
   const small = await mp.evaluate(() => {

@@ -14,6 +14,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import fs from 'node:fs'
 import { seedScript } from './seed.mjs'
+import { openMkDetail } from './support/mkOpen.mjs'
 
 const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
 const { default: handler, __resetAiAssistState } = await fromRoot('api/ai-assist.js')
@@ -165,6 +166,8 @@ async function openPlan(p) {
     await sample.first().click()
     await p.waitForTimeout(900)
   }
+  // D-630 예전 판(시장 신호 · 추천 기준)은 판 맨 아래 [더 보기] › [자세히 보기] 안 — 들어올 때마다 접힌 채라 두 번 눌러 펼친다
+  await openMkDetail(p)
   await p.getByTestId('radar-plan').waitFor({ timeout: 10000 })
 }
 const kitCalls = () => llm.filter((x) => x.sys.includes('(radar.kit'))

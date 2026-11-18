@@ -20,6 +20,7 @@
  *   node e2e/pack-cloud.mjs            (dist-qa-pack 으로 따로 빌드하고 4538 에 띄운다)
  */
 import { mkTab } from './support/mkTabs.mjs'
+import { openPlanInside, showAllTop } from './support/mkOpen.mjs'
 import { chromium } from 'playwright'
 import { spawn, execSync } from 'node:child_process'
 
@@ -281,6 +282,8 @@ const openPlan = async (page) => {
     await sample.first().click()
     await page.waitForTimeout(900)
   }
+  // D-630 [자세히 보기] 는 판 맨 아래 [더 보기] 안 · 들어올 때마다 접힌 채 — 두 줄을 펼친 뒤 본다
+  await openPlanInside(page)
   await page.getByTestId('radar-plan').waitFor({ timeout: 10000 })
 }
 /** D-613 · D-616 이번 주 뜨는 주제 줄 — 접혀 있으면 눌러 펼친 채로(고정) */
@@ -398,6 +401,8 @@ try {
     await page.waitForTimeout(900)
     await mkTab(page, 'yt-view-top')
     await page.waitForTimeout(400)
+    // D-630 인기 영상은 처음 세 편만 — 나머지는 [n편 더 보기]
+    await showAllTop(page)
     await page.locator('[data-testid="yt-card"]').filter({ hasText: '세무 기장 수수료 전부 공개' }).first().getByTestId('yt-card-thumb').click()
     await page.getByTestId('radar-video-detail').waitFor()
   }

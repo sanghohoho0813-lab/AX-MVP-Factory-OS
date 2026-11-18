@@ -208,7 +208,7 @@ const ideaHref = (id: string) => `/marketing?view=make&idea=${encodeURIComponent
 /** D-507 탭마다 '이 화면은' 한 줄 — 무엇을 해 주는 곳인지 · 무엇을 누르면 어떻게 되는지(쉬운 말) */
 // D-627 한 줄은 짧게(30자 안) — 더 긴 설명은 ?(tip)
 const RADAR_GUIDE: Record<Exclude<View, 'plan'>, { what: string; tip?: string; steps?: string[] }> = {
-  top: { what: '요즘 많이 본 남의 유튜브 영상이에요.', tip: '남의 유튜브에서 요즘 많이 본 영상을 모아 보여 줘요. 제목을 누르면 왜 잘됐는지 · 영상 정보가 열려요.' },
+  top: { what: '요즘 많이 본 남의 영상이에요.', tip: '남의 유튜브에서 요즘 많이 본 영상을 모아 보여 줘요. 제목을 누르면 왜 잘됐는지 · 영상 정보가 열려요.' },
   channels: { what: '주제를 고를 때 보는 유튜브 채널이에요.', tip: '이번 주 주제를 고를 때 살펴보는 유튜브 채널 목록이에요. 평소엔 그대로 두셔도 되고, 보고 싶은 채널이 있으면 [+ 채널 추가] 로 더해요.' },
   analysis: { what: '잘된 영상의 요일 · 시간 · 길이예요.', tip: '참고 채널 영상이 어느 요일 · 몇 시 · 몇 분 길이일 때 잘됐는지 보여 줘요. 우리 영상 올릴 때 · 길이를 정할 때 보세요.' },
   make: { what: '만든 대본 · 글이 모두 모이는 곳이에요.', steps: ['하나 누르기', '찍고 · 올리기', '[게시 완료] 누르기'] },
@@ -812,7 +812,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           title="마케팅 · 브랜딩"
           showOnPhone
           descriptionAsHint
-          description={mkText('주제 하나를 누르면 제목 · 유튜브 대본 · 짧은 영상(릴스) 대본 · 블로그 글 · 카드뉴스 · 올릴 때 쓰는 글이 한 번에 나옵니다. 주제는 참고 채널(남의 인기 유튜브)의 최근 영상을 6시간마다 새로 받아, 여러 채널에서 함께 오르고 평소보다 잘된 것을 근거와 함께 고릅니다(규칙 계산). 근거 · 관련 영상 · 시장 신호는 [유튜브] 아래 [자세히 보기] 에 있습니다.')}
+          description={mkText('주제 하나를 누르면 제목 · 유튜브 대본 · 짧은 영상(릴스) 대본 · 블로그 글 · 카드뉴스 · 올릴 때 쓰는 글이 한 번에 나옵니다. 주제는 참고 채널(남의 인기 유튜브)의 최근 영상을 6시간마다 새로 받아, 여러 채널에서 함께 오르고 평소보다 잘된 것을 근거와 함께 고릅니다(규칙 계산). 근거 · 관련 영상 · 시장 신호는 [유튜브] 화면 맨 아래 [더 보기] › [자세히 보기] 에 있습니다.')}
           // D-251 첫 화면(이번 주 키워드)에서는 새로 가져오기 · CSV 를 [자세히 보기] 안으로 — 다른 탭 · 아직 못 받았을 때는 그대로 위에
           // D-507 내 콘텐츠(만든 것 모음)에는 유튜브 새로 가져오기 · CSV 가 필요 없다 — 헷갈리지 않게 숨김
           // 휴대폰에서는 맨 위 [지금 새로 가져오기] · [CSV] 를 접는다(6시간마다 저절로 새로 · 첫 화면 [자세히 보기] 안에 그대로) — 첫 화면 한 줄을 아낀다
@@ -1063,7 +1063,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             resume={null}
             // D-630 받은 때 · 채널 · 영상 수는 [더 보기] 안 작은 글 · 못 받았을 때 안내(예시로 보기)는 목록 자리 바로 아래
             meta={prepared ? <FeedMeta prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} /> : undefined}
-            below={!prepared ? <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} /> : undefined}
+            below={!prepared ? <SetupCard plain status={yt.status} message={yt.message} onSample={yt.showSample} /> : undefined}
             interests={{ picked: prefs.interests ?? [], topics: interestIds, readOnly, onSave: (ids) => savePrefs({ ...prefs, interests: ids }) }}
             // D-251 대표 "키워드 1등이 뭐고 왜 그런 거고 관련 영상은 뭐고 이런 건 다 아래에 몰아서" — 예전 첫 화면 전부를 [자세히 보기] 한 곳에
             // D-603 따로 떨어진 판(panel) 대신 위 판 맨 아래 한 줄 — 접힘 · 펼침 기억은 그대로(mk-more)
@@ -1180,15 +1180,16 @@ function FeedButton({ onClick, disabled, title, testId, icon, children }: { onCl
   )
 }
 
-function SetupCard({ status, message, onSample }: { status: string; message: string; onSample: () => void }) {
+/** plain(D-630) — 다른 판 안(이번 주 뜨는 주제 판)에 놓일 때 테두리 칸 없이(상자 안 상자 0) */
+function SetupCard({ status, message, onSample, plain = false }: { status: string; message: string; onSample: () => void; plain?: boolean }) {
   if (status === 'loading' || status === 'idle')
     return (
-      <p className="t-body flex items-center gap-2 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-6 text-slate-600" data-testid="yt-loading">
+      <p className={`t-body flex items-center gap-2 text-slate-600 ${plain ? 'py-2' : 'rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-6'}`} data-testid="yt-loading">
         <RefreshCw aria-hidden="true" className="size-5 animate-spin text-brand-600" /> 유튜브에서 받아 오는 중… (처음에는 20초쯤 걸립니다)
       </p>
     )
   return (
-    <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5" data-testid="yt-setup" data-status={status}>
+    <section className={`flex flex-col gap-3 ${plain ? '' : 'rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5'}`} data-testid="yt-setup" data-status={status}>
       <p className="t-body flex items-start gap-2 break-keep text-slate-800">
         <TriangleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-warning-600" />
         <span>{message || '유튜브 데이터를 아직 받지 못했습니다.'}</span>
@@ -1514,14 +1515,15 @@ function TopView({
         </p>
       ) : (
         <>
-          <ol className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5" data-testid="yt-grid">
+          {/* D-630 접힌 채(세 편)는 세 칸으로 한 줄을 채운다 — 펼치면 예전 칸 수(4 · 5칸) */}
+          <ol className={`grid grid-cols-1 gap-2.5 ${cut ? 'sm:grid-cols-3' : 'sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5'}`} data-testid="yt-grid" data-cut={cut ? '1' : '0'}>
             {rows.map((v, i) => (
               <VideoCard key={v.id} v={v} r={rv.get(v.id)} rank={i + 1} rising={isRising(v, board.periodAvg)} noThumb={sample} onOpen={onOpen} />
             ))}
           </ol>
           {cut && (
             <button type="button" onClick={() => setMoreKey(listKey)} className="tap t-body flex min-h-12 w-full items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:border-brand-400" data-testid="yt-top-more">
-              나머지 {board.rows.length - TOP_FIRST}편 더 보기 <ChevronDown aria-hidden="true" className="size-5" />
+              {board.rows.length - TOP_FIRST}편 더 보기 <ChevronDown aria-hidden="true" className="size-5" />
             </button>
           )}
         </>
