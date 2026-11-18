@@ -647,7 +647,8 @@ function d241Tests() {
   // D-632 대표: "따라 할 틀 3개가 왜 계속 시연 샘플 화면 · 3단계 · 3칸 체크리스트 · 4칸 대시보드로만 나오나" — 같은 찍기 키트 뼈대가 후보마다 되풀이됐다
   {
     const rows = (sec('이번 주 찍을 후보')?.rows ?? []) as Record<string, unknown>[]
-    const skel = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x).replace(/["“][^"”]*["”]/g, '"…"').replace(/\s—\s.*$/, '')).join(' / ') : '')
+    // D-633 뼈대 = 구간 시각 순서(주제 낱말이 달라도 같은 틀이면 같은 뼈대)
+    const skel = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x).split(' ')[0]).join(' · ') : '')
     const arrays = rows.map((r) => skel(r.구성_규칙)).filter(Boolean)
     const strings = rows.filter((r) => typeof r.구성_규칙 === 'string').map((r) => String(r.구성_규칙))
     check('R6(D-632) 찍기 키트 뼈대(구성 · 쇼츠 3컷 · 준비)는 처음 나온 후보에만 — 같은 뼈대는 뒤 후보에 "○번 과 같은 뼈대" 한 줄',

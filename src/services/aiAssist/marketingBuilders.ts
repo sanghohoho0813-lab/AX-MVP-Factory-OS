@@ -128,10 +128,11 @@ export function radarBundle(i: RadarInput): AssistBundle {
    * D-632 찍기 키트(규칙)는 주제 축마다 같은 뼈대다 — 후보 8개 중 6개에 '0:00 결과 먼저 · 화면 녹화 · 3단계' 가 그대로 되풀이돼
    * AI 가 그 모양을 '이번 주 형식' 으로 알고 답마다 따라 했다. 같은 뼈대는 처음 나온 후보에만 싣고, 뒤에는 '○번과 같은 뼈대' 한 줄로.
    */
-  const skeleton = (xs: readonly string[]) => xs.map((x) => x.replace(/["“][^"”]*["”]/g, '"…"').replace(/\s—\s.*$/, '')).join(' / ')
+  // D-633 뼈대 = 구간 시각 순서(주제 낱말이 섞여도 같은 틀이면 같은 뼈대 — 예: 0:00 · 0:30 · 1:00 · 4:00 · 5:00) · 시각이 없는 줄(준비)은 따옴표 · 줄표 뒤를 뺀 글
+  const skeleton = (xs: readonly string[], times?: readonly string[]) => (times?.length ? times.join(' · ') : xs.map((x) => x.replace(/["“][^"”]*["”]/g, '"…"').replace(/\s—\s.*$/, '')).join(' / '))
   const seenKit = new Map<string, string>()
-  const onceKit = (kind: string, ref: string, xs: string[]): string[] | string => {
-    const key = `${kind}:${skeleton(xs)}`
+  const onceKit = (kind: string, ref: string, xs: string[], times?: readonly string[]): string[] | string => {
+    const key = `${kind}:${skeleton(xs, times)}`
     const first = seenKit.get(key)
     if (first) return `${first} 과 같은 뼈대(규칙) — 다시 싣지 않음`
     seenKit.set(key, ref)
@@ -158,8 +159,8 @@ export function radarBundle(i: RadarInput): AssistBundle {
           [isMarketingCustomer() ? '관점_규칙' : '미래AI랩관점_규칙']: safeText(o.view, [], 300),
           잘된틀_우리제목: kit.frames.slice(0, 3).map((f) => `${f.label} → ${f.mine}`),
           첫문장_규칙: safeText(kit.hook, [], 160),
-          구성_규칙: onceKit('구성', ref, kit.outline.map((st) => `${st.at} ${st.what}`)),
-          쇼츠3컷_규칙: onceKit('쇼츠', ref, kit.shorts.map((st) => `${st.at} ${st.what}`)),
+          구성_규칙: onceKit('구성', ref, kit.outline.map((st) => `${st.at} ${st.what}`), kit.outline.map((st) => st.at)),
+          쇼츠3컷_규칙: onceKit('쇼츠', ref, kit.shorts.map((st) => `${st.at} ${st.what}`), kit.shorts.map((st) => st.at)),
           형식: kit.format,
           준비: onceKit('준비', ref, kit.prep.slice(0, 3)),
         }

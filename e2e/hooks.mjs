@@ -161,7 +161,8 @@ await page.locator('[data-testid="thr-hooks-aim"][data-aim="curious"]').click()
 await twice(page.getByTestId('thr-hooks-ai-run'))
 await page.waitForFunction(() => /AI가 쓴/.test(document.querySelector('[data-testid="thr-hooks-kind"]')?.textContent ?? ''), null, { timeout: 20000 })
 const call = llm.slice(b0).find((x) => x.sys.includes('(threads.hooks'))
-check('A1 [AI로 10개 새로 쓰기] 두 번 눌러 확인 → threads.hooks 한 번 · 스레드 규칙 · 운영 원칙 실림', llm.length - b0 === 1 && !!call && call.sys.includes('[스레드 규칙]') && call.sys.includes('[대표 운영 원칙'), llm.slice(b0).map((x) => x.sys.slice(0, 80)))
+// D-633 지시문 = 성공 공식 먼저 → 스레드 공식 → 꼭 지킬 것(운영 원칙 블록 없음)
+check('A1 [AI로 10개 새로 쓰기] 두 번 눌러 확인 → threads.hooks 한 번 · 성공 공식 먼저 · 스레드 공식 · 꼭 지킬 것 실림', llm.length - b0 === 1 && !!call && call.sys.includes('[성공 공식 먼저') && call.sys.includes('[성공 공식 요약 — 스레드]') && call.sys.includes('[꼭 지킬 것') && !call.sys.includes('[대표 운영 원칙'), llm.slice(b0).map((x) => x.sys.slice(0, 80)))
 check('A2 보낸 자료 — 주제 · 누구에게(고른 칩) · 방향(궁금하게) · 26가지 방법(이름 · 예시 틀) · 보낸 글에 키 0', !!call && /주제: 고용지원금/.test(call.user) && call.user.includes(`누구에게: ${tgt}`) && /방향: 궁금하게/.test(call.user) && /첫마디 방법 26가지 26건/.test(call.user) && /하지 마세요/.test(call.user) && !/gem-e2e-SECRET/.test(call.user + call.sys), call?.user.slice(0, 600))
 const aiLines = await lineTexts(page, 'thr')
 check('A3 AI 첫마디 10개가 목록에 · 방법 이름 · 까닭 · 부풀리는 말(역대급)에 빨간 표시 하나', aiLines.length === 10 && aiLines[0] === AI_HOOKS.items[0].title && (await page.getByTestId('thr-hook-warn').count()) === 1 && /역대급/.test(await page.getByTestId('thr-hook-warn').innerText()) && /순서를 놓치면/.test(await page.getByTestId('thr-hook-name').first().innerText()), aiLines)
@@ -188,7 +189,7 @@ const b1 = llm.length
 await twice(page.getByTestId('sht-hooks-ai-run'))
 await page.waitForFunction(() => /AI가 쓴/.test(document.querySelector('[data-testid="sht-hooks-kind"]')?.textContent ?? ''), null, { timeout: 20000 })
 const scall = llm.slice(b1).find((x) => x.sys.includes('(shorts.hooks'))
-check('S3 릴스 AI 는 shorts.hooks(숏폼 규칙) · 어디에 = 릴스 · 틱톡 첫마디', llm.length - b1 === 1 && !!scall && scall.sys.includes('[숏폼 규칙]') && /어디에: 릴스 · 틱톡/.test(scall.user), scall?.user.slice(0, 300))
+check('S3 릴스 AI 는 shorts.hooks(숏폼 공식) · 어디에 = 릴스 · 틱톡 첫마디', llm.length - b1 === 1 && !!scall && scall.sys.includes('[성공 공식 요약 — 릴스 · 틱톡]') && /어디에: 릴스 · 틱톡/.test(scall.user), scall?.user.slice(0, 300))
 
 /* ---------------- M 휴대폰 ---------------- */
 for (const [w, big] of [[390, false], [360, true]]) {

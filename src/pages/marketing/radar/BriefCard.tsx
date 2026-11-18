@@ -49,7 +49,7 @@ export function BriefCard({ brief, custom, readOnly, onSave, plain = false }: { 
     >
       <div className="flex flex-col gap-3">
         <p className="t-sub break-keep text-slate-600" data-testid="radar-brief-ai-note">
-          AI 는 위 칸(내가 하는 일)만 읽어요 — 주제 · 제목 · 말투 · 형식은 성공 공식대로 자유롭게 씁니다. 아래 칸은 규칙 초안에만 써요.
+          AI 는 'AI 가 읽는 칸'(내가 하는 일)만 읽어요 — 주제 · 제목 · 말투 · 형식은 성공 공식대로 자유롭게 씁니다. 맨 아래 칸들은 규칙 초안에만 써요.
         </p>
         {[
           { key: 'ai', title: 'AI 가 읽는 칸 — 내가 하는 일', fields: BRIEF_FIELDS.filter((f) => AI_BRIEF_KEYS.includes(f.key)) },

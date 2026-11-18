@@ -1539,7 +1539,8 @@ try {
   for (let i = 0; i < 30 && aiCalls.length === 0; i += 1) await p4.waitForTimeout(500)
   await p4.waitForTimeout(1500) // 정산까지
   const uiRows = sql(`select count(*) || ':' || coalesce(sum(units), 0) from public.ai_usage_ledger where user_id = '${PILOT.id}' and assist_id = 'threads.write' and status = 'settled'`)
-  check('D-555 구독 고객: 스레드 AI 지시문에 AX 0 · 컨설팅 글 규칙은 감', aiCalls.length === 1 && !/(?<![A-Za-z])AX(?![A-Za-z])/.test(aiCalls[0]?.sys ?? '') && (aiCalls[0]?.sys ?? '').includes('[컨설팅 글 규칙'), ((aiCalls[0]?.sys ?? '').match(AXW) ?? []).slice(0, 4))
+  // D-633 컨설팅 글 규칙은 [꼭 지킬 것](안전 4줄)로 — 고객에게도 같은 줄(AX 문구만 대표)
+  check('D-555 구독 고객: 스레드 AI 지시문에 AX 0 · 꼭 지킬 것(안전 줄)은 감 · 성공 공식 먼저', aiCalls.length === 1 && !/(?<![A-Za-z])AX(?![A-Za-z])/.test(aiCalls[0]?.sys ?? '') && (aiCalls[0]?.sys ?? '').includes('[꼭 지킬 것') && (aiCalls[0]?.sys ?? '').includes('[성공 공식 먼저'), ((aiCalls[0]?.sys ?? '').match(AXW) ?? []).slice(0, 4))
   check('SAAS-2 팀장 화면: 스레드 [AI로 바로 쓰기] 켜짐 → AI 한 번 · 지시문에 대표 이름 0 · DB 장부에 정산 1줄(글 쓰기 2단위)', qsEnabled && aiCalls.length === 1 && !OWNER_WORDS.test(aiCalls[0]?.sys ?? '') && uiRows === '1:2', `${qsEnabled} n=${aiCalls.length} ${uiRows}`)
   sql(`delete from public.ai_usage_ledger where user_id = '${PILOT.id}'`) // 아래 한도 시험을 0 부터(시험 DB 만)
   await go(p4, '/marketing/shorts')
@@ -1580,7 +1581,7 @@ try {
   check('SAAS-2 팀장 AI: 한도 12단위를 다 쓰면 429 quota_exceeded · AI 안 부름 · 장부 합계 12', over.statusCode === 429 && over.body.code === 'quota_exceeded' && aiCalls.length === 6 && sql(`select sum(units) from public.ai_usage_ledger where user_id = '${PILOT.id}' and status <> 'released'`) === '12', `${over.statusCode} ${over.raw.slice(0, 160)} n=${aiCalls.length}`)
   check('D-555 구독 고객: 레이더 AI 지시문에 AX 0', aiCalls.length >= 1 && aiCalls.every((c) => !/(?<![A-Za-z])AX(?![A-Za-z])/.test(c.sys)), aiCalls.map((c) => (c.sys.match(AXW) ?? []).slice(0, 2)))
   const ownRun = await assistDirect(OWNER, { requestId: 'req-saas2-e2e-owner01', assistId: 'radar.top5', page: 'radar', context: mkCtx })
-  check('D-555 대표 계정: 레이더 AI 지시문에 [컨설팅 · AX 글 규칙] 그대로', (aiCalls.at(-1)?.sys ?? '').includes('[컨설팅 · AX 글 규칙') && (aiCalls.at(-1)?.sys ?? '').includes('AX 뜻 ='))
+  check('D-555 대표 계정: 레이더 AI 지시문에 [꼭 지킬 것] + AX 문구(D-633) 그대로', (aiCalls.at(-1)?.sys ?? '').includes('[꼭 지킬 것') && (aiCalls.at(-1)?.sys ?? '').includes('AX 뜻 ='))
   check('SAAS-2 대표 AI: 장부에 대표 줄 0(대표는 세지 않음) · 대표 마케팅 그대로', ownRun.statusCode === 200 && sql(`select count(*) from public.ai_usage_ledger where user_id = '${OWNER.id}'`) === '0')
   await go(p4, '/settings')
   await p4.getByTestId('ai-usage-numbers').waitFor({ timeout: 8000 }).catch(() => {})

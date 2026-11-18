@@ -247,11 +247,12 @@ const calls = weekCalls().slice(n0)
 const ids = calls.map(idOf).sort()
 check('G2 여섯 갈래 동시 — 롱폼 1(radar.pack.video) · 숏폼 2(shorts.write) · 스레드 3(threads.write)', ids.join() === 'radar.pack.video,shorts.write,shorts.write,threads.write,threads.write,threads.write', ids)
 const longU = calls.find((c) => idOf(c) === 'radar.pack.video')?.user ?? ''
-check('G3 롱폼 자료 — 짝 1 본업 · 미끼 · 접목 · 채널 설계 기준 · 규칙집(AI 는 미끼, 끝은 본업) · 이번 주 계획(쇼츠로 자를 곳)', longU.includes(coreOf(pairs[0])) && longU.includes(hookOf(pairs[0])) && longU.includes('[자료 · 접목') && longU.includes('[자료 · 채널 설계 기준') && longU.includes('[규칙집]') && longU.includes('AI 는 미끼, 끝은 본업') && longU.includes('이번 주 계획') && longU.includes('쇼츠로 자를 곳'), longU.slice(0, 500))
+// D-633 접목 규칙 = 이번 주 흐름 × 내 업(이어지면 좋다 · 억지로 엮지 않는다)
+check('G3 롱폼 자료 — 짝 1 본업 · 미끼 · 접목 · 채널 설계 기준 · 규칙집(억지로 엮지 않음) · 이번 주 계획(쇼츠로 자를 곳)', longU.includes(coreOf(pairs[0])) && longU.includes(hookOf(pairs[0])) && longU.includes('[자료 · 접목') && longU.includes('[자료 · 채널 설계 기준') && longU.includes('[규칙집]') && longU.includes('억지로 엮지 않는다') && !longU.includes('AI 는 미끼, 끝은 본업') && longU.includes('이번 주 계획') && longU.includes('쇼츠로 자를 곳'), longU.slice(0, 500))
 const sh = calls.filter((c) => idOf(c) === 'shorts.write').map((c) => c.user)
 const shTik = sh.find((u) => u.includes('틱톡 · 유튜브 쇼츠')) ?? ''
 const shReels = sh.find((u) => u.includes('인스타 릴스')) ?? ''
-check('G4 쇼츠 자료 — 짝 1 · 틱톡/쇼츠 · 같은 주 롱폼(링크는 고정 댓글) / 짝 2 · 릴스 · 둘 다 관점 · 채널 설계 기준 · 접목 · 규칙집 · 레이더 숫자(근거) 없음', shTik.includes(pairs[0]) && shTik.includes('같은주롱폼') && shReels.includes(pairs[1]) && sh.every((u) => u.includes('이번 주 주제') && u.includes('[자료 · 채널 설계 기준') && u.includes('[자료 · 접목') && u.includes('AI 는 미끼, 끝은 본업') && !u.includes('근거_우리만')), sh.map((u) => u.slice(0, 200)))
+check('G4 쇼츠 자료 — 짝 1 · 틱톡/쇼츠 · 같은 주 롱폼(링크는 고정 댓글) / 짝 2 · 릴스 · 둘 다 관점 · 채널 설계 기준 · 접목 · 규칙집 · 레이더 숫자(근거) 없음', shTik.includes(pairs[0]) && shTik.includes('같은주롱폼') && shReels.includes(pairs[1]) && sh.every((u) => u.includes('이번 주 주제') && u.includes('[자료 · 채널 설계 기준') && u.includes('[자료 · 접목') && u.includes('억지로 엮지 않는다') && !u.includes('근거_우리만')), sh.map((u) => u.slice(0, 200)))
 const th = calls.filter((c) => idOf(c) === 'threads.write').map((c) => c.user)
 const tplOf = (u) => [...u.matchAll(/(\d)번 ([A-X]) /g)].map((m) => m[2]).join('')
 check('G5 스레드 자료 — 짝 셋 · 글마다 요일 목적 · 틀(ETX / DGQ / ISP) · 채널 설계 기준 · 접목 · 레이더 숫자 없음', th.map(tplOf).sort().join() === ['DGQ', 'ETX', 'ISP'].sort().join() && pairs.every((t) => th.some((u) => u.includes(t))) && th.every((u) => u.includes('저장 · 공유') || u.includes('관계 · 팔로워')) && th.every((u) => u.includes('[자료 · 채널 설계 기준') && u.includes('[자료 · 접목') && !u.includes('근거_우리만')), th.map(tplOf))
