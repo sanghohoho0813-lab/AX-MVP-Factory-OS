@@ -2085,9 +2085,6 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         </>
       )}
 
-      <StepNext pos={flowPos} onGo={(k) => setTab(k as DetailTab)} />
-
-
       {reportOpen && (
         <ClientReportSheet
           record={record}
@@ -2497,6 +2494,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
       </section>
 
       )}
+
+      {/* D-631 [다음: ○○] 은 화면 맨 끝에 — 개요에서는 '업체 정보 수정' 목차가 이 단추 아래에 따로 떨어져 있었다 */}
+      <StepNext pos={flowPos} onGo={(k) => setTab(k as DetailTab)} />
 
       {importOpen && (
         <Suspense fallback={null}>

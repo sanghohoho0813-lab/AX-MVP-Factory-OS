@@ -111,7 +111,8 @@ const TodayPosts = lazy(() => import('./marketing/radar/TodayPosts'))
 const weekDataNow = () => hasWeekData()
 
 /** D-159: 할 일이 4건 넘으면 휴대폰에서도 두 칸 — 여섯 건이면 세 줄로 끝난다 */
-const todoGridClass = (n: number) => `ax-stagger grid gap-2 ${n >= 4 ? 'grid-cols-2' : 'grid-cols-1'} lg:grid-cols-2`
+/** D-631: PC 에서 할 일이 하나뿐이면 넓게 — 반쪽에 몰리고 오른쪽 반이 비어 있었다(D-522 아래 약속 칸과 같은 규칙) */
+const todoGridClass = (n: number) => `ax-stagger grid gap-2 ${n >= 4 ? 'grid-cols-2' : 'grid-cols-1'} lg:grid-cols-2 lg:[&>*:only-child]:col-span-2`
 
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토']
 
