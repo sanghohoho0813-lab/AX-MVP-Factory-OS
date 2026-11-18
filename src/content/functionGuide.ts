@@ -634,6 +634,17 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     hiddenForPilot: true,
     basicHidden: true,
   },
+  // D-635 대표 설정 › 작업공간 — 가입 신청 승인 · 거절(팀장 · 고객 화면에는 없음)
+  'fn-signup-requests': {
+    label: '가입 신청',
+    menu: 'settings',
+    what: '로그인 화면에서 가입한 사람(이름 · 소속 · 한 줄 소개 · 이메일)이 여기 줄로 떠요. [승인] 한 번이면 그 사람 계정이 열리고, [거절] 하면 기록만 남아요.',
+    why: '다른 컨설턴트가 쓰기 시작할 때 대표님이 SQL 없이 앱에서 바로 허락하려고 있어요. 승인 전에는 아무 화면도 열리지 않아요.',
+    effect: '승인하면 그 사람만 쓰는 빈 작업공간이 생겨요(대표님 업체 · 자료는 안 보이고, 그 사람 자료도 대표님은 못 봐요). 거절해도 지우는 것은 없어서 나중에 승인할 수 있어요.',
+    next: '결제와 이어서, 결제한 사람은 승인 없이 열리게 해요.',
+    hiddenForPilot: true,
+    basicHidden: true,
+  },
   // L-27 · D-608 팀장 설정 — 대표님이 내 고객 자료를 보려면 내가 허락해야(외부 구독 고객 화면에는 없음)
   'fn-view-consent': {
     label: '대표님의 내 고객 자료 보기 허락',

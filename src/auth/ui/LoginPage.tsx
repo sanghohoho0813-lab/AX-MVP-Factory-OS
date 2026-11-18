@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Check, X } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
-import { signInWithPassword } from '../authService'
+import { resendSignupEmail, signInWithPassword } from '../authService'
 import {
   accountLabel,
   clearSwitchTarget,
@@ -28,6 +28,9 @@ export function LoginPage() {
   const [email, setEmail] = useState(target)
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  // D-635 메일 인증 전에 로그인하면 — 그 자리에서 [확인 메일 다시 받기]
+  const [unconfirmed, setUnconfirmed] = useState(false)
+  const [resent, setResent] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -53,10 +56,12 @@ export function LoginPage() {
     e.preventDefault()
     if (submitting) return
     setError(null)
+    setResent('')
     setSubmitting(true)
     const result = await signInWithPassword(email.trim(), password)
     if (!result.ok) {
       setError(result.errorMessage ?? '로그인에 실패했습니다.')
+      setUnconfirmed(result.errorKind === 'email_not_confirmed')
       setSubmitting(false)
       return
     }
@@ -133,6 +138,25 @@ export function LoginPage() {
       )}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
         <AuthError message={error} />
+        {unconfirmed && error && (
+          <div className="flex flex-wrap items-center gap-2" data-testid="login-resend">
+            <button
+              type="button"
+              disabled={submitting || !email.trim()}
+              onClick={() => {
+                setSubmitting(true)
+                void resendSignupEmail(email.trim()).then((r) => {
+                  setResent(r.ok ? `${email.trim()} 로 확인 메일을 다시 보냈어요. 스팸함도 확인해 주세요.` : (r.errorMessage ?? '보내지 못했어요. 잠시 뒤 다시 눌러 주세요.'))
+                  setSubmitting(false)
+                })
+              }}
+              className="inline-flex h-10 cursor-pointer items-center rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[0.9375rem] font-semibold text-brand-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              확인 메일 다시 받기
+            </button>
+            {resent && <span className="text-[0.9375rem] break-keep text-slate-700" role="status">{resent}</span>}
+          </div>
+        )}
         <AuthField
           id="email"
           label="이메일"

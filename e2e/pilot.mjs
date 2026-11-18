@@ -45,7 +45,12 @@ const CUSTOMER = { id: '0e000000-0000-4000-8000-0000000000d1', email: 'customer@
 // L-7 · D-610 가입하면 바로 쓰기 — 로그인 화면에서 스스로 가입하고 메일 확인까지 마친 두 사람(대표가 켜기 전 · 켠 뒤 · 자리 다 찬 뒤)
 const SELF1 = { id: '0e000000-0000-4000-8000-0000000000e1', email: 'self1@e2e.kr', password: 'self1-pass' }
 const SELF2 = { id: '0e000000-0000-4000-8000-0000000000e2', email: 'self2@e2e.kr', password: 'self2-pass' }
-const USERS = [OWNER, PILOT, OUTSIDER, CUSTOMER, SELF1, SELF2]
+// D-635 가입 신청 → 대표가 앱에서 승인 · 거절 — APPLY1 은 로그인 화면 가입 폼으로 가입(메일 확인 전 → 확인), APPLY2 는 거절했다가 승인
+const APPLY1 = { id: '0e000000-0000-4000-8000-0000000000f1', email: 'apply1@e2e.kr', password: 'apply1-pass' }
+const APPLY2 = { id: '0e000000-0000-4000-8000-0000000000f2', email: 'apply2@e2e.kr', password: 'apply2-pass' }
+const USERS = [OWNER, PILOT, OUTSIDER, CUSTOMER, SELF1, SELF2, APPLY1, APPLY2]
+/** 진짜 Supabase 처럼 메일 확인 전에는 로그인 막힘 — D-635 가입자만(예전 시험 계정은 확인 시각이 비어 있어도 그대로 로그인) */
+const CONFIRM_REQUIRED = new Set([APPLY1.id, APPLY2.id])
 const OWNER_WS = '0e0000aa-0000-4000-8000-00000000000a'
 const OWNER_CLIENT = 'owner-secret-1'
 // D-171: 대표가 직접 만든 업무 항목(세무기장 · 모두의 창업 2차)도 팀장 화면 · 응답에 나오면 안 된다
@@ -177,6 +182,8 @@ async function assistDirect(u, body) {
 }
 
 const uploads = []
+const signups = [] // D-635 가입 폼이 보낸 것 { email, data }
+const resends = [] // D-635 [확인 메일 다시 받기]
 let restLog = [] // { who, method, url, body }
 let currentWho = null
 
@@ -190,7 +197,25 @@ async function route(r) {
     const body = JSON.parse(req.postData() ?? '{}')
     const u = url.searchParams.get('grant_type') === 'refresh_token' ? USERS.find((x) => `refresh-${x.id}` === body.refresh_token) : USERS.find((x) => x.email === body.email && x.password === body.password)
     if (!u) return r.fulfill(json({ error: 'invalid_grant', error_description: 'Invalid login credentials' }, 400))
+    if (CONFIRM_REQUIRED.has(u.id) && sql(`select (email_confirmed_at is null)::text from auth.users where id = '${u.id}'`) !== 'false') {
+      return r.fulfill(json({ code: 400, error_code: 'email_not_confirmed', msg: 'Email not confirmed' }, 400))
+    }
     return r.fulfill(json(sessionOf(u)))
+  }
+  // D-635 가입 폼 — 진짜 Supabase 처럼 auth.users 에 가입 정보(user_metadata)와 함께 넣고, 메일 확인 전이라 세션 없이 사용자만 돌려준다
+  if (path === '/auth/v1/signup' && method === 'POST') {
+    const body = JSON.parse(req.postData() ?? '{}')
+    const u = USERS.find((x) => x.email === String(body.email ?? '').toLowerCase())
+    if (!u) return r.fulfill(json({ code: 422, error_code: 'validation_failed', msg: 'Unable to validate email address: invalid format' }, 422))
+    const data = body.data && typeof body.data === 'object' ? body.data : {}
+    sql(`insert into auth.users (id, email, raw_user_meta_data, created_at) values ('${u.id}', '${u.email}', '${JSON.stringify(data).replace(/'/g, "''")}'::jsonb, now()) on conflict (id) do nothing`)
+    meta.set(u.id, data)
+    signups.push({ email: u.email, data })
+    return r.fulfill(json({ id: u.id, aud: 'authenticated', role: '', email: u.email, user_metadata: data, app_metadata: {}, identities: [{ id: u.id }], created_at: new Date().toISOString() }))
+  }
+  if (path === '/auth/v1/resend' && method === 'POST') {
+    resends.push(JSON.parse(req.postData() ?? '{}'))
+    return r.fulfill(json({}))
   }
   if (path === '/auth/v1/user') {
     const u = whoOf(headers['authorization'])
@@ -2532,6 +2557,225 @@ try {
     check('L7-17 대표 390: 가입하면 바로 쓰기 칸 가로 넘침 0', (await overflowX(po)) <= 0, String(await overflowX(po)))
     await shot(po, 'self-signup-06-owner-390')
     await cO.close()
+  }
+
+  /* ================= D-635 가입 신청 → 대표가 앱에서 승인 · 거절(0029) — 진짜 RLS ================= */
+  {
+    const D = '[data-testid="signup-request"]'
+    check('SG-0 준비: 0029 들어감 · 0028 꺼짐 · 결정 0', sql(`select count(*) from pg_proc where proname in ('signup_approve', 'signup_reject', 'my_signup_status', 'signup_requests', 'signup_requests_count')`) === '5' && sql(`select open::text from public.self_signup_policy`) === 'false' && sql(`select count(*) from public.signup_decisions`) === '0')
+    // (1) 가입 화면 — PC 1440 모양 · 휴대폰 390 에서 실제로 가입
+    const cS = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+    await cS.route(`https://${REF}.supabase.co/**`, route)
+    const psg = await cS.newPage()
+    psg.on('pageerror', (e) => errors.push(String(e)))
+    await psg.goto(`${BASE}/signup`, { waitUntil: 'networkidle' })
+    await psg.waitForTimeout(600)
+    const formLook = await psg.evaluate(() => ({
+      fields: [...document.querySelectorAll('form input')].map((i) => i.id).join(','),
+      note: document.querySelector('[data-testid="signup-approval-note"]')?.textContent ?? '',
+      btn: [...document.querySelectorAll('form button[type="submit"]')].map((b) => (b.textContent ?? '').trim()).join('|'),
+      minFont: Math.min(...[...document.querySelectorAll('form label, form input, form button, form p')].map((e) => parseFloat(getComputedStyle(e).fontSize))),
+    }))
+    check('SG-1 가입 화면: 이름 · 소속 · 한 줄 소개 · 이메일 · 비밀번호 · 확인 · "대표가 승인하면" 한 줄 · [가입 신청] · 글자 15px 이상', formLook.fields === 'name,company,intro,email,password,confirm' && formLook.note.includes('승인하면') && formLook.btn === '가입 신청' && formLook.minFont >= 15, formLook)
+    await shot(psg, 'd635-01-signup-form-1440')
+    await cS.close()
+    const cA = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+    await cA.route(`https://${REF}.supabase.co/**`, route)
+    const pa = await cA.newPage()
+    pa.on('pageerror', (e) => errors.push(String(e)))
+    await pa.goto(`${BASE}/signup`, { waitUntil: 'networkidle' })
+    await pa.waitForTimeout(500)
+    await pa.getByRole('button', { name: '가입 신청' }).click()
+    const e0 = ((await pa.getByRole('alert').first().innerText().catch(() => '')) ?? '').trim()
+    await pa.locator('#name').fill('한신청')
+    await pa.locator('#company').fill('신청 컨설팅')
+    await pa.locator('#intro').fill('정책자금 상담 5년차')
+    await pa.locator('#email').fill(APPLY1.email)
+    await pa.locator('#password').fill(APPLY1.password)
+    await pa.locator('#confirm').fill('다른비밀번호')
+    await pa.getByRole('button', { name: '가입 신청' }).click()
+    const e1 = ((await pa.getByRole('alert').first().innerText().catch(() => '')) ?? '').trim()
+    check('SG-2 빈 칸 → "이름을 적어 주세요" · 비밀번호 확인 다름 → 쉬운 말 · 서버로 안 감', e0.includes('이름') && e1.includes('같은 비밀번호') && signups.length === 0, `${e0} / ${e1}`)
+    await shot(pa, 'd635-02-signup-form-390')
+    await pa.locator('#confirm').fill(APPLY1.password)
+    await pa.getByRole('button', { name: '가입 신청' }).click()
+    await pa.getByTestId('signup-done').waitFor({ timeout: 8000 }).catch(() => {})
+    const done = ((await pa.getByTestId('signup-done').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    const meta1 = sql(`select concat_ws('|', raw_user_meta_data->>'signup_app', raw_user_meta_data->>'display_name', raw_user_meta_data->>'company', raw_user_meta_data->>'intro', (email_confirmed_at is null)::text) from auth.users where id = '${APPLY1.id}'`)
+    check('SG-3 [가입 신청] → "가입 신청 접수" 한 장(✓ 신청 → 메일 확인 → 대표 승인) · 보낸 주소 · [로그인하러 가기] · DB 가입 정보(내부 OS · 이름 · 소속 · 소개 · 메일 확인 전) · 전화 · 주민번호 칸 0', done.includes('가입 신청을 받았어요') && done.includes(APPLY1.email) && done.includes('대표 승인') && (await pa.getByTestId('signup-done-login').count()) === 1 && meta1 === 'internal_os|한신청|신청 컨설팅|정책자금 상담 5년차|true' && !/phone|jumin|rrn/i.test(JSON.stringify(signups[0]?.data ?? {})), `${done.slice(0, 160)} · ${meta1}`)
+    check('SG-3b 가입 접수 화면 390: 가로 넘침 0', (await overflowX(pa)) <= 0, String(await overflowX(pa)))
+    await shot(pa, 'd635-03-signup-done-390')
+    // (2) 메일 확인 전 로그인 → 쉬운 말 + [확인 메일 다시 받기]
+    await pa.getByTestId('signup-done-login').click()
+    await pa.waitForURL((x) => x.pathname.startsWith('/login'), { timeout: 8000 }).catch(() => {})
+    await pa.getByLabel('이메일').fill(APPLY1.email)
+    await pa.getByLabel('비밀번호').fill(APPLY1.password)
+    await pa.getByRole('button', { name: /^로그인/ }).click()
+    await pa.getByTestId('login-resend').waitFor({ timeout: 8000 }).catch(() => {})
+    const e2 = ((await pa.getByRole('alert').first().innerText().catch(() => '')) ?? '').trim()
+    await pa.getByTestId('login-resend').getByRole('button').click()
+    await pa.waitForTimeout(700)
+    const rs = ((await pa.getByTestId('login-resend').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    check('SG-4 메일 확인 전 로그인 → "메일 인증이 아직" · [확인 메일 다시 받기] → 서버에 다시 보냄(가입 메일) · "다시 보냈어요"', e2.includes('메일 인증') && resends.length === 1 && resends[0].type === 'signup' && resends[0].email === APPLY1.email && rs.includes('다시 보냈어요'), `${e2} / ${rs} / ${JSON.stringify(resends)}`)
+    await cA.close()
+
+    // (3) 대표: 종 '가입 신청' → 설정 › 작업공간 '가입 신청' — 메일 확인 전이면 [승인] 꺼짐
+    const cO = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+    await cO.route(`https://${REF}.supabase.co/**`, route)
+    const po = await cO.newPage()
+    po.on('pageerror', (e) => errors.push(String(e)))
+    await login(po, OWNER)
+    await po.waitForTimeout(800)
+    await po.locator('button[aria-label^="챙길 것"]').first().click()
+    await po.getByTestId('bell-signup').waitFor({ timeout: 6000 }).catch(() => {})
+    const bell = ((await po.getByTestId('bell-signup').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    check('SG-5 대표 종: "가입 신청 · 승인을 기다리는 사람 1명"', bell.includes('가입 신청') && bell.includes('1명'), bell)
+    await po.getByTestId('bell-signup').click()
+    await po.getByTestId('signup-requests').waitFor({ timeout: 8000 }).catch(() => {})
+    const row1 = po.locator(`${D}[data-email="${APPLY1.email}"]`)
+    const r1 = ((await row1.innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    check('SG-6 종 → 설정 › 작업공간 "가입 신청" 칸 · 줄 = 이름 · 소속 · 이메일 · 소개 · "메일 확인 전" · [승인] 꺼짐 · 기능 안내 열쇠', po.url().includes('tab=workspace') && r1.includes('한신청 · 신청 컨설팅') && r1.includes('정책자금 상담 5년차') && r1.includes('메일 확인 전') && (await row1.getByTestId('signup-approve').isDisabled()) && (await po.locator('[data-guide="fn-signup-requests"]').count()) === 1, `${po.url()} · ${r1.slice(0, 200)}`)
+    // 메일 확인(가입 메일의 링크를 누른 것과 같게)
+    sql(`update auth.users set email_confirmed_at = now() where id = '${APPLY1.id}'`)
+
+    // (4) 새 가입자 로그인(390) → '가입 신청 접수 — 대표 승인 뒤 쓸 수 있어요'
+    const c1 = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+    await c1.route(`https://${REF}.supabase.co/**`, route)
+    const p1 = await c1.newPage()
+    p1.on('pageerror', (e) => errors.push(String(e)))
+    await login(p1, APPLY1)
+    await p1.getByTestId('signup-pending').waitFor({ timeout: 8000 }).catch(() => {})
+    const pend = await p1.evaluate(() => ({
+      status: document.querySelector('[data-testid="no-access"]')?.getAttribute('data-signup') ?? '',
+      title: document.querySelector('[data-testid="no-access"]')?.textContent ?? '',
+      steps: [...document.querySelectorAll('[data-testid="signup-steps"] li')].map((li) => `${li.getAttribute('data-step')}:${li.getAttribute('data-state')}`).join(','),
+      email: document.querySelector('[data-testid="no-access-email"]')?.textContent ?? '',
+      minFont: Math.min(...[...document.querySelectorAll('h1, p, li span, button')].map((e) => parseFloat(getComputedStyle(e).fontSize))),
+      over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    }))
+    check('SG-7 새 가입자(390): "가입 신청 접수 — 대표 승인 뒤 쓸 수 있어요" · 단계(신청 ✓ → 메일 ✓ → 대표 승인 지금) · 이메일 · 글자 15px 이상 · 넘침 0 · 대표 자료 0', pend.status === 'pending' && pend.title.includes('대표 승인 뒤') && pend.steps === 'apply:done,mail:done,approve:now' && pend.email.includes(APPLY1.email) && pend.minFont >= 15 && pend.over <= 0 && leaked(await bodyText(p1)).length === 0, pend)
+    await shot(p1, 'd635-04-pending-390')
+    await p1.getByTestId('no-access-retry').click()
+    await p1.waitForTimeout(900)
+    check('SG-8 [승인됐는지 다시 확인] → 아직이면 "hh:mm 에 확인했어요 — 아직 승인 전" · 화면 그대로', ((await p1.getByTestId('signup-checked').innerText().catch(() => '')) ?? '').includes('아직 승인 전') && (await p1.getByTestId('signup-pending').count()) === 1)
+    const cP2 = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+    await cP2.route(`https://${REF}.supabase.co/**`, route)
+    const p1w = await cP2.newPage()
+    await login(p1w, APPLY1)
+    await p1w.getByTestId('signup-pending').waitFor({ timeout: 8000 }).catch(() => {})
+    await shot(p1w, 'd635-05-pending-1440')
+    await cP2.close()
+
+    // (5) 대표 [승인] — 한 번 더 묻기(작업공간 이름 = 소속) → DB 가 0028 · customer_provision 과 같은 계정
+    await go(po, '/settings?tab=workspace&focus=signup')
+    await po.getByTestId('signup-requests').waitFor({ timeout: 8000 }).catch(() => {})
+    await po.locator(`${D}[data-email="${APPLY1.email}"]`).getByTestId('signup-approve').click()
+    await po.getByTestId('signup-approve-dialog').waitFor({ timeout: 5000 }).catch(() => {})
+    const dlg = ((await po.getByRole('dialog').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    const wsDefault = await po.getByTestId('signup-approve-name').inputValue().catch(() => '')
+    check('SG-9 [승인] → 한 번 더 묻기: 이메일 · 빈 작업공간 · AI 시험 14일 · 작업공간 이름 = 소속 · 대표 자료 안 보임', dlg.includes(APPLY1.email) && dlg.includes('빈 작업공간') && dlg.includes('14일') && wsDefault === '신청 컨설팅' && dlg.includes('못 봐요'), `${dlg.slice(0, 200)} · ${wsDefault}`)
+    await shot(po, 'd635-06-owner-approve-1440')
+    await po.getByTestId('signup-decide').click()
+    await po.waitForTimeout(1500)
+    const ws1 = sql(`select id from public.workspaces where owner_id = '${APPLY1.id}'`)
+    check('SG-10 승인 → DB: pilot · customer · 작업공간 "신청 컨설팅" 하나 · 구성원 본인뿐(대표 0) · AI customer trial · 결정 approved(대표)', sql(`select tier || ':' || audience from public.os_access where user_id = '${APPLY1.id}'`) === 'pilot:customer' && ws1.length === 36 && sql(`select name from public.workspaces where id = '${ws1}'`) === '신청 컨설팅' && sql(`select string_agg(user_id::text || ':' || role, ',') from public.workspace_members where workspace_id = '${ws1}'`) === `${APPLY1.id}:owner` && sql(`select kind || ':' || plan from public.ai_entitlements where user_id = '${APPLY1.id}'`) === 'customer:trial' && sql(`select decision || ':' || decided_by from public.signup_decisions where user_id = '${APPLY1.id}'`) === `approved:${OWNER.id}`, ws1)
+    check('SG-11 승인 뒤 목록에서 빠짐 · 칸 "기다리는 가입 신청이 없어요"', (await po.locator(`${D}[data-email="${APPLY1.email}"]`).count()) === 0 && ((await po.getByTestId('signup-requests-summary').innerText().catch(() => '')) ?? '').includes('없어요'))
+
+    // (6) 새 가입자 [다시 확인] → 앱이 열림 · 대표 자료 0 · 고객 메뉴
+    await p1.getByTestId('no-access-retry').click()
+    await p1.waitForLoadState('networkidle').catch(() => {})
+    await p1.waitForTimeout(1800)
+    const app1 = await bodyText(p1)
+    const rest1 = await p1.evaluate(async ([ref, other]) => {
+      const tok = JSON.parse(Object.entries(localStorage).find(([k]) => k.includes('auth-token'))?.[1] ?? '{}').access_token
+      const h = { apikey: 'qa-anon', Authorization: `Bearer ${tok}`, 'content-type': 'application/json' }
+      const base = `https://${ref}.supabase.co/rest/v1`
+      const clients = await fetch(`${base}/operations_clients?select=company_name`, { headers: h }).then((r) => r.text())
+      const list = await fetch(`${base}/rpc/signup_requests`, { method: 'POST', headers: h, body: '{}' }).then((r) => r.json())
+      const approve = await fetch(`${base}/rpc/signup_approve`, { method: 'POST', headers: h, body: JSON.stringify({ p_uid: other }) }).then((r) => r.status)
+      const decisions = await fetch(`${base}/signup_decisions?select=*`, { headers: h }).then((r) => r.text())
+      return { clients, list: Array.isArray(list) ? list.length : -1, approve, decisions }
+    }, [REF, APPLY2.id])
+    check('SG-12 승인된 가입자 [다시 확인] → 앱이 열림(승인 전 화면 아님) · 대표 자료 0 · 영업자 정산 없음', (await p1.getByTestId('no-access').count()) === 0 && leaked(app1).length === 0 && !app1.includes('영업자 정산'), app1.slice(0, 200))
+    check('SG-13 새 고객 REST: 업체 0줄 · 가입 신청 목록 0줄 · 남을 승인 막힘 · 결정 표 0줄', rest1.clients === '[]' && rest1.list === 0 && rest1.approve >= 400 && rest1.decisions === '[]', rest1)
+    await shot(p1, 'd635-07-approved-app-390')
+    await c1.close()
+
+    // (7) 거절 → 그분 화면 '가입이 승인되지 않았어요' → 나중에 승인 → 창으로 돌아오면 앱
+    sql(`insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data, created_at) values ('${APPLY2.id}', '${APPLY2.email}', now(), '{"signup_app":"internal_os","display_name":"두신청","company":"거절 연습"}', now()) on conflict do nothing`)
+    meta.set(APPLY2.id, { signup_app: 'internal_os', display_name: '두신청', company: '거절 연습' })
+    const c2 = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true })
+    await c2.route(`https://${REF}.supabase.co/**`, route)
+    const p2 = await c2.newPage()
+    p2.on('pageerror', (e) => errors.push(String(e)))
+    await login(p2, APPLY2)
+    await p2.getByTestId('signup-pending').waitFor({ timeout: 8000 }).catch(() => {})
+    check('SG-14 두 번째 가입자: 가입 신청 접수 화면', (await p2.getByTestId('signup-pending').count()) === 1)
+    await go(po, '/settings?tab=workspace&focus=signup')
+    await po.getByTestId('signup-requests').waitFor({ timeout: 8000 }).catch(() => {})
+    await shot(po, 'd635-08-owner-list-1440')
+    await po.setViewportSize({ width: 390, height: 844 })
+    await po.waitForTimeout(500)
+    check('SG-15 대표 390: 가입 신청 칸 가로 넘침 0 · [승인] [거절] 44px 이상', (await overflowX(po)) <= 0 && (await po.locator(`${D}[data-email="${APPLY2.email}"] button`).evaluateAll((bs) => Math.min(...bs.map((b) => b.getBoundingClientRect().height)))) >= 40, String(await overflowX(po)))
+    await shot(po, 'd635-09-owner-list-390')
+    await po.setViewportSize({ width: 1440, height: 900 })
+    await po.locator(`${D}[data-email="${APPLY2.email}"]`).getByTestId('signup-reject').click()
+    await po.getByTestId('signup-reject-dialog').waitFor({ timeout: 5000 }).catch(() => {})
+    await po.getByTestId('signup-reject-note').fill('시범 대상 아님')
+    await po.getByTestId('signup-decide').click()
+    await po.waitForTimeout(1500)
+    check('SG-16 [거절](메모) → DB 결정 rejected · 메모 · 계정 그대로 · 등급 · 작업공간 0 · 목록 "거절한 사람 1명"', sql(`select decision || ':' || note from public.signup_decisions where user_id = '${APPLY2.id}'`) === 'rejected:시범 대상 아님' && sql(`select count(*) from auth.users where id = '${APPLY2.id}'`) === '1' && sql(`select count(*) from public.os_access where user_id = '${APPLY2.id}'`) === '0' && sql(`select count(*) from public.workspaces where owner_id = '${APPLY2.id}'`) === '0' && ((await po.getByTestId('signup-rejected-list').innerText().catch(() => '')) ?? '').includes('거절한 사람 1명'))
+    await p2.getByTestId('no-access-retry').click()
+    await p2.getByTestId('signup-rejected').waitFor({ timeout: 6000 }).catch(() => {})
+    const rej = ((await p2.getByTestId('signup-rejected').innerText().catch(() => '')) ?? '').replace(/\n/g, ' ')
+    check('SG-17 거절된 가입자: "가입이 승인되지 않았어요" · 담당자 문의 한 줄 · 이메일 · [다시 확인] · 대표 메모는 안 보임 · 넘침 0', rej.includes('가입이 승인되지 않았어요') && rej.includes('담당자') && rej.includes(APPLY2.email) && !rej.includes('시범 대상 아님') && (await overflowX(p2)) <= 0, rej.slice(0, 200))
+    await shot(p2, 'd635-10-rejected-390')
+    const cR = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+    await cR.route(`https://${REF}.supabase.co/**`, route)
+    const prw = await cR.newPage()
+    await login(prw, APPLY2)
+    await prw.getByTestId('signup-rejected').waitFor({ timeout: 8000 }).catch(() => {})
+    await shot(prw, 'd635-11-rejected-1440')
+    await cR.close()
+    // 대표가 나중에 승인(거절한 사람 목록에서)
+    await po.getByTestId('signup-rejected-list').locator('summary').click()
+    await po.locator(`${D}[data-email="${APPLY2.email}"]`).getByTestId('signup-approve').click()
+    await po.getByTestId('signup-approve-dialog').waitFor({ timeout: 5000 }).catch(() => {})
+    await po.getByTestId('signup-decide').click()
+    await po.waitForTimeout(1500)
+    check('SG-18 거절했던 사람 [승인] → pilot · customer · 작업공간 "거절 연습" · 결정 approved · 거절한 때는 남음', sql(`select tier || ':' || audience from public.os_access where user_id = '${APPLY2.id}'`) === 'pilot:customer' && sql(`select name from public.workspaces where owner_id = '${APPLY2.id}'`) === '거절 연습' && sql(`select decision || ':' || (rejected_at is not null)::text from public.signup_decisions where user_id = '${APPLY2.id}'`) === 'approved:true')
+    // 그분은 아무것도 누르지 않고 창으로 돌아오기만(15초에 한 번까지 다시 물음)
+    await p2.waitForTimeout(15500)
+    await p2.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await p2.waitForFunction(() => !document.querySelector('[data-testid="no-access"]'), null, { timeout: 15000 }).catch(() => {})
+    await p2.waitForLoadState('networkidle').catch(() => {})
+    await p2.waitForTimeout(1200)
+    check('SG-19 승인되면 그분 창으로 돌아오기만 해도(다시 확인 안 눌러도) 앱이 열림 · 대표 자료 0', (await p2.getByTestId('no-access').count()) === 0 && leaked(await bodyText(p2)).length === 0)
+    await c2.close()
+    // 대표 종: 남은 신청 0 → '가입 신청' 줄 없음
+    await go(po, '/')
+    await po.locator('button[aria-label^="챙길 것"]').first().click()
+    await po.waitForTimeout(800)
+    check('SG-20 모두 처리한 뒤 대표 종에 "가입 신청" 줄 없음', (await po.getByTestId('bell-signup').count()) === 0)
+    await cO.close()
+
+    // (8) 내부 팀장: 설정에 '가입 신청' 칸 없음 · 서버 목록 0 · 숫자 0 · 승인 막힘
+    const cP = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+    await cP.route(`https://${REF}.supabase.co/**`, route)
+    const pp = await cP.newPage()
+    await login(pp, PILOT)
+    await go(pp, '/settings?tab=workspace&focus=signup')
+    const restP = await pp.evaluate(async ([ref, other]) => {
+      const tok = JSON.parse(Object.entries(localStorage).find(([k]) => k.includes('auth-token'))?.[1] ?? '{}').access_token
+      const h = { apikey: 'qa-anon', Authorization: `Bearer ${tok}`, 'content-type': 'application/json' }
+      const base = `https://${ref}.supabase.co/rest/v1`
+      const list = await fetch(`${base}/rpc/signup_requests`, { method: 'POST', headers: h, body: '{}' }).then((r) => r.json())
+      const count = await fetch(`${base}/rpc/signup_requests_count`, { method: 'POST', headers: h, body: '{}' }).then((r) => r.json())
+      const reject = await fetch(`${base}/rpc/signup_reject`, { method: 'POST', headers: h, body: JSON.stringify({ p_uid: other }) }).then((r) => r.status)
+      return { list: Array.isArray(list) ? list.length : -1, count, reject }
+    }, [REF, APPLY2.id])
+    check('SG-21 내부 팀장: 설정에 "가입 신청" 칸 없음 · 서버 목록 0 · 숫자 0 · 거절 막힘', (await pp.getByTestId('signup-requests').count()) === 0 && restP.list === 0 && restP.count === 0 && restP.reject >= 400, restP)
+    await cP.close()
   }
 
   check('화면 오류(pageerror) 0', errors.length === 0, errors.slice(0, 3).join(' | '))

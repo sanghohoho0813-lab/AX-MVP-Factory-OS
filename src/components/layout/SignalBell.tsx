@@ -68,6 +68,31 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
     return () => { alive = false }
   }, [workspaceId, version, pilot, tick])
 
+  // D-635 승인을 기다리는 가입 신청(대표만 — 서버가 대표가 아니면 0 · 0029 전이면 0). 승인 · 거절하면 바로 다시 센다
+  const [signupCount, setSignupCount] = useState(0)
+  const [signupTick, setSignupTick] = useState(0)
+  useEffect(() => {
+    const bump = () => setSignupTick((t) => t + 1)
+    window.addEventListener('signup-requests-changed', bump)
+    return () => window.removeEventListener('signup-requests-changed', bump)
+  }, [])
+  useEffect(() => {
+    if (pilot) {
+      setSignupCount(0)
+      return
+    }
+    let alive = true
+    void import('../../services/signupApproval')
+      .then(({ loadSignupRequestsCount }) => loadSignupRequestsCount())
+      .then((n) => {
+        if (alive) setSignupCount(n)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [pilot, tick, signupTick])
+
   const critical = useMemo(() => alerts.filter((a) => a.severity === 'critical'), [alerts])
   // D-188: 팀장이 보낸 새 피드백 — 대표 종에도
   const { entries: feedback, unread: feedbackUnread } = useFeedbackInbox()
@@ -76,7 +101,7 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
   const { entries: support, unread: supportUnread } = useSupportInbox()
   const supportNew = (support ?? []).filter((m) => !m.readAt)
   const supportText = [supportNew.some((m) => m.kind === 'question') ? `문의 ${supportNew.filter((m) => m.kind === 'question').length}건` : '', supportNew.some((m) => m.kind === 'error') ? `화면 오류 ${supportNew.filter((m) => m.kind === 'error').length}건` : ''].filter(Boolean).join(' · ')
-  const count = critical.length + events.length + feedbackUnread + supportUnread
+  const count = critical.length + events.length + feedbackUnread + supportUnread + signupCount
 
   return (
     <div ref={containerRef} className="relative">
@@ -102,6 +127,14 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
             <p className="px-4 py-4 text-[0.875rem] text-slate-500">{pilot ? '급한 경고가 없습니다.' : '급한 경고와 새 상담신청이 없습니다.'}</p>
           ) : (
             <ul className="max-h-80 overflow-y-auto">
+              {signupCount > 0 && (
+                <li className="border-b border-slate-50">
+                  <Link to="/settings?tab=workspace&focus=signup" onClick={() => setOpen(false)} data-testid="bell-signup" className="block px-4 py-2.5 hover:bg-slate-50">
+                    <span className="block text-[0.875rem] font-semibold text-brand-700">가입 신청</span>
+                    <span className="block truncate text-[0.875rem] text-slate-700">승인을 기다리는 사람 {signupCount}명</span>
+                  </Link>
+                </li>
+              )}
               {feedbackUnread > 0 && (
                 <li className="border-b border-slate-50">
                   <Link to="/feedback/inbox" onClick={() => setOpen(false)} data-testid="bell-feedback" className="block px-4 py-2.5 hover:bg-slate-50">

@@ -3,8 +3,8 @@
  * 조용히 local 모드로 fallback 하지 않는다.
  */
 
-import { useEffect, useState } from 'react'
-import { Check, CheckCircle2, Copy, Loader2, LogOut, RefreshCw, Settings2, ShieldAlert, WifiOff } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Check, CheckCircle2, Circle, Copy, Hourglass, Loader2, LogOut, RefreshCw, Settings2, ShieldAlert, WifiOff } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import {
   defaultWorkspaceName,
@@ -13,6 +13,7 @@ import {
   startSelfSignup,
   type SelfSignupState,
 } from '../../services/selfSignup'
+import { loadMySignupStatus, type MySignupStatus } from '../../services/signupApproval'
 
 function CenteredCard({ children }: { children: React.ReactNode }) {
   return (
@@ -139,16 +140,21 @@ export function ConnectionErrorScreen({ detail, onRetry }: { detail?: string; on
  *        권한은 그대로다(승인 전에는 어떤 화면 · 자료도 열리지 않는다).
  * L-7 · D-610: 대표가 '가입하면 바로 쓰기' 를 켜 두었으면(서버 0028) 기다리는 대신 [바로 시작하기] 한 번 — 서버가 계정을 연다.
  *        꺼져 있거나 · 자리가 다 찼거나 · 0028 전이면 지금 화면 그대로.
+ * D-635: 내부 OS 가입 화면으로 가입한 사람은 '가입 신청 접수 — 대표 승인 뒤 쓸 수 있어요'(대표가 앱에서 승인 · 거절 — 서버 0029).
+ *        창으로 돌아올 때 · [다시 확인] · 1분마다 다시 물어 승인되면 바로 앱으로. 거절되면 '가입이 승인되지 않았어요'.
+ *        홈페이지에서만 가입한 사람 · 팀장 초대를 기다리는 사람 · 0029 전에는 예전 '승인 전' 화면 그대로.
  */
 export function NoAccessScreen({ onSignOut, email = '', name = '' }: { onSignOut: () => void; email?: string; name?: string }) {
   const [state, setState] = useState<SelfSignupState | null>(null)
+  const [signup, setSignup] = useState<MySignupStatus>('missing')
   const [note, setNote] = useState('')
   useEffect(() => {
     let alive = true
-    void loadSelfSignupState().then((s) => {
+    void Promise.all([loadSelfSignupState(), loadMySignupStatus()]).then(([s, m]) => {
       if (!alive) return
-      // 그 사이 계정이 열렸다(대표가 열었거나 다른 창에서 시작) — 새로 열면 앱으로 간다
-      if (s === 'has_access') window.location.reload()
+      // 그 사이 계정이 열렸다(대표가 승인했거나 다른 창에서 시작) — 새로 열면 앱으로 간다
+      if (s === 'has_access' || m === 'has_access') window.location.reload()
+      setSignup(m)
       setState(s)
       if (s === 'unconfirmed') setNote(selfSignupStartText('unconfirmed'))
     })
@@ -178,7 +184,140 @@ export function NoAccessScreen({ onSignOut, email = '', name = '' }: { onSignOut
       />
     )
   }
+  if (signup === 'pending' || signup === 'unconfirmed' || signup === 'rejected') {
+    return <SignupStatusCard onSignOut={onSignOut} email={email} initial={signup} />
+  }
   return <WaitingCard onSignOut={onSignOut} email={email} note={note} />
+}
+
+/** D-635 로그인한 이메일 한 줄 + [복사] — 담당자에게 알려 줄 때 */
+function EmailRow({ email }: { email: string }) {
+  const [copied, setCopied] = useState(false)
+  if (!email) return null
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(email)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // 복사가 막힌 브라우저 — 이메일은 화면에 그대로 보인다
+    }
+  }
+  return (
+    <div className="mt-4 flex items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left" data-testid="no-access-email">
+      <span className="min-w-0 flex-1">
+        <span className="block text-[0.875rem] text-slate-600">로그인한 이메일</span>
+        <span className="block truncate text-[1rem] font-semibold text-slate-900">{email}</span>
+      </span>
+      <button
+        type="button"
+        onClick={() => void copy()}
+        data-testid="no-access-copy"
+        className="tap inline-flex min-h-11 shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[0.9375rem] font-semibold text-slate-800 hover:bg-slate-50"
+      >
+        {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />}
+        {copied ? '복사했어요' : '복사'}
+      </button>
+    </div>
+  )
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/**
+ * D-635 가입 신청 접수(대표 승인 기다림) · 메일 확인 전 · 거절됨 — 한 장.
+ *  - 다시 묻는 때: [다시 확인] · 창으로 돌아올 때(15초에 한 번까지) · 화면이 보이는 동안 1분마다. 승인되면 새로 열어 앱으로.
+ *  - 거절된 사람도 [다시 확인] 은 남긴다(대표가 나중에 승인할 수 있다).
+ */
+function SignupStatusCard({ onSignOut, email, initial }: { onSignOut: () => void; email: string; initial: MySignupStatus }) {
+  const [status, setStatus] = useState<MySignupStatus>(initial)
+  const [busy, setBusy] = useState(false)
+  const [checkedAt, setCheckedAt] = useState('')
+  const lastAt = useRef(0)
+  const recheck = useCallback(async (manual: boolean) => {
+    if (!manual && Date.now() - lastAt.current < 15_000) return
+    lastAt.current = Date.now()
+    if (manual) setBusy(true)
+    const m = await loadMySignupStatus()
+    if (m === 'has_access') {
+      window.location.reload()
+      return
+    }
+    if (m === 'pending' || m === 'unconfirmed' || m === 'rejected') setStatus(m)
+    const d = new Date()
+    setCheckedAt(`${pad2(d.getHours())}:${pad2(d.getMinutes())}`)
+    if (manual) setBusy(false)
+  }, [])
+  useEffect(() => {
+    lastAt.current = Date.now()
+    const back = () => {
+      if (document.visibilityState === 'visible') void recheck(false)
+    }
+    window.addEventListener('focus', back)
+    document.addEventListener('visibilitychange', back)
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void recheck(false)
+    }, 60_000)
+    return () => {
+      window.removeEventListener('focus', back)
+      document.removeEventListener('visibilitychange', back)
+      window.clearInterval(timer)
+    }
+  }, [recheck])
+
+  const rejected = status === 'rejected'
+  const unconfirmed = status === 'unconfirmed'
+  const steps: { key: string; title: string; state: 'done' | 'now' | 'next' }[] = [
+    { key: 'apply', title: '가입 신청', state: 'done' },
+    { key: 'mail', title: '메일 확인', state: unconfirmed ? 'now' : 'done' },
+    { key: 'approve', title: '대표 승인', state: unconfirmed ? 'next' : 'now' },
+  ]
+  return (
+    <CenteredCard>
+      <div data-testid={rejected ? 'signup-rejected' : 'signup-pending'} data-signup={status}>
+        <span className={`mx-auto flex size-12 items-center justify-center rounded-full bg-slate-100 ${rejected ? 'text-slate-600' : 'text-brand-700'}`}>
+          {rejected ? <ShieldAlert aria-hidden="true" className="size-6" /> : <Hourglass aria-hidden="true" className="size-6" />}
+        </span>
+        <h1 className="mt-4 text-[1.2rem] font-bold break-keep text-slate-900" data-testid="no-access" data-signup={status}>
+          {rejected ? '가입이 승인되지 않았어요' : unconfirmed ? '메일 확인이 남았어요' : '가입 신청 접수 — 대표 승인 뒤 쓸 수 있어요'}
+        </h1>
+        <p className="mt-2 text-[1rem] break-keep text-slate-700">
+          {rejected
+            ? '지금은 이 계정으로 쓸 수 없어요. 궁금한 점은 안내받은 담당자에게 아래 이메일과 함께 문의해 주세요.'
+            : unconfirmed
+              ? '가입할 때 받은 메일의 확인 링크를 눌러 주세요. 그다음 대표가 승인하면 바로 열려요.'
+              : '승인되면 이 화면이 저절로 앱으로 바뀌어요. 다시 가입하지 않아도 돼요.'}
+        </p>
+        {!rejected && (
+          <ol className="mt-4 flex flex-wrap items-center justify-center gap-1.5 text-[0.9375rem]" data-testid="signup-steps">
+            {steps.map((st, i) => (
+              <li key={st.key} className="flex items-center gap-1.5" data-step={st.key} data-state={st.state}>
+                {i > 0 && <span aria-hidden="true" className="text-slate-400">→</span>}
+                {st.state === 'done' ? (
+                  <CheckCircle2 aria-hidden="true" className="size-4 text-success-700" />
+                ) : (
+                  <Circle aria-hidden="true" className={`size-4 ${st.state === 'now' ? 'text-brand-700' : 'text-slate-400'}`} />
+                )}
+                <span className={st.state === 'now' ? 'font-semibold text-brand-700' : st.state === 'done' ? 'text-slate-700' : 'text-slate-600'}>{st.title}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+        <EmailRow email={email} />
+        <Button variant="primary" className="mt-5 h-12 w-full text-[1rem] font-semibold sm:h-12" onClick={() => void recheck(true)} disabled={busy} data-testid="no-access-retry">
+          <RefreshCw aria-hidden="true" className={`size-4 ${busy ? 'animate-spin' : ''}`} /> {busy ? '확인하는 중…' : rejected ? '다시 확인' : '승인됐는지 다시 확인'}
+        </Button>
+        {checkedAt && (
+          <p role="status" className="mt-2 text-[0.9375rem] text-slate-600" data-testid="signup-checked">
+            {checkedAt} 에 확인했어요 — {rejected ? '아직 승인되지 않았어요' : '아직 승인 전이에요'}
+          </p>
+        )}
+        <Button variant="ghost" className="mt-2 h-11 w-full" onClick={onSignOut} data-testid="no-access-signout">
+          <LogOut aria-hidden="true" className="size-4" /> 로그아웃
+        </Button>
+      </div>
+    </CenteredCard>
+  )
 }
 
 /** L-7 · D-610 '가입하면 바로 쓰기' 가 켜져 있을 때 — 작업공간 이름 하나 · 큰 단추 하나 */
@@ -255,16 +394,6 @@ function SelfStartCard({ email, name, onSignOut, onClosed }: { email: string; na
 
 /** D-579 아직 사용 승인 전 — 이메일 · [복사] · [승인됐는지 다시 확인] · [로그아웃] */
 function WaitingCard({ onSignOut, email, note }: { onSignOut: () => void; email: string; note: string }) {
-  const [copied, setCopied] = useState(false)
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(email)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1500)
-    } catch {
-      // 복사가 막힌 브라우저 — 이메일은 화면에 그대로 보인다
-    }
-  }
   return (
     <CenteredCard>
       <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-slate-100 text-slate-600">
@@ -281,23 +410,7 @@ function WaitingCard({ onSignOut, email, note }: { onSignOut: () => void; email:
           {note}
         </p>
       )}
-      {email && (
-        <div className="mt-4 flex items-center gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 text-left" data-testid="no-access-email">
-          <span className="min-w-0 flex-1">
-            <span className="block text-[0.875rem] text-slate-600">로그인한 이메일</span>
-            <span className="block truncate text-[1rem] font-semibold text-slate-900">{email}</span>
-          </span>
-          <button
-            type="button"
-            onClick={() => void copy()}
-            data-testid="no-access-copy"
-            className="tap inline-flex min-h-11 shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 text-[0.9375rem] font-semibold text-slate-800 hover:bg-slate-50"
-          >
-            {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />}
-            {copied ? '복사했어요' : '복사'}
-          </button>
-        </div>
-      )}
+      <EmailRow email={email} />
       <Button variant="primary" className="mt-5 h-12 w-full text-[1rem] font-semibold sm:h-12" onClick={() => window.location.reload()} data-testid="no-access-retry">
         <RefreshCw aria-hidden="true" className="size-4" /> 승인됐는지 다시 확인
       </Button>

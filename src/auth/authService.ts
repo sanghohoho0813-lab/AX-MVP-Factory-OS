@@ -40,18 +40,31 @@ export async function signUpWithPassword(
   email: string,
   password: string,
   displayName?: string,
+  /** D-635 대표가 승인할 때 볼 소속 · 한 줄 소개(전화 · 주민번호는 받지 않는다) */
+  extra?: { company?: string; intro?: string },
 ): Promise<AuthResult> {
   try {
-    const { data, error } = await getSupabaseClient().auth.signUp({
-      email,
-      password,
-      // D-106: 내부 OS 직원 가입 표시 — 고객 플랫폼 회원가입 알림(잠재고객 상담신청)에서 빠지게 한다
-      options: { data: displayName ? { display_name: displayName, signup_app: 'internal_os' } : { signup_app: 'internal_os' } },
-    })
+    // D-106: 내부 OS 직원 가입 표시 — 고객 플랫폼 회원가입 알림(잠재고객 상담신청)에서 빠지게 한다
+    const meta: Record<string, string> = { signup_app: 'internal_os' }
+    if (displayName) meta.display_name = displayName
+    if (extra?.company) meta.company = extra.company
+    if (extra?.intro) meta.intro = extra.intro
+    const { data, error } = await getSupabaseClient().auth.signUp({ email, password, options: { data: meta } })
     if (error) return fail(error)
     return ok(data.session)
   } catch (err) {
     return fail(err)
+  }
+}
+
+/** D-635 가입 확인 메일 다시 보내기(로그인 화면 '메일 인증이 아직' 일 때) */
+export async function resendSignupEmail(email: string): Promise<{ ok: boolean; errorMessage?: string }> {
+  try {
+    const { error } = await getSupabaseClient().auth.resend({ type: 'signup', email })
+    if (error) return { ok: false, errorMessage: toFriendlyAuthError(error).message }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, errorMessage: toFriendlyAuthError(err).message }
   }
 }
 

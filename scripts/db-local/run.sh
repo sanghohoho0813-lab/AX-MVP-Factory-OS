@@ -20,6 +20,17 @@ got="$(echo "$chk" | grep -cE '^1 먼저\|.*\|들어감$') $(echo "$chk" | grep 
 if [ "$got" = "5 3 12/12 8/8 10/10 " ]; then out="$out
 PASS  점검 SQL(0026~0028 · 전부 넣은 DB): 먼저 5줄 · 이번 3줄 모두 '들어감'(12/12 · 8/8 · 10/10)"; else out="$out
 FAIL  점검 SQL(0026~0028 · 전부 넣은 DB): $got (기대 5 3 12/12 8/8 10/10)"; fi
+# D-635 0029 점검(check_applied_0029.sql) — 전부 넣은 DB 에서는 먼저 5줄 · 이번 1줄 '들어감'(7/7)
+chk=$(su postgres -c "psql -At -F '|' -d $DB -c \"\$(cat supabase/manual/check_applied_0029.sql)\"" 2>&1)
+got="$(echo "$chk" | grep -cE '^1 먼저\|.*\|들어감$') $(echo "$chk" | grep -cE '^2 이번\|.*\|들어감$') $(echo "$chk" | grep -E '^2 이번' | grep -oE '[0-9]+/[0-9]+' | tr '\n' ' ')$(echo "$chk" | grep -E '^0 확인' | cut -d'|' -f5)"
+if [ "$got" = "5 1 7/7 on" ]; then out="$out
+PASS  점검 SQL(0029 · 전부 넣은 DB): 읽기 전용 on · 먼저 5줄 · 이번 1줄 '들어감'(7/7)"; else out="$out
+FAIL  점검 SQL(0029 · 전부 넣은 DB): $got (기대 5 1 7/7 on)"; fi
+vfy=$(su postgres -c "psql -At -F '|' -d $DB -c \"\$(cat supabase/manual/verify_after_0029.sql)\"" 2>&1)
+got="$(echo "$vfy" | grep -cE '^[1-5]\|.*\|좋음$') $(echo "$vfy" | grep -E '^8\|' | cut -d'|' -f3) $(echo "$vfy" | grep -c ERROR)"
+if [ "$got" = "5 꺼짐 0" ]; then out="$out
+PASS  확인 SQL(0029 · 전부 넣은 DB): 1~5 '좋음' · 0028 꺼짐 · 오류 0"; else out="$out
+FAIL  확인 SQL(0029 · 전부 넣은 DB): $got (기대 5 꺼짐 0)"; fi
 echo "$out"
 pass=$(echo "$out" | grep -c '^PASS'); bad=$(echo "$out" | grep -cE '^FAIL|ERROR')
 echo "통과 $pass · 실패 $bad"
