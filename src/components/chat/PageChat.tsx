@@ -59,11 +59,13 @@ export function PageChat({
   }, [host, scope, marketing])
 
   // 알리기(값이 바뀌면 고쳐 알림) · 화면을 떠날 때 한 번 뺀다
+  // D-636 그리기 단계(layout)에서 — 같은 대화창을 쓰는 다음 화면으로 넘어갈 때 앞 화면이 빼고 · 새 화면이 알리고 · 판에 다시 붙는 것이
+  //   화면에 그려지기 전에 한 번에 끝난다(빈 판이 한 장도 그려지지 않게). useEffect 였을 때는 그 사이 빈 판이 한 번 그려졌다
   const off = useRef<(() => void) | null>(null)
-  useEffect(() => {
+  useLayoutEffect(() => {
     off.current = registerPageChat({ key, scope, kind, auto, launcher, openPhone: hasPhone ? () => phoneRef.current?.() : undefined })
   }, [key, scope, kind, auto, launcher, hasPhone])
-  useEffect(() => () => off.current?.(), [])
+  useLayoutEffect(() => () => off.current?.(), [])
 
   const visible = !!pc.slot && currentPageChat(pc)?.key === key
   const [seen, setSeen] = useState(false)

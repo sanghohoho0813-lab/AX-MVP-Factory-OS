@@ -402,14 +402,17 @@ function toolRoute(element: ReactElement): ReactElement {
   return <ToolClientFrame>{element}</ToolClientFrame>
 }
 
-/** D-628 특허 · 벤처의 다른 화면 — 화면 + (열어 둔 대화창이 있으면) 같은 대화창. 대화창 조각을 기다리는 동안 화면은 그대로 그린다 */
+/**
+ * D-628 특허 · 벤처의 다른 화면 — 화면 + (열어 둔 대화창이 있으면) 같은 대화창.
+ * D-636 대화창 조각을 따로 Suspense 로 감싸지 않는다 — 새 경계는 조각을 받는 동안 빈칸(null)을 먼저 그려 앞 화면의 대화창이 빠지고
+ *   오른쪽 판이 잠깐 사라졌다. 감싸지 않으면 화면 이동(전환)이 앞 화면을 띄운 채 화면 + 대화창이 다 준비될 때까지 기다렸다가 한 번에 바꾼다.
+ *   (대화창 조각은 첫 화면에서 이미 받아 둔 것이라 거의 기다리지 않는다 · 열어 두지 않았으면 아무것도 받지 않는다)
+ */
 function pvRoute(element: ReactElement): ReactElement {
   return toolRoute(
     <>
       {element}
-      <Suspense fallback={null}>
-        <PvChatGate />
-      </Suspense>
+      <PvChatGate />
     </>,
   )
 }
