@@ -24,7 +24,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import fs from 'node:fs'
 import { seedScript } from './seed.mjs'
-import { openTools } from './pageTools.mjs'
+import { openChat, openTools } from './pageTools.mjs'
 
 const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
 const { default: handler, __resetAiAssistState } = await fromRoot('api/ai-assist.js')
@@ -135,6 +135,17 @@ await page.getByTestId('ai-assist-chip').first().click()
 await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.getByTestId('ai-assist-error').waitFor({ timeout: 8000 })
 const err0 = await page.getByTestId('ai-assist-error').innerText()
+// D-628 PC — 판이 화면을 덮지 않고 오른쪽 판의 [대화] 자리에 뜬다(뒤판 없음 · 가운데 화면은 그대로 굴러간다)
+{
+  const where = await page.evaluate(() => {
+    const panel = document.querySelector('[data-testid="ai-assist-panel"]')
+    const dock = document.querySelector('[data-testid="side-dock"]')
+    const main = document.querySelector('main').getBoundingClientRect()
+    const r = panel.getBoundingClientRect()
+    return { inDock: !!dock && dock.contains(panel), docked: panel.getAttribute('data-docked'), modal: panel.getAttribute('aria-modal'), left: Math.round(r.left), mainRight: Math.round(main.right), bodyLock: document.body.style.overflow, mode: dock?.getAttribute('data-mode') }
+  })
+  check('0 D-628 PC 에서 AI 도우미 판은 오른쪽 판 안(화면을 덮는 창 아님 · 본문 오른쪽 · 뒤 화면 굴리기 안 막음)', where.inDock && where.docked === '1' && where.modal === null && where.left >= where.mainRight - 1 && where.bodyLock !== 'hidden' && where.mode === 'dock', where)
+}
 check("0 키 없음 → '키가 아직' + 넣을 이름 GEMINI_API_KEY · 공급자 안 부름", /키가 아직/.test(err0) && err0.includes('GEMINI_API_KEY') && llm.length === 0, err0)
 await page.keyboard.press('Escape')
 
@@ -504,6 +515,8 @@ await page.keyboard.press('Escape')
   // 다른 화면 — 특허 · 벤처 대화창 [AI로 더 자세히](공통 두 번 누르기 부품)
   await page.goto(BASE + '/patent-venture?client=cli_hansol', { waitUntil: 'networkidle' })
   await page.waitForTimeout(800)
+  // D-628 대화창은 오른쪽 판 — [대화] 로 연다
+  await openChat(page)
   await page.getByTestId('chat-starter').first().click().catch(() => {})
   await page.waitForTimeout(800)
   const more = page.getByTestId('chat-ai-more').first()
@@ -683,6 +696,9 @@ for (const w of [360, 390]) {
   await mp.waitForTimeout(800)
   const wide = await mp.evaluate(() => [...document.querySelectorAll('[data-testid="ai-assist-panel"] *')].filter((el) => el.getBoundingClientRect().right > window.innerWidth + 1).length)
   check(`E ${w} 판 열고 답까지 — 화면 밖으로 나간 칸 0`, wide === 0, wide)
+  // D-628 휴대폰은 예전처럼 아래에서 올라오는 판(오른쪽 판 없음)
+  const sheet = await mp.evaluate(() => ({ modal: document.querySelector('[data-testid="ai-assist-panel"]')?.getAttribute('aria-modal'), dock: document.querySelectorAll('[data-testid="side-dock"]').length }))
+  check(`E ${w} D-628 휴대폰 AI 도우미는 아래에서 올라오는 판 그대로(오른쪽 판 없음)`, sheet.modal === 'true' && sheet.dock === 0, sheet)
   if (w === 390) await shot(mp, 'E-390-panel')
   // D-629 휴대폰은 판 안 '쓰는 모델' 줄에서 고른다 — 자동 줄 · [가장 싼 모델] · [좋은 모델] 을 펼쳐도 폭 안에 · 손가락으로 누를 높이
   await mp.getByTestId('ai-assist-model-toggle').click()

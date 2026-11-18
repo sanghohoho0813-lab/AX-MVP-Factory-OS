@@ -13,6 +13,8 @@ import { MODULE_PAGES } from '../data/modules'
  * 이 틀들은 앱 뼈대와 함께 미리 받아 둔다(app/shellChunks) — 화면을 열 때 한 번 더 기다리지 않게.
  */
 const ChatFirst = lazy(() => import('../components/chat/ChatFirst').then((m) => ({ default: m.ChatFirst })))
+// D-628 특허 · 벤처 다른 화면에서 오른쪽 대화창 이어 보이기 — 이것도 필요할 때 받는다(로그인 화면이 받지 않게)
+const PvChatGate = lazy(() => import('../pages/patent/PvChatGate').then((m) => ({ default: m.PvChatGate })))
 const AxOpenPage = lazy(() => import('../pages/AxOpenPage').then((m) => ({ default: m.AxOpenPage })))
 const ToolClientFrame = lazy(() => import('../tools/shared/toolClientContext').then((m) => ({ default: m.ToolClientFrame })))
 const ModuleRoute = lazy(() => import('../tools/shared/ModuleRoute').then((m) => ({ default: m.ModuleRoute })))
@@ -400,6 +402,18 @@ function toolRoute(element: ReactElement): ReactElement {
   return <ToolClientFrame>{element}</ToolClientFrame>
 }
 
+/** D-628 특허 · 벤처의 다른 화면 — 화면 + (열어 둔 대화창이 있으면) 같은 대화창. 대화창 조각을 기다리는 동안 화면은 그대로 그린다 */
+function pvRoute(element: ReactElement): ReactElement {
+  return toolRoute(
+    <>
+      {element}
+      <Suspense fallback={null}>
+        <PvChatGate />
+      </Suspense>
+    </>,
+  )
+}
+
 /**
  * 모듈 한 벌 = 주소 두 줄 (D-91).
  * `/tools/<key>` 는 그 모듈의 첫 화면, `/tools/<key>/<화면>` 은 목차에서 고른 화면이다.
@@ -482,10 +496,11 @@ export const appRouteChildren = [
       // D-247 대표 "기업인증 밖으로" — 특허 · 벤처 한 곳(대표만: 메뉴 표 ownerOnly 가 팀장 주소도 막는다). 기업인증 › 벤처 안 입구도 그대로
       // D-250 첫 화면은 대화창 — 예전 진행판 · 도구 카드는 /more([자세히])
       { path: 'patent-venture', element: toolRoute(<PatentVentureChatPage />) },
-      { path: 'patent-venture/more', element: toolRoute(<PatentVentureHomePage />) },
-      { path: 'patent-venture/plan', element: toolRoute(<VenturePlanPage />) },
+      // D-628 PvChatGate — 첫 화면에서 오른쪽 대화창을 연 채 답 단추로 넘어왔으면 같은 대화창이 따라온다(안 열려 있으면 아무것도 안 그림)
+      { path: 'patent-venture/more', element: pvRoute(<PatentVentureHomePage />) },
+      { path: 'patent-venture/plan', element: pvRoute(<VenturePlanPage />) },
       // D-248 특허 명세서 쓰기(?draft= · ?client=) — 아이디어 → 구성요소 → 도면 → 청구항 → 본문 → 점검 · MD · 벤처 재료로
-      { path: 'patent-venture/write', element: toolRoute(<SpecWritePage />) },
+      { path: 'patent-venture/write', element: pvRoute(<SpecWritePage />) },
       { path: 'patent-venture/spec-check', element: <PatentSpecCheckPage back={{ to: '/patent-venture', label: '특허 · 벤처' }} /> },
       { path: 'studio/:projectId', element: <ConsultingProjectPage /> },
       { path: 'tools', element: <ToolsHubPage /> },

@@ -6,9 +6,10 @@
  * 판정은 전부 `src/certification/core` (OS 를 모르는 Core) — 이 화면은 어댑터(integration)로 업체를 넘기고 결과를 보여 줄 뿐.
  *
  * D-250: 첫 화면(overview)은 대화창(CertChat) — 대표 "아주 간단하게". 예전 '인증 한눈에' 는 ?detail=1([자세히])에 그대로.
+ * D-628: 대화창은 오른쪽 판으로 — 가운데는 늘 작업 화면('인증 한눈에' · 인증별 화면). 첫 주소(뒤에 아무것도 없음)에서만 대화창이 저절로 열린다.
  */
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { useModuleSection } from '../../tools/shared/ModuleRoute'
 import { toolOf } from '../../config/toolRegistry'
@@ -23,6 +24,7 @@ import { useToast } from '../../components/ui/toastContext'
 import { VenturePlanWorkbench } from './VenturePlanWorkbench'
 import { sectionHref } from './certNav'
 import { CertChat } from './CertChat'
+import { useChatAutoOpen } from '../../lib/useChatFirst'
 
 export default function CertPage() {
   const section = useModuleSection()
@@ -41,36 +43,31 @@ export default function CertPage() {
   }
   const head = <PageHeader title={d.clientName ? `${d.clientName} 기업인증` : '기업인증'} description={meta?.hint ? `${meta.label} — ${meta.hint}` : '어떤 인증을 왜 · 언제 · 무엇을 준비해서'} />
 
-  // D-250 예전 '인증 한눈에'(?detail=1) → 대화창으로 돌아가는 길
-  const backChat =
-    section === 'overview' ? (
-      <Link to={d.clientId ? `/tools/cert-os?client=${encodeURIComponent(d.clientId)}` : '/tools/cert-os'} className="tap t-sub inline-flex items-center gap-1.5 self-start rounded-(--radius-control) px-2 py-2 font-semibold text-brand-700 hover:bg-brand-50" data-testid="cert-back-chat">
-        <ArrowLeft aria-hidden="true" className="size-4" /> 대화창으로
-      </Link>
-    ) : null
-
-  // D-250 첫 화면은 대화창 — 회사 고르기도 대화창 안에서
-  if (section === 'overview' && params.get('detail') !== '1') {
-    return (
-      <div className="flex flex-col gap-4" data-testid="cert-chat-page">
-        <CertChat d={d} />
+  // D-628 대화창(오른쪽 판) — 모든 기업인증 화면에서 같은 대화가 따라온다. 저절로 여는 것은 맨 첫 화면에서만('대화창 같이' 를 고른 사람)
+  const autoPref = useChatAutoOpen()
+  const { pathname } = useLocation()
+  const chat = <CertChat d={d} auto={autoPref && /^\/tools\/cert-os\/?$/.test(pathname) && params.get('detail') !== '1'} />
+  const wrap = (body: ReactNode, testId?: string) => (
+    <>
+      <div className="flex flex-col gap-5" data-testid={testId}>
+        {body}
       </div>
-    )
-  }
+      {chat}
+    </>
+  )
 
   if (!d.clientId) {
-    return (
-      <div className="flex flex-col gap-5">
+    return wrap(
+      <>
         {head}
-        {backChat}
         <PickClient />
-      </div>
+      </>,
     )
   }
   // D-214: 모듈 기록(칩 · 답 · 진행 기록)을 다 읽은 뒤에 보여 준다 — 읽기 전에 누르면 같은 업체 줄이 하나 더 생겨 원래 줄을 가렸다
   if (!d.ctx || !d.loaded) {
-    return (
-      <div className="flex flex-col gap-5">
+    return wrap(
+      <>
         {head}
         {d.loadError ? (
           <div role="alert" data-testid="cert-load-error" className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center">
@@ -84,7 +81,7 @@ export default function CertPage() {
             업체 기록을 읽는 중…
           </p>
         )}
-      </div>
+      </>,
     )
   }
   // P1: 칩으로 고른 특허 · 연구소 중 회사 정보(확인)와 다른 것 — [회사 정보에 확인된 사실로 저장] 대상
@@ -92,10 +89,9 @@ export default function CertPage() {
   const key = section as CertificationKey
   const a = d.list.find((x) => x.key === key)
   const work = a ? d.workOf(key) : null
-  return (
-    <div className="flex flex-col gap-5" data-testid="cert-page">
+  return wrap(
+    <>
       {head}
-      {backChat}
       {section === 'overview' && <CertOverview ctx={d.ctx} list={d.list} roadmap={d.roadmap} profile={d.profile} onProfile={(p) => void d.saveProfile(p).catch(saveFailed)} clientId={d.clientId} pendingFacts={pendingFacts} onConfirmFacts={d.confirmFacts} />}
       {section === 'iso' && <IsoScreen list={d.list} ctx={d.ctx} />}
       {a && work && planOpen && <VenturePlanWorkbench ctx={d.ctx} notes={work.notes} onSave={(patch) => d.saveWork(a.key, { notes: patch })} onBack={() => navigate(sectionHref('venture', d.clientId))} />}
@@ -120,6 +116,7 @@ export default function CertPage() {
           workspaceId={d.workspaceId}
         />
       )}
-    </div>
+    </>,
+    'cert-page',
   )
 }

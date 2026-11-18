@@ -1,9 +1,10 @@
 /**
- * D-552 모듈 첫 화면 = 대화창(9곳). 대표 "완전한 LLM 느낌 + 아래에 어떻게 묻는지 예시 + 직접 클릭하면서 하고 싶은 사람도".
+ * D-552 모듈 대화창(9곳). 대표 "완전한 LLM 느낌 + 아래에 어떻게 묻는지 예시 + 직접 클릭하면서 하고 싶은 사람도".
+ * D-628 이 대화창은 오른쪽 판(휴대폰은 아래 판) 안에 그려진다 — 가운데는 그 모듈의 작업 화면 그대로.
  *
- *   맨 위: 모듈 이름 · [사용 방법] · [바로 화면] · 회사 고르기
- *   처음: '무엇을 도와드릴까요?' · 이 화면이 하는 일 한 줄 · 질문창 · 큰 단추 4개 · 이렇게 물어보세요(예시)
- *   아래: 직접 눌러서 하기 — 예전 화면들(목차)로 바로 + '이 모듈을 열면: 대화창부터 / 바로 화면'
+ *   처음: 시작 카드('무엇을 도와드릴까요?' · 이 화면이 하는 일 한 줄 · [대화 시작])
+ *   시작: 회사 고르기 · [사용 방법] · 큰 단추 4개 · 이렇게 물어보세요(예시) · 직접 눌러서 하기 · 질문창(맨 아래)
+ *   직접 눌러서 하기 — 목차 화면으로 바로(가운데가 바뀐다) + '이 화면을 열면: 대화창 같이 / 화면만'
  * 답은 modChat(규칙 · 판정 그대로). 쓴 말은 대표 · 팀장이면 AI(기존 '직접 물어본 것에 답' 단추와 같은 길).
  */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -45,7 +46,7 @@ import { useGrantNotices } from '../grants/useGrants'
 import type { GrantNotice } from '../../services/grants/grantMatch'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { MOD_CHAT, modAiContext, modChatActions, modChatAnswer, modGuide, calcHref, type ModChatData } from '../../services/workChat/modChat'
-import { CHAT_FIRST_PATHS, CHAT_FIRST_EVENT, modeOf, readChatFirst, writeChatFirst, type ChatFirstKey, type ChatFirstMode } from '../../services/workChat/chatFirst'
+import { CHAT_FIRST_PATHS, CHAT_FIRST_EVENT, CHAT_FIRST_MODE_LABEL, modeOf, readChatFirst, writeChatFirst, type ChatFirstKey, type ChatFirstMode } from '../../services/workChat/chatFirst'
 
 const STARTER_ICON: Record<string, LucideIcon> = {
   judge: Target,
@@ -123,7 +124,7 @@ function DirectArea({ k, clientId }: { k: ChatFirstKey; clientId: string }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        title="대화 없이 화면에서 바로 하고 싶으면 여기서 고르세요. 누르면 예전 화면 그대로 열려요."
+        title="대화 없이 화면에서 바로 하고 싶으면 여기서 고르세요. 누르면 가운데 화면이 그 화면으로 바뀌어요."
         className="tap t-body flex min-h-11 w-full items-center gap-2 text-left font-bold text-slate-900"
         data-testid="modchat-direct-open"
       >
@@ -132,7 +133,7 @@ function DirectArea({ k, clientId }: { k: ChatFirstKey; clientId: string }) {
         <ChevronDown aria-hidden="true" className={`size-5 shrink-0 text-slate-500 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       <div className={open ? 'flex flex-col gap-3' : 'hidden'}>
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="modchat-direct-list">
+        <ul className="grid grid-cols-1 gap-2" data-testid="modchat-direct-list">
           {shown.map((it) => (
             <li key={it.id}>
               <Link to={it.href} title={it.hint || undefined} className="tap flex h-full min-h-11 items-center gap-3 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 hover:border-brand-400 hover:bg-slate-50" data-testid="modchat-direct-item" data-id={it.id}>
@@ -150,12 +151,7 @@ function DirectArea({ k, clientId }: { k: ChatFirstKey; clientId: string }) {
         <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3" data-testid="modchat-mode">
           <span className="t-sub font-semibold text-slate-700">이 화면을 열면</span>
           <div role="radiogroup" aria-label="이 화면을 열면" className="inline-flex rounded-(--radius-control) border border-slate-300 p-0.5">
-            {(
-              [
-                ['chat', '대화창부터'],
-                ['direct', '바로 화면'],
-              ] as const
-            ).map(([m, label]) => (
+            {(['chat', 'direct'] as const).map((m) => (
               <button
                 key={m}
                 type="button"
@@ -165,11 +161,11 @@ function DirectArea({ k, clientId }: { k: ChatFirstKey; clientId: string }) {
                 className={`tap t-sub min-h-10 rounded-[calc(var(--radius-control)-2px)] px-3 font-semibold ${mode === m ? 'bg-brand-600 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
                 data-testid={`modchat-mode-${m}`}
               >
-                {label}
+                {CHAT_FIRST_MODE_LABEL[m]}
               </button>
             ))}
           </div>
-          <span className="t-sub break-keep text-slate-500">{mode === 'direct' ? '다음부터 대화창 없이 예전 화면으로 열려요(위 [대화로 묻기] 로 언제든 돌아와요).' : '모든 모듈은 설정 › 내 설정에서 한 번에 바꿀 수 있어요.'}</span>
+          <span className="t-sub break-keep text-slate-500">{mode === 'direct' ? '다음부터 대화창은 닫힌 채 열려요(오른쪽 끝 [대화] 로 언제든 열어요).' : '모든 화면은 설정 › 내 설정에서 한 번에 바꿀 수 있어요.'}</span>
         </div>
       </div>
     </section>
@@ -180,7 +176,7 @@ const CLIENT_KEY = (k: ChatFirstKey) => `axmvp.modchat.client.${k}`
 
 function ModuleChatInner({ k, notices }: { k: ChatFirstKey; notices: readonly GrantNotice[] }) {
   const cfg = MOD_CHAT[k]
-  const { loadClients } = useToolClient()
+  const { loadClients, clientId: urlClient } = useToolClient()
   const { ent } = useEntitlements()
   const access = useAiAssistAccess()
   const marketingAi = useMarketingAiOn()
@@ -206,6 +202,11 @@ function ModuleChatInner({ k, notices }: { k: ChatFirstKey; notices: readonly Gr
       alive = false
     }
   }, [loadClients])
+
+  // D-628 · D-618 업체로 연 화면(?client=) 옆의 대화창은 그 업체로 — 다시 고르게 하지 않는다
+  useEffect(() => {
+    if (urlClient) setClientId(urlClient)
+  }, [urlClient])
 
   const onClient = (id: string) => {
     setClientId(id)
@@ -260,6 +261,8 @@ function ModuleChatInner({ k, notices }: { k: ChatFirstKey; notices: readonly Gr
       today={today}
       aiOn={aiOn}
       below={<DirectArea k={k} clientId={clientId} />}
+      scope={`mod:${k}`}
+      dockOnly
     />
   )
 }
@@ -281,7 +284,7 @@ export function ModuleChat({ k }: { k: ChatFirstKey }) {
     return () => window.removeEventListener(CHAT_FIRST_EVENT, on)
   }, [])
   return (
-    <div data-testid="modchat" data-module={k}>
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="modchat" data-module={k}>
       {k === 'grants' ? <GrantsChat /> : <ModuleChatInner k={k} notices={NO_NOTICES} />}
     </div>
   )

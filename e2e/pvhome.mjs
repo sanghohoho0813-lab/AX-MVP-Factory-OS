@@ -7,6 +7,7 @@
  *     → [AI로 명세서 초안 쓰기] 한 번에 명세서(열자마자 AI) · 돌아오면 '명세서 이어 쓰기' · 회사 안 고르면 '이어서 할 회사'
  *  P  자세히(/more) 사업계획서 칸 — 업체에서 열었으면 그 회사가 골라진 채로
  *  C  대화창 [AI에게 묻기] 를 연달아 눌러도 AI 는 한 번
+ *  D-628 대화창은 오른쪽 판으로 — 가운데는 머리 · 준비 현황 · 다음 할 일(주 단추 하나)만. 대화창 · 큰 단추 4개는 오른쪽 끝 [대화] 안에 그대로
  *  M  360/390/430/아주 큰 글자 넘침 0 · 주 단추 44px
  * AI 는 진짜 api/ai-assist.js 를 같은 프로세스에서(공급자 응답만 가짜 · 호출 수를 센다). 명세서 AI 는 부르지 않게 막는다.
  */
@@ -14,6 +15,7 @@ import { chromium } from 'playwright'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { seedScript } from './seed.mjs'
+import { openChat } from './pageTools.mjs'
 
 const fromRoot = (p) => import(pathToFileURL(path.resolve(p)).href)
 const { default: handler, __resetAiAssistState } = await fromRoot('api/ai-assist.js')
@@ -68,12 +70,8 @@ async function wire(page) {
 }
 const overflowX = (p) => p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
 const drafts = (p) => p.evaluate(() => Object.keys(localStorage).filter((k) => /patent-draft/.test(k)).flatMap((k) => { try { const v = JSON.parse(localStorage.getItem(k) ?? '[]'); return Array.isArray(v) ? v : [] } catch { return [] } }))
-/** 대화창 위의 주 단추(진한 단추) */
-const primAbove = (p) =>
-  p.evaluate(() => {
-    const hero = document.querySelector('[data-testid="chat-hero"], [data-testid="chat-turns"]')?.getBoundingClientRect().top ?? Infinity
-    return [...document.querySelectorAll('main button.bg-brand-600, main a.bg-brand-600')].filter((b) => b.getBoundingClientRect().height > 0 && b.getBoundingClientRect().top < hero).map((b) => b.getAttribute('data-testid'))
-  })
+/** 가운데(본문)의 주 단추(진한 단추) — D-628 대화창이 오른쪽으로 가서 가운데 전체를 센다 */
+const primInMain = (p) => p.evaluate(() => [...document.querySelectorAll('main button.bg-brand-600, main a.bg-brand-600')].filter((b) => b.getBoundingClientRect().height > 0).map((b) => b.getAttribute('data-testid')))
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
@@ -92,9 +90,10 @@ await page.getByTestId('pv-brief').waitFor({ timeout: 15000 })
 const states = await page.getByTestId('pv-brief-step').evaluateAll((xs) => xs.map((x) => `${x.getAttribute('data-key')}:${x.getAttribute('data-state')}`))
 check('H1 회사를 고르면 묻지 않아도 준비 현황 — 명세서 · 점검 · 사업계획서 세 칸(모두 아직, 글로도 "아직")', states.join() === 'spec:todo,check:todo,plan:todo' && (await page.getByTestId('pv-brief-steps').innerText()).split('아직').length - 1 === 3, states)
 check('H2 이미 있는 자료(회사 기록 n줄 · 서류함) · AI 가 알아서 읽음', /회사 기록 \d+줄/.test(await page.getByTestId('pv-brief-have').innerText()) && /알아서 읽어요/.test(await page.getByTestId('pv-brief-have').innerText()), await page.getByTestId('pv-brief-have').innerText())
-// D-511 대화창 먼저 — 다음 할 일(주 단추)은 대화 판 아래로 옮겼다 → 대화창 위 진한 단추 0 · 주 단추는 [AI로 명세서 초안 쓰기] 하나
-check('H3 다음 할 일 주 단추 하나 = [AI로 명세서 초안 쓰기] · 대화창 위 진한 단추 0(D-511 대화 먼저) · 주의 2줄(초안은 사람이 정함 · 출원번호는 기록에 있는 것만)', (await page.getByTestId('pv-brief-next').innerText()).includes('AI로 명세서 초안 쓰기') && (await primAbove(page)).length === 0 && (await page.locator('main [data-testid="pv-brief-next"].bg-brand-600, main [data-testid="pv-brief-next"] .bg-brand-600').count()) >= 1 && (await page.locator('[data-testid="pv-brief-cautions"] li').count()) === 2 && /출원번호/.test(await page.getByTestId('pv-brief-cautions').innerText()), await primAbove(page))
-check('H4 대화창 · 큰 단추 4개는 그대로 아래에(지운 것 없음)', (await page.getByTestId('chat-hero').getByTestId('chat-starter').count()) === 4)
+// D-628 대화창은 오른쪽 판 — 가운데의 진한 단추는 다음 할 일 하나뿐(= [AI로 명세서 초안 쓰기]) · 가운데에 질문창 없음
+check('H3 다음 할 일 주 단추 하나 = [AI로 명세서 초안 쓰기] · 가운데 진한 단추는 그것 하나 · 가운데에 대화창 없음(D-628) · 주의 2줄(초안은 사람이 정함 · 출원번호는 기록에 있는 것만)', (await page.getByTestId('pv-brief-next').innerText()).includes('AI로 명세서 초안 쓰기') && (await primInMain(page)).length === 1 && (await page.locator('main [data-testid="chat-input"], main [data-testid="chat-hero"]').count()) === 0 && (await page.locator('main [data-testid="pv-brief-next"].bg-brand-600, main [data-testid="pv-brief-next"] .bg-brand-600').count()) >= 1 && (await page.locator('[data-testid="pv-brief-cautions"] li').count()) === 2 && /출원번호/.test(await page.getByTestId('pv-brief-cautions').innerText()), await primInMain(page))
+await openChat(page)
+check('H4 대화창 · 큰 단추 4개는 오른쪽 판에 그대로(지운 것 없음) · 가운데 준비 현황은 그대로 보임', (await page.locator('[data-testid="side-dock"] [data-testid="chat-hero"] [data-testid="chat-starter"]').count()) === 4 && (await page.locator('main [data-testid="pv-brief"]').isVisible()))
 const before = (await drafts(page)).length
 { const l289 = page.getByTestId('pv-brief-next'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 await page.waitForURL(/\/patent-venture\/write\?/, { timeout: 10000 })
@@ -129,6 +128,7 @@ check('P3 회사 없이 열면 그대로 "회사 고르기"', (await page.getByT
 
 /* ---------------- C 대화창 AI 한 번만 ---------------- */
 await page.goto(`${BASE}/patent-venture?client=${CLIENT}`, { waitUntil: 'networkidle' })
+await openChat(page)
 await page.getByTestId('chat-input').fill('이 회사 명세서 다음에 뭐 해?')
 const n0 = llm.length
 await page.getByTestId('chat-send').evaluate((b) => {

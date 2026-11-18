@@ -1,11 +1,14 @@
 /**
  * D-552 모듈 첫 화면 = 대화창(대표 "어느 파트를 가도 LLM 첫 화면 같은 느낌" · "직접 클릭하면서 하고 싶은 사람은 그렇게").
+ * D-628 대화창은 오른쪽 판으로 갔다(대표 "가운데는 작업창, 오른쪽에서 요청") — 가운데는 늘 작업 화면이고, 이 값은
+ *       **오른쪽 대화창을 저절로 열지**를 정한다: 'chat' = 대화창 같이 열기 · 'direct' = 화면만(오른쪽 끝 [대화] 를 눌러야 열림).
  *
- * 메뉴로 들어온 **맨 첫 주소**(`/tools/policy-funding` 처럼 뒤에 아무것도 없을 때)만 대화창을 보여 준다.
- *  - 목차 화면(`/tools/<모듈>/<화면>`) · 업체를 물고 온 주소(`?client=`) · 상황 예시(`?preset=`) 등 뒤에 무엇이 붙은 주소는 **예전 화면 그대로**
- *    (맞춤 추천 · 상황 예시 · 오늘 화면에서 누른 '열기' 가 한 번 더 누르지 않게).
- *  - `?chat=1` 은 언제나 대화창(예전 화면 위 [대화로 묻기]).
- *  - 사람마다 고를 수 있다: 모듈마다 · 전체(설정 › 내 설정) '대화창부터' / '바로 화면'. 처음은 대화창부터.
+ * 메뉴로 들어온 **맨 첫 주소**(`/tools/policy-funding` 처럼 뒤에 아무것도 없을 때)에서만 저절로 연다.
+ *  - 목차 화면(`/tools/<모듈>/<화면>`) · 업체를 물고 온 주소(`?client=`) · 상황 예시(`?preset=`) 등 뒤에 무엇이 붙은 주소는 저절로 열지 않는다
+ *    (맞춤 추천 · 상황 예시 · 오늘 화면에서 누른 '열기' 는 그 화면만 — 이미 열려 있던 대화창은 그대로 따라온다).
+ *  - `?chat=1` 은 언제나 연다.
+ *  - 사람마다 고를 수 있다: 모듈마다 · 전체(설정 › 내 설정) '대화창 같이' / '화면만'. 처음은 대화창 같이.
+ *    특허 · 벤처 · 기업인증 · 마케팅 대화창은 전체 값을 따른다.
  * 규칙 계산 — 외부 호출 없음.
  */
 
@@ -40,6 +43,9 @@ export const CHAT_FIRST_LABEL: Readonly<Record<ChatFirstKey, string>> = {
 }
 
 export type ChatFirstMode = 'chat' | 'direct'
+
+/** D-628 화면에 쓰는 말 — 저장 값(chat · direct)은 그대로(D-315) */
+export const CHAT_FIRST_MODE_LABEL: Readonly<Record<ChatFirstMode, string>> = { chat: '대화창 같이', direct: '화면만' }
 
 export interface ChatFirstPrefs {
   /** 전체 기본(없으면 'chat') */
@@ -119,8 +125,8 @@ export function chatFirstKeyOf(pathname: string): ChatFirstKey | null {
 }
 
 /**
- * 지금 주소에서 대화창을 보여 줄까 — `?chat=1` 이면 언제나 · 맨 첫 주소(뒤에 아무것도 없음)면 고른 대로.
- * 목차 화면 · 업체 · 상황 예시 · 다른 칸이 붙은 주소는 예전 화면.
+ * 지금 주소에서 대화창을 저절로 열까 — `?chat=1` 이면 언제나 · 맨 첫 주소(뒤에 아무것도 없음)면 고른 대로.
+ * 목차 화면 · 업체 · 상황 예시 · 다른 칸이 붙은 주소는 저절로 열지 않는다(D-628 전에는 '대화창을 가운데에 보여 줄까' 였다).
  */
 export function chatShown(pathname: string, search: string, prefs: ChatFirstPrefs): boolean {
   const key = chatFirstKeyOf(pathname)

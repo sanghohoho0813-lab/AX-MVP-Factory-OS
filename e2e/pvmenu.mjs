@@ -61,7 +61,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.waitForURL(/\/patent-venture$/)
   await page.waitForTimeout(400)
   // D-250 첫 화면 = 대화창 · 예전 진행판 · 카드는 [자세히](/patent-venture/more)
-  check('메뉴 → /patent-venture · 첫 화면 = 대화창', (await page.getByTestId('pv-chat-page').count()) === 1)
+  // D-628 대화창은 오른쪽 판으로 — 가운데는 머리(회사 고르기) · 단계 · [자세히], 대화는 오른쪽 끝 [대화](시드는 '화면만' 이라 닫힌 채)
+  check('메뉴 → /patent-venture · 첫 화면 = 머리 · 회사 칸 · 다섯 단계(가운데) + 오른쪽 끝 [대화]', (await page.getByTestId('pv-chat-page').count()) === 1 && (await page.locator('main [data-testid="page-client"]').count()) === 1 && (await page.locator('main [data-testid="pv-steps"]').count()) === 1 && (await page.locator('main [data-testid="chat-input"]').count()) === 0 && (await page.getByTestId('page-chat-launch').count()) === 1)
   check('메뉴 불 켜짐(지금 화면)', (await page.locator('aside').first().locator('a[aria-current="page"]').innerText()).includes('특허 · 벤처'))
   await page.getByTestId('chat-detail').click()
   await page.waitForURL(/\/patent-venture\/more$/)
@@ -112,7 +113,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   await page.getByTestId('vplan-back').click()
   await page.waitForURL(/\/patent-venture$/)
   await page.getByTestId('pv-chat-page').waitFor({ timeout: 5000 }).catch(() => {})
-  check('돌아가기 → 특허 · 벤처 첫 화면(대화창)', (await page.getByTestId('pv-chat-page').count()) === 1)
+  check('돌아가기 → 특허 · 벤처 첫 화면', (await page.getByTestId('pv-chat-page').count()) === 1)
   await page.goto(BASE + '/patent-venture/plan', { waitUntil: 'networkidle' })
   await page.waitForTimeout(500)
   check('회사 없이 열면 회사 고르기', (await page.getByTestId('pv-plan-pick').count()) === 1 && (await page.getByTestId('vplan').count()) === 0)
@@ -153,7 +154,7 @@ for (const width of [360, 390, 430]) {
     await link.click()
     await page.waitForURL(/\/patent-venture$/)
     await page.waitForTimeout(400)
-    check('390: 서랍 → 첫 화면(대화창)', (await page.getByTestId('pv-chat-page').count()) === 1)
+    check('390: 서랍 → 첫 화면(가운데 작업 화면 + 둥근 [대화])', (await page.getByTestId('pv-chat-page').count()) === 1 && (await page.getByTestId('page-chat-launch').count()) === 1)
   }
   for (const scale of ['', 'extra_large']) {
     await page.goto(BASE + '/patent-venture', { waitUntil: 'networkidle' })

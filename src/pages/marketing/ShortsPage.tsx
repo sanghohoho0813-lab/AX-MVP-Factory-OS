@@ -807,6 +807,8 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, brief, aiOk, 
         <AiAssist
           page="shorts"
           title="릴스 · 틱톡"
+          // D-628 이 화면의 대화창 — 오른쪽 판에(붙일 폭이 되면 저절로 · 오른쪽 끝 [대화])
+          dock="auto"
           presets={['shorts.write']}
           quick={0}
           build={() => ({ context: writeContext({ aim: draft.aim, format: draft.format }), links: {} })}

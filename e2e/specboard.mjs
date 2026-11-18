@@ -16,6 +16,7 @@
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 import { seedScript } from './seed.mjs'
+import { openChat } from './pageTools.mjs'
 
 const BASE = process.argv[2] ?? 'http://localhost:4390'
 const SHOTS = process.argv[3] ?? ''
@@ -592,6 +593,8 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await routeAi(page)
   await page.goto(`${BASE}/patent-venture?client=${CLIENT}`, { waitUntil: 'networkidle' })
   await page.getByTestId('pv-chat-page').waitFor()
+  // D-628 대화창은 오른쪽 판 — [대화] 로 연다
+  await openChat(page)
   await page.getByTestId('chat-hero').getByTestId('chat-starter').first().click()
   const act = page.locator('[data-testid="chat-action"][data-id="new-spec"]').last()
   await act.waitFor()

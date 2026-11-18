@@ -102,6 +102,8 @@ import { PlanView, type FocusData, type OppCard } from './radar/PlanView'
 import { IconChip, VideoDetail, VideoRow } from './radar/RadarParts'
 import { KeywordHome, ResumeCard, type HomeKeyword, type HomeResume } from './radar/KeywordHome'
 import { MkAsk } from './radar/MkAsk'
+import { ChatStartGate, PageChat } from '../../components/chat/PageChat'
+import { useChatAutoOpen } from '../../lib/useChatFirst'
 import { MkStart } from './radar/MkStart'
 import { MkPath } from './radar/MkPath'
 import type { MkRoute } from '../../services/marketing/mkAsk'
@@ -790,6 +792,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     else if (r.kind === 'pack') openPack(`custom:${cleanTopic(r.topic)}`)
   }
   const homeStatus = prepared ? 'ready' : loading || yt.status === 'idle' ? 'loading' : 'none'
+  // D-628 대화창은 오른쪽 판으로 — '대화창 같이' 를 고른 사람만 저절로 열린다
+  const autoChat = useChatAutoOpen()
   const radarAssist =
     !readOnly && !firstScreen && !packKey && !weekOn && view !== 'plan' && (prepared || view === 'make') ? (
       <AiAssist
@@ -1030,7 +1034,14 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           {!readOnly && customer && <MkStart workspaceId={workspaceId} picked={prefs.interests ?? []} prefsReady={prefsReady} onSaveInterests={(ids) => savePrefs({ ...prefs, interests: ids })} />}
           {/* D-566 처음 시작 길 — 지금 할 한 가지(다섯 걸음) → 다 하면 오늘의 한 가지(요일마다). 대표가 아닌 계정에만 */}
           {!readOnly && customer && <MkPath workspaceId={workspaceId} ideas={notebook.ideas.length} interests={(prefs.interests ?? []).length} prefsReady={prefsReady} />}
-          {readOnly ? null : <MkAsk onRoute={onAsk} />}
+          {/* D-628 첫 화면 대화창(무엇을 만들까요?)은 오른쪽 판으로 — 가운데는 이어서 하기 · 살펴보기 · 만들기 목록. 처음은 [대화 시작] 카드 */}
+          {readOnly ? null : (
+            <PageChat scope="mk" auto={autoChat}>
+              <ChatStartGate scope="mk" title="무엇을 만들까요?" sub="한 줄만 쓰면 글 · 대본을 만들어요">
+                <MkAsk onRoute={onAsk} />
+              </ChatStartGate>
+            </PageChat>
+          )}
           {!readOnly && resume && <ResumeCard {...resume} />}
           <div role="tablist" data-testid="yt-views">
             <MarketingTabs
@@ -1046,6 +1057,19 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
       ) : home ? (
         <>
           {prepared && <FeedNotices sample={yt.sample} message={yt.status === 'ready' || yt.status === 'sample' ? '' : yt.message} extraMessage={extra.status === 'error' ? extra.message : ''} />}
+          {/* D-628 이번 주 찍을 것(유튜브)의 AI 도우미 = 이 화면의 대화창 — 오른쪽 판에 뜬다([자세히 보기] 를 펴지 않아도 · [⋯] 에서도 열린다) */}
+          {prepared && plan && focus && !readOnly && (
+            <AiAssist
+              page="radar"
+              scope="radar:plan"
+              title="마케팅 · 이번 주 찍을 것"
+              presets={RADAR_ASSIST.plan}
+              build={assistBuild}
+              itemActions={(id) => (PLAN_ASSISTS.has(id) ? planActions : null)}
+              resultActions={(id) => (id === 'radar.script' ? scriptActions : null)}
+              dock="auto"
+            />
+          )}
           <PeekProvider value={peekEnv}>
           <KeywordHome
             // D-616 이번 주 뜨는 주제 = 예전 '이번 주 찍을 것' 1~10위(같은 후보) — 줄을 누르면 이유 · 근거 · 찍는 법 · 확정 · 만들기
@@ -1081,17 +1105,6 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                   forceOpen={foldAllOpen()}
                 >
                   <div className="flex flex-wrap gap-2">{feedButtons}</div>
-                  {!readOnly && (
-                    <AiAssist
-                      page="radar"
-                      scope="radar:plan"
-                      title="마케팅 · 이번 주 찍을 것"
-                      presets={RADAR_ASSIST.plan}
-                      build={assistBuild}
-                      itemActions={(id) => (PLAN_ASSISTS.has(id) ? planActions : null)}
-                      resultActions={(id) => (id === 'radar.script' ? scriptActions : null)}
-                    />
-                  )}
                   <PeekProvider value={peekEnv}>
                     <PlanView
                       plan={plan}

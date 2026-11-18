@@ -19,7 +19,8 @@ import { createPortal } from 'react-dom'
 import { ArrowUpRight, Globe, PanelRight, PanelsLeftRight, Search, Sparkles, X } from 'lucide-react'
 import { inFrame } from '../../lib/deviceView'
 import { useCustomerAudience } from '../../config/customerAudience'
-import { closeDock, openDock, useDock } from '../../lib/sideDock'
+import { openDock, useDock } from '../../lib/sideDock'
+import { closePageDock, showFreeChat, usePageChat } from '../../lib/pageChat'
 import { CORNER_GAP, SIDE_SERVICES, SIDE_SITES, SIDE_WIDTHS, closeSideAi, cornerSpot, focusSideAi, openOsLeft, openSideAddress, openSideAi, setSidePrefs, useSideAi, type SideService, type SideWidth } from '../../lib/sideAi'
 import { fetchAssistStatus, type ProviderId } from '../../services/aiAssist/client'
 import { allowedProviders, isCheapOnly, readChoice, saveChoice } from '../../services/aiAssist/store'
@@ -53,6 +54,8 @@ export function SideAiButton() {
   const customer = useCustomerAudience()
   const s = useSideAi()
   const dock = useDock()
+  // D-628 판은 이 화면 대화창 때문에 열려 있을 수도 있다 — 자리 재기 · [오른쪽 판 닫기] 는 지금 그려져 있는지를 본다
+  const dockShown = usePageChat().dockShown
   const [open, setOpen] = useState(false)
   const [at, setAt] = useState<CSSProperties>({})
   const [corner, setCorner] = useState<{ spot: 'margin' | 'inline'; left: number; top: number }>({ spot: 'inline', left: 0, top: 0 })
@@ -67,15 +70,20 @@ export function SideAiButton() {
   /** D-261 OS 안 오른쪽 판에서 고른 AI 회사 모델로 대화 — 그 회사 모델을 아직 안 골랐으면 보통(standard) 모델로 바꿔 둔다 */
   const chatInside = async () => {
     const want = PROVIDER_OF[s.service]
-    if (want && readChoice()?.provider !== want) {
+    const picked = readChoice()
+    if (want && picked?.provider !== want) {
       if (!allowedProviders().includes(want)) showToast('이 계정은 Gemini 로 대화해요 — OS 안 판을 Gemini 로 엽니다')
       else {
         setStarting(true)
         try {
-          const p = (await fetchAssistStatus(true)).providers.find((x) => x.id === want)
+          const status = await fetchAssistStatus(true)
+          const p = status.providers.find((x) => x.id === want)
           // D-614 가장 싼 모델만 쓰는 계정(내부 팀장 · 대표가 팀장 화면으로 볼 때)은 그 회사의 가장 싼 모델로
           const m = p?.configured ? (isCheapOnly() ? p.models.find((x) => x.tier === 'cheap') : p.models.find((x) => x.tier === 'standard') ?? p.models[0]) : undefined
-          if (m) saveChoice({ provider: want, model: m.id })
+          // D-629 자동(고른 모델 없음)이고 고른 AI 가 자동이 쓰는 회사(서버 기본)면 그대로 둔다 — 판을 연다고 자동을 '직접' 으로 바꾸지 않는다
+          if (!picked && p?.configured && status.defaultChoice?.provider === want) {
+            /* 자동 그대로 — 물음은 가장 싼 모델 · 일을 시킬 때는 좋은 모델 */
+          } else if (m) saveChoice({ provider: want, model: m.id })
           else showToast(`${MODEL_NAME[s.service]} 키가 아직 없어요 — 지금 고른 모델로 엽니다(판 위 [모델] 에서 바꿀 수 있어요)`)
         } catch {
           /* 목록을 못 읽으면 지금 고른 모델로 연다 */
@@ -85,6 +93,8 @@ export function SideAiButton() {
       }
     }
     openDock('chat')
+    // D-628 [○○ 로 대화] 는 화면과 상관없이 고른 AI 와 묻는 자유 대화 — 이 화면 대화창이 있어도 자유 대화를 보여 준다
+    showFreeChat()
     setOpen(false)
   }
   // D-265 판은 단추 바로 아래 · 오른쪽 끝을 단추에 맞춤 · 아래로는 화면 안까지만(넘치면 판 안에서 굴린다)
@@ -109,7 +119,7 @@ export function SideAiButton() {
   }, [])
   useLayoutEffect(() => {
     remeasure()
-  }, [remeasure, label, s.reserve, dock.open, dock.width])
+  }, [remeasure, label, s.reserve, dock.open, dockShown, dock.width])
   useEffect(() => {
     const main = document.querySelector('main')
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => remeasure())
@@ -126,7 +136,7 @@ export function SideAiButton() {
   // 판이 열린 채 옆 창 · 오른쪽 판 · 자리가 바뀌면 판도 단추를 따라간다(옆 창 밑에 깔리지 않게)
   useLayoutEffect(() => {
     if (open) placePanel()
-  }, [open, placePanel, corner, s.reserve, dock.open, dock.width])
+  }, [open, placePanel, corner, s.reserve, dock.open, dockShown, dock.width])
   useEffect(() => {
     if (!open) return
     const away = (e: PointerEvent) => {
@@ -238,8 +248,8 @@ export function SideAiButton() {
                 </>
               )}
             </div>
-            {dock.open && (
-              <button type="button" onClick={() => closeDock()} className="tap t-meta self-start font-semibold text-violet-800 underline underline-offset-2" data-testid="side-ai-dock-close">
+            {dockShown && (
+              <button type="button" onClick={() => closePageDock()} className="tap t-meta self-start font-semibold text-violet-800 underline underline-offset-2" data-testid="side-ai-dock-close">
                 오른쪽 판 닫기
               </button>
             )}

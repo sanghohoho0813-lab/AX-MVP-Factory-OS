@@ -959,6 +959,8 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, weekRef, brie
         <AiAssist
           page="threads"
           title="스레드"
+          // D-628 이 화면의 대화창 — 오른쪽 판에(붙일 폭이 되면 저절로 · 오른쪽 끝 [대화])
+          dock="auto"
           presets={['threads.write']}
           quick={0}
           build={() => ({ context: writeContext({ goal: draft.goal, template: draft.template, tag: draft.tag }), links: {} })}
