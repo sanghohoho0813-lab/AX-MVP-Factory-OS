@@ -323,14 +323,11 @@ export function WorkChat(p: WorkChatProps) {
   const pc = usePageChat()
   const started = !empty || pc.started.includes(scope)
   const focusNext = useRef(false)
-  // PC 에서 [대화] 를 눌러 방금 열었으면(대화 없음) 질문칸에 커서 — 휴대폰은 자판이 큰 단추를 가려서 두지 않는다
-  const firstMount = useRef(true)
+  // [대화 시작] 을 눌렀거나, PC 에서 [대화] 로 방금 열었으면(대화 없음) 질문칸에 커서 — 휴대폰은 자판이 큰 단추를 가려서 두지 않는다
   const phoneNow = pc.mode === 'none'
   useEffect(() => {
-    const first = firstMount.current
-    firstMount.current = false
     if (!started) return
-    if (focusNext.current || (first && empty && !phoneNow)) {
+    if (focusNext.current || (empty && !phoneNow)) {
       focusNext.current = false
       inputRef.current?.focus({ preventScroll: true })
     }

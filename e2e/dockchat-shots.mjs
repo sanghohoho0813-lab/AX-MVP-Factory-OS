@@ -42,12 +42,19 @@ for (const vp of [
   for (const [name, url] of SCREENS) {
     await page.goto(BASE + url, { waitUntil: 'networkidle' })
     await page.waitForTimeout(900)
+    // 유튜브 — 받아 온 영상이 없으면 견본을 켠다(AI 도우미 = 이 화면의 대화창은 영상이 있어야 생긴다)
+    const sample = page.getByTestId('yt-sample')
+    if (await sample.count()) {
+      await sample.first().click()
+      await page.waitForTimeout(1200)
+    }
     await page.screenshot({ path: path.join(OUT, `${vp.tag}-${name}-1-first.png`) })
     // 휴대폰 · 좁은 화면은 [대화] 단추로 연다
     const launch = page.getByTestId('page-chat-launch')
     if (await launch.isVisible().catch(() => false)) {
       await launch.click()
-      await page.waitForTimeout(500)
+      // 아래 판이 다 올라온 뒤(0.7초 번짐)
+      await page.waitForTimeout(1100)
     }
     const start = page.getByTestId('chat-start')
     if (await start.isVisible().catch(() => false)) {
@@ -56,11 +63,19 @@ for (const vp of [
     }
     await page.screenshot({ path: path.join(OUT, `${vp.tag}-${name}-2-started.png`) })
     const starter = page.getByTestId('chat-starter').first()
+    const preset = page.getByTestId('ai-assist-preset').first()
     if (await starter.isVisible().catch(() => false)) {
       await starter.click()
       await page.waitForTimeout(700)
       await page.screenshot({ path: path.join(OUT, `${vp.tag}-${name}-3-answer.png`) })
       await page.getByTestId('chat-clear').click().catch(() => {})
+    } else if (await preset.isVisible().catch(() => false)) {
+      // AI 도우미 — 질문 하나를 고르고 [이대로 질문하기](AI 는 꺼 둠 → 알림 줄까지)
+      await preset.click()
+      await page.getByTestId('ai-assist-confirm-go').click().catch(() => {})
+      await page.waitForTimeout(900)
+      await page.screenshot({ path: path.join(OUT, `${vp.tag}-${name}-3-answer.png`) })
+      await page.keyboard.press('Escape')
     }
     const sheetClose = page.getByTestId('page-chat-sheet-close')
     if (await sheetClose.isVisible().catch(() => false)) await sheetClose.click()

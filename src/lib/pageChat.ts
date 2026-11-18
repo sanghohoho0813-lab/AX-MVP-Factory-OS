@@ -114,10 +114,14 @@ if (typeof window !== 'undefined') {
   })
 }
 
-/** 보이는 순서 — 눌러서 연 AI 도우미(3) → 그 화면 대화창(2) → 그 화면 AI 도우미(1). 같으면 먼저 알린 것 */
+/**
+ * 보이는 순서 — 눌러서 연 AI 도우미(4) → 그 화면 대화창(3) → 그 화면의 대화창으로 삼은 AI 도우미(2 — 여는 단추가 있는 것) → 그 밖의 AI 도우미(1).
+ * 같으면 먼저 알린 것.
+ */
 function rankOf(e: PageChatEntry, explicit: number | null): number {
-  if (e.key === explicit) return 3
-  return e.kind === 'chat' ? 2 : 1
+  if (e.key === explicit) return 4
+  if (e.kind === 'chat') return 3
+  return e.launcher ? 2 : 1
 }
 
 /** 지금 화면에서 보일 대화창(없으면 null) */

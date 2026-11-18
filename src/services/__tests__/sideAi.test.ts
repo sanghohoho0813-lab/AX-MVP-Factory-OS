@@ -7,6 +7,7 @@
 import { PARK_MS, SIDE_SERVICES, SIDE_SITES, addressLabel, addressToUrl, atSideEdge, cornerSpot, cutsOpener, exitPoint, featuresOf, formPopupLikely, inVacated, learnedReserve, looksCut, parsePrefs, reserveFor, sideLayout, sideRectIn, zoomOf } from '../../lib/sideAi'
 import { NAV_ICONS, NAV_MAX, NAV_MIN, navMaxFor, navPx, parseNavSize, sizeAtDrag, stepNav, type NavSize } from '../../lib/navWidth'
 import { DOCK_CHAT_MAX, DOCK_MAX, DOCK_MIN, GOOGLE_FRAME_HOME, canFrame, dockChatContext, dockLayout, frameUrlOf, parseDock, parseDockChat } from '../../lib/sideDock'
+import { autoOpenPageChat, basePageChat, closeAssistInDock, closePageDock, currentPageChat, launchPageChat, nextPageChatKey, openAssistInDock, openPageChat, pageChatState, pageChatView, parsePageChat, registerPageChat, resetPageChat, setPageChatEnv, showFreeChat, togglePageChatView } from '../../lib/pageChat'
 
 let pass = 0
 let fail = 0
@@ -173,6 +174,79 @@ check('K3 javascript · data · file · 깨진 주소는 절대 안 띄움', !ca
   const now = 10_000
   check('D-495 빠르게 나가면 마지막으로 받은 자리(옆 창이 덮지 않은 곳)를 씀', JSON.stringify(exitPoint({ x: 1190, y: 500 }, { x: 1150, y: 498, t: now - 16 }, now)) === JSON.stringify({ x: 1150, y: 498 }))
   check('D-495 오래된 자리 · 먼 자리는 쓰지 않음', exitPoint({ x: 1190, y: 500 }, { x: 1150, y: 498, t: now - 900 }, now).x === 1190 && exitPoint({ x: 1190, y: 500 }, { x: 700, y: 498, t: now - 16 }, now).x === 1190 && exitPoint({ x: 1190, y: 500 }, null, now).x === 1190)
+}
+
+/* ---------------- D-628 이 화면의 대화창은 오른쪽 판에 — 무엇이 보이는지 · 열고 닫는 규칙(저장 없이 규칙만) ---------------- */
+{
+  check('P1 닫아 둔 기억 읽기 — {"closed":true} 만 닫힘 · 망가진 값 · 없는 값은 열림', parsePageChat('{"closed":true}').closed === true && parsePageChat('{"closed":"yes"}').closed === false && parsePageChat('not json').closed === false && parsePageChat(null).closed === false)
+  resetPageChat()
+  setPageChatEnv('dock', false)
+  check('P2 대화창이 없는 화면 — 보일 것 없음 · [대화] 탭은 자유 대화', currentPageChat() === null && basePageChat() === null && pageChatView() === false)
+
+  // AI 도우미만 있는 화면(오늘 · 고객 관리 …) — [대화] 탭은 예전 그대로 자유 대화, 그림 단추로 그 화면 도우미
+  const assistKey = nextPageChatKey()
+  const offAssist = registerPageChat({ key: assistKey, scope: 'assist:clients', kind: 'assist', auto: false, launcher: false })
+  const plain0 = pageChatView()
+  togglePageChatView()
+  const plain1 = pageChatView()
+  togglePageChatView()
+  check('P3 AI 도우미만 있는 화면 — 처음은 자유 대화 · 그림 단추 → 그 화면 도우미 → 다시 자유 대화', basePageChat()?.key === assistKey && plain0 === false && plain1 === true && pageChatView() === false)
+  // [⋯] AI 도우미를 눌러 열면 판이 그 도우미로 열리고, 닫으면 그 때문에 열린 판은 내려간다
+  const opened = openAssistInDock(assistKey)
+  const st1 = pageChatState()
+  const view1 = pageChatView()
+  closeAssistInDock(assistKey)
+  const st2 = pageChatState()
+  check('P4 AI 도우미를 눌러 열기 → 판에 그 도우미(open = 그 화면) → 닫으면 그 때문에 열린 판은 내림 · 닫아 둔 기억은 안 남김', opened && st1.explicit === assistKey && st1.open === 'assist:clients' && view1 && st2.explicit === null && st2.open === null && st2.closed === false, { st1, st2 })
+
+  // 대화창이 있는 화면(모듈) — 대화창이 AI 도우미보다 먼저 · [대화] 탭은 그 화면 대화
+  const chatKey = nextPageChatKey()
+  const offChat = registerPageChat({ key: chatKey, scope: 'mod:policy-funding', kind: 'chat', auto: true, launcher: true })
+  check('P5 대화창 + AI 도우미가 같이 있으면 그 화면 대화창이 먼저 · [대화] 탭 = 그 화면 대화', currentPageChat()?.key === chatKey && basePageChat()?.key === chatKey && pageChatView() === true)
+  autoOpenPageChat('mod:policy-funding')
+  openAssistInDock(assistKey)
+  const over = { cur: currentPageChat()?.key, base: basePageChat()?.key, open: pageChatState().open }
+  closeAssistInDock(assistKey)
+  const under = { cur: currentPageChat()?.key, open: pageChatState().open, explicit: pageChatState().explicit }
+  check('P6 대화창 위에 AI 도우미를 눌러 열면 도우미가 위 · 닫으면 그 화면 대화창으로(판은 열린 채)', over.cur === assistKey && over.base === chatKey && over.open === 'mod:policy-funding' && under.cur === chatKey && under.open === 'mod:policy-funding' && under.explicit === null, { over, under })
+  showFreeChat()
+  const free = pageChatView()
+  openPageChat()
+  check('P7 머리줄 [○○ 로 대화] → 자유 대화 · 이 화면 대화를 열면 다시 그 화면 대화', free === false && pageChatView() === true && pageChatState().open === 'mod:policy-funding')
+
+  // 닫으면 기억 · 저절로 열기는 그 기억을 풀지 않는다 · 여는 단추는 푼다(바로 시작)
+  closePageDock()
+  const shut = { ...pageChatState() }
+  autoOpenPageChat('mod:policy-funding')
+  const stillClosed = pageChatState().closed
+  closePageDock()
+  launchPageChat()
+  const launched = { ...pageChatState() }
+  check('P8 닫기 → 닫아 둔 기억 · 판 내림 → 저절로 열기는 기억을 풀지 않음 → [대화] 단추는 풀고 바로 시작(시작 카드 없이)', shut.closed === true && shut.open === null && stillClosed === true && launched.closed === false && launched.open === 'mod:policy-funding' && launched.started.includes('mod:policy-funding'), { shut, launched })
+
+  // 휴대폰(판 없음) — 아래 판을 연다. 자기 판을 따로 여는 대화(AI 도우미)는 그 판을
+  resetPageChat()
+  setPageChatEnv('none', false)
+  openPageChat({ start: true })
+  const sheet = { sheet: pageChatState().sheet, open: pageChatState().open, noDock: openAssistInDock(assistKey) }
+  offChat()
+  let phoneOpened = 0
+  const autoKey = nextPageChatKey()
+  const offAuto = registerPageChat({ key: autoKey, scope: 'assist:threads', kind: 'assist', auto: true, launcher: true, openPhone: () => (phoneOpened += 1) })
+  resetPageChat()
+  openPageChat()
+  check('P9 휴대폰 — 대화창은 아래 판(오른쪽 판 아님) · AI 도우미는 판에 못 띄움(예전 판) · 그 화면 대화창으로 삼은 AI 도우미는 자기 판을 연다', sheet.sheet === true && sheet.open === null && sheet.noDock === false && basePageChat()?.key === autoKey && phoneOpened === 1 && pageChatState().sheet === false, { sheet, phoneOpened })
+
+  // 그 화면의 대화창으로 삼은 AI 도우미(마케팅 유튜브 · 스레드 · 릴스) — 눌러 연 것을 닫으면 판을 닫고 기억한다
+  setPageChatEnv('dock', true)
+  openAssistInDock(autoKey)
+  const autoView = pageChatView()
+  closeAssistInDock(autoKey)
+  check('P10 그 화면 대화창으로 삼은 AI 도우미 — [대화] 탭이 처음부터 그것 · 닫으면 판을 닫고 기억(다음부터 저절로 안 열림)', autoView === true && pageChatState().open === null && pageChatState().closed === true && pageChatState().explicit === null, pageChatState())
+  offAuto()
+  offAssist()
+  resetPageChat()
+  check('P11 화면을 떠나면(알린 것을 빼면) 보일 것 없음', currentPageChat() === null && pageChatView() === false)
 }
 
 console.log(`\nsideAi: ${pass} passed, ${fail} failed`)

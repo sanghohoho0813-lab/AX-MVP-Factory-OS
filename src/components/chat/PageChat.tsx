@@ -13,6 +13,7 @@ import { useLocation, useNavigationType } from 'react-router-dom'
 import { MessageCircle, X } from 'lucide-react'
 import { useBackToClose } from '../../lib/backToClose'
 import { useEscToClose } from '../../lib/escStack'
+import { isMarketingArea } from '../../lib/marketingArea'
 import { CHAT_TINT, basePageChat, closePageSheet, currentPageChat, launchPageChat, nextPageChatKey, registerPageChat, setPageChatSlot, startPageChat, usePageChat } from '../../lib/pageChat'
 
 
@@ -49,9 +50,13 @@ export function PageChat({
     d.className = 'flex min-h-0 flex-1 flex-col'
     return d
   }, [])
+  // D-507 마케팅 · 브랜딩 화면의 대화창은 오른쪽 판 안에서도 그 영역의 글자 기준(60대 — 한 단계 크게 · 진하게)을 따른다
+  const marketing = isMarketingArea(useLocation().pathname)
   useEffect(() => {
     host.setAttribute('data-page-chat', scope)
-  }, [host, scope])
+    if (marketing) host.setAttribute('data-area', 'marketing')
+    else host.removeAttribute('data-area')
+  }, [host, scope, marketing])
 
   // 알리기(값이 바뀌면 고쳐 알림) · 화면을 떠날 때 한 번 뺀다
   const off = useRef<(() => void) | null>(null)

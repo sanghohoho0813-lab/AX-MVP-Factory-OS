@@ -47,6 +47,7 @@ import { SideAiButton } from './SideAiButton'
 import { ArrangeButton } from '../ui/arrange'
 import { ChatModeButton } from '../chat/ChatFirst'
 import { PageChatLauncher, PageChatSheet } from '../chat/PageChat'
+import { isMarketingArea } from '../../lib/marketingArea'
 import { LayoutCloudSync } from './LayoutCloudSync'
 import { useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { setAllowedProviders, setCheapOnly } from '../../services/aiAssist/store'
@@ -259,10 +260,4 @@ export function AppShell() {
 function shellKeyOf(pathname: string): string {
   const m = /^\/tools\/([^/]+)/.exec(pathname)
   return m ? `/tools/${m[1]}` : pathname
-}
-
-/** D-507 마케팅 · 브랜딩 화면(레이더 · 내 콘텐츠 · 스레드 · 릴스 · 홍보 글 · 홈페이지) */
-
-export function isMarketingArea(pathname: string): boolean {
-  return pathname === '/marketing' || pathname.startsWith('/marketing/') || pathname === '/tools/content' || pathname.startsWith('/tools/content/') || pathname === '/tools/homepage' || pathname.startsWith('/tools/homepage/')
 }

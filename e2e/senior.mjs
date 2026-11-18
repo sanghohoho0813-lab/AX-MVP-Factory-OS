@@ -170,7 +170,8 @@ function measure({ jargon, phone }) {
     if (n) jar.push(`${w}×${n}`)
   }
   // D-507 무엇을 하는 곳인지 한 줄(첫 화면 1 → 2 → 3 · 화면마다 '이 화면은' · 스레드/릴스 탭 설명)이 처음 보이는 화면 안에 있나
-  const guideEl = [...document.querySelectorAll('[data-testid="mk-steps"], [data-testid="mk-guide"], [data-testid$="-about"]')].find((el) => vis(el) && el.getBoundingClientRect().top < innerHeight)
+  // D-628 첫 화면의 한 줄 대화창(mk-guide)은 오른쪽 판으로 갔다 — 가운데의 '무엇을 하는 곳' 한 줄은 머리 아래 radar-subtitle(D-507)
+  const guideEl = [...document.querySelectorAll('[data-testid="mk-steps"], [data-testid="mk-guide"], [data-testid="radar-subtitle"], [data-testid$="-about"]')].find((el) => vis(el) && el.getBoundingClientRect().top < innerHeight)
   return {
     guide: !!guideEl,
     small14: small14.length,
