@@ -172,10 +172,11 @@ export function InnerTabs<K extends string>({ tabs, value, onPick, label, testPr
           const tone = TONES[t.tone ?? 'slate']
           return (
             <HoverTip key={t.key} block tip={t.tip ? <TipBody title={t.label} body={t.tip} /> : null} className="h-full" testId={`${testPrefix}-tabtip`}>
-              <button type="button" role="tab" aria-selected={on} onClick={() => onPick(t.key)} className={`tap t-sub inline-flex h-full min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-[8px] px-1 text-center leading-tight font-semibold break-keep sm:flex-row sm:gap-1.5 ${on ? `bg-white ${tone.ink} shadow-(--shadow-card) ring-2 ${tone.ring}` : 'text-slate-600 hover:bg-white/70'}`} data-testid={`${testPrefix}-tab-${t.key}`}>
-                <Icon aria-hidden="true" className={`size-4 shrink-0 ${tone.icon}`} />
-                <span className="sm:hidden">{t.short}</span>
-                <span className="hidden sm:inline">{t.label}</span>
+              {/* D-630 칸 줄은 얇은 한 줄 — PC 도 짧은 이름(쓰기 · 기록표 · 글 틀 · 매일). 온전한 이름은 마우스를 올리면 · 화면 읽기에는 그대로 */}
+              <button type="button" role="tab" aria-selected={on} onClick={() => onPick(t.key)} className={`tap t-sub inline-flex h-full min-h-11 w-full min-w-0 flex-row items-center justify-center gap-1.5 rounded-[8px] px-1 text-center leading-tight font-semibold break-keep ${on ? `bg-white ${tone.ink} shadow-(--shadow-card) ring-2 ${tone.ring}` : 'text-slate-600 hover:bg-white/70'}`} data-testid={`${testPrefix}-tab-${t.key}`}>
+                {/* 휴대폰은 글자만(큰 글자 · 네 칸에서도 칸을 넘지 않게) */}
+                <Icon aria-hidden="true" className={`size-4 shrink-0 max-sm:hidden ${tone.icon}`} />
+                <span>{t.short}</span>
               </button>
             </HoverTip>
           )
@@ -185,7 +186,9 @@ export function InnerTabs<K extends string>({ tabs, value, onPick, label, testPr
         <p className="t-sub flex min-w-0 items-start gap-1.5 px-1 break-keep text-slate-700" data-testid={`${testPrefix}-about`}>
           {CurIcon && <CurIcon aria-hidden="true" className={`mt-0.5 size-4 shrink-0 ${curTone.icon}`} />}
           <span className="min-w-0">
-            <b className={curTone.ink}>{cur.label}</b> — {cur.about ?? cur.tip}
+            {/* D-630 '지금 칸' 한 줄은 설명만 — 칸 이름은 바로 위 고른 칸이 말한다(화면 읽기에는 이름 — 설명) */}
+            <b className="sr-only">{cur.label} — </b>
+            {cur.about ?? cur.tip}
           </span>
         </p>
       )}

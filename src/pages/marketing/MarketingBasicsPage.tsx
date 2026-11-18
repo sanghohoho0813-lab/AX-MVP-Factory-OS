@@ -6,12 +6,15 @@
  *  - 읽은 표시는 이 브라우저에 기억 — 다음에 열면 안 읽은 것부터.
  * D-627 대표 "목차를 눌러 들어갔을 때 한 화면 글자 수를 엄격하게 — 여러 번 누르더라도 하나하나 더 나오게" —
  *   처음에는 제목 줄만(펼친 칸 0 · 요점 줄 0) · 다섯 줄 + [2개 더 보기]. 누르면 그 한 가지가 펼쳐지고 [읽었어요] 를 누르면 다음 것이 펼쳐진다.
+ * D-630 대표 "마케팅은 들어갔을 때 아직 많다 — 딱 한 가지만" — 처음에는 일곱 가지 목록(다섯 줄 + 더 보기)만.
+ *   목록 아래 도구 넷(프로필 소개 글 · 내 상담 신청 링크 · 연락 받는 길 만드는 법 · 올리는 법)은 접힌 한 줄 [더 보기] 안으로
+ *   (들어올 때마다 접힌 채 · ?open=intake 로 오면 펼친 채 · [모두 펼치기] 를 해 둔 사람은 처음부터 펼침).
  * 규칙 글이다(content/marketingBasics) — AI 를 부르지 않는다. 마케팅 영역이라 글자 15px 이상 · 쉬운 말(D-507).
  */
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowRight, Check, ChevronDown } from 'lucide-react'
-import { HintTip } from '../../components/ui/fold'
+import { Fold, HintTip, foldAllOpen } from '../../components/ui/fold'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
 import { ScreenGuide } from '../../tools/marketing/ScreenGuide'
@@ -113,14 +116,24 @@ export function MarketingBasicsPage() {
           {total - FIRST}개 더 보기 <ChevronDown aria-hidden="true" className="size-4" />
         </button>
       )}
-      {/* D-583 읽고 나면 '그래서 어디에 어떻게 올리나' — 채널별 올리는 법(접힌 한 줄 · 안에서 탭) */}
-      {/* D-588 글에서는 팔지 않고 프로필로 보낸다 — 그 프로필에 쓸 소개 글(접힌 한 줄 · 규칙 초안) */}
-      <ProfileBioMaker contactSeed={contactSeed} />
-      {/* D-609 가장 쉬운 연락 받는 길 — 내 상담 신청 링크(적으면 잠재고객으로 바로 · 서버 0027 이 없으면 안 그림) */}
-      <IntakeLinkCard defaultOpen={intakeOpen} onUse={(line) => setContactSeed((prev) => ({ line, n: prev.n + 1 }))} />
-      {/* D-596 프로필에 적을 '연락 받는 길' 이 아직 없는 사람 — 만드는 법(접힌 한 줄) · 고른 줄은 위 소개 글 칸으로 */}
-      <ContactPathHowTo onUse={(line) => setContactSeed((prev) => ({ line, n: prev.n + 1 }))} />
-      <PostingHowTo channels={['threads', 'reels', 'tiktok', 'shorts', 'youtube']} testId="mk-basics-howto" />
+      {/* D-630 읽은 뒤 쓰는 도구 넷은 접힌 한 줄 [더 보기] 안 — 첫 화면은 일곱 가지 목록만 */}
+      <Fold
+        id="mk.basics.more"
+        title="더 보기"
+        hint="읽은 뒤 바로 쓰는 도구예요 — 프로필 소개 글 만들기 · 내 상담 신청 링크 · 연락 받는 길 만드는 법 · 올리는 법 보기."
+        keepClosed
+        forceOpen={intakeOpen || foldAllOpen()}
+        testId="mk-basics-tools"
+      >
+        {/* D-583 읽고 나면 '그래서 어디에 어떻게 올리나' — 채널별 올리는 법(접힌 한 줄 · 안에서 탭) */}
+        {/* D-588 글에서는 팔지 않고 프로필로 보낸다 — 그 프로필에 쓸 소개 글(접힌 한 줄 · 규칙 초안) */}
+        <ProfileBioMaker contactSeed={contactSeed} />
+        {/* D-609 가장 쉬운 연락 받는 길 — 내 상담 신청 링크(적으면 잠재고객으로 바로 · 서버 0027 이 없으면 안 그림) */}
+        <IntakeLinkCard defaultOpen={intakeOpen} onUse={(line) => setContactSeed((prev) => ({ line, n: prev.n + 1 }))} />
+        {/* D-596 프로필에 적을 '연락 받는 길' 이 아직 없는 사람 — 만드는 법(접힌 한 줄) · 고른 줄은 위 소개 글 칸으로 */}
+        <ContactPathHowTo onUse={(line) => setContactSeed((prev) => ({ line, n: prev.n + 1 }))} />
+        <PostingHowTo channels={['threads', 'reels', 'tiktok', 'shorts', 'youtube']} testId="mk-basics-howto" />
+      </Fold>
     </div>
   )
 }

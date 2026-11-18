@@ -22,14 +22,13 @@ import { refKind } from '../../services/aiAssist/actions'
 import type { AssistItem } from '../../services/aiAssist/client'
 import { shootKit } from '../../services/marketing/shootKit'
 import { todayLocalDate } from '../../lib/appClock'
-import { useIsPhone } from '../../lib/useIsPhone'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronDown, ClipboardCopy, Download, ExternalLink, Eye, Flame, Hash, MessageCircle, PlayCircle, RefreshCw, Rocket, SlidersHorizontal, ThumbsUp, TriangleAlert, UserRound } from 'lucide-react'
+import { ChevronDown, ClipboardCopy, Download, ExternalLink, Eye, Flame, Hash, MonitorPlay, PlayCircle, RefreshCw, Rocket, SlidersHorizontal, Smartphone, TriangleAlert, UserRound } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/primitives'
-import { Fold, HintTip, openFold } from '../../components/ui/fold'
+import { Fold, HintTip, foldAllOpen, openFold } from '../../components/ui/fold'
 import { hintFor } from '../../content/sectionHints'
 import { useToast } from '../../components/ui/toastContext'
 import { copyText, downloadText } from '../../components/consulting/studioParts'
@@ -93,13 +92,14 @@ import {
   opportunityLabel,
   radarPlan,
   radarVideos,
+  ratioLine,
   risingTopics,
   sideBreakouts,
   type Opportunity,
   type RadarVideo,
 } from '../../services/marketing/ytRadar'
 import { PlanView, type FocusData, type OppCard } from './radar/PlanView'
-import { IconChip, RatioChip, VideoDetail, VideoRow } from './radar/RadarParts'
+import { IconChip, VideoDetail, VideoRow } from './radar/RadarParts'
 import { KeywordHome, ResumeCard, type HomeKeyword, type HomeResume } from './radar/KeywordHome'
 import { MkAsk } from './radar/MkAsk'
 import { MkStart } from './radar/MkStart'
@@ -153,6 +153,8 @@ type View = RadarView
 const seg = (on: boolean) => `tap t-sub inline-flex flex-1 items-center justify-center gap-1.5 rounded-[8px] px-2 py-2 font-semibold whitespace-nowrap sm:px-3 ${on ? 'bg-white text-slate-900 shadow-(--shadow-card) ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white/70'}`
 const PERIODS: YtPeriod[] = ['week', 'month', 'year', 'shorts']
 const TOP_NS = [20, 30, 40, 60]
+/** D-630 인기 영상 — 들어왔을 때 보이는 편 수(1 · 2 · 3위 · 나머지는 [나머지 n편 더 보기]) */
+const TOP_FIRST = 3
 
 
 /**
@@ -762,8 +764,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
     </>
   )
   // D-295 채널 설계 기준은 대표 계정만(접힌 채로) — 팀장 · 구독 고객은 설정 › 내 브랜드로 각자
-  const briefCard = !readOnly && !isMarketingCustomer() ? <BriefCard brief={brief} custom={!!prefs.brief} readOnly={readOnly} onSave={saveBrief} /> : null
-  /** D-603 다른 판 안([자세히 보기] · 묶음 화면 판)에 들어갈 때 — 테두리 칸 없이 */
+  /** D-603 다른 판 안([자세히 보기] · 묶음 화면 판)에 들어갈 때 — 테두리 칸 없이 · D-630 유튜브를 못 받았을 때도 [더 보기] 안에 이 모양으로 */
   const briefInline = !readOnly && !isMarketingCustomer() ? <BriefCard plain brief={brief} custom={!!prefs.brief} readOnly={readOnly} onSave={saveBrief} /> : null
   const home = view === 'plan' && !packKey && !weekOn && !firstScreen
   // D-616 뜨는 주제 줄을 눌러 펼친 판 — 예전 '이번 주 찍을 것' 카드와 같은 단추 · 같은 저장(확정 · 담기 · 관심 없음 · AI 추천 대본)
@@ -821,15 +822,28 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                 {/* MK-SIMPLE(D-553) 예전 큰 보라 띠(질문 단추 서너 개 · 직접 묻기 · 모델) → 머리 오른쪽 [AI 도우미] 하나 — 질문 단추는 누르면 열리는 판 안에 그대로 */}
                 {radarAssist}
                 {/* D-627 새로 가져오기 · 엑셀로 받기는 화면 일이 아니라 도구 — 경로 줄 오른쪽 [⋯] 안으로 */}
-                {view !== 'make' && <InPageTools>{feedButtons}</InPageTools>}
+                {view !== 'make' && (
+                  <InPageTools>
+                    {feedButtons}
+                    {/* D-630 받은 때 · 채널 · 영상 수 — 새로 가져오기 아래 작은 글 */}
+                    {prepared && (
+                      <p className="t-meta px-3 py-1.5 text-slate-600">
+                        <FeedMeta prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} />
+                      </p>
+                    )}
+                  </InPageTools>
+                )}
               </>
             )
           }
         />
         {/* 보조 이름 · 받은 때 · 채널 수는 작은 글 한 줄(D-195 — '이번 주 찍을 것' 보다 먼저 눈을 끌지 않게) */}
         {/* MK-SIMPLE(D-553) '무엇을 하는 곳' 한 줄은 첫 화면 · 이번 주 찍을 것에만 — 다른 화면은 아래 '이 화면은' 한 줄이 그 화면을 말한다(같은 말 두 번 0) */}
-        {!packKey && !weekOn && (firstScreen || (prepared && view !== 'make')) && (
-          <p className="t-meta flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-500">
+        {/* D-630 받은 때 · 채널 수 · 영상 수는 화면 머리에 깔지 않는다 — 유튜브(이번 주 뜨는 주제)는 판 맨 아래 [더 보기] 안,
+            남의 인기 영상(인기 영상 · 참고 채널 · 올리는 때)은 경로 줄 오른쪽 [⋯] 안(새로 가져오기 옆). 들어오면 이름 + 목록만 */}
+        {!packKey && !weekOn && firstScreen && (
+          // D-630 첫 화면의 '무엇을 하는 곳' 한 줄은 이 줄 하나(대화창 제목 아래 설명 줄은 ? 안으로) — 시험 이름 mk-first-about
+          <p className="t-meta flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-500" data-testid="mk-first-about">
             {/* D-507 이곳이 무엇을 해 주는지 한 줄(쉬운 말) — 예전 이름(콘텐츠 레이더)은 괄호로 남긴다 */}
             {/* D-627 한 줄은 첫 화면에만 · 짧게(30자 안) — 이번 주 찍을 것(유튜브)은 판 머리 '이번 주 무엇을 올릴까요?' + 1 → 2 → 3 이 말한다 */}
             {firstScreen && (
@@ -842,7 +856,6 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                 {customer ? '내 유튜브 · SNS 에 올릴 글 · 대본 만들기' : '우리 유튜브 · SNS · 블로그에 올릴 글 만들기'}
               </span>
             )}
-            {prepared && !firstScreen && view !== 'make' && <FeedMeta prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} />}
           </p>
         )}
       </div>
@@ -1048,6 +1061,9 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
             onCustom={(t) => openPack(`custom:${t}`)}
             week={{ ai: mkAi && !readOnly && weekPlanSetup.pairs.length > 0, done: weekDone, onOpen: openWeek }}
             resume={null}
+            // D-630 받은 때 · 채널 · 영상 수는 [더 보기] 안 작은 글 · 못 받았을 때 안내(예시로 보기)는 목록 자리 바로 아래
+            meta={prepared ? <FeedMeta prepared={prepared} fetchedAt={yt.feed?.fetchedAt ?? ''} failed={yt.feed?.failed ?? []} /> : undefined}
+            below={!prepared ? <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} /> : undefined}
             interests={{ picked: prefs.interests ?? [], topics: interestIds, readOnly, onSave: (ids) => savePrefs({ ...prefs, interests: ids }) }}
             // D-251 대표 "키워드 1등이 뭐고 왜 그런 거고 관련 영상은 뭐고 이런 건 다 아래에 몰아서" — 예전 첫 화면 전부를 [자세히 보기] 한 곳에
             // D-603 따로 떨어진 판(panel) 대신 위 판 맨 아래 한 줄 — 접힘 · 펼침 기억은 그대로(mk-more)
@@ -1060,6 +1076,9 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                   title="자세히 보기"
                   hint="주제마다 왜 지금 · 근거 영상 · 제목 · 표지 글 · 이번 주로 확정은 위 '이번 주 뜨는 주제' 에서 그 주제를 누르면 펼쳐져요. 여기에는 시장 신호 · 추천 기준(숨긴 주제) · 이번 주 제작 예정 · AI 도우미 · 새로 가져오기 · 엑셀로 받기 · 채널 설계 기준이 있어요."
                   testId="mk-more"
+                  // D-630 [더 보기] 안에서도 들어올 때마다 접힌 채 — 한 번 누를 때마다 한 덩어리씩([모두 펼치기] 를 해 둔 사람만 처음부터 펼침)
+                  keepClosed
+                  forceOpen={foldAllOpen()}
                 >
                   <div className="flex flex-wrap gap-2">{feedButtons}</div>
                   {!readOnly && (
@@ -1095,13 +1114,13 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
                   </PeekProvider>
                   {briefInline}
                 </Fold>
-              ) : undefined
+              ) : (
+                // 데이터를 아직 못 받았어도 채널 설계 기준은 고칠 수 있게 — D-630 화면 아래 따로 두던 판을 [더 보기] 안으로
+                (briefInline ?? undefined)
+              )
             }
           />
           </PeekProvider>
-          {!prepared && <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />}
-          {/* 데이터를 아직 못 받았어도 채널 설계 기준은 고칠 수 있게(예전처럼 화면 아래) */}
-          {!prepared && briefCard}
         </>
       ) : !prepared ? (
         <SetupCard status={yt.status} message={yt.message} onSample={yt.showSample} />
@@ -1112,24 +1131,21 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
           {/* D-605 대표 "남의 인기 영상 화면도 박스 많아 — 똑같이 정리" — 인기 영상 · 참고 채널 · 올리는 때 · 길이 모두 큰 판 하나 안에(칸 사이는 가는 가로선) */}
           <div className="flex min-w-0 flex-col rounded-(--radius-panel) border border-slate-200 bg-white px-3 py-3 sm:px-4 sm:py-4" data-testid="look-box" data-view={view}>
           {view === 'top' && (
-            <div className="flex min-w-0 flex-col gap-4">
-              <HotBanner prepared={prepared} onPick={(k) => setParam({ p: '', kw: k })} />
-              <div className="flex min-w-0 flex-col gap-3 border-t border-slate-100 pt-4">
-              <Filters prepared={prepared} period={period} type={type} channel={liveChannel} topN={topN} onType={setType} onChannel={setChannel} onTopN={setTopN} />
-              <TopView
-                prepared={prepared}
-                rv={rvById}
-                period={period}
-                kw={kw}
-                topN={topN}
-                filter={filter}
-                sample={yt.sample}
-                onPeriod={(p) => setParam({ p: p === 'week' ? '' : p, kw: '' })}
-                onKeyword={(k) => setParam({ kw: k })}
-                onOpen={openVideo}
-              />
-              </div>
-            </div>
+            // D-630 들어오면 많이 본 영상 세 편 + [n편 더 보기] 만 — 이번 주 주목 주제 · 거르기 · 기간 · 키워드 · 숫자 한 줄은 접힌 한 줄 [기간 · 주제 고르기] 안
+            <TopView
+              prepared={prepared}
+              rv={rvById}
+              period={period}
+              kw={kw}
+              topN={topN}
+              filter={filter}
+              sample={yt.sample}
+              onPeriod={(p) => setParam({ p: p === 'week' ? '' : p, kw: '' })}
+              onKeyword={(k) => setParam({ kw: k })}
+              onOpen={openVideo}
+              banner={<HotBanner prepared={prepared} onPick={(k) => setParam({ p: '', kw: k })} />}
+              filters={<Filters prepared={prepared} period={period} type={type} channel={liveChannel} topN={topN} onType={setType} onChannel={setChannel} onTopN={setTopN} />}
+            />
           )}
           {view === 'channels' && <ChannelManager channels={fullFeed?.channels ?? []} prefs={prefs} readOnly={readOnly} failed={yt.feed?.failed ?? []} onPrefs={savePrefs} notify={showToast} />}
           {view === 'analysis' && <AnalysisView prepared={prepared} rvideos={rvideos} rv={rvById} onCopy={(t) => copy(t)} />}
@@ -1220,8 +1236,8 @@ function FeedNotices({ sample, message, extraMessage }: { sample: boolean; messa
     <div className="flex flex-col gap-2">
       {sample && (
         // D-627 한 줄로 — 언제 바뀌는지는 마우스를 올리면
-        <p className="t-body rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 font-semibold break-keep text-danger-700" title="유튜브 연결 설정을 마치면 실제 참고 채널로 바뀝니다." data-testid="yt-sample-banner">
-          예시 데이터예요 — 지어낸 채널 · 숫자예요.
+        <p className="t-body rounded-(--radius-control) border border-slate-200 bg-white px-4 py-3 font-semibold break-keep text-danger-700" title="지어낸 채널 · 숫자예요 — 유튜브 연결 설정을 마치면 실제 참고 채널로 바뀝니다." data-testid="yt-sample-banner">
+          예시 데이터예요.
         </p>
       )}
       {message && (
@@ -1360,6 +1376,8 @@ function TopView({
   onPeriod,
   onKeyword,
   onOpen,
+  banner,
+  filters,
 }: {
   prepared: Prepared
   rv: ReadonlyMap<string, RadarVideo>
@@ -1371,6 +1389,10 @@ function TopView({
   onPeriod: (p: YtPeriod) => void
   onKeyword: (k: string) => void
   onOpen: (v: YtVideo) => void
+  /** D-630 접힌 한 줄 [기간 · 주제 고르기] 안 맨 위 — 이번 주 주목 주제 TOP 3 */
+  banner?: ReactNode
+  /** D-630 같은 접힌 줄 안 — 거르기(종류 · 채널 · TOP n) */
+  filters?: ReactNode
 }) {
   const [allKw, setAllKw] = useState(false)
   const counts = useMemo(() => Object.fromEntries(PERIODS.map((p) => [p, periodVideos(prepared.videos, p, filter).length])) as Record<YtPeriod, number>, [prepared, filter])
@@ -1384,14 +1406,27 @@ function TopView({
   const second = board.rows[1]
   const shownKw = allKw ? keywords : keywords.slice(0, 8)
   // D-507 60대+ — 휴대폰은 처음 10편만(한 줄 목록이라 30편이면 아홉 화면) · [나머지 n편 더 보기] · 기간 · 키워드 · TOP 을 바꾸면 다시 10편부터. PC 는 그대로
-  const phone = useIsPhone()
+  // D-630 대표 "들어갔을 때 딱 한 가지만" — PC · 휴대폰 모두 처음 세 편만(1 · 2 · 3위) · [나머지 n편 더 보기]. [모두 펼치기] 를 해 둔 사람은 처음부터 전부
   const listKey = `${period}|${kw}|${topN}|${filter.type}|${filter.channels.join(',')}`
   const [moreKey, setMoreKey] = useState('')
-  const PHONE_FIRST = 10
-  const cut = phone && moreKey !== listKey && board.rows.length > PHONE_FIRST
-  const rows = cut ? board.rows.slice(0, PHONE_FIRST) : board.rows
+  const [openAll] = useState(() => foldAllOpen())
+  const cut = !openAll && moreKey !== listKey && board.rows.length > TOP_FIRST
+  const rows = cut ? board.rows.slice(0, TOP_FIRST) : board.rows
+  // 기간 · 키워드 · 거르기를 고른 채로 들어왔으면(주소 ?p= · ?kw=) 무엇으로 거른 목록인지 보이게 그 줄을 펼친 채로
+  const picked = period !== 'week' || !!kw || filter.type !== 'all' || filter.channels.length > 0
   return (
-    <div className="flex flex-col gap-4" data-testid="yt-top">
+    <div className="flex flex-col gap-3" data-testid="yt-top">
+      <Fold
+        id="yt.top.more"
+        title="기간 · 주제 고르기"
+        hint="이번 주 주목 주제 TOP 3 · 거르기(긴 영상 · 쇼츠 · 채널 · TOP 몇 편) · 기간(이번 주 · 이번 달 · 올해 · 쇼츠) · 인기 핵심 키워드 · 조회수 1위 · 평균 조회수가 여기 있어요. 고르면 아래 목록이 바뀌어요."
+        keepClosed
+        forceOpen={openAll || picked}
+        className="border-b border-slate-100 data-[open=1]:pb-3"
+        testId="yt-top-tools"
+      >
+      {banner}
+      {filters}
       <div className="flex flex-wrap gap-2" role="group" aria-label="기간" data-testid="yt-periods">
         {PERIODS.map((p) => (
           <button
@@ -1459,6 +1494,19 @@ function TopView({
           )}
         </section>
       )}
+      {board.rows.length > 0 && (
+        // D-605 숫자 칸 셋(테두리 칸) → 가는 선 사이 한 줄 숫자(같은 숫자 · 같은 말) · D-630 접힌 줄 안으로
+        <dl className="flex flex-wrap gap-x-6 gap-y-1.5 border-t border-slate-100 pt-2.5" data-testid="yt-summary">
+          <SumStat label="조회수 1위" value={`${shortNum(top.views)}회`} hint={top.channelName} />
+          <SumStat label="평균 조회수" value={`${shortNum(board.shownAvg)}회`} hint={`영상 ${board.rows.length}편`} />
+          {board.myBestRank > 0 ? (
+            <SumStat label="내 채널 최고 순위" value={`${board.myBestRank}위`} warn hint={`${shortNum(board.rows[board.myBestRank - 1].views)}회`} />
+          ) : (
+            <SumStat label="조회수 2위" value={second ? `${shortNum(second.views)}회` : '—'} hint={second?.channelName} />
+          )}
+        </dl>
+      )}
+      </Fold>
 
       {board.rows.length === 0 ? (
         <p className="t-body py-2 text-slate-500" data-testid="yt-empty">
@@ -1466,16 +1514,6 @@ function TopView({
         </p>
       ) : (
         <>
-          {/* D-605 숫자 칸 셋(테두리 칸) → 가는 선 사이 한 줄 숫자(같은 숫자 · 같은 말) */}
-          <dl className="flex flex-wrap gap-x-6 gap-y-1.5 border-y border-slate-100 py-2.5" data-testid="yt-summary">
-            <SumStat label="조회수 1위" value={`${shortNum(top.views)}회`} hint={top.channelName} />
-            <SumStat label="평균 조회수" value={`${shortNum(board.shownAvg)}회`} hint={`영상 ${board.rows.length}편`} />
-            {board.myBestRank > 0 ? (
-              <SumStat label="내 채널 최고 순위" value={`${board.myBestRank}위`} warn hint={`${shortNum(board.rows[board.myBestRank - 1].views)}회`} />
-            ) : (
-              <SumStat label="조회수 2위" value={second ? `${shortNum(second.views)}회` : '—'} hint={second?.channelName} />
-            )}
-          </dl>
           <ol className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5" data-testid="yt-grid">
             {rows.map((v, i) => (
               <VideoCard key={v.id} v={v} r={rv.get(v.id)} rank={i + 1} rising={isRising(v, board.periodAvg)} noThumb={sample} onOpen={onOpen} />
@@ -1483,7 +1521,7 @@ function TopView({
           </ol>
           {cut && (
             <button type="button" onClick={() => setMoreKey(listKey)} className="tap t-body flex min-h-12 w-full items-center justify-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-4 font-semibold text-slate-800 hover:border-brand-400" data-testid="yt-top-more">
-              나머지 {board.rows.length - PHONE_FIRST}편 더 보기 <ChevronDown aria-hidden="true" className="size-5" />
+              나머지 {board.rows.length - TOP_FIRST}편 더 보기 <ChevronDown aria-hidden="true" className="size-5" />
             </button>
           )}
         </>
@@ -1531,31 +1569,26 @@ function VideoCard({ v, r, rank, rising, noThumb, onOpen }: { v: YtVideo; r: Rad
             </span>
           )}
         </span>
-        <span className="t-meta absolute right-1.5 bottom-1.5 rounded bg-slate-900/80 px-1.5 font-semibold text-white">{v.isShort ? '쇼츠' : '긴 영상'}</span>
+        {/* D-630 긴 영상 · 쇼츠 표시는 그림(화면 읽기에는 글) — 글자는 누르면 뜨는 창에 */}
+        <span className="absolute right-1.5 bottom-1.5 inline-flex items-center rounded bg-slate-900/80 p-1 text-white" title={v.isShort ? '쇼츠' : '긴 영상'}>
+          {v.isShort ? <Smartphone aria-hidden="true" className="size-3.5" /> : <MonitorPlay aria-hidden="true" className="size-3.5" />}
+          <span className="sr-only">{v.isShort ? '쇼츠' : '긴 영상'}</span>
+        </span>
       </button>
-      <div className="flex min-w-0 flex-1 flex-col gap-1 sm:px-0.5 sm:pb-2">
-        <p className="t-meta truncate text-slate-500">{v.channelName}</p>
+      {/* D-630 카드 한 장 = 제목 + 조회수 — 채널 · 평소 대비 · 좋아요 · 댓글 · 올린 날 · 유튜브에서 보기는 누르면 뜨는 '참고 영상' 창에(지운 것 없음)
+          화면 읽기 · 마우스(title)에는 채널 · 평소 대비 · 올린 날이 그대로 */}
+      <div className="flex min-w-0 flex-1 flex-col gap-1 sm:px-0.5 sm:pb-2" title={`${v.channelName} · ${dateKo(v.publishedAt)} · 좋아요 ${v.likeRate.toFixed(1)}% · 댓글 ${shortNum(v.comments)}`}>
         {/* D-507 휴대폰에서 제목도 손가락 하나(44px) — 25px 줄을 정확히 누르기 어려웠다 */}
         <button type="button" onClick={() => onOpen(v)} className="tap t-sub line-clamp-2 text-left font-semibold break-keep text-slate-900 [overflow-wrap:anywhere] hover:text-brand-700 hover:underline">
           {v.title}
         </button>
-        {r && r.ratio !== null && <RatioChip v={r} />}
-        <p className="t-meta mt-auto flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-1 text-slate-600">
+        <p className="t-meta mt-auto flex flex-wrap items-center gap-x-2 gap-y-0.5 text-slate-600">
           <span className="inline-flex items-center gap-0.5 font-semibold text-slate-800">
             <Eye aria-hidden="true" className="size-3.5" /> {shortNum(v.views)}
           </span>
-          <span className="inline-flex items-center gap-0.5">
-            <ThumbsUp aria-hidden="true" className="size-3.5" /> {v.likeRate.toFixed(1)}%
+          <span className="sr-only" data-testid="yt-card-more">
+            {v.channelName} · {r && r.ratio !== null ? `${ratioLine(r)} · ` : ''}좋아요 {v.likeRate.toFixed(1)}% · 댓글 {shortNum(v.comments)} · {dateKo(v.publishedAt)}
           </span>
-          <span className="inline-flex items-center gap-0.5">
-            <MessageCircle aria-hidden="true" className="size-3.5" /> {shortNum(v.comments)}
-          </span>
-        </p>
-        <p className="t-meta flex items-center justify-between gap-2 text-slate-400">
-          <span>{dateKo(v.publishedAt)}</span>
-          <a href={v.url} target="_blank" rel="noopener noreferrer" className="tap -my-3 inline-flex items-center justify-end gap-0.5 font-semibold text-slate-500 hover:text-brand-700" aria-label={`${v.title} — 유튜브에서 보기`}>
-            유튜브 <ExternalLink aria-hidden="true" className="size-3" />
-          </a>
         </p>
       </div>
     </li>

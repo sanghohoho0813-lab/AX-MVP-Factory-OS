@@ -13,20 +13,32 @@
  * D-627 대표 "목차를 눌러 들어갔을 때 한 화면 글자 수를 엄격하게 — 기능은 그대로, 여러 번 누르더라도 하나하나 더 나오게" —
  *   처음 보이는 것은 ① 주제(한 줄 쓰기 + 우리 분야 칩 PC 4 · 휴대폰 3) ② 큰 단추 [AI로 완성 글 쓰기] · [뼈대] 둘뿐.
  *   추천 형식 · 더 바라는 점 · 잘 된 남의 글 · 사실 목록 · 모델 고르기 · 내 맞춤(more)은 접힌 한 줄 [더 정하기(선택)] 안(같은 시험 이름 · 지운 것 없음).
+ * D-630 대표(2026-11-18) "스레드도 그렇다 · 릴스 · 틱톡도 들어갔을 때 글자가 너무 많다 — '2 고치고 확인하기' 부터는 안 보이는 게 낫다" —
+ *   들어오면 1단계만: 주제 한 줄 · 우리 분야 칩 셋(짧은 이름) · 큰 단추 [AI로 완성 글 쓰기] · 작은 [직접 쓰기].
+ *   [뼈대만 받기 · 예시로 시작] · [첫마디 10개 보기] 는 접힌 한 줄 [더 보기] 안으로(예전 [더 정하기(선택)] — 같은 접기 열쇠 · 같은 시험 이름).
+ *   [더 보기] 는 들어올 때마다 접힌 채(펼친 것을 기억하지 않는다 · [모두 펼치기] 를 해 둔 사람만 처음부터 펼침). 2단계(글 칸)는 글이 생긴 뒤에야 그 아래에.
  */
 import { useState, type ReactNode } from 'react'
-import { ChevronDown, Flame, Pin, SlidersHorizontal, Sparkles, Wand2 } from 'lucide-react'
+import { ChevronDown, Flame, NotebookPen, Pin, SlidersHorizontal, Sparkles, Wand2 } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
-import { Fold, HintTip } from '../../components/ui/fold'
+import { Fold, HintTip, foldAllOpen } from '../../components/ui/fold'
 import type { TopicChip } from '../../services/marketing/quickStart'
 import { StepTitle } from './snsParts'
 import { toneChip } from './snsTone'
 import { AiConfirm } from '../../components/ai/AiConfirm'
 import { ModelPicker } from '../../components/ai/ModelPicker'
 
-/** D-602 우리 분야 주제 칩 — 처음에 보이는 수(D-627 PC 4 · 휴대폰 3 · 나머지는 [전부 n개 보기]) */
-const OURS_SHOWN = 4
-const OURS_SHOWN_PHONE = 3
+/** D-602 우리 분야 주제 칩 — 처음에 보이는 수(D-630 PC · 휴대폰 모두 3 · 나머지는 [n개 더 보기]) */
+const OURS_SHOWN = 3
+
+/**
+ * D-630 접힌 칩의 짧은 이름 — 긴 주제 이름('정관정비 및 임원보수 규정')의 첫 낱말('정관정비').
+ * 누르면 주제 칸에는 온전한 이름이 들어간다(마우스를 올리면 온전한 이름). 첫 낱말이 한 글자이거나 같은 줄에 겹치면 온전한 이름 그대로.
+ */
+function shortTopic(topic: string): string {
+  const first = topic.trim().split(/\s+/)[0] ?? ''
+  return first.length >= 2 && first.length < topic.trim().length ? first : topic
+}
 
 export function QuickStart({
   testPrefix,
@@ -48,7 +60,10 @@ export function QuickStart({
   request,
   reference,
   more,
+  onHand,
 }: {
+  /** D-630 [직접 쓰기] — AI · 뼈대 없이 빈 글 칸(2단계)을 바로 연다 */
+  onHand?: () => void
   /** D-558 요청 한 줄(선택) — AI 에 [자료 · 요청] 으로 */
   request?: { value: string; onChange: (v: string) => void; placeholder: string }
   /** D-558 잘 된 남의 글(선택 · 저장 안 함) — 상자 안에 보이게 */
@@ -89,17 +104,29 @@ export function QuickStart({
   const pickedAt = ours.findIndex((c) => c.topic === topic)
   const pickedLate = pickedAt >= OURS_SHOWN
   const [allOurs, setAllOurs] = useState(false)
-  const oursShown = allOurs || pickedLate ? ours : ours.slice(0, OURS_SHOWN)
+  const oursAll = allOurs || pickedLate
+  const oursShown = oursAll ? ours : ours.slice(0, OURS_SHOWN)
+  // D-630 접힌 줄은 짧은 이름(첫 낱말) — 겹치면 온전한 이름 그대로
+  const shorts = oursShown.map((c) => shortTopic(c.topic))
+  const shortOf = (i: number): string | undefined => (oursAll || oursShown[i].label || shorts[i] === oursShown[i].topic || shorts.indexOf(shorts[i]) !== shorts.lastIndexOf(shorts[i]) ? undefined : shorts[i])
   // D-602 이번 주 키워드는 접힌 한 줄 — 고른 주제가 이번 주 키워드면 펼친 채로
   const [weekOpen, setWeekOpen] = useState(false)
   const weekPicked = week.some((c) => c.topic === topic)
-  const chip = (c: TopicChip, tone: 'rose' | 'indigo', phoneHide = false) => (
-    <button key={c.topic} type="button" aria-pressed={topic === c.topic} onClick={() => onPick(c.topic)} title={c.label ? c.topic : undefined} className={`${toneChip(tone, topic === c.topic)} ${phoneHide ? 'max-sm:hidden' : ''}`} data-testid={`${testPrefix}-qs-chip`} data-from={c.from}>
-      {c.label ?? c.topic}
+  const chip = (c: TopicChip, tone: 'rose' | 'indigo', short?: string) => (
+    <button key={c.topic} type="button" aria-pressed={topic === c.topic} onClick={() => onPick(c.topic)} title={c.label || short ? c.topic : undefined} className={toneChip(tone, topic === c.topic)} data-testid={`${testPrefix}-qs-chip`} data-from={c.from} data-topic={c.topic}>
+      {c.label ?? short ?? c.topic}
     </button>
   )
   // 칸 사이 가로선(안쪽 상자 대신) — 대표 "줄글 느낌 · 큰 박스 안에 가로선"
   const row = 'border-t border-slate-100 pt-3'
+  const oursLabel = (
+    <HintTip tip="우리 분야 주제 — 늘 그대로예요. 영업 관리 › 전략에 모아 둔 상담 주제예요(정관 · 가지급금 · 정책자금 …). 고객이 실제로 묻는 것이라 글감으로 좋아요. 매주 바뀌지 않아요. 짧게 보이는 칩은 마우스를 올리면 온전한 이름이 보여요." label="우리 분야 주제" tight>
+      <span className="t-sub flex min-w-0 flex-wrap items-center gap-x-1.5 font-semibold text-slate-800" data-testid={`${testPrefix}-qs-ours-label`}>
+        {oursAll && <Pin aria-hidden="true" className="size-4 shrink-0 text-indigo-600" />}
+        <span className={oursAll ? undefined : 'sr-only'}>우리 분야 주제</span>
+      </span>
+    </HintTip>
+  )
   return (
     <div data-testid={`${testPrefix}-qs`}>
       {/* D-299 카드(Surface)는 넘치는 것을 자른다 — [모델 · ○○] 고르는 판 · ? 설명이 잘려서 자르지 않는 상자로 */}
@@ -115,22 +142,18 @@ export function QuickStart({
         />
         {ours.length > 0 && (
           <div className="flex flex-col gap-1.5" data-testid={`${testPrefix}-qs-ours`}>
-            {/* D-627 '늘 그대로예요' 표시는 ? 설명 안으로(글자 수 한도) */}
-            <HintTip tip="늘 그대로예요 — 영업 관리 › 전략에 모아 둔 상담 주제예요(정관 · 가지급금 · 정책자금 …). 고객이 실제로 묻는 것이라 글감으로 좋아요. 매주 바뀌지 않아요." label="우리 분야 주제" tight>
-              <span className="t-sub flex min-w-0 flex-wrap items-center gap-x-1.5 font-semibold text-slate-800" data-testid={`${testPrefix}-qs-ours-label`}>
-                <Pin aria-hidden="true" className="size-4 shrink-0 text-indigo-600" />
-                우리 분야 주제
-              </span>
-            </HintTip>
-            <div className="flex flex-wrap gap-1.5">
-              {/* 휴대폰은 이름이 길어 한 줄에 하나씩 — 앞 4개만(고른 주제는 늘 보임) */}
-              {oursShown.map((c, i) => chip(c, 'indigo', !allOurs && i >= OURS_SHOWN_PHONE && i !== pickedAt))}
-              {ours.length > OURS_SHOWN_PHONE && !pickedLate && (
-                <button type="button" onClick={() => setAllOurs((v) => !v)} aria-expanded={allOurs} className={`tap t-sub inline-flex min-h-9 items-center gap-1 rounded-full px-3 font-semibold text-brand-700 hover:bg-slate-50 ${ours.length > OURS_SHOWN ? '' : 'sm:hidden'}`} data-testid={`${testPrefix}-qs-ours-more`}>
-                  {allOurs ? '접기' : `${ours.length}개 다 보기`}
+            {/* D-627 '늘 그대로예요' 표시는 ? 설명 안으로(글자 수 한도)
+                D-630 이름표('우리 분야 주제')는 다 펼쳤을 때만 칩 위 한 줄로 — 접힌 줄은 칩 셋 + [n개 더 보기] + ?(이름표는 화면 읽기에만) */}
+            {oursAll && oursLabel}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {oursShown.map((c, i) => chip(c, 'indigo', shortOf(i)))}
+              {ours.length > OURS_SHOWN && !pickedLate && (
+                <button type="button" onClick={() => setAllOurs((v) => !v)} aria-expanded={allOurs} className="tap t-sub inline-flex min-h-11 items-center gap-1 rounded-full px-3 font-semibold text-brand-700 hover:bg-slate-50" data-testid={`${testPrefix}-qs-ours-more`}>
+                  {allOurs ? '접기' : `${ours.length - OURS_SHOWN}개 더 보기`}
                   <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${allOurs ? 'rotate-180' : ''}`} />
                 </button>
               )}
+              {!oursAll && oursLabel}
             </div>
           </div>
         )}
@@ -139,8 +162,10 @@ export function QuickStart({
           <details open={weekOpen || weekPicked} onToggle={(e) => setWeekOpen((e.currentTarget as HTMLDetailsElement).open)} data-testid={`${testPrefix}-qs-week`}>
             <summary className="sum-chev tap t-sub flex min-h-9 cursor-pointer flex-wrap items-center gap-x-1.5 font-semibold text-slate-800" data-testid={`${testPrefix}-qs-week-open`}>
               <Flame aria-hidden="true" className="size-4 shrink-0 text-rose-600" />
-              <span data-testid={`${testPrefix}-qs-week-label`}>이번 주 키워드 {week.length}개</span>
-              <span className="t-meta font-normal text-slate-600" title="유튜브에서 이번 주에 뜨는 주제 — 매주 바뀌어요">· 매주 바뀌어요</span>
+              {/* D-630 '매주 바뀌어요' 는 마우스를 올리면(title) */}
+              <span data-testid={`${testPrefix}-qs-week-label`} title="유튜브에서 이번 주에 뜨는 주제 — 매주 바뀌어요">
+                이번 주 키워드 {week.length}개
+              </span>
             </summary>
             <div className="mt-1.5 flex flex-wrap gap-1.5">{week.map((c) => chip(c, 'rose'))}</div>
           </details>
@@ -152,20 +177,29 @@ export function QuickStart({
                 <Sparkles aria-hidden="true" className="size-4" /> {ai.busy ? 'AI가 쓰는 중…' : ai.label}
               </Button></AiConfirm>
             )}
-            {fallback && (
-              <Button variant={ai.ok ? 'ghost' : 'primary'} onClick={fallback.onClick} disabled={!has} className={ai.ok ? '' : 'w-full sm:w-auto'} data-testid={`${testPrefix}-qs-rule`}>
+            {/* AI 를 못 쓰는 계정은 뼈대 · 예시가 큰 단추(쓸 수 있으면 아래 [더 보기] 안) */}
+            {fallback && !ai.ok && (
+              <Button variant="primary" onClick={fallback.onClick} disabled={!has} className="w-full sm:w-auto" data-testid={`${testPrefix}-qs-rule`}>
                 <Wand2 aria-hidden="true" className="size-4" /> {fallback.label}
               </Button>
             )}
+            {/* D-630 AI 없이 바로 쓰는 길 — 빈 글 칸(2단계)을 연다 */}
+            {onHand && (
+              <Button variant="ghost" onClick={onHand} title="AI 없이 빈 글 칸을 열어 직접 써요 — 쓰는 동안 규칙 검사가 바로 봐 줘요." data-testid={`${testPrefix}-hand`}>
+                <NotebookPen aria-hidden="true" className="size-4" /> 직접 쓰기
+              </Button>
+            )}
           </div>
-          {/* D-627 한 줄로 — 무엇이 되는지 긴 설명은 마우스를 올리면(title) */}
-          <p
-            className="t-sub break-keep text-slate-600"
-            data-testid={`${testPrefix}-qs-note`}
-            title={has ? (ai.ok ? '한 번 누르면 바로 올려도 되는 완성 글(1안)이 아래 글 칸에 들어가요 — 다른 안은 이 아래에 남겨 둬요. 올리기 전 규칙 검사를 한 번 봐요.' : '추천 형식의 뼈대를 글 칸에 넣어요 — 대괄호 [ ] 를 사실로 채우면 돼요.') : undefined}
-          >
-            {has ? (ai.ok ? '완성 글이 아래 글 칸에 들어가요.' : '뼈대가 글 칸에 들어가요.') : '주제부터 골라 주세요.'}
-          </p>
+          {/* D-627 한 줄로 — 무엇이 되는지 긴 설명은 마우스를 올리면(title) · D-630 주제를 고른 뒤에만(고르기 전 안내는 주제 칸 안 글이 말한다) */}
+          {has && (
+            <p
+              className="t-sub break-keep text-slate-600"
+              data-testid={`${testPrefix}-qs-note`}
+              title={ai.ok ? '한 번 누르면 바로 올려도 되는 완성 글(1안)이 아래 글 칸에 들어가요 — 다른 안은 이 아래에 남겨 둬요. 올리기 전 규칙 검사를 한 번 봐요.' : '추천 형식의 뼈대를 글 칸에 넣어요 — 대괄호 [ ] 를 사실로 채우면 돼요.'}
+            >
+              {ai.ok ? '완성 글이 아래 글 칸에 들어가요.' : '뼈대가 글 칸에 들어가요.'}
+            </p>
+          )}
           {ai.error && (
             <p role="alert" className="t-sub break-keep text-danger-700" data-testid={`${testPrefix}-qs-error`}>
               {ai.error}
@@ -173,18 +207,30 @@ export function QuickStart({
           )}
           {children}
         </div>
-        {hooks}
-        {/* D-627 더 정하기(선택) — 추천 형식 · 바라는 점 · 참고 글 · 사실 · 모델 · 내 맞춤을 접힌 한 줄 안에(펼친 것은 이 기기에 기억) */}
+        {/* D-627 더 정하기(선택) — 추천 형식 · 바라는 점 · 참고 글 · 사실 · 모델 · 내 맞춤을 접힌 한 줄 안에
+            D-630 이름은 [더 보기] · 뼈대/예시 · 첫마디 10개도 이 안으로 · 들어올 때마다 접힌 채(같은 접기 열쇠 — 예전 기억은 지우지 않고 읽지 않는다) */}
         <div className={row}>
         <Fold
           id={`${testPrefix}.qs.more`}
-          title="더 정하기(선택)"
-          hint={`추천 형식 · 더 바라는 점 · 잘 된 남의 글 · 사실 목록 · AI 모델 · 내 맞춤(형식 직접 고르기)이 여기 있어요. 안 열어도 추천 형식으로 바로 써요.${recLabel ? ` 지금 형식: ${recLabel}` : ''}`}
+          title="더 보기"
+          hint={`${fallback && ai.ok ? `${fallback.label} · ` : ''}첫마디 10개 · 추천 형식 · 더 바라는 점 · 잘 된 남의 글 · 사실 목록 · AI 모델 · 내 맞춤(형식 직접 고르기)이 여기 있어요. 안 열어도 추천 형식으로 바로 써요.${recLabel ? ` 지금 형식: ${recLabel}` : ''}`}
           icon={<SlidersHorizontal aria-hidden="true" className="size-4 text-slate-500" />}
           testId={`${testPrefix}-qs-more`}
           className="data-[open=1]:pb-1"
+          keepClosed
+          forceOpen={foldAllOpen()}
         >
         <div className="flex flex-col gap-3">
+        {/* 기다리기 싫을 때(규칙 · 예시) — AI 를 쓸 수 있는 계정은 여기 */}
+        {fallback && ai.ok && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" onClick={fallback.onClick} disabled={!has} data-testid={`${testPrefix}-qs-rule`}>
+              <Wand2 aria-hidden="true" className="size-4" /> {fallback.label}
+            </Button>
+            {!has && <span className="t-sub text-slate-600">주제부터 골라 주세요.</span>}
+          </div>
+        )}
+        {hooks}
         {top}
         {/* D-298 추천 형식 줄 — 형식 이름에 마우스를 올리면(휴대폰은 ?) 무슨 뜻인지 · 예시. D-602 상자 대신 가로선 */}
         <div className="flex flex-wrap items-center gap-2" data-testid={`${testPrefix}-qs-rec`}>

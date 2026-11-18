@@ -3,10 +3,13 @@
  * 대표(2026-11-03): "처음에 딱 미니 LLM 처럼 보이고 살펴보기 · 만들기만 — 나머지는 한 번 눌러야 보이게. 진짜 심플하게".
  *  - 쓴 말은 규칙으로 갈 곳을 정한다(services/marketing/mkAsk) — 'AI' 라고 부르지 않는다. 글을 AI 로 다시 쓰는 것은 그 화면의 [AI로 다 쓰기] 단추만.
  *  - 아래 바로 가기 다섯(이번 주 · 1주일치 · 스레드 · 릴스/틱톡 · 블로그/플레이스) — 쓰지 않고 한 번 눌러도 된다.
+ * D-630 대표 "마케팅은 들어갔을 때 아직 많다" — 제목 아래 설명 줄은 화면에 깔지 않는다(제목 옆 ? · 화면 읽기에는 그대로).
+ *   무엇을 하는 곳인지는 화면 맨 위 한 줄(우리 유튜브 · SNS · 블로그에 올릴 글 만들기)이 말한다 — 같은 말 두 번 0.
  */
 import { useState } from 'react'
 import { MessageCircle, Send } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
+import { HintTip } from '../../../components/ui/fold'
 import { MK_ASK_CHIPS, mkRoute, type MkRoute } from '../../../services/marketing/mkAsk'
 
 export function MkAsk({ onRoute }: { onRoute: (r: MkRoute) => void }) {
@@ -20,15 +23,12 @@ export function MkAsk({ onRoute }: { onRoute: (r: MkRoute) => void }) {
   }
   return (
     <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="mk-ask-title" data-testid="mk-ask">
-      <div className="flex flex-col gap-1">
+      <HintTip tip="주제나 하고 싶은 것을 한 줄로 쓰면, 올릴 글 · 대본을 바로 만들어 드려요. 아래 단추를 한 번 눌러도 돼요." label="무엇을 만들까요?">
         <h2 id="mk-ask-title" className="t-section flex items-center gap-2 text-slate-900">
           <MessageCircle aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
           무엇을 만들까요?
         </h2>
-        <p className="t-sub break-keep text-slate-700" data-testid="mk-guide">
-          주제나 하고 싶은 것을 한 줄로 쓰면, 올릴 글 · 대본을 바로 만들어 드려요.
-        </p>
-      </div>
+      </HintTip>
       <form
         className="flex flex-col gap-2 sm:flex-row"
         onSubmit={(e) => {

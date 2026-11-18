@@ -72,18 +72,21 @@ export function DomainBadge({ axis, domain }: { axis: ContentAxis; domain: Conte
   )
 }
 
-/** 신호 세기 — 세 칸 막대 + 글 */
-export function StrengthMeter({ strength }: { strength: Strength }) {
+/**
+ * 신호 세기 — 세 칸 막대 + 글.
+ * D-630 compact: 접힌 목록 줄에서는 막대만(글은 마우스를 올리면 · 화면 읽기에는 그대로) — 줄을 펼치면 글도 같이.
+ */
+export function StrengthMeter({ strength, compact = false }: { strength: Strength; compact?: boolean }) {
   const n = strength === 'strong' ? 3 : strength === 'medium' ? 2 : 1
   const on = strength === 'strong' ? 'bg-red-500' : strength === 'medium' ? 'bg-amber-500' : 'bg-slate-400'
   return (
-    <span className="t-meta inline-flex shrink-0 items-center gap-1.5 font-semibold text-slate-700" data-testid="radar-strength" data-strength={strength}>
+    <span className="t-meta inline-flex shrink-0 items-center gap-1.5 font-semibold text-slate-700" data-testid="radar-strength" data-strength={strength} title={compact ? STRENGTH_LABEL[strength] : undefined}>
       <span aria-hidden="true" className="flex items-end gap-0.5">
         {[0, 1, 2].map((i) => (
           <span key={i} className={`w-1 rounded-sm ${i < n ? on : 'bg-slate-200'}`} style={{ height: 6 + i * 3 }} />
         ))}
       </span>
-      {STRENGTH_LABEL[strength]}
+      <span className={compact ? 'sr-only' : undefined}>{STRENGTH_LABEL[strength]}</span>
     </span>
   )
 }

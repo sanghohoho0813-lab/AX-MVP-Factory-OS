@@ -231,7 +231,8 @@ export function SubjectPicker({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="누구 것인지 거르기">
+      {/* D-630 거르기 칩은 목록이 한 화면(다섯 줄)을 넘을 때만 — 다섯 곳 안쪽이면 다 보이므로 거를 것이 없다(줄마다 계약 고객 · 잠재고객 표시는 그대로) */}
+      <div className={`flex flex-wrap gap-1.5 ${rows.length > LIST_FIRST || filter !== 'all' ? '' : 'hidden'}`} role="tablist" aria-label="누구 것인지 거르기" data-testid="subject-filters">
         {/* D-627 0곳인 묶음 칩은 숨긴다(전체 · 지금 고른 것은 늘) — 칩은 네 개 안팎 */}
         {(['all', 'contract', 'lead', 'consultant', 'trial'] as const).filter((f) => f === 'all' || f === filter || counts[f] > 0).map((f) => (
           <button

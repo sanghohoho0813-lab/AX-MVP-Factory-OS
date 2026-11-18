@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DraftSyncLine, useDraftSync } from './useDraftSync'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { BookOpen, CalendarCheck, ClipboardCopy, Clapperboard, Download, Eye, FilePlus2, Lightbulb, MessageCircle, NotebookPen, RefreshCw, Save, Send, SlidersHorizontal, TriangleAlert } from 'lucide-react'
+import { BookOpen, CalendarCheck, ClipboardCopy, Clapperboard, Download, Eye, FilePlus2, Lightbulb, MessageCircle, RefreshCw, Save, Send, SlidersHorizontal, TriangleAlert } from 'lucide-react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { Badge, MetricTile, Surface } from '../../components/ui/primitives'
@@ -183,8 +183,15 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
   const [openedWith] = useState(() => !!(params.get('topic') || params.get('open')))
   const sync = useDraftSync<Draft>({ kind: 'shorts', workspaceId, readOnly, draft, replace: (d) => setDraft(() => d), blocked: openedWith, empty: draftEmpty, clean: cleanDraft })
   const draftOf = (p: ShortPost): Draft => ({ ...EMPTY, id: p.id, platform: p.platform, aim: p.aim, format: p.format, topic: p.topic, script: p.script, caption: p.caption, hashtags: p.hashtags, checks: p.checks, source: p.source })
+  /**
+   * D-630 📐 들어오면 1단계(무엇에 대해 쓸까요?)만 — 2단계(대본 칸 · 규칙 검사)는 이번 방문에서 대본을 열었을 때만 그린다
+   * (AI 완성 대본 · 직접 쓰기 · 이어서 쓰기 · 기록표 · 내 콘텐츠에서 연 대본). 쓰던 대본이 남아 있어도 들어올 때는 한 줄 [이어서 쓰기] 로.
+   * 탭(기록표 · 설명서)을 오가도 그대로 두려고 여기(부모)에 둔다.
+   */
+  const [editing, setEditing] = useState(false)
   const openPost = (p: ShortPost) => {
     setDraft(() => draftOf(p))
+    setEditing(true)
     go('write')
   }
   // D-355 내 콘텐츠 '만든 것 한눈에' 에서 누르고 왔으면(?open=) 그 대본을 대본 칸에 — 쓰던 다른 대본이 있으면 묻고 · 못 찾으면 기록표로 · open 은 한 번 쓰고 지운다
@@ -197,6 +204,8 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
     if (p) {
       next.delete('tab')
       if (draft.id === p.id || !draft.script.trim() || window.confirm('지금 쓰던 대본을 이 대본으로 바꿀까요? (쓰던 대본은 사라집니다)')) setDraft(() => draftOf(p))
+      // D-630 대본을 들고 온 길(내 콘텐츠 · 지난번 하던 것) — 대본 칸을 연 채로
+      setEditing(true)
     } else next.set('tab', 'records')
     setParams(next, { replace: true })
   }, [openId, store.loaded]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -229,7 +238,7 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
       )}
       {readOnly && <p className="t-sub rounded-(--radius-control) bg-slate-50 px-3 py-2 text-slate-600" data-testid="mk-viewas-note">팀장 화면을 보는 중에는 저장하지 않습니다 — AI 단추는 팀장님 화면 그대로 눌러 볼 수 있어요(회사마다 가장 싼 모델 · 답은 글 칸에만).</p>}
       {tab === 'write' && <DraftSyncLine sync={sync} testPrefix="sht" />}
-      {tab === 'write' && <WritePanel draft={draft} setDraft={setDraft} store={store} brief={brief} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} />}
+      {tab === 'write' && <WritePanel draft={draft} setDraft={setDraft} editing={editing} setEditing={setEditing} store={store} brief={brief} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} />}
       {tab === 'records' && <RecordsPanel store={store} readOnly={readOnly} onOpen={openPost} />}
       {tab === 'guide' && <GuidePanel onUse={pickFormat} />}
     </div>
@@ -242,7 +251,7 @@ type Store = ReturnType<typeof useShortPosts>
 /* 오늘 만들 영상                                                        */
 /* ------------------------------------------------------------------ */
 
-function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; store: Store; brief: ChannelBrief; aiOk: boolean; readOnly: boolean; onRecords: () => void }) {
+function WritePanel({ draft, setDraft, editing, setEditing, store, brief, aiOk, readOnly, onRecords }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; /** D-630 이번 방문에서 대본 칸(2단계)을 열었나 */ editing: boolean; setEditing: (on: boolean) => void; store: Store; brief: ChannelBrief; aiOk: boolean; readOnly: boolean; onRecords: () => void }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const today = todayLocalDate()
@@ -258,14 +267,24 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
   const writeContext = (use: { aim: ShortAim | ''; format: ShortFormatKey | '' }, revise?: { body: string; fixes: readonly string[] }) =>
     withWriteExtras(shortsContext({ platform: draft.platform, aim: use.aim, format: use.format, topic: draft.topic, facts: draft.facts, recent: store.posts, today }), { brief, request, revise })
   const [saving, setSaving] = useState(false)
-  /** D-364 📐 한 단계씩 — 대본이 아직 없으면 2단계는 한 줄 + [직접 쓰기](스레드 화면과 같다) */
+  /**
+   * D-364 📐 한 단계씩 — 대본이 아직 없으면 2단계는 한 줄 + [직접 쓰기](스레드 화면과 같다)
+   * D-630 대표 "'2 고치고 확인하기' 부터는 안 보이는 게 낫다" — 2단계는 대본을 열기 전에는 아예 그리지 않는다(한 줄도 0 · [직접 쓰기] 는 1단계 큰 단추 옆).
+   * 대본이 생기면 1단계 바로 아래에 나타나고 그 자리로 내려간다. 쓰던 대본이 남아 있어도 들어올 때는 맨 위 한 줄 [이어서 쓰기].
+   */
   const [editorAll] = useFold('sht.editor', false)
-  const [handOpen, setHandOpen] = useState(false)
-  const hasScript = !!draft.script.trim()
+  const editorOpen = editorAll || editing
+  // 2단계가 새로 나타나면(처음 그릴 때는 빼고) 그 자리로
+  const wasOpen = useRef(editorOpen)
   useEffect(() => {
-    if (hasScript) setHandOpen(true)
-  }, [hasScript])
-  const editorOpen = editorAll || handOpen || hasScript
+    if (editorOpen && !wasOpen.current) scrollAndFlash('sht-editor')
+    wasOpen.current = editorOpen
+  }, [editorOpen])
+  /** [직접 쓰기] · [이어서 쓰기] — 대본 칸을 열고 바로 쓸 수 있게 */
+  const openEditor = () => {
+    setEditing(true)
+    window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-testid="sht-script"]')?.focus({ preventScroll: true }), 80)
+  }
   const factsText = `${draft.facts}\n${draft.topic}`
   const lint = useMemo(() => lintShort({ platform: draft.platform, aim: draft.aim, script: draft.script, caption: draft.caption, hashtags: draft.hashtags, facts: factsText }), [draft.platform, draft.aim, draft.script, draft.caption, draft.hashtags, factsText])
   // D-559 올리기 전 점수(규칙) — 대본 + 설명 글
@@ -312,6 +331,7 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
   const start = (part: Pick<Draft, 'script' | 'caption' | 'hashtags' | 'source'> & Partial<Draft>) => {
     if (draft.script.trim() && draft.script.trim() !== part.script.trim() && !window.confirm('지금 쓰던 대본을 이 대본으로 바꿀까요? (쓰던 대본은 사라집니다)')) return
     set({ checks: [], ...part })
+    setEditing(true)
     document.getElementById('sht-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
   const startExample = () => {
@@ -340,6 +360,7 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
     if (!window.confirm('지금 대본의 첫 줄을 이 첫마디로 바꿀까요? (나머지는 그대로예요)')) return
     rows[i] = next
     set({ script: rows.join('\n') })
+    setEditing(true)
     showToast('첫 줄을 바꿨어요.')
     document.getElementById('sht-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -370,6 +391,7 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
         if (fill) {
           const filled = { script: first.script, caption: first.caption, hashtags: first.hashtags }
           set({ ...filled, source: 'ai', checks, ...(first.format ? { format: first.format } : {}) })
+          setEditing(true)
           const had = atClick.script.trim() && atClick.script.trim() !== first.script.trim()
           const sc = scoreShortDraft(first, aimNow)
           const polishNow = needsPolish(sc) && aiOk
@@ -447,6 +469,7 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
     const prev = { script: draft.script, caption: draft.caption, hashtags: draft.hashtags }
     if (prev.script.trim() === d.script.trim()) return
     set({ script: d.script, caption: d.caption || prev.caption, hashtags: d.hashtags || prev.hashtags, source: 'ai', ...(d.format ? { format: d.format } : {}) })
+    setEditing(true)
     setFix(prev.script.trim() ? { busy: false, error: '', before: prev, fixed: d.script, why: 'new' } : { busy: false, error: '', before: null, fixed: '' })
   }
   const runQuick = () => {
@@ -479,7 +502,7 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
       if (posted) {
         setDraft((d) => ({ ...EMPTY, platform: d.platform, aim: d.aim }))
         setAi({ busy: false, error: '', drafts: [] })
-        setHandOpen(false)
+        setEditing(false)
         showToast('기록표에 올렸어요 — 하루 이틀 뒤 숫자를 적어 주세요.')
         onRecords()
       } else {
@@ -496,19 +519,37 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
 
   // D-507 계속 쓰기 — 대본 칸이 비어 있고 써 둔 대본이 있으면 맨 위 한 줄 [이어서 쓰기](가장 최근에 저장한 것)
   const lastDraft = !draft.script.trim() && !draft.id ? [...store.posts].filter((p) => p.status === 'draft' && p.script.trim()).sort((a, b) => b.savedAt.localeCompare(a.savedAt))[0] : undefined
+  // D-630 쓰던 대본이 이 기기에 남아 있으면(저장 전 대본 · 다른 기기에서 이어 온 대본) — 대본 칸을 펼치는 대신 맨 위 한 줄 [이어서 쓰기]
+  const pending = !editorOpen && draft.script.trim() ? (draft.topic.trim() || draft.script.trim().split('\n')[0]).slice(0, 24) : ''
   return (
     <div className="flex flex-col gap-4" data-testid="sht-write">
-      {lastDraft && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="sht-resume">
+      {pending && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="sht-resume" data-kind="local">
+          <span className="min-w-0 flex-1 basis-48">
+            <span className="t-meta block font-semibold text-slate-600">쓰던 대본</span>
+            <span className="t-sub block font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="sht-resume-line">
+              {pending}
+            </span>
+          </span>
+          <button type="button" onClick={openEditor} className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-4 font-bold text-white hover:bg-brand-700" data-testid="sht-resume-go">
+            이어서 쓰기
+          </button>
+        </div>
+      )}
+      {!pending && lastDraft && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="sht-resume" data-kind="saved">
           <span className="min-w-0 flex-1 basis-48">
             <span className="t-meta block font-semibold text-slate-600">써 둔 대본</span>
             <span className="t-sub block font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="sht-resume-line">
-              {(lastDraft.topic.trim() || lastDraft.script.trim().split('\n')[0]).slice(0, 40)}
+              {(lastDraft.topic.trim() || lastDraft.script.trim().split('\n')[0]).slice(0, 24)}
             </span>
           </span>
           <button
             type="button"
-            onClick={() => setDraft(() => ({ ...EMPTY, id: lastDraft.id, platform: lastDraft.platform, aim: lastDraft.aim, format: lastDraft.format, topic: lastDraft.topic, script: lastDraft.script, caption: lastDraft.caption, hashtags: lastDraft.hashtags, checks: lastDraft.checks, source: lastDraft.source }))}
+            onClick={() => {
+              setDraft(() => ({ ...EMPTY, id: lastDraft.id, platform: lastDraft.platform, aim: lastDraft.aim, format: lastDraft.format, topic: lastDraft.topic, script: lastDraft.script, caption: lastDraft.caption, hashtags: lastDraft.hashtags, checks: lastDraft.checks, source: lastDraft.source }))
+              openEditor()
+            }}
             className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-4 font-bold text-white hover:bg-brand-700"
             data-testid="sht-resume-go"
           >
@@ -542,6 +583,8 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
         facts={<FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="sht" what="영상" />}
         ai={{ ok: aiOk, busy: ai.busy, error: ai.error, label: 'AI로 완성 대본 쓰기', onRun: () => void runQuick() }}
         fallback={{ label: '예시로 시작', onClick: startExample }}
+        // D-630 [직접 쓰기] — 예전 2단계 한 줄에 있던 단추(같은 시험 이름) · 대본 칸이 열려 있으면 숨김
+        onHand={editorOpen ? undefined : openEditor}
         request={aiOk ? { value: request, onChange: setRequest, placeholder: '예: 50대 사장님께 말하듯 · 30초 안으로 · 댓글로 키워드 받기' } : undefined}
         more={
           <>
@@ -670,17 +713,8 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
       </QuickStart>
 
 
-      {!editorOpen ? (
-        <Surface className="flex flex-col gap-2">
-          <div id="sht-editor" className="scroll-mt-24" data-testid="sht-editor-closed">
-            <StepTitle n="2">고치고 확인하기</StepTitle>
-          </div>
-          {/* D-627 무엇이 나오는지 긴 설명은 마우스를 올리면(title) */}
-          <Button variant="secondary" className="self-start" title="1단계에서 [AI로 완성 대본 쓰기] · 예시 · 빈 틀로 시작하면 여기에 대본이 나와요 — 첫마디 · 길이 · 자막 · #태그를 바로 검사해요." onClick={() => (setHandOpen(true), window.setTimeout(() => document.querySelector<HTMLTextAreaElement>('[data-testid="sht-script"]')?.focus(), 0))} data-testid="sht-hand">
-            <NotebookPen aria-hidden="true" className="size-4" /> 직접 쓰기
-          </Button>
-        </Surface>
-      ) : (
+      {/* D-630 2단계는 대본을 열기 전에는 그리지 않는다(예전: 한 줄 + [직접 쓰기] — 그 단추는 1단계 큰 단추 옆으로) */}
+      {!editorOpen ? null : (
       <Surface className="flex flex-col gap-3">
         <div id="sht-editor" className="scroll-mt-24">
           <StepTitle n="2">고치고 확인하기</StepTitle>
@@ -738,7 +772,7 @@ function WritePanel({ draft, setDraft, store, brief, aiOk, readOnly, onRecords }
                   </Button>
                 </>
               )}
-              <Button variant="ghost" onClick={() => (draft.script.trim() && !window.confirm('지금 대본을 비우고 새로 만들까요?') ? undefined : (setDraft((d) => ({ ...EMPTY, platform: d.platform, aim: d.aim })), setAi({ busy: false, error: '', drafts: [] }), setHandOpen(false)))} data-testid="sht-new">
+              <Button variant="ghost" onClick={() => (draft.script.trim() && !window.confirm('지금 대본을 비우고 새로 만들까요?') ? undefined : (setDraft((d) => ({ ...EMPTY, platform: d.platform, aim: d.aim })), setAi({ busy: false, error: '', drafts: [] }), setEditing(false), window.scrollTo({ top: 0, behavior: 'smooth' })))} data-testid="sht-new">
                 새로
               </Button>
             </div>
