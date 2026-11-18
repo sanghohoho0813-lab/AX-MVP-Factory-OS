@@ -1227,7 +1227,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             </Button>
           </div>
         )}
-        <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2 xl:items-start">
+        {/* D-631 한 줄의 두 카드는 같은 높이로(이름이 두 줄인 카드 옆 카드만 낮아 아래가 들쭉날쭉했다) — 펼친 카드는 두 칸을 다 쓰니 옆 카드가 없다 */}
+        <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
           {SERVICES.filter((meta, i) => workAll || i < 5 || meta.key === focusedService).map((meta) => {
             const state = record.services[meta.key]
             const missing = missingDocumentsFor(record, meta.key, today)
@@ -1678,7 +1679,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                     />
                   )}
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <label className="flex min-h-11 min-w-0 items-start gap-2.5 py-1">
+                    {/* D-631 이름 줄을 누르는 칸(44px) 가운데로 — 위에 붙어 있어 이름 아래만 비어 보였다(안 받은 칸) · 받은 칸은 이름과 '받음' 줄 사이가 36px 로 벌어져 있었다 */}
+                    <label className="flex min-h-11 min-w-0 items-start gap-2.5 py-2.5">
                       <input
                         type="checkbox"
                         aria-label={`${meta.label} 받음`}
@@ -1687,7 +1689,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                           if (e.target.checked) setOpenDocs((cur) => new Set(cur).add(meta.key))
                           void commit(withDocument(record, meta.key, { received: e.target.checked }))
                         }}
-                        className="mt-1 size-5 shrink-0 accent-brand-600"
+                        className="mt-0.5 size-5 shrink-0 accent-brand-600"
                       />
                       <span className="min-w-0">
                         <span className="flex flex-wrap items-center gap-1.5">
@@ -1765,7 +1767,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                   </div>
 
                   {compact ? (
-                    <div data-doc-compact={meta.key} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-[1.9rem]">
+                    <div data-doc-compact={meta.key} className="-mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-[1.9rem]">
                       <span className="t-sub font-medium text-success-700">받음</span>
                       {meta.needsFile && !state.fileName && <span className="sr-only" data-testid={`doc-compact-nofile-${meta.key}`}>파일 없음</span>}
                       {view.expiresOn && (

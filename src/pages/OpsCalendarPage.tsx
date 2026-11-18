@@ -569,11 +569,15 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
                           </span>
                         </p>
                       )}
-                      <div className="flex flex-wrap gap-2">
-                        <Button variant="primary" onClick={() => setQuick({ date: picked, tab: 'todo' })} data-testid="picked-quick-todo">
+                      {/*
+                        D-631 진한 단추는 머리의 [적기] 하나만 — 같은 창을 여는 진한 단추가 한 화면에 둘이었다(이쪽은 흰 단추로).
+                        PC 오른쪽 판에서는 두 단추가 한 줄에 안 들어가 폭이 다른 채 쌓였다 — 판 폭에 맞춰 나란히 쌓는다(휴대폰은 한 줄 그대로).
+                      */}
+                      <div className="flex flex-wrap gap-2 xl:flex-col">
+                        <Button variant="secondary" onClick={() => setQuick({ date: picked, tab: 'todo' })} data-testid="picked-quick-todo" className="xl:w-full">
                           <Plus aria-hidden="true" className="size-4" />이 날에 적기 · 반복
                         </Button>
-                        <Button variant="secondary" onClick={() => setQuick({ date: picked, tab: 'off' })} data-testid="picked-quick-off" data-guide="fn-calendar-dayoff">
+                        <Button variant="secondary" onClick={() => setQuick({ date: picked, tab: 'off' })} data-testid="picked-quick-off" data-guide="fn-calendar-dayoff" className="xl:w-full">
                           {pickedOff.length > 0 ? '쉬는 날 고치기' : '쉬는 날로 표시'}
                         </Button>
                       </div>

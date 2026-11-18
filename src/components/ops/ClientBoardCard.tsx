@@ -286,7 +286,8 @@ export function ClientBoardCard({
               {kindBadge}
             </span>
           )}
-          <div className="flex shrink-0 items-center gap-2">
+          {/* D-631 ml-auto — 펼친 카드(휴대폰)에서 이 묶음이 아랫줄로 넘어가면 왼쪽 끝으로 붙어, 접기 화살표 자리가 접힌 때(오른쪽 끝)와 달라졌다 */}
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             {criticalCount > 0 ? (
               <Badge tone={tone}>지금 {criticalCount}</Badge>
             ) : warningCount > 0 ? (

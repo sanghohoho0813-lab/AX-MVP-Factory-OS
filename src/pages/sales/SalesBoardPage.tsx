@@ -737,7 +737,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
           <>
             {/* 넓은 화면 — 여섯 칸이 한눈에 */}
             {/* D-631 여섯 칸 머리 높이를 같게(두 줄 이름 기준) — '1차 미팅 예정' 처럼 두 줄이 되는 칸만 머리가 커서 카드 시작 줄이 칸마다 달랐다 */}
-            <div data-testid="sales-board" className="hidden gap-2.5 xl:grid xl:grid-cols-6 [&_[data-stage-head]]:min-h-[3.75rem] [&_[data-stage-head]]:justify-center">
+            <div data-testid="sales-board" className="hidden gap-2.5 xl:grid xl:grid-cols-6 [&_[data-stage-head]]:min-h-[4.25rem] [&_[data-stage-head]]:justify-center">
               {SALES_FLOW_STAGES.map((s) => column(s, groups[s]))}
             </div>
             <div className="hidden gap-2.5 xl:grid xl:grid-cols-2">
