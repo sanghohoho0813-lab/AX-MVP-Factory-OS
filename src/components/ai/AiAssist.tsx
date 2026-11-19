@@ -39,7 +39,8 @@ import { normRef, safeText } from '../../services/aiAssist/context'
 import type { AssistBundle } from '../../services/aiAssist/context'
 import { askPresetOf, presetsFor } from '../../services/aiAssist/presets'
 import type { AssistPage, AssistPreset } from '../../services/aiAssist/presets'
-import { CHOICE_EVENT, contextHash, historyOf, markDone, newRequestId, pushHistory, readChoice, saveChoice, allowedProviders, isCheapOnly } from '../../services/aiAssist/store'
+import { CHOICE_EVENT, contextHash, historyOf, markDone, newRequestId, readChoice, saveChoice, allowedProviders, isCheapOnly, addPending, removePending, pendingFor, pushHistoryIfOwner, currentOwner } from '../../services/aiAssist/store'
+import { resumeOnce } from '../../services/aiAssist/resume'
 import { askCarry, type AiChoice, type FollowMeta, type HistoryEntry } from '../../services/aiAssist/store'
 import { classifyAsk } from '../../services/aiAssist/autoModel'
 import { autoPlanFor, showsAuto, useLastAutoPick } from '../../lib/modelPickPref'
@@ -558,9 +559,19 @@ function AssistPanel({
         // D-626 직접 물어보기는 이어서 — 이 화면에서 방금 주고받은 것을 '앞선 대화' 로 같이 보낸다(단추 · 이어 쓰기는 그대로)
         const carry = !opts.follow && preset.id.endsWith('.ask') ? askCarry(historyOf(scope), carryFromRef.current) : []
         const context = opts.follow ? { ...bundle.context, sections: [opts.follow.section, ...bundle.context.sections] } : carry.length ? { ...bundle.context, sections: [{ name: '앞선 대화', rows: carry }, ...bundle.context.sections] } : bundle.context
-        const runResult: AssistRun = await callAssist({ requestId, assistId: preset.id, page, choice: opts.choice ?? choice, context, ask: masked })
-        const entry: HistoryEntry & { links: Record<string, string> } = { scope, assistId: preset.id, label, ask: masked, hash, run: runResult, links: bundle.links, ids: bundle.ids ?? {}, ...(bundle.aliases ? { aliases: bundle.aliases } : {}), ...(opts.follow ? { follow: opts.follow } : {}) }
-        pushHistory(entry)
+        // D-638 묻는 중을 적어 둔다 — 판을 닫거나 다른 화면으로 가도(휴대폰이 탭을 버려도) 다시 열면 이 번호로 답을 받아 온다
+        const owner = currentOwner()
+        const meta = { scope, assistId: preset.id, label, ask: masked, hash, links: bundle.links, ids: bundle.ids ?? {}, ...(bundle.aliases ? { aliases: bundle.aliases } : {}), ...(opts.follow ? { follow: opts.follow } : {}) }
+        addPending({ ...meta, rid: requestId })
+        let runResult: AssistRun
+        try {
+          runResult = await callAssist({ requestId, assistId: preset.id, page, choice: opts.choice ?? choice, context, ask: masked })
+        } finally {
+          removePending(requestId)
+        }
+        const entry: HistoryEntry & { links: Record<string, string> } = { ...meta, run: runResult, links: bundle.links }
+        // D-638 묻는 사이 계정이 바뀌었으면 지난 답에 넣지 않는다(다른 사람 기록에 섞이지 않게)
+        if (!pushHistoryIfOwner(entry, owner)) return
         setHistory(historyOf(scope))
         setTurns((t) => [...t.filter((x) => x.run.requestId !== entry.run.requestId), entry])
         setAsking(null)
@@ -627,6 +638,30 @@ function AssistPanel({
     },
     [scope],
   )
+
+  // D-638 이 화면에서 답을 기다리다 판을 닫았던 것 — 다시 열면 그 번호로 받아 와 지난 답 · 대화에 넣는다(AI 다시 안 부름)
+  useEffect(() => {
+    const waiting = pendingFor(scope)
+    if (!waiting.length) return
+    let alive = true
+    void (async () => {
+      for (const p of waiting) {
+        const got = await resumeOnce(p.rid)
+        if (got === 'pending') continue
+        removePending(p.rid)
+        if (!got) continue
+        const { rid: _rid, at: _at, owner, ...meta } = p
+        const entry: HistoryEntry & { links: Record<string, string> } = { ...meta, run: got, links: meta.links ?? {} }
+        if (!pushHistoryIfOwner(entry, owner)) continue
+        if (!alive) continue
+        setHistory(historyOf(scope))
+        setTurns((t) => [...t.filter((x) => x.run.requestId !== got.requestId), entry])
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [scope])
 
   // 띠의 질문 단추로 열었으면 그 단추를 골라 둔다(한 번만) · D-288 [직접 묻기] 로 열었으면 질문 칸에 바로 쓰게
   useEffect(() => {

@@ -5,7 +5,8 @@
  * 계정을 바꾸면(금고가 키를 바꿔 끼움) 대화 칸이 다시 열릴 때 새로 읽고, 바꾸기 전에 물은 답은 새 사람 자리에 쓰지 않는다.
  */
 import { useSyncExternalStore } from 'react'
-import { callAssist } from './client'
+import { callAssist, type AssistRun } from './client'
+import { resumeOnce } from './resume'
 import { newRequestId, readChoice } from './store'
 import { DOCK_CHAT_KEY, DOCK_CHAT_MAX, dockChatContext, parseDockChat, type DockTurn } from '../../lib/sideDock'
 
@@ -59,27 +60,14 @@ export async function askDock(q: string, screen: string): Promise<void> {
   const id = uid()
   const owner = liveOwner()
   const context = dockChatContext(state.turns, new Date().toLocaleDateString('sv-SE'), screen)
-  commit((cur) => [...cur, { id, at: new Date().toISOString(), q: question, status: 'pending' }])
+  // D-638 요청 번호를 줄에 같이 적어 둔다 — 답을 기다리다 화면이 닫혀도 다시 열면 이 번호로 답을 받아 온다(두 번 세지 않음)
+  const rid = newRequestId()
+  commit((cur) => [...cur, { id, at: new Date().toISOString(), q: question, status: 'pending', rid }])
   set({ busy: true })
   try {
-    const run = await callAssist({ requestId: newRequestId(), assistId: 'side.chat', page: 'side', choice: readChoice(), context, ask: question })
-    const s = run.structured
+    const run = await callAssist({ requestId: rid, assistId: 'side.chat', page: 'side', choice: readChoice(), context, ask: question })
     if (liveOwner() !== owner) return
-    commit((cur) =>
-      cur.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              status: 'done',
-              headline: s?.headline || run.raw.slice(0, 2000),
-              items: (s?.items ?? []).map((i) => ({ title: i.title, detail: i.detail, body: i.body })),
-              next: s?.next ?? [],
-              caution: s?.caution || undefined,
-              model: run.model,
-            }
-          : t,
-      ),
-    )
+    commit((cur) => cur.map((t) => (t.id === id ? filled(t, run) : t)))
   } catch (e) {
     if (liveOwner() !== owner) return
     const why = e instanceof Error && e.message ? e.message : 'AI 연결을 확인해 주세요'
@@ -87,6 +75,44 @@ export async function askDock(q: string, screen: string): Promise<void> {
   } finally {
     set({ busy: false })
   }
+}
+
+/** 답이 온 줄 */
+function filled(t: DockTurn, run: AssistRun): DockTurn {
+  const s = run.structured
+  return {
+    ...t,
+    status: 'done',
+    resume: undefined,
+    error: undefined,
+    headline: s?.headline || run.raw.slice(0, 2000),
+    items: (s?.items ?? []).map((i) => ({ title: i.title, detail: i.detail, body: i.body })),
+    next: s?.next ?? [],
+    caution: s?.caution || undefined,
+    model: run.model,
+  }
+}
+
+/**
+ * D-638 화면이 닫혀 있던 사이에 온 답 받아 오기 — '다시 받아 오는 중' 줄마다 그 요청 번호로 서버에 묻는다.
+ * 답 → 그 줄을 채움 · 아직 쓰는 중 → 그대로 두고 다음에 다시(창으로 돌아올 때) · 서버에 없음 → '다시 물어봐 주세요'.
+ */
+export async function resumeDockTurns(): Promise<void> {
+  const owner = liveOwner()
+  for (const t of state.turns.filter((x) => x.resume && x.rid)) {
+    const got = await resumeOnce(t.rid as string)
+    if (liveOwner() !== owner) return
+    if (got === 'pending') continue
+    commit((cur) => cur.map((x) => (x.id !== t.id ? x : got ? filled(x, got) : { ...x, resume: undefined, error: '답을 받지 못했어요 — 다시 물어봐 주세요' })))
+  }
+}
+
+if (typeof window !== 'undefined') {
+  // 처음 열 때 · 휴대폰이 다른 앱에 갔다 돌아올 때
+  queueMicrotask(() => void resumeDockTurns())
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void resumeDockTurns()
+  })
 }
 
 /** 지우기 · 되돌리기 */
@@ -100,6 +126,7 @@ export function syncDockChat(): void {
   if (state.busy) return
   const turns = load()
   if (JSON.stringify(turns) !== JSON.stringify(state.turns)) set({ turns })
+  void resumeDockTurns()
 }
 
 function subscribe(f: () => void): () => void {

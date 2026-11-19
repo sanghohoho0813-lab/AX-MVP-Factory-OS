@@ -52,6 +52,10 @@ export interface ChatTurn {
   a: ChatAnswer | null
   status: 'done' | 'pending' | 'error'
   error?: string
+  /** D-638 AI 요청 번호 — 답을 기다리다 화면을 떠나도 다시 열면 이 번호로 답을 받아 온다(두 번 세지 않음) */
+  rid?: string
+  /** D-638 다시 받아 오는 중 */
+  resume?: boolean
 }
 
 export interface ChatStarter {
@@ -87,7 +91,13 @@ export function parseHistory(raw: string | null): ChatTurn[] {
     return v
       .filter((t): t is ChatTurn => !!t && typeof t === 'object' && typeof (t as ChatTurn).id === 'string' && typeof (t as ChatTurn).q === 'string')
       .slice(-HISTORY_MAX)
-      .map((t) => (t.status === 'pending' ? { ...t, status: 'error' as const, error: '화면을 떠나 답을 받지 못했어요 — 다시 물어봐 주세요' } : t))
+      .map((t) => {
+        if (t.status !== 'pending' && !t.resume) return t
+        // D-638 요청 번호가 있고 30분 안이면 '받아 오는 중'(열리면 그 번호로 답을 받아 온다)
+        const at = Date.parse(t.at)
+        if (t.rid && /^[A-Za-z0-9_-]{8,80}$/.test(t.rid) && Number.isFinite(at) && Date.now() - at < 30 * 60_000) return { ...t, status: 'error' as const, resume: true, error: '화면을 떠나 있던 사이에 온 답을 받아 오는 중…' }
+        return { ...t, status: 'error' as const, resume: undefined, error: '화면을 떠나 답을 받지 못했어요 — 다시 물어봐 주세요' }
+      })
   } catch {
     return []
   }

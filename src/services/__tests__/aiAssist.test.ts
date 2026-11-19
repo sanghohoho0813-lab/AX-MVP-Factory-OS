@@ -15,7 +15,7 @@ import { SKILLS, COMMON_RULES } from '../../../api/_ai/skills.js'
 import { ASSIST_PRESETS, askPresetOf } from '../aiAssist/presets'
 import { safeText, personNames, RefBook, clientRow, normRef } from '../aiAssist/context'
 import { betterModel, dueFromWhen, isSamePage, pointsAtTodo, refLabel, todoText, unaliasAnswer } from '../aiAssist/actions'
-import { AssistError, __resetAssistStatusCache, callAssist, fetchAssistStatus, peekAssistStatus, providerMessage } from '../aiAssist/client'
+import { AssistError, __resetAssistStatusCache, __setRecoverTimes, callAssist, fetchAssistStatus, peekAssistStatus, providerMessage } from '../aiAssist/client'
 import { askWeight, autoPlan, classifyAsk, pickAuto, presetWeight } from '../aiAssist/autoModel'
 import { __setRetryTimes, callAssistRetry } from '../aiAssist/retry'
 import { __resetJudgeSkill, readJudgeSkill, saveJudgeSkill, syncJudgeSkill } from '../aiAssist/judgeSkill'
@@ -440,6 +440,7 @@ async function serverTests() {
         return e instanceof AssistError ? e.code : 'other'
       }
     }
+    __setRecoverTimes(60, 5)
     const got = [
       await codeOf(504, 'An error occurred with your deployment FUNCTION_INVOCATION_TIMEOUT'),
       await codeOf(502, '<html>Bad gateway</html>'),
@@ -448,8 +449,9 @@ async function serverTests() {
       await codeOf(404, '<html>Not found</html>'),
       await codeOf(503, JSON.stringify({ ok: false, code: 'setup_needed', missing: ['GEMINI_API_KEY'] })),
     ]
-    check("S25 JSON 아닌 오류는 상태 번호로(504 · 502 → 시간 초과/연결 · 413 → 너무 큼 · 401 → 로그인 · 404 → 서버 함수 없음) · '키 설정 필요' 는 서버가 말할 때만",
-      JSON.stringify(got) === JSON.stringify(['provider_unreachable', 'provider_unreachable', 'too_large', 'login_required', 'not_deployed', 'setup_needed']), got)
+    __setRecoverTimes(120_000, 2_000)
+    check("S25 JSON 아닌 오류는 상태 번호로(504 함수 잘림 → 같은 번호로 다시 물은 뒤 '시간 초과' · 502 → 시간 초과/연결 · 413 → 너무 큼 · 401 → 로그인 · 404 → 서버 함수 없음) · '키 설정 필요' 는 서버가 말할 때만",
+      JSON.stringify(got) === JSON.stringify(['gateway_timeout', 'provider_unreachable', 'too_large', 'login_required', 'not_deployed', 'setup_needed']), got)
   }
 }
 
@@ -806,20 +808,20 @@ async function d263Tests() {
   whys.length = 0
   calls = []
   seq([{ status: 504, body: 'FUNCTION_INVOCATION_TIMEOUT' }, { status: 200, body: good }])
+  __setRecoverTimes(3000, 5)
   await callAssistRetry({ req: { assistId: 'venture.judge', page: 'venture', choice: null, context: CTX as never }, parse: parse as never, hint: 'h', missMessage: 'm', onRetry: (w) => whys.push(w) })
-  // D-278 끊겨서 다시 부를 때는 같은 요청 번호 — 서버가 이미 쓴 답(못 받은 것)을 그대로 돌려줘 요금이 두 번 나가지 않는다
-  check('DR2 잠깐 끊김(504) → 쉬었다 다시 · 같은 요청 번호(서버가 앞의 답을 그대로 — 요금 한 번)', whys.join() === 'transient' && calls.length === 2 && calls[0].body.requestId === calls[1].body.requestId, calls.map((c) => c.body.requestId))
+  // D-278 끊겨서 다시 부를 때는 같은 요청 번호 · D-638 함수가 잘린 504 는 같은 번호의 답을 먼저 묻는다(보낸 요청을 또 보내지 않음 — 요금 한 번)
+  const posts2 = calls.filter((c) => !c.url.includes('result='))
+  const gets2 = calls.filter((c) => c.url.includes('result='))
+  check('DR2 잠깐 끊김(504) → 같은 요청 번호의 답을 물어 받음 · 다시 보내기 0(요금 한 번)', whys.length === 0 && posts2.length === 1 && gets2.length === 1 && gets2[0].url.includes(`result=${String(posts2[0].body.requestId)}`), calls.map((c) => c.url.slice(-40)))
   check('DR2a 답 모양 어긋남 → 이름표를 붙인 다른 질문이라 새 요청 번호', r1.value != null && rIds.length === 2 && rIds[0] !== rIds[1], rIds)
   whys.length = 0
   calls = []
   seq([{ status: 504, body: 'FUNCTION_INVOCATION_TIMEOUT' }, { status: 504, body: 'FUNCTION_INVOCATION_TIMEOUT' }, { status: 200, body: good }])
-  let timeoutCode = ''
-  try {
-    await callAssistRetry({ req: { assistId: 'venture.judge', page: 'venture', choice: null, context: CTX as never }, parse: parse as never, hint: 'h', missMessage: 'm', onRetry: (w) => whys.push(w) })
-  } catch (e) {
-    timeoutCode = e instanceof AssistError ? e.code : 'other'
-  }
-  check('DR2b 시간 초과가 두 번이면 멈춤 — 자동으로는 한 번만 다시(이미 요금이 났을 수 있음)', timeoutCode === 'provider_unreachable' && calls.length === 2 && whys.join() === 'transient', { timeoutCode, n: calls.length, whys })
+  const r2b = await callAssistRetry({ req: { assistId: 'venture.judge', page: 'venture', choice: null, context: CTX as never }, parse: parse as never, hint: 'h', missMessage: 'm', onRetry: (w) => whys.push(w) })
+  const posts2b = calls.filter((c) => !c.url.includes('result='))
+  check('DR2b 묻는 길도 한 번 잘려도(504) 조금 뒤 다시 물어 같은 답 · 다시 보내기 0 · 새 요청 번호 0', !!r2b.value && posts2b.length === 1 && calls.length === 3 && whys.length === 0, { n: calls.length, whys })
+  __setRecoverTimes(120_000, 2_000)
   whys.length = 0
   calls = []
   seq([{ status: 503, body: JSON.stringify({ ok: false, code: 'provider_busy' }) }, { status: 503, body: JSON.stringify({ ok: false, code: 'provider_busy' }) }, { status: 200, body: good }])
@@ -1306,6 +1308,103 @@ async function d629Tests() {
   setEnv()
 }
 
+/* ------------------------------------------------------------------ */
+/* D-638 한 번 누르면 끝까지 — 화면 쪽 이어 받기(같은 요청 번호 · 두 번 세지 않음)   */
+/* ------------------------------------------------------------------ */
+async function recoverTests() {
+  const saved = globalThis.fetch
+  __setRecoverTimes(3000, 5)
+  type Step = (url: string, init?: RequestInit) => Response | 'throw'
+  let steps: Step[] = []
+  let log: { method: string; url: string; body: Record<string, unknown> }[] = []
+  const js = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } })
+  globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
+    const url = String(input)
+    log.push({ method: init?.method ?? 'GET', url, body: init?.body ? JSON.parse(String(init.body)) : {} })
+    const step = steps.shift()
+    const r = step ? step(url, init) : js({ code: 'result_not_found' }, 404)
+    if (r === 'throw') throw new TypeError('Failed to fetch')
+    return r
+  }) as typeof fetch
+  const RUN = { requestId: 'x', status: 'succeeded', structured: { headline: '이어 받은 답', items: [] }, provider: 'gemini', model: 'gemini-x' }
+  const ask = (id: string, signal?: AbortSignal) => callAssist({ requestId: id, assistId: 'side.chat', page: 'side' as never, choice: { provider: 'gemini', model: 'gemini-x' }, context: { title: 't', today: '2026-11-19', facts: [], sections: [] } as never, ask: '물음', ...(signal ? { signal } : {}) })
+  const posts = () => log.filter((l) => l.method === 'POST')
+  const gets = () => log.filter((l) => l.method === 'GET' && l.url.includes('result='))
+
+  // R1 휴대폰이 다른 앱에 갔다 와 연결이 끊김 → 같은 번호로 답 묻기 → 서버가 아직 쓰는 중(202) → 다음 물음에 답
+  log = []
+  steps = [() => 'throw', () => js({ ok: false, code: 'request_in_progress' }, 202), () => js({ ok: true, replayed: true, run: RUN })]
+  const r1 = await ask('rec-0000001')
+  check('RC1 연결이 끊겨도 같은 번호로 답을 다시 받음 — 보내기 1번 · 묻기 2번(쓰는 중 → 답) · 같은 요청 번호', r1.structured?.headline === '이어 받은 답' && posts().length === 1 && gets().length === 2 && gets().every((g) => g.url.includes('result=rec-0000001')), log.map((l) => `${l.method} ${l.url.slice(-30)}`))
+
+  // R2 서버에 없음(다른 서버 · 보관 전) → 같은 번호로 한 번 더 보냄(resume) → 답
+  log = []
+  steps = [() => 'throw', () => js({ ok: false, code: 'result_not_found' }, 404), () => js({ ok: true, replayed: true, run: RUN })]
+  const r2 = await ask('rec-0000002')
+  check('RC2 서버에 아직 없음 → 같은 번호 · resume 으로 한 번 더 보냄(새 번호 아님) → 답', r2.structured?.headline === '이어 받은 답' && posts().length === 2 && posts()[1].body.requestId === 'rec-0000002' && posts()[1].body.resume === true && !('resume' in posts()[0].body), posts().map((p) => p.body.requestId))
+
+  // R3 [멈추기] 를 누른 요청은 이어 받지 않는다
+  log = []
+  const ctrl = new AbortController()
+  steps = [() => {
+    ctrl.abort()
+    return 'throw'
+  }]
+  let c3 = ''
+  try {
+    await ask('rec-0000003', ctrl.signal)
+  } catch (e) {
+    c3 = e instanceof AssistError ? e.code : 'other'
+  }
+  check('RC3 멈추기 — 이어 받지 않음(묻기 0 · 다시 보내기 0)', c3 === 'aborted' && gets().length === 0 && posts().length === 1, { c3, log: log.length })
+
+  // R4 장부는 '이미 끝남' 인데 보관된 답 없음(0030 전) — 바로 알림(오래 기다리지 않음) · 다시 보내지 않음
+  log = []
+  steps = [() => js({ ok: false, code: 'request_done' }, 409), () => js({ ok: false, code: 'result_not_found' }, 404)]
+  let c4 = ''
+  let m4 = ''
+  const t4 = Date.now()
+  try {
+    await ask('rec-0000004')
+  } catch (e) {
+    c4 = e instanceof AssistError ? e.code : 'other'
+    m4 = e instanceof Error ? e.message : ''
+  }
+  check('RC4 이미 끝난 요청 · 보관 없음 — 바로 멈춤 · "사용량은 한 번만" 안내 · 다시 보내기 0', c4 === 'request_done' && m4.includes('한 번만') && posts().length === 1 && gets().length === 1 && Date.now() - t4 < 1500, { c4, m4, ms: Date.now() - t4 })
+
+  // R5 AI 쪽 붐빔 · 로그인 문제 같은 것은 이어 받기 대상이 아님(바로 알림)
+  log = []
+  steps = [() => js({ ok: false, code: 'provider_busy' }, 503)]
+  let c5 = ''
+  try {
+    await ask('rec-0000005')
+  } catch (e) {
+    c5 = e instanceof AssistError ? e.code : 'other'
+  }
+  check('RC5 붐빔(503 JSON)은 이어 받지 않고 바로 알림 — 묻기 0', c5 === 'provider_busy' && gets().length === 0 && posts().length === 1, c5)
+
+  // R6 함수가 잘림(게이트웨이 504 · 화면 HTML) → 끊김으로 보고 답 묻기 → 보관된 답
+  log = []
+  steps = [() => new Response('<html>timeout</html>', { status: 504, headers: { 'content-type': 'text/html' } }), () => js({ ok: true, replayed: true, run: RUN })]
+  const r6 = await ask('rec-0000006')
+  check('RC6 함수가 잘린 504(화면 HTML)도 끊김으로 — 같은 번호 답 받음', r6.structured?.headline === '이어 받은 답' && gets().length === 1, log.length)
+
+  // R7 끝까지 못 받으면(서버가 계속 없음) — 다시 보내기는 두 번까지 · 끊김 오류로 끝
+  log = []
+  steps = [() => 'throw', () => js({ code: 'result_not_found' }, 404), () => 'throw', () => js({ code: 'result_not_found' }, 404), () => 'throw']
+  __setRecoverTimes(300, 5)
+  let c7 = ''
+  try {
+    await ask('rec-0000007')
+  } catch (e) {
+    c7 = e instanceof AssistError ? e.code : 'other'
+  }
+  check('RC7 끝내 못 받음 — 다시 보내기 최대 2번(같은 번호) · 끊김으로 끝(새 요청 0)', c7 === 'network' && posts().length <= 3 && posts().every((p) => p.body.requestId === 'rec-0000007'), { c7, posts: posts().length })
+
+  __setRecoverTimes(120_000, 2_000)
+  globalThis.fetch = saved
+}
+
 await serverTests()
 askTests()
 bundleTests()
@@ -1314,5 +1413,6 @@ await d263Tests()
 await kbContractTests()
 await lockTests()
 await d629Tests()
+await recoverTests()
 console.log(`\naiAssist: ${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)

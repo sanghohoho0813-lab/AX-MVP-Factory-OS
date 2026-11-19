@@ -122,6 +122,11 @@ check('까닭 네 가지', DOWN_REASONS.map((r) => r.key).join() === 'wrongClien
 // 7. 저장된 대화 — 묻는 중에 닫은 것은 다시 묻기로
 const turns = parseTurns(JSON.stringify([{ id: 'h1', at: 'x', q: '질문', clientIds: [], status: 'pending' }, { id: 'h2', at: 'x', q: '둘', clientIds: [], status: 'ai', answer: { headline: 'a', items: [] } }, { bad: 1 }]))
 check('저장된 대화: 묻는 중이던 것은 "다시 물어봐 주세요" · 깨진 줄은 버림', turns.length === 2 && turns[0].status === 'rule' && /다시 물어봐/.test(turns[0].why ?? '') && turns[1].status === 'ai')
+// D-638 요청 번호가 있는 '묻는 중' 줄(30분 안) → 다시 받아 오는 중 · 30분 지난 것 · 번호 없는 것은 다시 묻기
+const nowIso = new Date().toISOString()
+const oldIso = new Date(Date.now() - 40 * 60_000).toISOString()
+const rt = parseTurns(JSON.stringify([{ id: 'r1', at: nowIso, q: '방금', clientIds: [], status: 'pending', rid: 'as_abcdefgh12' }, { id: 'r2', at: oldIso, q: '오래전', clientIds: [], status: 'pending', rid: 'as_abcdefgh34' }, { id: 'r3', at: nowIso, q: '번호 없음', clientIds: [], status: 'pending' }]))
+check('저장된 대화(D-638): 번호 있는 30분 안 줄은 "받아 오는 중"(resume) · 40분 지난 줄 · 번호 없는 줄은 "다시 물어봐 주세요"', rt[0].resume === true && /받아 오는 중/.test(rt[0].why ?? '') && !rt[1].resume && /다시 물어봐/.test(rt[1].why ?? '') && !rt[2].resume && rt.every((t) => t.status === 'rule'), rt.map((t) => [t.resume, t.why]))
 
 // 8. 화면 이름표 = 서버 지시문(같은 id · page · label)
 const p = ASSIST_PRESETS.find((x) => x.id === 'home.chat')

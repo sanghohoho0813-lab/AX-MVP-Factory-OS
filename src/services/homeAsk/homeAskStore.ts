@@ -8,6 +8,7 @@
 import { useSyncExternalStore } from 'react'
 import { callAssist, type AssistAnswer } from '../aiAssist/client'
 import { newRequestId, readChoice } from '../aiAssist/store'
+import { resumable, resumeOnce } from '../aiAssist/resume'
 import type { AssistBundle } from '../aiAssist/context'
 import { EMPTY_FEEDBACK, parseFeedback, preferenceRules, priorTurnsSection, withFeedback, type DownReason, type HomeFeedback, type PlanChip, type RuleAnswer } from './homeAsk'
 import type { ChatDoc, DocCompany } from './homeDocs'
@@ -40,6 +41,10 @@ export interface HomeTurn {
   plans?: PlanChip[]
   /** D-502 질문에서 읽은 업체 사정(상황 질문의 답 · 아직 업체에 없는 것만) — [업체에 기록] 한 번 */
   talk?: { clientId: string; company: string; answers: TalkAnswer[]; numbers?: TalkNumber[]; changes?: string[]; next?: TalkNext; saved?: boolean }
+  /** D-638 AI 요청 번호 — 답을 기다리다 화면이 닫혀도 다시 열면 이 번호로 답을 받아 온다(두 번 세지 않음) */
+  rid?: string
+  /** D-638 다시 받아 오는 중 */
+  resume?: boolean
 }
 
 export interface HomeAskState {
@@ -69,7 +74,12 @@ export function parseTurns(raw: string | null): HomeTurn[] {
     return v
       .filter((t): t is HomeTurn => !!t && typeof t === 'object' && typeof (t as HomeTurn).id === 'string' && typeof (t as HomeTurn).q === 'string')
       // 묻는 중에 닫았던 것은 '다시 묻기' 로 보이게(답이 영영 안 오는 회색 줄이 남지 않게)
-      .map((t) => (t.status === 'pending' ? { ...t, status: 'rule' as const, why: '답을 받기 전에 화면을 닫았어요 — 다시 물어봐 주세요.', answer: t.answer ?? { headline: '답을 받지 못했어요.', items: [] } } : t))
+      // D-638 AI 요청 번호가 있고 30분 안이면 '다시 받아 오는 중'(열리면 그 번호로 답을 받아 온다)
+      .map((t) => {
+        if (t.status !== 'pending' && !t.resume) return t
+        if (resumable(t)) return { ...t, status: 'rule' as const, resume: true, why: '화면이 닫혀 있던 사이에 온 답을 받아 오는 중…', answer: t.answer ?? { headline: '답을 받아 오는 중이에요…', items: [] } }
+        return { ...t, status: 'rule' as const, resume: undefined, why: '답을 받기 전에 화면을 닫았어요 — 다시 물어봐 주세요.', answer: t.answer ?? { headline: '답을 받지 못했어요.', items: [] } }
+      })
       .slice(-MAX_TURNS)
   } catch {
     return []
@@ -250,7 +260,10 @@ export async function askHome(plan: AskPlan): Promise<void> {
       sections: [...prep.bundle.context.sections.slice(0, prior ? 11 : 12), ...(prior ? [prior] : [])],
       rules: [...(prep.bundle.context.rules ?? []), ...rules],
     }
-    const run = await callAssist({ requestId: newRequestId(), assistId: 'home.chat', page: 'today', choice: readChoice(), context, ask: q })
+    // D-638 요청 번호 · 열 링크를 줄에 먼저 적어 둔다 — 답을 기다리다 화면이 닫혀도 다시 열면 이 번호로 받아 와 같은 링크로 보인다
+    const rid = newRequestId()
+    commit((cur) => cur.map((t) => (t.id === id ? { ...t, rid, links: prep.bundle.links } : t)))
+    const run = await callAssist({ requestId: rid, assistId: 'home.chat', page: 'today', choice: readChoice(), context, ask: q })
     const s = run.structured
     finish({ status: 'ai', answer: s ?? { headline: run.raw.slice(0, 2000), items: [] }, links: prep.bundle.links, model: run.servedModel || run.model })
   } catch (e) {
@@ -259,6 +272,35 @@ export async function askHome(plan: AskPlan): Promise<void> {
   } finally {
     set({ busy: false })
   }
+}
+
+/**
+ * D-638 화면이 닫혀 있던 사이에 온 답 받아 오기 — '다시 받아 오는 중' 줄마다 그 요청 번호로 서버에 묻는다.
+ * 답 → AI 답으로 채움 · 아직 쓰는 중 → 다음에 다시(오늘로 돌아올 때 · 창으로 돌아올 때) · 서버에 없음 → '다시 물어봐 주세요'.
+ */
+export async function resumeHomeTurns(): Promise<void> {
+  const owner = liveOwner()
+  for (const t of state.turns.filter((x) => x.resume && x.rid)) {
+    const got = await resumeOnce(t.rid as string)
+    if (liveOwner() !== owner) return
+    if (got === 'pending') continue
+    commit((cur) =>
+      cur.map((x) =>
+        x.id !== t.id
+          ? x
+          : got
+            ? { ...x, status: 'ai', resume: undefined, why: '', answer: got.structured ?? { headline: got.raw.slice(0, 2000), items: [] }, model: got.servedModel || got.model }
+            : { ...x, resume: undefined, why: '답을 받기 전에 화면을 닫았어요 — 다시 물어봐 주세요.', answer: { headline: '답을 받지 못했어요.', items: [] } },
+      ),
+    )
+  }
+}
+
+if (typeof window !== 'undefined') {
+  queueMicrotask(() => void resumeHomeTurns())
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void resumeHomeTurns()
+  })
 }
 
 /** 👍 · 👎 — 다음 답의 말하기 규칙으로 쌓인다 */
@@ -295,6 +337,7 @@ export function syncHomeTurns(): void {
   if (state.busy) return
   const turns = read(HOME_ASK_KEY, parseTurns, [])
   if (JSON.stringify(turns) !== JSON.stringify(state.turns)) set({ turns })
+  void resumeHomeTurns()
 }
 
 const subscribe = (f: () => void) => {

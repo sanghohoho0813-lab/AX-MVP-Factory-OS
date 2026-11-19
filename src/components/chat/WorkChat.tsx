@@ -18,6 +18,7 @@ import { useToast } from '../ui/toastContext'
 import { ClientPickerOptions } from '../ops/ClientPickerOptions'
 import { assistOn, useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { callAssist } from '../../services/aiAssist/client'
+import { resumeOnce } from '../../services/aiAssist/resume'
 import { readChoice } from '../../services/aiAssist/store'
 import { ModelPicker } from '../ai/ModelPicker'
 import { ChatTextSize } from './ChatTextSize'
@@ -215,22 +216,47 @@ export function WorkChat(p: WorkChatProps) {
     setTurns(loadTurns(p.module, p.clientId))
   }, [p.module, p.clientId])
 
+  // D-638 화면을 떠난 뒤에 온 답도 버리지 않는다 — 예전엔 setTurns 안에서만 저장해 화면이 사라지면(다른 화면으로 감) 답이 저장되지 않았다
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
   const commit = useCallback(
     (fn: (cur: ChatTurn[]) => ChatTurn[], key = keyRef.current) => {
-      // 답을 기다리는 사이 회사를 바꿨으면 그 회사 기록에만 넣는다
-      if (key !== keyRef.current) {
+      // 답을 기다리는 사이 회사를 바꿨거나 화면을 떠났으면 그 회사 기록에만 넣는다
+      if (key !== keyRef.current || !mountedRef.current) {
         const [m, c] = key.split('|')
-        saveTurns(m as ChatModule, c, fn(loadTurns(m as ChatModule, c)))
+        saveTurns(m as ChatModule, c, fn(loadTurns(m as ChatModule, c)).slice(-HISTORY_MAX))
         return
       }
-      setTurns((cur) => {
-        const next = fn(cur).slice(-HISTORY_MAX)
-        saveTurns(p.module, p.clientId, next)
-        return next
-      })
+      const next = fn(turnsRef.current).slice(-HISTORY_MAX)
+      turnsRef.current = next
+      saveTurns(p.module, p.clientId, next)
+      setTurns(next)
     },
     [p.module, p.clientId],
   )
+
+  // D-638 떠나 있던 사이에 온 답 받아 오기 — '받아 오는 중' 줄마다 그 요청 번호로 서버에 묻는다(AI 다시 안 부름)
+  useEffect(() => {
+    const key = `${p.module}|${p.clientId}`
+    const waiting = loadTurns(p.module, p.clientId).filter((t) => t.resume && t.rid)
+    if (!waiting.length) return
+    void (async () => {
+      for (const t of waiting) {
+        const got = await resumeOnce(t.rid as string)
+        if (got === 'pending') continue
+        const a = got ? answerFromAi(got.structured, got.raw, got.model) : null
+        if (a) a.actions = p.actionsFor(t.q)
+        commit((cur) => cur.map((x) => (x.id !== t.id ? x : a ? { ...x, a, status: 'done', error: undefined, resume: undefined } : { ...x, resume: undefined, error: '화면을 떠나 답을 받지 못했어요 — 다시 물어봐 주세요' })), key)
+      }
+    })()
+    // 회사 · 모듈이 바뀔 때만(답 단추 목록은 그 화면 것)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.module, p.clientId])
 
   // 새 질문이 생기거나 AI 답이 도착하면 그 질문을 화면 위쪽으로 — 아래 질문창에 답이 가리지 않게
   const lastKey = `${turns.length}:${turns[turns.length - 1]?.status ?? ''}`
@@ -251,10 +277,12 @@ export function WorkChat(p: WorkChatProps) {
     const id = uid('t')
     const key = keyRef.current
     const ctx = p.aiContext(turnsRef.current)
-    commit((cur) => [...cur, { id, at: new Date().toISOString(), q: shown, a: null, status: 'pending' }], key)
+    // D-638 요청 번호를 줄에 같이 적어 둔다 — 떠났다 와도 이 번호로 답을 받아 온다
+    const rid = uid('ch')
+    commit((cur) => [...cur, { id, at: new Date().toISOString(), q: shown, a: null, status: 'pending', rid }], key)
     setBusy(true)
     try {
-      const run = await callAssist({ requestId: uid('ch'), assistId: p.assistId, page: p.page, choice: readChoice(), context: ctx, ask: q })
+      const run = await callAssist({ requestId: rid, assistId: p.assistId, page: p.page, choice: readChoice(), context: ctx, ask: q })
       const a = answerFromAi(run.structured, run.raw, run.model)
       a.actions = p.actionsFor(q)
       commit((cur) => cur.map((t) => (t.id === id ? { ...t, a, status: 'done' } : t)), key)

@@ -9,7 +9,7 @@
  */
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import handler, { MARKETING_PAGES, __resetAiAssistState } from '../../../api/ai-assist.js'
+import handler, { AFTER_AI_MS, MARKETING_PAGES, __resetAiAssistState, aiBudget } from '../../../api/ai-assist.js'
 import { ASSISTS, assistSystem } from '../../../api/_ai/assists.js'
 import { OWNER_IDENTITY_WORDS, cleanBrand, customerize } from '../../../api/_ai/brand.js'
 import { OWNER_FACT_MARKERS, customerLabel, customerOutput, customerPack, stripOwnerContext } from '../../../api/_ai/customerMarketing.js'
@@ -108,6 +108,9 @@ function reserve(a: Record<string, unknown>) {
 
 type Call = { url: string; body: Record<string, unknown> }
 let calls: Call[] = []
+let results = new Map<string, { assist: string; run: Record<string, unknown> }>()
+let resultsCalls: { method: string; url: string }[] = []
+let resultsMode: 'ok' | 'missing' = 'ok'
 let providerFails = false
 let providerDelayMs = 0
 const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status })
@@ -127,6 +130,20 @@ globalThis.fetch = (async (input: unknown, init?: { method?: string; headers?: R
     if (audienceMode === 'down') throw new Error('network down')
     if (audienceMode === 'none') return json({ code: '42703', message: 'column os_access.audience does not exist' }, 400)
     return json([{ audience: audienceMode }])
+  }
+  // D-638 AI 답 보관(0030 흉내) — 사람(로그인)마다 따로 · 표가 없는 운영은 404
+  if (url.includes('/rest/v1/ai_assist_results')) {
+    resultsCalls.push({ method: init?.method ?? 'GET', url })
+    if (resultsMode === 'missing') return json({ code: '42P01', message: 'relation "public.ai_assist_results" does not exist' }, 404)
+    const who = String(headers.Authorization)
+    if ((init?.method ?? 'GET') === 'POST') {
+      const k = `${who}:${String(body.request_id)}`
+      if (!results.has(k)) results.set(k, { assist: String(body.assist_id), run: body.run as Record<string, unknown> })
+      return new Response(null, { status: 201 })
+    }
+    const id = decodeURIComponent(/request_id=eq\.([^&]+)/.exec(url)?.[1] ?? '')
+    const row = results.get(`${who}:${id}`)
+    return json(row ? [{ assist_id: row.assist, run: row.run }] : [])
   }
   if (url.includes('/rest/v1/rpc/my_ai_access')) {
     ledgerCalls.push({ fn: 'my_ai_access', args: body })
@@ -199,12 +216,20 @@ function setEnv(secret = true) {
   settleFails = 0
   providerFails = false
   providerDelayMs = 0
+  results = new Map()
+  resultsCalls = []
+  resultsMode = 'ok'
 }
 let seq = 0
 const rid = () => `req-usage-${String(++seq).padStart(6, '0')}`
 async function post(body: Record<string, unknown>, auth: string) {
   const res = mkRes()
   await handler({ method: 'POST', url: '/api/ai-assist', headers: { authorization: auth }, body: JSON.stringify(body) }, res)
+  return res
+}
+async function getResult(id: string, auth: string) {
+  const res = mkRes()
+  await handler({ method: 'GET', url: `/api/ai-assist?result=${encodeURIComponent(id)}`, headers: { authorization: auth } }, res)
   return res
 }
 async function status(auth: string) {
@@ -1104,6 +1129,61 @@ async function run() {
         CONTACT_PATHS.every((c) => !/문의[:：]\s*문의/.test(bioWith(c.bioLine)) && bioWith(c.bioLine).includes(c.bioLine)) && CONTACT_PATH_NOTE.includes('비슷한 말') && CONTACT_PATH_AFTER.includes('잠재고객') && hasMenuGuide('fn-mk-contact'),
       JSON.stringify({ bad: bad.map((c) => c.key), sample: bioWith(CONTACT_PATHS[0].bioLine).slice(-60) }),
     )
+  }
+
+  /* ---- 6. D-638 한 번 누르면 끝까지 — 끊겨도 같은 요청 번호로 답을 다시 받는다 · 두 번 세지 않음 ---- */
+  {
+    setEnv()
+    const id = rid()
+    const first = await post({ requestId: id, assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+    const kept = results.get(`${PILOT}:${id}`)
+    check('W1 답을 만들면 그 사람 로그인으로 보관(0030) — 요청 번호 · 단추 · 답 그대로', first.statusCode === 200 && !!kept && kept.assist === 'radar.top5' && (kept.run as { requestId?: string }).requestId === id, { s: first.statusCode, kept: !!kept })
+    // 휴대폰이 다른 앱에 갔다 옴 = 화면은 답을 못 받음 → 다른 서버(메모리 없음)에 같은 번호로 묻기
+    __resetAiAssistState()
+    const again = await getResult(id, PILOT)
+    check('W2 다른 서버(메모리 없음)에서 같은 번호의 답 묻기(GET ?result) — 보관된 답 그대로 · AI 다시 안 부름 · 장부 예약 0 · 사용량 그대로(2)', again.statusCode === 200 && (again.body.run as { requestId?: string })?.requestId === id && provider().length === 1 && fnCalls('ai_usage_reserve').length === 1 && used() === 2, { s: again.statusCode, b: again.raw.slice(0, 200) })
+    const resumed = await post({ requestId: id, assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND, resume: true }, PILOT)
+    check('W3 같은 번호로 다시 보내기(resume) — 보관된 답 · AI · 장부 0번 더(동시 · 한도 계산 그대로)', resumed.statusCode === 200 && resumed.body.replayed === true && provider().length === 1 && fnCalls('ai_usage_reserve').length === 1 && used() === 2, { s: resumed.statusCode, b: resumed.raw.slice(0, 200) })
+    const other = await getResult(id, OWNER)
+    check('W4 다른 사람(대표 로그인)이 같은 번호로 물어도 0 — 404', other.statusCode === 404 && other.body.code === 'result_not_found', other.body)
+    const wrong = await post({ requestId: id, assistId: 'bench.copy', page: 'radar', context: MK_CTX, brand: BRAND, resume: true }, PILOT)
+    check('W5 같은 번호 · 다른 단추로 다시 보내기 — 409 request_conflict(남의 답을 섞지 않음)', wrong.statusCode === 409 && wrong.body.code === 'request_conflict', wrong.body)
+    const bad = await getResult('a b', PILOT)
+    check('W6 번호 모양 틀림 — 400', bad.statusCode === 400)
+  }
+  {
+    // 같은 서버에서 아직 쓰는 중 — 묻는 쪽은 기다렸다가 같은 답(한 번만 부름)
+    setEnv()
+    providerDelayMs = 300
+    const id = rid()
+    const slow = post({ requestId: id, assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+    await new Promise((r) => setTimeout(r, 30))
+    const waiting = await getResult(id, PILOT)
+    const done = await slow
+    check('W7 같은 서버가 아직 쓰는 중 — 묻는 쪽은 기다렸다가 같은 답 · AI 한 번 · 장부 한 번', waiting.statusCode === 200 && (waiting.body.run as { requestId?: string })?.requestId === id && done.statusCode === 200 && provider().length === 1 && fnCalls('ai_usage_reserve').length === 1, { w: waiting.statusCode, d: done.statusCode, p: provider().length })
+  }
+  {
+    // 보관 표가 없는 운영(0030 적용 전) — 예전처럼 돈다(답 그대로 · 오류 없음) · 다른 서버에서 물으면 404(화면이 같은 번호로 다시 보냄)
+    setEnv()
+    resultsMode = 'missing'
+    const id = rid()
+    const r = await post({ requestId: id, assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+    __resetAiAssistState()
+    const miss = await getResult(id, PILOT)
+    const again = await post({ requestId: id, assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND, resume: true }, PILOT)
+    check('W8 보관 표 없음(0030 전) — 답은 그대로 · 다른 서버에서 묻기 404 · 같은 번호 다시 보내기는 장부가 "이미 끝남"(409 request_done) · AI 다시 안 부름 · 사용량 그대로', r.statusCode === 200 && miss.statusCode === 404 && again.statusCode === 409 && again.body.code === 'request_done' && provider().length === 1 && used() === 2, { r: r.statusCode, m: miss.statusCode, a: again.statusCode, b: again.body })
+  }
+  {
+    // 첫 요청은 보관을 먼저 묻지 않는다(빠르게) — resume 일 때만
+    setEnv()
+    const id = rid()
+    await post({ requestId: id, assistId: 'radar.top5', page: 'radar', context: MK_CTX, brand: BRAND }, PILOT)
+    const gets = resultsCalls.filter((c) => c.method === 'GET').length
+    check('W9 첫 요청은 보관을 먼저 읽지 않음(GET 0 · 넣기 1)', gets === 0 && resultsCalls.filter((c) => c.method === 'POST').length === 1, resultsCalls)
+  }
+  {
+    // 시간 — 함수 끝 8초 전까지만 AI 를 기다린다(조사 단추가 55초 + 55초를 기다리다 함수가 잘리지 않게)
+    check('W10 AI 를 기다릴 수 있는 시간 — 남은 시간만큼(최소 1초) · 기본 55초를 넘지 않음', aiBudget(Date.now() + 52_000) <= 52_000 && aiBudget(Date.now() + 52_000) >= 51_000 && aiBudget(Date.now() + 500) === 1000 && aiBudget(Date.now() + 200_000) === 55_000 && AFTER_AI_MS === 8000)
   }
 
   console.log(`\nsaas-usage: ${passed} passed, ${failed} failed`)

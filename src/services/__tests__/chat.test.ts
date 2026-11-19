@@ -44,6 +44,8 @@ const done = (q: string, title: string): ChatTurn => ({ id: `t_${q}`, at: '2026-
   check(`C3 기록은 최근 ${HISTORY_MAX}개만`, parsed.length === HISTORY_MAX && parsed[0].q === '질문10' && parsed.at(-1)!.q === '질문29', parsed.length)
   const pend = parseHistory(JSON.stringify([{ id: 'p', at: '', q: '기다리던 질문', a: null, status: 'pending' }]))
   check('C4 답을 기다리다 떠난 질문 → 끊김(error) + 다시 물어보라는 말', pend[0].status === 'error' && /다시 물어/.test(pend[0].error ?? ''), pend)
+  const fresh = parseHistory(JSON.stringify([{ id: 'p2', at: new Date().toISOString(), q: '방금 질문', a: null, status: 'pending', rid: 'ch_abc123_xyz98765' }, { id: 'p3', at: new Date(Date.now() - 31 * 60_000).toISOString(), q: '오래된 질문', a: null, status: 'pending', rid: 'ch_abc123_xyz11111' }]))
+  check('C4b(D-638) 번호 있는 30분 안 질문 → 받아 오는 중(resume) · 31분 지난 것 → 다시 물어보기', fresh[0].resume === true && /받아 오는 중/.test(fresh[0].error ?? '') && !fresh[1].resume && /다시 물어/.test(fresh[1].error ?? ''), fresh)
   const ai = answerFromAi({ headline: '명세서부터', items: [{ title: '청구항 정리', tag: '먼저', detail: '독립항 1개' }], next: ['', '도면 확인'], caution: ' 공식 기준 확인 ' }, '', 'gemini-x')
   check('C5 AI 답 → 카드(제목 · 줄 · 다음 · 주의 · 모델 · source=ai)', ai.source === 'ai' && ai.title === '명세서부터' && ai.lines[0] === '[먼저] 청구항 정리 — 독립항 1개' && ai.next?.length === 1 && ai.caution === '공식 기준 확인' && ai.model === 'gemini-x', ai)
   const raw = answerFromAi(null, '첫 줄 답\n둘째 줄\n\n셋째 줄', 'm')

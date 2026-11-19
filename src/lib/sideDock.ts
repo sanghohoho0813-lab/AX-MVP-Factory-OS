@@ -121,6 +121,10 @@ export interface DockTurn {
   caution?: string
   model?: string
   error?: string
+  /** D-638 요청 번호 — 답을 기다리다 화면이 닫혀도 다시 열면 이 번호로 답을 받아 온다 */
+  rid?: string
+  /** D-638 다시 받아 오는 중(화면이 닫혔던 '묻는 중' 줄) */
+  resume?: boolean
 }
 
 export const DOCK_CHAT_KEY = 'axmvp.ui.side_dock.chat'
@@ -136,6 +140,10 @@ export function parseDockChat(raw: string | null): DockTurn[] {
     for (const t of v as Record<string, unknown>[]) {
       if (!t || typeof t !== 'object' || typeof t.id !== 'string' || typeof t.q !== 'string') continue
       const status = t.status === 'done' ? 'done' : 'error'
+      // D-638 묻는 중에 닫힌 줄 — 요청 번호가 있고 30분 안이면 '다시 받아 오는 중'(열리면 그 번호로 답을 묻는다)
+      const rid = typeof t.rid === 'string' && /^[A-Za-z0-9_-]{8,80}$/.test(t.rid) ? t.rid : undefined
+      const at = typeof t.at === 'string' ? Date.parse(t.at) : NaN
+      const resume = (t.status === 'pending' || t.resume === true) && !!rid && Number.isFinite(at) && Date.now() - at < 30 * 60_000
       const items = Array.isArray(t.items)
         ? (t.items as Record<string, unknown>[]).filter((i) => i && typeof i.title === 'string').slice(0, 12).map((i) => ({ title: String(i.title).slice(0, 300), detail: str(i.detail, 2000), body: str(i.body, 12000) }))
         : undefined
@@ -149,7 +157,9 @@ export function parseDockChat(raw: string | null): DockTurn[] {
         next: Array.isArray(t.next) ? (t.next as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 6) : undefined,
         caution: str(t.caution, 1000),
         model: str(t.model, 120),
-        error: status === 'error' ? (str(t.error, 300) ?? '답을 받지 못했어요 — 다시 물어봐 주세요') : undefined,
+        error: status === 'error' ? (resume ? '화면이 닫혀 있던 사이에 온 답을 받아 오는 중…' : t.status === 'pending' ? '답을 받지 못했어요 — 다시 물어봐 주세요' : (str(t.error, 300) ?? '답을 받지 못했어요 — 다시 물어봐 주세요')) : undefined,
+        ...(rid ? { rid } : {}),
+        ...(resume ? { resume: true } : {}),
       })
     }
     return out.slice(-DOCK_CHAT_MAX)

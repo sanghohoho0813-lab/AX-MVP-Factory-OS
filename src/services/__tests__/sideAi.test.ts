@@ -108,6 +108,8 @@ check('K3 javascript · data · file · 깨진 주소는 절대 안 띄움', !ca
   const many = Array.from({ length: 40 }, (_, i) => ({ id: `t${i}`, at: '', q: `질문 ${i}`, status: 'done', headline: `답 ${i}`, items: [{ title: '가' }, { nope: 1 }] }))
   const list = parseDockChat(JSON.stringify([...many, { id: 'p', q: '기다리던 것', status: 'pending' }, { q: 'id 없음' }, 'x', null]))
   check('K8 대화 기록 — 30개까지 · 모양 틀린 줄 버림 · 기다리던 중 닫힌 것은 다시 묻기로', list.length === DOCK_CHAT_MAX && list[list.length - 1].id === 'p' && list[list.length - 1].status === 'error' && !!list[list.length - 1].error && list[0].items?.length === 1 && parseDockChat('깨짐').length === 0 && parseDockChat('{"a":1}').length === 0, list.slice(-2))
+  const fresh = parseDockChat(JSON.stringify([{ id: 'r1', at: new Date().toISOString(), q: '방금', status: 'pending', rid: 'as_abcdefgh12' }, { id: 'r2', at: new Date(Date.now() - 40 * 60_000).toISOString(), q: '오래전', status: 'pending', rid: 'as_abcdefgh34' }, { id: 'r3', at: new Date().toISOString(), q: '이상한 번호', status: 'pending', rid: 'a b' }]))
+  check('K8b(D-638) 번호 있는 30분 안 줄 → 받아 오는 중(resume · 번호 남김) · 40분 지난 줄 · 이상한 번호 → 다시 묻기', fresh[0].resume === true && fresh[0].rid === 'as_abcdefgh12' && /받아 오는 중/.test(fresh[0].error ?? '') && !fresh[1].resume && /다시 물어/.test(fresh[1].error ?? '') && !fresh[2].resume && !fresh[2].rid, fresh)
   const ctx = dockChatContext(list, '2026-10-21', '오늘')
   check('K9 보낼 것 — 앞선 대화(끝난 것) 4줄 · 지금 화면 이름만(회사 기록 없음)', ctx.sections.length === 1 && ctx.sections[0].rows.length === 4 && ctx.sections[0].rows[3].q === '질문 39' && ctx.facts[0] === '지금 보고 있는 화면: 오늘' && dockChatContext([], '2026-10-21', '').sections.length === 0 && dockChatContext([], '2026-10-21', '').facts.length === 0)
 }

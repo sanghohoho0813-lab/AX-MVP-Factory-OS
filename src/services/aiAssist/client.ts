@@ -157,6 +157,8 @@ const MESSAGE: Record<string, string> = {
   provider_billing: 'AI 회사 계정의 잔액 · 사용 한도가 다 됐습니다. 충전한 뒤 다시 눌러 주세요.',
   provider_model: 'AI 회사가 이 모델 이름을 모릅니다. 다른 모델을 골라 주세요.',
   provider_unreachable: 'AI 답을 받지 못했습니다(시간 초과). 다시 눌러 주세요.',
+  // D-638 서버 함수가 시간 안에 못 끝남(게이트웨이 504) — 같은 번호로 답을 다시 물어본 뒤에도 못 받았을 때
+  gateway_timeout: 'AI 답이 늦어 받지 못했습니다(시간 초과). 잠시 뒤 다시 눌러 주세요.',
   provider_error: 'AI 쪽 오류로 답을 받지 못했습니다. 다시 눌러 주세요.',
   network: '서버에 닿지 못했습니다. 인터넷 연결을 확인해 주세요.',
   auth_unreachable: '로그인 확인이 늦어 멈췄습니다. 잠시 뒤 다시 눌러 주세요.',
@@ -168,7 +170,8 @@ const MESSAGE: Record<string, string> = {
   marketing_not_included: '마케팅 · 브랜딩은 이 기능이 포함된 요금제에서 열려요.',
   usage_unreachable: 'AI 사용량을 확인하지 못해 멈췄어요(세지 않았습니다). 잠시 뒤 다시 눌러 주세요.',
   request_in_progress: '같은 요청이 아직 처리 중이에요. 잠시 뒤 결과를 확인해 주세요.',
-  request_done: '이미 처리된 요청이에요. 새로 눌러 주세요.',
+  request_done: '답은 이미 만들어졌는데 이 화면이 받지 못했어요(사용량은 한 번만 셌어요). 잠시 뒤 다시 눌러 주세요.',
+  result_not_found: '답을 받지 못했습니다. 다시 눌러 주세요.',
 }
 
 export function assistMessage(code: string): string {
@@ -314,31 +317,149 @@ export interface AssistVideo {
   end: number
 }
 
-export async function callAssist(req: { requestId: string; assistId: string; page: AssistPage; choice: { provider: ProviderId; model: string } | null; context: AssistContext; ask?: string; video?: AssistVideo; skill?: string; signal?: AbortSignal }): Promise<AssistRun> {
-  const brand = brandForRequest()
-  // D-629 자동이면 이 요청의 물음 · 단추로 모델을 정한다(직접 고른 모델은 그대로)
-  const { choice, auto } = await resolveAssistChoice(req)
+/* ------------------------------------------------------------------ */
+/* D-638 한 번 누르면 끝까지 — 끊겨도 같은 요청 번호로 답을 다시 받는다       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 대표(2026-11-19) "한 번 누르면 중간에 이탈 · 이동 · 멈춤 · 코인이 갑자기 … 백그라운드에서 돌아가도 전혀 문제없게".
+ *   휴대폰이 다른 앱으로 가면 브라우저가 연결을 끊는 일이 잦다 — 서버는 그래도 답을 끝까지 만들고(사용량은 한 번) 보관한다(0030).
+ *   그래서 연결이 끊긴 요청은 실패로 끝내지 않고: 화면이 다시 보일 때까지 기다린 뒤 → 같은 요청 번호의 답을 묻는다(GET ?result)
+ *   → 아직 쓰는 중이면 조금 뒤 다시 → 서버에 없으면 같은 번호로 한 번 더 보낸다(resume — 서버가 보관 · 장부를 먼저 본다 · 두 번 세지 않음).
+ *   멈추기(signal)를 누른 요청은 이어 받지 않는다.
+ */
+const RECOVER_CODES = new Set(['network', 'gateway_timeout', 'request_in_progress', 'request_done'])
+/** 이어 받기를 끝까지 기다리는 시간(화면이 숨어 있던 시간은 빼고) */
+const RECOVER_MS = 120_000
+let recoverMs = RECOVER_MS
+let recoverGapMs = 2_000
+/** 시험용 — 이어 받기 시간 */
+export function __setRecoverTimes(total: number, gap: number) {
+  recoverMs = total
+  recoverGapMs = gap
+}
+
+/** 화면이 보일 때까지 — 휴대폰이 다른 앱에 가 있는 동안은 묻지 않는다(돌아오면 바로) */
+function untilVisible(signal?: AbortSignal): Promise<void> {
+  if (typeof document === 'undefined' || document.visibilityState !== 'hidden') return Promise.resolve()
+  return new Promise((ok) => {
+    const done = () => {
+      document.removeEventListener('visibilitychange', on)
+      signal?.removeEventListener('abort', done)
+      ok()
+    }
+    const on = () => {
+      if (document.visibilityState !== 'hidden') done()
+    }
+    document.addEventListener('visibilitychange', on)
+    signal?.addEventListener('abort', done)
+  })
+}
+
+const pause = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((ok) => {
+    const t = setTimeout(ok, ms)
+    signal?.addEventListener('abort', () => {
+      clearTimeout(t)
+      ok()
+    })
+  })
+
+/** 같은 요청 번호의 답 — 'done'(답) · 'pending'(아직 쓰는 중) · 'missing'(서버에 없음) · 'error'(그 밖 — 실패 이유) */
+export async function fetchAssistResult(requestId: string, signal?: AbortSignal): Promise<{ state: 'done'; run: AssistRun } | { state: 'pending' } | { state: 'missing' } | { state: 'error'; error: AssistError }> {
+  let res: Response
+  try {
+    res = await fetch(`${ASSIST_ENDPOINT}?result=${encodeURIComponent(requestId)}`, { headers: { ...(await authHeader()) }, ...(signal ? { signal } : {}) })
+  } catch {
+    return { state: 'error', error: new AssistError('network', MESSAGE.network) }
+  }
+  // 아직 쓰는 중(202) · 묻는 길이 잠깐 잘림(게이트웨이 504 — 화면 HTML) → 조금 뒤 다시 묻는다
+  if (res.status === 202 || (res.status === 504 && notJson(res))) return { state: 'pending' }
+  if (res.status === 404 && !notJson(res)) return { state: 'missing' }
+  if (!res.ok) return { state: 'error', error: await readError(res) }
+  if (notJson(res)) return { state: 'error', error: new AssistError('not_deployed', MESSAGE.not_deployed) }
+  try {
+    const b = (await res.json()) as { run?: AssistRun }
+    return b && b.run ? { state: 'done', run: b.run } : { state: 'missing' }
+  } catch {
+    return { state: 'missing' }
+  }
+}
+
+type PostBody = Record<string, unknown> & { requestId: string }
+
+async function postAssist(body: PostBody, signal?: AbortSignal): Promise<AssistRun> {
   let res: Response
   try {
     res = await fetch(ASSIST_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-      // SAAS-1 이 작업공간의 브랜드 · AI 설정(있으면) — 서버는 대표가 아닌 계정에만 쓴다
-      body: JSON.stringify({ requestId: req.requestId, assistId: req.assistId, page: req.page, choice, context: req.context, ask: req.ask ?? '', ...(req.video ? { video: req.video } : {}), ...(req.skill ? { skill: req.skill } : {}), ...(brand ? { brand } : {}) }),
+      body: JSON.stringify(body),
       // D-350 [멈추기] — 기다리던 답을 버린다(서버가 이미 받은 요청은 끝까지 갈 수 있다)
-      ...(req.signal ? { signal: req.signal } : {}),
+      ...(signal ? { signal } : {}),
     })
   } catch {
-    if (req.signal?.aborted) throw new AssistError('aborted', '멈췄습니다.')
+    if (signal?.aborted) throw new AssistError('aborted', '멈췄습니다.')
     throw new AssistError('network', MESSAGE.network)
   }
+  // 함수가 잘렸거나(게이트웨이 504 — 화면 HTML) 연결이 이상하게 끝난 것은 '끊김' 으로 — 서버가 답을 보관했을 수 있다
+  if (res.status === 504 && notJson(res)) throw new AssistError('gateway_timeout', MESSAGE.gateway_timeout)
   if (!res.ok) throw await readError(res)
   if (notJson(res)) throw new AssistError('not_deployed', MESSAGE.not_deployed)
   const b = (await res.json()) as { ok: boolean; run?: AssistRun }
   if (!b || !b.run) throw new AssistError('provider_error', MESSAGE.provider_error)
+  return b.run
+}
+
+/**
+ * 끊긴 요청 이어 받기 — 받으면 답, 끝내 못 받으면 마지막 오류.
+ * 같은 요청 번호로만 묻고 보낸다(서버 · 장부가 두 번 세지 않는다). 다시 보내기는 두 번까지.
+ */
+async function recoverRun(first: AssistError, body: PostBody, signal?: AbortSignal): Promise<AssistRun> {
+  let last = first
+  let resent = 0
+  let spent = 0
+  while (spent < recoverMs) {
+    if (signal?.aborted) throw new AssistError('aborted', '멈췄습니다.')
+    await untilVisible(signal)
+    const began = Date.now()
+    const got = await fetchAssistResult(body.requestId, signal)
+    if (got.state === 'done') return got.run
+    if (got.state === 'error' && got.error.code !== 'network') throw got.error
+    // 장부는 '이미 끝남' 인데 보관된 답이 없음(보관 표 0030 이 없는 운영) — 더 기다려도 못 받는다. 센 것은 한 번뿐
+    if (got.state === 'missing' && last.code === 'request_done') throw last
+    if (got.state === 'missing' && resent < 2) {
+      resent += 1
+      try {
+        return await postAssist({ ...body, resume: true }, signal)
+      } catch (e) {
+        if (!(e instanceof AssistError) || !RECOVER_CODES.has(e.code)) throw e
+        last = e
+      }
+    }
+    await pause(recoverGapMs, signal)
+    spent += Date.now() - began
+  }
+  throw last
+}
+
+export async function callAssist(req: { requestId: string; assistId: string; page: AssistPage; choice: { provider: ProviderId; model: string } | null; context: AssistContext; ask?: string; video?: AssistVideo; skill?: string; signal?: AbortSignal }): Promise<AssistRun> {
+  const brand = brandForRequest()
+  // D-629 자동이면 이 요청의 물음 · 단추로 모델을 정한다(직접 고른 모델은 그대로)
+  const { choice, auto } = await resolveAssistChoice(req)
+  // SAAS-1 이 작업공간의 브랜드 · AI 설정(있으면) — 서버는 대표가 아닌 계정에만 쓴다
+  const body: PostBody = { requestId: req.requestId, assistId: req.assistId, page: req.page, choice, context: req.context, ask: req.ask ?? '', ...(req.video ? { video: req.video } : {}), ...(req.skill ? { skill: req.skill } : {}), ...(brand ? { brand } : {}) }
+  let run: AssistRun
+  try {
+    run = await postAssist(body, req.signal)
+  } catch (e) {
+    // D-638 끊김 · 같은 요청 처리 중 · 이미 처리됨 → 같은 번호로 이어 받기(멈추기는 그대로 끝)
+    if (!(e instanceof AssistError) || !RECOVER_CODES.has(e.code) || req.signal?.aborted) throw e
+    run = await recoverRun(e, body, req.signal)
+  }
   // D-629 자동이 고른 것 — 모델 고르기 판에 '방금: 좋은 모델로 답함' 한 줄(서버가 실제로 부른 모델로 — 답 아래 'AI 답 · 모델' 과 같은 이름)
-  if (auto && isProvider(b.run.provider)) noteAutoPick({ weight: auto, provider: b.run.provider, model: String(b.run.model || choice?.model || ''), at: Date.now() })
+  if (auto && isProvider(run.provider)) noteAutoPick({ weight: auto, provider: run.provider, model: String(run.model || choice?.model || ''), at: Date.now() })
   // 방금 답은 자동이 고른 것이 아니다(직접 고른 모델 · 이번 한 번만 다른 모델) — 앞의 '방금' 줄을 남겨 두지 않는다
   else if (lastAutoPick()) noteAutoPick(null)
-  return b.run
+  return run
 }

@@ -23,9 +23,12 @@ import { __resetGateState, assistLimits, fail, rateCheck, readBody, send, whoCan
 import { cleanBrand } from './_ai/brand.js'
 import { customerLabel, customerOutput, stripOwnerContext } from './_ai/customerMarketing.js'
 import { __resetUsageState, legacyAudience, myAccess, releaseUsage, reserveUsage, settleUsage, usageReady, usageUnits } from './_ai/usage.js'
+import { loadResult, saveResult } from './_ai/results.js'
 import { PROVIDERS, __resetProviderCache, callModel, cleanChoice, defaultChoice, priceOf, probeProvider, providerBase, providerKey, publicCatalog, tierModel, tierOf } from './_ai/providers.js'
 
 const IDEM_TTL = 15 * 60_000
+/** D-638 답 다시 받기 — 이 서버가 아직 쓰는 중이면 이만큼 기다린다(그 뒤엔 '아직 쓰는 중' 으로 답하고 화면이 다시 묻는다) */
+const RESULT_WAIT_MS = 25_000
 /** 팀장 등급 중 외부 구독 고객(· 누구인지 모를 때)이 쓸 수 있는 AI 회사 */
 export const PILOT_PROVIDERS = new Set(['gemini'])
 /** D-614 내부 팀장이 쓸 수 있는 AI 회사 — 회사마다 가장 싼 모델 하나만(pilotModel) */
@@ -110,6 +113,21 @@ function timeoutMs() {
   return Math.min(Math.max(Number.isFinite(v) && v > 0 ? v : 55000, 5000), 295000)
 }
 
+/**
+ * D-638 함수 한 번의 끝(vercel.json maxDuration 60초 · 바꾸면 AI_MAX_DURATION_MS 도) — AI 를 부를 수 있는 마지막 때.
+ * 끝나기 8초 전까지만 AI 를 기다린다: 그 뒤의 정산 · 되돌림 · 답 보관이 함수가 잘리기 전에 끝나게
+ * (예전: 조사 단추가 검색 55초 + 다시 55초를 기다리다 함수가 잘리면 '센 채 답 없음' 이 될 수 있었다).
+ */
+export const AFTER_AI_MS = 8000
+function maxDurationMs() {
+  const v = Number(process.env.AI_MAX_DURATION_MS)
+  return Number.isFinite(v) && v >= 20000 ? Math.min(v, 300000) : 60000
+}
+/** 남은 시간 안에서 AI 를 기다릴 수 있는 만큼(최소 1초) */
+export function aiBudget(deadline, now = Date.now()) {
+  return Math.max(1000, Math.min(timeoutMs(), deadline - now))
+}
+
 /** D-264 서버만 가진 글(지시 · 기준 문서 · 점검 기준) — 답에 통째로 나오면 막는다 */
 let SECRETS = null
 const secrets = () =>
@@ -142,7 +160,7 @@ class UsageError extends Error {
   }
 }
 
-async function runOnce(assist, choice, body, role, video = null) {
+async function runOnce(assist, choice, body, role, video = null, deadline = Date.now() + maxDurationMs() - AFTER_AI_MS) {
   const key = providerKey(choice.provider)
   const base = providerBase(choice.provider)
   // D-264 화면 자료 · 물음 · 대표 기준에서도 쓰지 않는 이름 · 출처 이름을 지우고 보낸다
@@ -166,25 +184,28 @@ async function runOnce(assist, choice, body, role, video = null) {
   const user = video ? `${built.user}\n[영상] 맨 앞에 붙인 YouTube 영상\n[구간] ${clock(video.start)} ~ ${clock(video.end)} — 이 구간만(시각은 영상 처음부터 센 것)` : built.user
   const started = Date.now()
   // '생각' 토큰까지 세는 공급자가 있어 글 몫의 두 배를 상한으로
-  const call = { provider: choice.provider, key, base, model: choice.model, system, user, maxOut: assist.maxOut * 2, timeoutMs: timeoutMs(), ...(video ? { video } : {}) }
+  const call = { provider: choice.provider, key, base, model: choice.model, system, user, maxOut: assist.maxOut * 2, ...(video ? { video } : {}) }
+  // D-638 부를 때마다 남은 시간만큼만 기다린다 · 다시 부를 시간이 6초도 안 남았으면 다시 부르지 않는다(시간 초과로 끝 — 센 것은 돌려준다)
+  const timed = () => ({ ...call, timeoutMs: aiBudget(deadline) })
+  const roomForRetry = () => deadline - Date.now() >= 6000
   // D-252 조사 단추는 웹 검색을 붙여 본다 — 공급자 · 모델이 검색을 거절(400)하면 검색 없이 한 번 더(화면에 '검색 근거 없음')
   // D-260 영상은 화면을 낮은 해상도로 먼저(토큰 · 시간 ↓ — 받아 적기는 말이 중요) · 모델이 거절하면 기본 해상도로 한 번 더
   let out = null
   if (assist.research) {
     try {
-      out = await callModel({ ...call, search: true })
+      out = await callModel({ ...timed(), search: true })
     } catch (e) {
-      if (!(e instanceof ProviderError) || e.code !== 'provider_rejected') throw e
+      if (!(e instanceof ProviderError) || e.code !== 'provider_rejected' || !roomForRetry()) throw e
     }
   }
   if (!out && video) {
     try {
-      out = await callModel({ ...call, lowRes: true })
+      out = await callModel({ ...timed(), lowRes: true })
     } catch (e) {
-      if (!(e instanceof ProviderError) || e.code !== 'provider_rejected') throw e
+      if (!(e instanceof ProviderError) || e.code !== 'provider_rejected' || !roomForRetry()) throw e
     }
   }
-  if (!out) out = await callModel(call)
+  if (!out) out = await callModel(timed())
   const parsed = extractJson(out.content)
   const checked = parsed ? validate(ASSIST_OUTPUT_SCHEMA, parsed) : { ok: false, value: null, errors: ['JSON 아님'] }
   const price = priceOf(choice.provider, choice.model)
@@ -248,8 +269,31 @@ export default async function handler(req, res) {
     const usage = acc && acc.state === 'ok' && acc.configured ? { used: acc.used, limit: acc.limit, month: acc.month, kind: acc.kind, plan: acc.plan, active: acc.active } : null
     return send(res, 200, { ok: true, role: who.role, ...(who.role === 'pilot' ? { cheapOnly: internal } : {}), ...catalog, ...(probe ? { probe } : {}), limits: assistLimits(), marketing, usage, assists: assists.map((a) => ({ id: a.id, page: a.page, version: a.version })) })
   }
+  // D-638 답 다시 받기 — 화면이 끊겼다 돌아왔을 때(휴대폰이 다른 앱으로 갔다 옴 · 다른 화면으로 갔다 옴) 같은 요청 번호의 답을 묻는다.
+  //   이 서버가 아직 쓰는 중이면 기다렸다가 · 다 썼으면 그대로 · 보관(0030)에 있으면 그것 — AI 를 다시 부르지 않는다(사용량도 안 셈)
+  if (method === 'GET' && url.searchParams.has('result')) {
+    const id = String(url.searchParams.get('result') || '')
+    if (!ID_RE.test(id)) return fail(res, 400, 'bad_request')
+    const who = await whoCan(req, { allowPilot: true })
+    if (!who.ok) return fail(res, who.status, who.code, who.missing ? { missing: who.missing } : {})
+    const prev = inflight.get(`${who.userId}:${id}`)
+    if (prev) {
+      try {
+        const run = await Promise.race([prev.promise, new Promise((ok) => setTimeout(() => ok(null), RESULT_WAIT_MS))])
+        if (run) return send(res, 200, { ok: true, replayed: true, run })
+        return fail(res, 202, 'request_in_progress')
+      } catch (e) {
+        if (e instanceof UsageError) return fail(res, e.status, e.code, e.extra)
+        return fail(res, e instanceof ProviderError ? e.status : 502, e instanceof ProviderError ? e.code : 'provider_error', providerExtra(e))
+      }
+    }
+    const kept = await loadResult(bearerOf(req), id)
+    if (kept) return send(res, 200, { ok: true, replayed: true, run: kept.run })
+    return fail(res, 404, 'result_not_found')
+  }
   if (method !== 'POST') return fail(res, 405, 'bad_request')
 
+  const began = Date.now()
   const who = await whoCan(req, { allowPilot: true })
   if (!who.ok) return fail(res, who.status, who.code, who.missing ? { missing: who.missing } : {})
   const pilot = who.role === 'pilot'
@@ -301,6 +345,16 @@ export default async function handler(req, res) {
     }
   }
 
+  // D-638 같은 요청을 다시 보낸 것(화면이 끊겼다 돌아옴) — 보관된 답이 있으면 AI · 장부 없이 그대로(첫 요청은 묻지 않는다 — 빠르게)
+  const bearer = bearerOf(req)
+  if (body.resume === true) {
+    const kept = await loadResult(bearer, body.requestId)
+    if (kept) {
+      if (kept.assistId && kept.assistId !== assist.id) return fail(res, 409, 'request_conflict')
+      return send(res, 200, { ok: true, replayed: true, run: kept.run })
+    }
+  }
+
   // D-244: 고른 모델의 단계로 센다 — 예전엔 모두 cheap 이라 깊게 하루 한도가 걸리지 않았다
   const rate = rateCheck(`${who.userId}:assist`, tierOf(choice.provider, choice.model), now, assistLimits())
   if (!rate.ok) {
@@ -317,6 +371,7 @@ export default async function handler(req, res) {
   //   0022 가 있으면: 마케팅은 누구든(내부 팀장 포함) 권한(marketing) + 장부 예약이 되어야만
   const tier = tierOf(choice.provider, choice.model)
   const mk = MARKETING_PAGES.has(assist.page)
+  const deadline = began + maxDurationMs() - AFTER_AI_MS
   const promise = (async () => {
     let charged = false
     if (pilot) {
@@ -351,14 +406,19 @@ export default async function handler(req, res) {
     }
     let run
     try {
-      run = await runOnce(assist, choice, body, who.role, video)
+      run = await runOnce(assist, choice, body, who.role, video, deadline)
     } catch (e) {
       // AI 가 실패하면 센 것을 돌려준다 — 같은 요청 번호로 다시 해도 한 번만 센다
       if (charged) await releaseUsage(token, body.requestId)
       throw e
     }
-    if (!charged) return run
-    const s = await settleUsage(token, body.requestId, run)
+    // D-638 답 보관(0030) — 화면이 끊겨도 같은 요청 번호로 다시 받는다(정산과 같이 · 둘 다 몇 초 안)
+    const keep = saveResult(bearer, { requestId: body.requestId, assistId: assist.id, run })
+    if (!charged) {
+      await keep
+      return run
+    }
+    const [s] = await Promise.all([settleUsage(token, body.requestId, run), keep])
     // 정산이 끝내 실패해도 장부에서 빠지지 않는다(예약 줄 = 센 기록 · 15분 뒤 자동 정산) — 답은 그대로 준다
     if (!s) console.warn(`[ai-assist] 정산 못 함(예약으로 센 채 · 15분 뒤 자동 정산) 문의번호=${String(body.requestId).slice(-6)}`)
     return { ...run, quota: s ? { used: Number(s.used) || 0, limit: s.limit === null || s.limit === undefined ? null : Number(s.limit) } : null }

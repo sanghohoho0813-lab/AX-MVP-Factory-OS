@@ -264,3 +264,57 @@ export function newRequestId(): string {
     return `as_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* D-638 묻는 중 — 화면을 떠나도 · 휴대폰이 탭을 버려도 다시 열면 답을 받아 온다 */
+/* ------------------------------------------------------------------ */
+
+export const PENDING_KEY = 'axmvp.ai.pending.v1'
+/** 묻는 중 한 줄 — 받아 오면 이 정보로 지난 답(HistoryEntry)을 만든다 */
+export type PendingAsk = Omit<HistoryEntry, 'run' | 'done'> & { rid: string; at: string; owner: string }
+
+const liveOwnerNow = (): string => {
+  try {
+    return localStorage.getItem('axmvp.vault.live') ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function readPending(): PendingAsk[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(PENDING_KEY) ?? '[]') as unknown
+    if (!Array.isArray(v)) return []
+    const now = Date.now()
+    return (v as PendingAsk[]).filter((p) => p && typeof p.rid === 'string' && typeof p.scope === 'string' && typeof p.assistId === 'string' && now - Date.parse(p.at) < 30 * 60_000).slice(-20)
+  } catch {
+    return []
+  }
+}
+function writePending(list: PendingAsk[]) {
+  try {
+    if (list.length) localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(-20)))
+    else localStorage.removeItem(PENDING_KEY)
+  } catch {
+    /* 저장이 안 되면 이번 화면에서만 기다린다 */
+  }
+}
+/** 묻기 시작 — 요청 번호 · 화면 묶음 · 자료 지문 · 링크를 적어 둔다(지금 사람 이름표와 함께) */
+export function addPending(p: Omit<PendingAsk, 'at' | 'owner'>): void {
+  writePending([...readPending().filter((x) => x.rid !== p.rid), { ...p, at: new Date().toISOString(), owner: liveOwnerNow() }])
+}
+export function removePending(rid: string): void {
+  writePending(readPending().filter((x) => x.rid !== rid))
+}
+/** 이 화면 묶음에서 아직 답을 못 받은 것(30분 안 · 지금 사람 것만) */
+export function pendingFor(scope: string): PendingAsk[] {
+  const owner = liveOwnerNow()
+  return readPending().filter((p) => p.scope === scope && p.owner === owner)
+}
+/** D-638 지난 답 넣기 — 묻는 사이 계정(금고)이 바뀌었으면 넣지 않는다(다른 사람 기록에 섞이지 않게) */
+export function pushHistoryIfOwner(e: HistoryEntry, owner: string): boolean {
+  if (liveOwnerNow() !== owner) return false
+  pushHistory(e)
+  return true
+}
+export const currentOwner = liveOwnerNow
