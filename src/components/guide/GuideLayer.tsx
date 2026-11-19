@@ -169,7 +169,7 @@ export function GuideLayer() {
         left = r.left
         top = fitsBelow ? r.bottom + 8 : r.top - h - 8
       } else if (vw - r.right >= CARD_W + 20) {
-        // D-636 위아래 어디에도 다 들어가지 않으면(키 큰 칸 — 마케팅 첫 화면 4:3 칸 · 낮은 창) 옆에 —
+        // D-637 위아래 어디에도 다 들어가지 않으면(키 큰 칸 — 마케팅 첫 화면 4:3 칸 · 낮은 창) 옆에 —
         // 예전처럼 아래로 두고 화면 안으로 끌어올리면 마우스를 올린 그 칸을 통째로 덮었다
         left = r.right + 10
         top = r.top - 6

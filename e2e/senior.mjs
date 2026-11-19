@@ -241,7 +241,7 @@ for (const vp of [
       if (!then && !path.includes('/build')) check(`${vp.tag} ${name}: 무엇을 하는 곳인지 한 줄이 첫 화면 안`, m.guide)
     }
   }
-  // D-507 계속 쓰기 쉽게 — 주제 하나를 담으면 첫 화면 [이어서 하기](D-636 맨 아래 접힌 한 줄) · 묶음 끝 '다음엔 이것'
+  // D-507 계속 쓰기 쉽게 — 주제 하나를 담으면 첫 화면 [이어서 하기](D-637 맨 아래 접힌 한 줄) · 묶음 끝 '다음엔 이것'
   if (!REPORT && !ONLY) {
     await page.goto(BASE + '/marketing?view=plan', { waitUntil: 'networkidle' }).catch(() => {})
     await page.waitForTimeout(500)
@@ -261,7 +261,7 @@ for (const vp of [
     const saved = (await page.getByTestId('mk-pack-next-open').count()) === 1
     await page.getByTestId('mk-pack-next-back').click()
     await page.getByTestId('mk-home').waitFor({ timeout: 8000 })
-    // D-636 대표 "지난번 하던 것 같은 기록은 맨 아래에 · 접어 뒀다가 누르면 내용이 보이게 · PC 도 마찬가지" — 살펴보기 · 만들기 목록 아래 접힌 한 줄
+    // D-637 대표 "지난번 하던 것 같은 기록은 맨 아래에 · 접어 뒀다가 누르면 내용이 보이게 · PC 도 마찬가지" — 살펴보기 · 만들기 목록 아래 접힌 한 줄
     // (예전 D-511: 첫 화면 대화창 아래 · 목록 위 큰 카드)
     await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' }).catch(() => {})
     const fold = page.getByTestId('mk-resume-fold')
@@ -280,7 +280,7 @@ for (const vp of [
     await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' }).catch(() => {})
     await page.getByTestId('mk-resume-fold').waitFor({ timeout: 5000 }).catch(() => {})
     check(`${vp.tag} 지난번 하던 것 — 다시 들어오면 또 접힌 채`, (await page.getByTestId('mk-resume-fold').getAttribute('data-open').catch(() => '')) === '0' && (await page.getByTestId('mk-resume').count()) === 0)
-    // D-636 대표 "PC 에서는 정사각형에 가까운 직사각형" — 첫 화면 칸(살펴보기 · 만들기)은 가로 ÷ 세로 1.1~1.6 · 아이콘 위 · 이름 아래 · 칸 크기 같음
+    // D-637 대표 "PC 에서는 정사각형에 가까운 직사각형" — 첫 화면 칸(살펴보기 · 만들기)은 가로 ÷ 세로 1.1~1.6 · 아이콘 위 · 이름 아래 · 칸 크기 같음
     //   휴대폰은 예전 모양 그대로(두 칸씩 · 낮은 칸 — 세로 72px 이하)
     const tiles = await page.evaluate(() =>
       ['yt-view-top', 'yt-view-make', 'yt-view-plan', 'mk-tab-threads', 'mk-tab-shorts', 'mk-tab-content', 'mk-tab-homepage'].map((id) => {

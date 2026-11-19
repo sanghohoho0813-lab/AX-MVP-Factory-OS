@@ -8,6 +8,7 @@
  *
  *   A 특허 · 벤처: 처음 화면(무엇을 도와드릴까요? · 질문창 · 큰 단추 4) · [사용 방법] 8단계 · [자세히] → 예전 진행판 → [대화창으로]
  *     단추 → 바로 답(AI 안 부름) · [견본으로 연습] → 명세서 쓰기 → 돌아오면 대화 그대로 · [이어서 쓰기]
+ *     D-636 [자세히] · [대화창으로] · [견본으로 연습] 으로 옮기는 2초 동안 오른쪽 판이 한 번도 사라지거나 비지 않음(50ms 마다 · 바뀔 때마다 · 그려질 때마다)
  *     쓴 질문 → AI 답(pv.chat · 작업 단추 붙음 · 발명 본문 안 감) · [AI로 더 자세히] · AI 실패 → 정해진 답 + 알림
  *     📎 명세서 파일 → 점검 답 · 답 복사 · 대화 지우기 → [되돌리기] · 회사 바꾸면 그 회사 대화
  *   B 기업인증: 목차 · 순서 띠 없이 대화창만 · 회사 없으면 '회사 고르기' · 단추 4 → 답 · [전체 판정 보기] → 예전 '인증 한눈에'(?detail=1)
@@ -141,6 +142,43 @@ const visibleChars = (page, sel) =>
     }
     return n
   }, sel)
+/**
+ * D-636 화면을 옮기는 사이 오른쪽 판이 잠깐이라도 사라지거나 비는지 — 누르기 전에 건다(watchDock).
+ * 50ms 마다 + DOM 이 바뀔 때마다 + 그려지는 판(rAF)마다 적는다. dockGaps 는 옮긴 뒤 ms 동안 더 지켜본 다음 적은 것을 돌려준다.
+ */
+const watchDock = (page) =>
+  page.evaluate(() => {
+    const w = (window.__dockWatch = { t0: performance.now(), polls: 0, gone: [], empty: [], stop: null })
+    const rec = (src) => {
+      const t = Math.round(performance.now() - w.t0)
+      if (src === 'poll') w.polls++
+      const d = document.querySelector('[data-testid="side-dock"]')
+      // 판 안의 대화창 자리(slot) → 화면이 그려 보낸 칸(host) → 그 안의 대화창
+      if (!d) w.gone.push(`${src}@${t}`)
+      else if (!(d.querySelector('[data-testid="page-chat-slot"]')?.firstElementChild?.childElementCount > 0)) w.empty.push(`${src}@${t}`)
+    }
+    const mo = new MutationObserver(() => rec('dom'))
+    mo.observe(document.body, { childList: true, subtree: true })
+    const iv = setInterval(() => rec('poll'), 50)
+    let raf = requestAnimationFrame(function frame() {
+      rec('frame')
+      raf = requestAnimationFrame(frame)
+    })
+    w.stop = () => {
+      mo.disconnect()
+      clearInterval(iv)
+      cancelAnimationFrame(raf)
+    }
+  })
+const dockGaps = async (page, ms = 2000) => {
+  await page.waitForTimeout(ms)
+  return page.evaluate(() => {
+    const w = window.__dockWatch
+    w.stop()
+    return { polls: w.polls, gone: w.gone.slice(0, 8), goneN: w.gone.length, empty: w.empty.slice(0, 8), emptyN: w.empty.length }
+  })
+}
+const noGap = (g) => g.polls >= 30 && g.goneN === 0 && g.emptyN === 0
 const turns = (page) => page.getByTestId('chat-turn').count()
 const lastAnswer = (page) => page.getByTestId('chat-answer').last()
 const toastText = async (page) => {
@@ -208,13 +246,19 @@ const errors = []
   check('A6 Esc → 사용 방법 닫힘', (await page.getByTestId('chat-guide').count()) === 0)
 
   // 자세히 → 예전 화면 → 대화창으로
+  await watchDock(page)
   await page.locator('main [data-testid="chat-detail"]').click()
   await page.getByTestId('pv-home').waitFor()
   check('A7 가운데 [자세히] → 예전 진행판(빈 화면 안내 · 도구 카드 그대로)', page.url().endsWith('/patent-venture/more') && (await page.getByTestId('pv-empty').count()) === 1 && (await page.locator('[data-testid^="pv-card-"]').count()) >= 3, await page.locator('[data-testid^="pv-card-"]').count())
+  const gapMore = await dockGaps(page)
+  check(`A7a D-636 [자세히] 로 옮기는 2초 동안 오른쪽 판이 한 번도 사라지거나 비지 않음(50ms 마다 ${gapMore.polls}번 · 바뀔 때마다 · 그려질 때마다)`, noGap(gapMore), gapMore)
+  await watchDock(page)
   await page.getByTestId('pv-back-chat').click()
   await page.getByTestId('pv-chat-page').waitFor()
   await page.getByTestId('chat-hero').waitFor({ timeout: 6000 }).catch(() => {})
   check('A8 [대화창으로] → 특허 · 벤처 첫 화면 · 오른쪽 대화창이 열린 채(질문칸 그대로)', new URL(page.url()).pathname === '/patent-venture' && (await dockOf(page)).chat === 'pv' && (await page.getByTestId('chat-hero').count()) === 1)
+  const gapBack = await dockGaps(page)
+  check(`A8a D-636 [대화창으로] 돌아오는 2초 동안도 판이 그대로(50ms 마다 ${gapBack.polls}번)`, noGap(gapBack), gapBack)
 
   // 회사 고르기
   await page.getByTestId('chat-client').selectOption(CLIENT)
@@ -233,13 +277,15 @@ const errors = []
   await shot(page, 'pv-turn1-pc')
 
   // 견본으로 연습 → 명세서 쓰기 → 돌아오기
+  // D-636 넘어가는 사이 오른쪽 판이 사라지면 안 된다(예전에는 '불러오는 중…' 동안 0.3~1초 사라졌다가 같은 대화로 다시 떴다)
+  await watchDock(page)
   await a.locator('[data-testid="chat-action"][data-id="sample"]').click()
   await page.waitForURL(/\/patent-venture\/write\?/)
   const writeUrl = new URL(page.url())
   check('A13 [견본으로 연습] → 명세서 쓰기(그 회사 · 1단계)', writeUrl.searchParams.get('client') === CLIENT && writeUrl.searchParams.get('step') === 'idea' && !!writeUrl.searchParams.get('draft'), page.url())
+  const gapWrite = await dockGaps(page)
+  check(`A13a D-636 명세서 쓰기로 넘어가는 2초 동안 오른쪽 판이 한 번도 사라지거나 비지 않음(50ms 마다 ${gapWrite.polls}번 · 바뀔 때마다 · 그려질 때마다)`, noGap(gapWrite), gapWrite)
   // D-628 답 단추로 다른 특허 · 벤처 화면에 가도 오른쪽 판은 열린 채 같은 대화
-  // 화면이 바뀌는 사이 오른쪽 판이 잠깐(1초 안) 다시 그려진다 — 판 안의 대화가 다시 보일 때까지 기다린다(그 전에 재면 가끔 '판 없음')
-  await page.locator('[data-testid="side-dock"] [data-testid="chat-turns"]').waitFor({ timeout: 8000 }).catch(() => {})
   check('A13b 명세서 쓰기 화면에서도 오른쪽 판이 열린 채 대화 그대로(1개) · 그 화면에 여는 단추는 따로 없음', (await dockOf(page)).chat === 'pv' && (await turns(page)) === 1 && (await page.getByTestId('page-chat-launch').count()) === 0, await dockOf(page))
   await shot(page, 'pv-write-pc')
   const draftId = writeUrl.searchParams.get('draft')

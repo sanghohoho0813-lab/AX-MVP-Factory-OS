@@ -256,8 +256,16 @@ export function AppShell() {
   )
 }
 
-/** 본문을 새로 그릴 기준 — 모듈 안의 화면 이동은 같은 것으로 본다 */
+/**
+ * 본문을 새로 그릴 기준 — 모듈 안의 화면 이동은 같은 것으로 본다.
+ * D-636 특허 · 벤처(/patent-venture/…)도 한 묶음 — 첫 화면의 오른쪽 대화창(pv)을 진행판 · 명세서 쓰기 · 사업계획서가 이어 받는다.
+ *   key 가 바뀌면 그 아래 Suspense 가 새것이 되어, 다음 화면 조각을 받는 동안 '불러오는 중…' 이 먼저 그려지고 앞 화면의 대화창이 빠진다
+ *   → 오른쪽 판이 잠깐 사라졌다가(본문 폭도 넓어졌다 좁아짐) 다시 뜬다. 같은 key 면 화면 이동(전환)이 앞 화면을 띄운 채 기다렸다가 한 번에 바꾼다.
+ *   같은 대화창을 여러 주소가 나눠 쓰는 묶음을 새로 만들면 여기에도 더한다.
+ */
 function shellKeyOf(pathname: string): string {
   const m = /^\/tools\/([^/]+)/.exec(pathname)
-  return m ? `/tools/${m[1]}` : pathname
+  if (m) return `/tools/${m[1]}`
+  if (/^\/patent-venture(\/|$)/.test(pathname)) return '/patent-venture'
+  return pathname
 }
