@@ -27,7 +27,8 @@ import { useToast } from '../ui/toastContext'
 import { ModelPicker } from '../ai/ModelPicker'
 import { ChatTextSize } from '../chat/ChatTextSize'
 import { AiConfirm } from '../ai/AiConfirm'
-import { BotBubble, BotRow, ChatNotice, MeBubble, TypingBubble } from '../chat/bubbles'
+import { BotBubble, BotRow, ChatNotice, CutLine, MeBubble, TypingBubble } from '../chat/bubbles'
+import { ASK_MAX_CHAT } from '../../services/aiAssist/context'
 import { chatDayKey, chatDayLine, chatTime } from '../../lib/chatTime'
 
 const DOCK_DEFAULT_W = 420
@@ -197,9 +198,10 @@ function ChatTab() {
                   </div>
                 ))}
                 {t.caution && <p className="t-sub break-keep text-warning-800">△ {t.caution}</p>}
+                {t.cut && <CutLine testId="dock-cut" />}
                 <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                   {(t.next ?? []).slice(0, 3).map((n) => (
-                    <AiConfirm keepLabel cancel={false}><button key={n} type="button" onClick={() => ask(n)} disabled={busy} className="tap t-meta min-h-9 rounded-full border border-violet-300 bg-violet-50 px-2.5 text-left font-semibold break-keep text-violet-900 hover:bg-violet-100 disabled:opacity-50" data-testid="dock-next">
+                    <AiConfirm key={n} keepLabel cancel={false}><button type="button" onClick={() => ask(n)} disabled={busy} className="tap t-meta min-h-9 rounded-full border border-violet-300 bg-violet-50 px-2.5 text-left font-semibold break-keep text-violet-900 hover:bg-violet-100 disabled:opacity-50" data-testid="dock-next">
                       {n}
                     </button></AiConfirm>
                   ))}
@@ -222,6 +224,7 @@ function ChatTab() {
           ref={inputRef}
           rows={2}
           value={text}
+          maxLength={ASK_MAX_CHAT}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {

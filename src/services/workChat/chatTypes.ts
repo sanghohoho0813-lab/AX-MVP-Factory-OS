@@ -6,6 +6,7 @@
  */
 import { redactSensitive } from '../../domain/consulting/privacyFilter'
 import type { AssistAnswer } from '../aiAssist/client'
+import { chatAnswerOf } from '../aiAssist/looseJson'
 import type { AssistRow } from '../aiAssist/context'
 
 import type { ChatFirstKey } from './chatFirst'
@@ -42,6 +43,8 @@ export interface ChatAnswer {
   next?: string[]
   caution?: string
   model?: string
+  /** D-638 답이 길어 끝이 잘림 */
+  cut?: boolean
 }
 
 export interface ChatTurn {
@@ -104,12 +107,20 @@ export function parseHistory(raw: string | null): ChatTurn[] {
 }
 
 /** AI 답 → 답 카드 */
-export function answerFromAi(ans: AssistAnswer | null, raw: string, model: string): ChatAnswer {
+export function answerFromAi(ans: AssistAnswer | null, raw: string, model: string, finish?: string): ChatAnswer {
+  const cut = /^(?:max_tokens|length)$/i.test(String(finish ?? '').trim()) || undefined
+  // D-638 모양 검사에서 떨어진 답도 너그럽게 읽는다(모든 대화창 같은 길) — JSON 껍데기는 화면에 안 나온다
   if (!ans) {
+    const read = chatAnswerOf({ structured: null, raw: String(raw ?? ''), finish })
+    if (read.items.length) return { ...answerFromAi(read, '', model), cut: read.cut || undefined }
     const text = String(raw ?? '').trim()
-    return { title: text ? text.split('\n')[0].slice(0, 200) : 'AI 가 답을 정리하지 못했어요 — 다시 물어봐 주세요', lines: text.split('\n').slice(1, 8).filter((l) => l.trim()), tone: 'info', actions: [], source: 'ai', model }
+    if (!text) return { title: 'AI 가 답을 정리하지 못했어요 — 다시 물어봐 주세요', lines: [], tone: 'info', actions: [], source: 'ai', model }
+    if (/^\s*(?:```(?:json)?\s*)?[{[]/i.test(text)) return { title: read.headline, lines: [], tone: 'info', actions: [], source: 'ai', model, cut: read.cut || undefined }
+    const plain = read.headline
+    return { title: plain.split('\n')[0].slice(0, 200), lines: plain.split('\n').slice(1, 8).filter((l) => l.trim()), tone: 'info', actions: [], source: 'ai', model, cut }
   }
   return {
+    cut,
     title: ans.headline || '(답 없음)',
     lines: (ans.items ?? []).slice(0, 8).map((i) => [i.tag ? `[${i.tag}]` : '', i.title, i.detail ? `— ${i.detail}` : ''].filter(Boolean).join(' ')),
     tone: 'info',

@@ -23,13 +23,13 @@ import { readChoice } from '../../services/aiAssist/store'
 import { ModelPicker } from '../ai/ModelPicker'
 import { ChatTextSize } from './ChatTextSize'
 import type { AssistPage } from '../../services/aiAssist/presets'
-import type { AssistContext } from '../../services/aiAssist/context'
+import { ASK_MAX_CHAT, type AssistContext } from '../../services/aiAssist/context'
 import { copyText } from '../../services/grants/grantView'
 import { toneClass, type FeatureTone } from '../../config/featureVisual'
 import type { HeroArt } from '../../config/heroArt'
 import { PageHero } from '../ui/pageFrame'
 import { ChatStartCard, PageChat } from './PageChat'
-import { BotRow, ChatNotice, MeBubble, TypingBubble } from './bubbles'
+import { BotRow, ChatNotice, CutLine, MeBubble, TypingBubble } from './bubbles'
 import { chatDayKey, chatDayLine, chatTime } from '../../lib/chatTime'
 import { startPageChat, usePageChat } from '../../lib/pageChat'
 import { HISTORY_MAX, answerFromAi, answerText, historyKey, parseHistory, type ChatActKind, type ChatAnswer, type ChatGuideStep, type ChatModule, type ChatStarter, type ChatTurn } from '../../services/workChat/chatTypes'
@@ -148,6 +148,7 @@ function AnswerCard({ a, owner, aiReady, onAct, onAsk, onAiMore, onCopy }: { a: 
         </p>
       )}
       {a.caution && <p className="t-sub break-keep text-warning-800">△ {a.caution}</p>}
+      {a.cut && <CutLine />}
       <div className="flex flex-wrap items-center gap-2 pt-1">
         {a.actions.map((x) =>
           x.href ? (
@@ -249,7 +250,7 @@ export function WorkChat(p: WorkChatProps) {
       for (const t of waiting) {
         const got = await resumeOnce(t.rid as string)
         if (got === 'pending') continue
-        const a = got ? answerFromAi(got.structured, got.raw, got.model) : null
+        const a = got ? answerFromAi(got.structured, got.raw, got.servedModel || got.model, got.finish) : null
         if (a) a.actions = p.actionsFor(t.q)
         commit((cur) => cur.map((x) => (x.id !== t.id ? x : a ? { ...x, a, status: 'done', error: undefined, resume: undefined } : { ...x, resume: undefined, error: '화면을 떠나 답을 받지 못했어요 — 다시 물어봐 주세요' })), key)
       }
@@ -283,7 +284,7 @@ export function WorkChat(p: WorkChatProps) {
     setBusy(true)
     try {
       const run = await callAssist({ requestId: rid, assistId: p.assistId, page: p.page, choice: readChoice(), context: ctx, ask: q })
-      const a = answerFromAi(run.structured, run.raw, run.model)
+      const a = answerFromAi(run.structured, run.raw, run.servedModel || run.model, run.finish)
       a.actions = p.actionsFor(q)
       commit((cur) => cur.map((t) => (t.id === id ? { ...t, a, status: 'done' } : t)), key)
     } catch (e) {
@@ -385,7 +386,7 @@ export function WorkChat(p: WorkChatProps) {
         <textarea
           ref={inputRef}
           value={text}
-          onChange={(e) => setText(e.target.value.slice(0, 500))}
+          onChange={(e) => setText(e.target.value.slice(0, ASK_MAX_CHAT))}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault()

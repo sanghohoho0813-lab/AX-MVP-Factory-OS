@@ -8,6 +8,7 @@
  */
 import type { AssistRun, ProviderId } from './client'
 import type { AssistSection } from './context'
+import { answerOf, chatAnswerOf } from './looseJson'
 
 const CHOICE_KEY = 'axmvp.ai.choice.v1'
 const HISTORY_KEY = 'axmvp.ai.history.v1'
@@ -198,15 +199,20 @@ function readAll(): HistoryEntry[] {
  */
 export const CARRY_TURNS = 5
 export const CARRY_WINDOW_MS = 6 * 3600_000
-export function askCarry(entries: readonly HistoryEntry[], from = '', now = Date.now()): { 질문: string; 답: string }[] {
-  return entries
-    .filter((e) => e.assistId.endsWith('.ask') && !e.follow && e.ask && e.run.createdAt > from && now - Date.parse(e.run.createdAt) < CARRY_WINDOW_MS)
+export function askCarry(entries: readonly HistoryEntry[], from = '', now = Date.now(), before = ''): { 질문: string; 답: string }[] {
+  const live = entries.filter((e) => !e.follow && e.run.createdAt > from && (!before || e.run.createdAt < before) && now - Date.parse(e.run.createdAt) < CARRY_WINDOW_MS)
+  const asks = live.filter((e) => e.assistId.endsWith('.ask') && e.ask)
+  // D-638 방금 누른 단추 답 하나도 같이 — '2번을 더 자세히' 처럼 단추 답을 이어 물으면 무엇을 말하는지 알게(가장 최근 단추 답 하나만)
+  const lastButton = live.filter((e) => !e.assistId.endsWith('.ask')).sort((a, b) => b.run.createdAt.localeCompare(a.run.createdAt))[0]
+  return [...asks, ...(lastButton ? [lastButton] : [])]
     .sort((a, b) => a.run.createdAt.localeCompare(b.run.createdAt))
     .slice(-CARRY_TURNS)
     .map((e) => {
-      const a = e.run.structured
-      const body = a ? [a.headline, ...(a.items ?? []).slice(0, 6).map((i) => [i.title, i.detail].filter(Boolean).join(' — '))].filter(Boolean).join(' / ') : e.run.raw
-      return { 질문: e.ask.slice(0, 300), 답: String(body ?? '').slice(0, 700) }
+      // D-638 원문(JSON)이 아니라 읽은 답으로 — 모양 검사에서 떨어진 답도 머리글 · 항목으로
+      const a = answerOf(e.run) ?? e.run.structured
+      const body = a ? [a.headline, ...(a.items ?? []).slice(0, 6).map((i) => [i.title, i.detail].filter(Boolean).join(' — '))].filter(Boolean).join(' / ') : chatAnswerOf({ structured: null, raw: e.run.raw }).headline
+      const q = e.assistId.endsWith('.ask') ? e.ask : `(단추) ${e.label || e.assistId}`
+      return { 질문: q.slice(0, 300), 답: String(body ?? '').slice(0, 700) }
     })
 }
 

@@ -13,6 +13,7 @@ import { withFactValue } from '../customerFacts'
 import { applyTalk, hasTalk, talkFound } from '../homeAsk/talkApply'
 import { buildInsights, insightChanges } from '../clientInsights'
 import { parseTurns } from '../homeAsk/homeAskStore'
+import { openCommandTarget } from '../homeAsk/homeOpen'
 import { ASSISTS } from '../../../api/_ai/assists.js'
 import { aiFactLines, defaultDocQuestion, docCompanyOf, previewWithDocs, readFactsLines, type ChatDoc } from '../homeAsk/homeDocs'
 import { NEW_DOCS_TTL_MS, clearNewClientDocs, handNewClientDocs, peekNewClientDocs } from '../docHandoff'
@@ -127,6 +128,10 @@ const nowIso = new Date().toISOString()
 const oldIso = new Date(Date.now() - 40 * 60_000).toISOString()
 const rt = parseTurns(JSON.stringify([{ id: 'r1', at: nowIso, q: '방금', clientIds: [], status: 'pending', rid: 'as_abcdefgh12' }, { id: 'r2', at: oldIso, q: '오래전', clientIds: [], status: 'pending', rid: 'as_abcdefgh34' }, { id: 'r3', at: nowIso, q: '번호 없음', clientIds: [], status: 'pending' }]))
 check('저장된 대화(D-638): 번호 있는 30분 안 줄은 "받아 오는 중"(resume) · 40분 지난 줄 · 번호 없는 줄은 "다시 물어봐 주세요"', rt[0].resume === true && /받아 오는 중/.test(rt[0].why ?? '') && !rt[1].resume && /다시 물어봐/.test(rt[1].why ?? '') && !rt[2].resume && rt.every((t) => t.status === 'rule'), rt.map((t) => [t.resume, t.why]))
+
+// D-638 '○○ 열어 줘' — 화면을 여는 말이면 묻지 않고 그 화면(맞는 화면이 있을 때만 · 규칙)
+const H = [{ key: 'threads', kind: 'screen' as const, label: '스레드', sublabel: '', path: '/marketing/threads' }, { key: 'fn-x', kind: 'function' as const, label: '스레드 글 점수', sublabel: '', path: '/marketing/threads' }]
+check('바로 가기(D-638): "스레드 열어 줘" · "스레드 화면" → 스레드 화면 · 물음("스레드 글 어떻게 써?") · 기능만 맞음 · 아주 긴 글은 묻기로', openCommandTarget('스레드 열어 줘', H)?.path === '/marketing/threads' && openCommandTarget('스레드 화면', H)?.label === '스레드' && openCommandTarget('스레드 글 어떻게 써?', H) === null && openCommandTarget('스레드 열어 줘', [H[1]]) === null && openCommandTarget('스레드 '.repeat(10) + '열어 줘', H) === null && openCommandTarget('열어 줘', []) === null)
 
 // 8. 화면 이름표 = 서버 지시문(같은 id · page · label)
 const p = ASSIST_PRESETS.find((x) => x.id === 'home.chat')

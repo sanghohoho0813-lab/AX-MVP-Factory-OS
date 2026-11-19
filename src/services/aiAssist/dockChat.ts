@@ -7,6 +7,7 @@
 import { useSyncExternalStore } from 'react'
 import { callAssist, type AssistRun } from './client'
 import { resumeOnce } from './resume'
+import { chatAnswerOf } from './looseJson'
 import { newRequestId, readChoice } from './store'
 import { DOCK_CHAT_KEY, DOCK_CHAT_MAX, dockChatContext, parseDockChat, type DockTurn } from '../../lib/sideDock'
 
@@ -79,17 +80,19 @@ export async function askDock(q: string, screen: string): Promise<void> {
 
 /** 답이 온 줄 */
 function filled(t: DockTurn, run: AssistRun): DockTurn {
-  const s = run.structured
+  // D-638 모든 대화창이 같은 길로 읽는다 — JSON 껍데기는 화면에 안 나오고, 끝이 잘린 답은 한 줄 붙는다
+  const s = chatAnswerOf(run)
   return {
     ...t,
     status: 'done',
     resume: undefined,
     error: undefined,
-    headline: s?.headline || run.raw.slice(0, 2000),
-    items: (s?.items ?? []).map((i) => ({ title: i.title, detail: i.detail, body: i.body })),
-    next: s?.next ?? [],
-    caution: s?.caution || undefined,
-    model: run.model,
+    headline: s.headline,
+    items: s.items.map((i) => ({ title: i.title, detail: i.detail, body: i.body })),
+    next: s.next ?? [],
+    caution: s.caution || undefined,
+    cut: s.cut || undefined,
+    model: run.servedModel || run.model,
   }
 }
 

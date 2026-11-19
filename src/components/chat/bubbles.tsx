@@ -116,3 +116,12 @@ export function ChatNotice({ children, testId, title }: { children: ReactNode; t
     </p>
   )
 }
+
+/** D-638 답이 길어 끝이 잘렸을 때 답 아래 한 줄 — 모든 대화창이 같은 글 */
+export function CutLine({ testId = 'chat-cut' }: { testId?: string }) {
+  return (
+    <p className="t-sub break-keep text-slate-700" data-testid={testId}>
+      ✂ 답이 길어 끝이 잘렸어요 — "이어서 써 줘" 라고 물으면 이어서 써요.
+    </p>
+  )
+}

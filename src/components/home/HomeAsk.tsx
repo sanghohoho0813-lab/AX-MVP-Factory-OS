@@ -15,17 +15,20 @@ import { addDaysLocal } from '../../services/clientOpsNextAction'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, ArrowUp, Building2, Calculator, CalendarClock, Check, ChevronRight, Copy, FileText, FileUp, Lightbulb, ListChecks, Loader2, Mic, MicOff, Paperclip, Phone, Plus, ThumbsDown, ThumbsUp, Trash2, Wallet, X } from 'lucide-react'
 import { Button } from '../ui/Button'
-import { BotRow, MeBubble, TypingBubble } from '../chat/bubbles'
+import { BotRow, CutLine, MeBubble, TypingBubble } from '../chat/bubbles'
 import { handDocsTo, handNewClientDocs } from '../../services/docHandoff'
 import { CHAT_DOC_MAX, defaultDocQuestion, labelOfDoc, type ChatDoc, type DocCompany } from '../../services/homeAsk/homeDocs'
 import { ModelPicker } from '../ai/ModelPicker'
 import { ChatTextSize } from '../chat/ChatTextSize'
+import { useGuideGroups } from '../guide/useGuideGroups'
+import { searchScreens } from '../../content/screenSearch'
+import { openCommandTarget } from '../../services/homeAsk/homeOpen'
 import { ClientPickerOptions } from '../ops/ClientPickerOptions'
 import { useToast } from '../ui/toastContext'
 import { useIsPhone } from '../../lib/useIsPhone'
 import { useCustomerAudience } from '../../config/customerAudience'
 import type { ClientOpsRecord } from '../../types/clientOps'
-import type { AssistBundle } from '../../services/aiAssist/context'
+import { ASK_MAX_CHAT, type AssistBundle } from '../../services/aiAssist/context'
 import { DOWN_REASONS, docRequestText, findClients, intentsOf, isDocListItem, learnAliases, type HomeIntent, type HomeSuggestion, type PlanChip, type RuleAnswer, type SuggestIcon } from '../../services/homeAsk/homeAsk'
 import type { TalkAnswer, TalkNext, TalkNumber } from '../../services/homeAsk/homeTalk'
 import { TalkCard } from './TalkCard'
@@ -63,6 +66,23 @@ function speechCtor(): (new () => SpeechLike) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
 }
 
+/** D-638 오늘 대화창 크게 / 한 줄 — 이 기기에 기억(처음은 크게) */
+const BIG_KEY = 'axmvp.ui.home_ask_big'
+function readHomeAskBig(): boolean {
+  try {
+    return localStorage.getItem(BIG_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+function saveHomeAskBig(on: boolean) {
+  try {
+    localStorage.setItem(BIG_KEY, on ? '1' : '0')
+  } catch {
+    /* 이번 화면에서만 */
+  }
+}
+
 export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRecordTalk }: HomeAskProps) {
   // D-563 외부 구독 고객 계정 — 모듈 판정을 약속하는 말을 쓰지 않는다
   const customer = useCustomerAudience()
@@ -78,6 +98,17 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
   const [showOld, setShowOld] = useState(false)
   // U2(2026-11-05 대표 승인) 평소에는 입력칸 한 줄 — 누르면(입력칸 · [+] · 말로 적기) 지금처럼 큰 글 · 안내 · 질문 세 줄까지 펼친다. 한 번 펼치면 이 화면에 있는 동안 그대로
   const [open, setOpen] = useState(false)
+  // D-638 대표(2026-11-19) "홈 화면에서도 대화 한 번이면 원하는 걸 — LLM 초기 화면처럼" — 처음엔 큰 대화창(인사 · 입력칸 · 질문 한 줄).
+  //   [한 줄로] 를 누르면 예전처럼 입력칸 한 줄(이 기기에 기억 · 다시 펼치면 [늘 크게]).
+  const [big, setBig] = useState(readHomeAskBig)
+  const keepBig = (on: boolean) => {
+    setBig(on)
+    saveHomeAskBig(on)
+    if (!on) setOpen(false)
+  }
+  // D-638 화면 · 기능 이름을 치면 바로 가기(찾기와 같은 표 — 이 계정에 보이는 화면만)
+  const guide = useGuideGroups()
+  const jumps = useMemo(() => (text.trim().length >= 2 ? searchScreens(text, guide.groups, { pilot: guide.pilot, basic: guide.basic }, 3).filter((h) => !h.path.startsWith('/guide')) : []), [text, guide])
   // D-498 함께 보낼 서류(이 기기에서 읽기만 — 저장은 답 아래 단추로)
   const [docs, setDocs] = useState<ChatDoc[]>([])
   const [over, setOver] = useState(false)
@@ -162,15 +193,24 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
     setDocs([])
     void askHome({ question: q, clientIds: ids, canAI, docs: sent, prepare: () => prepare(q, ids, intents, sent) })
   }
+  /** D-638 '○○ 열어 줘' 처럼 화면을 여는 말이면 묻지 않고 그 화면으로(AI 0 · 맞는 화면이 분명할 때만) */
+  const go = (raw: string): boolean => {
+    const target = openCommandTarget(raw, jumps)
+    if (!target) return false
+    setText('')
+    navigate(target.path)
+    showToast(`${target.label} 화면을 열었어요`)
+    return true
+  }
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
-    send(text)
+    if (!go(text)) send(text)
   }
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // 한글 조합 중 Enter 는 글자 확정 — 보내지 않는다
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      send(text)
+      if (!go(text)) send(text)
     }
   }
   const toggleMic = () => {
@@ -208,7 +248,9 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
   const pinnedName = pinned ? byId.get(pinned)?.companyName ?? '' : ''
   const shown = showOld ? turns : turns.slice(-2)
   // 대화 · 올린 서류 · 고른 업체 · 적던 글이 있으면 늘 펼친 채로(지금처럼)
-  const expanded = open || turns.length > 0 || docs.length > 0 || !!pinned || !!text || menu || picking || listening || over
+  const expanded = big || open || turns.length > 0 || docs.length > 0 || !!pinned || !!text || menu || picking || listening || over
+  // D-638 큰 대화창인데 아직 아무것도 안 한 처음 — 인사 · 입력칸 · 질문 한 줄(가로)만. 누르면 안내 · 질문 세 줄
+  const idleBig = big && !open && turns.length === 0 && docs.length === 0 && !pinned && !text && !menu && !picking && !listening && !over
 
   return (
     <section
@@ -228,7 +270,8 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
         setOver(false)
         void addFiles(Array.from(e.dataTransfer.files))
       }}
-      className={expanded ? `rounded-(--radius-panel) border bg-white px-3 py-5 sm:px-8 sm:py-7 ${over ? 'border-brand-400' : 'border-slate-200'}` : ''}
+      data-big={big ? '1' : '0'}
+      className={expanded ? `relative rounded-(--radius-panel) border bg-white px-3 ${idleBig ? 'py-4 sm:px-8 sm:py-5' : 'py-5 sm:px-8 sm:py-7'} ${over ? 'border-brand-400' : 'border-slate-200'}` : ''}
     >
       <input
         ref={fileRef}
@@ -246,16 +289,24 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
       {/* 목차 제목이 아니라 인사 — 목차 설명(ⓘ) 규칙(D-192)은 h2 목차에만 */}
       {expanded && (
         <>
-          <p className="text-center text-[1.2rem] leading-snug font-bold break-keep text-slate-900 sm:text-[1.55rem]" data-testid="home-ask-title">
+          {/* D-638 크게 / 한 줄로 — 이 기기에 기억 */}
+          {turns.length === 0 && (
+            <button type="button" onClick={() => keepBig(!big)} className="tap t-meta absolute top-2 right-2 inline-flex min-h-10 items-center rounded-(--radius-control) px-2.5 font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800 sm:min-h-8" data-testid="home-ask-size-toggle" aria-pressed={big}>
+              {big ? '한 줄로' : '늘 크게'}
+            </button>
+          )}
+          <p className={`text-center leading-snug font-bold break-keep text-slate-900 ${idleBig ? 'text-[1.2rem]' : 'text-[1.2rem] sm:text-[1.55rem]'}`} data-testid="home-ask-title">
             무엇을 도와드릴까요?
           </p>
-          <p className="t-sub mt-1 text-center break-keep text-slate-500" data-testid="home-ask-guide">
-            {customer ? '업체 이름과 함께 물어보거나 서류를 올리면 그 업체 자료로 답해요' : '업체 이름과 함께 물어보거나 서류를 올리면 모듈 판정까지 보고 답해요'}
-          </p>
+          {!idleBig && (
+            <p className="t-sub mt-1 text-center break-keep text-slate-500" data-testid="home-ask-guide">
+              {customer ? '업체 이름과 함께 물어보거나 서류를 올리면 그 업체 자료로 답해요' : '업체 이름과 함께 물어보거나 서류를 올리면 모듈 판정까지 보고 답해요'}
+            </p>
+          )}
         </>
       )}
 
-      <form onSubmit={onSubmit} className={`relative mx-auto ${expanded ? 'mt-4' : ''} flex w-full max-w-3xl items-end gap-1 rounded-[26px] border border-slate-300 bg-white py-1.5 pr-1.5 pl-1.5 shadow-sm focus-within:border-violet-400`} data-testid="home-ask-form">
+      <form onSubmit={onSubmit} className={`relative mx-auto ${expanded ? (idleBig ? 'mt-3' : 'mt-4') : ''} flex w-full max-w-3xl items-end gap-1 rounded-[26px] border border-slate-300 bg-white py-1.5 pr-1.5 pl-1.5 shadow-sm focus-within:border-violet-400`} data-testid="home-ask-form">
         <div ref={menuRef} className="relative shrink-0">
           <button type="button" aria-label="업체 고르기 · 서류로 새 업체" aria-expanded={menu} onClick={() => setMenu((v) => !v)} className="tap flex size-10 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100" data-testid="home-ask-plus" data-guide={menu ? undefined : 'fn-ask-plus'}>
             <Plus aria-hidden="true" className="size-5" />
@@ -317,6 +368,7 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
             ref={box}
             rows={1}
             value={text}
+            maxLength={ASK_MAX_CHAT}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKey}
             onFocus={() => setOpen(true)}
@@ -338,7 +390,35 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
         </button>
       </form>
 
-      {!expanded ? null : turns.length === 0 ? (
+      {/* D-638 화면 · 기능 이름을 치면 바로 가기 — 누르면 그 화면(묻지 않아도 된다) */}
+      {jumps.length > 0 && (
+        <div className="mx-auto mt-2 flex w-full max-w-3xl flex-wrap items-center gap-1.5 px-1" data-testid="home-ask-jumps">
+          <span className="t-meta font-semibold text-slate-500">바로 가기</span>
+          {jumps.map((h) => (
+            <button key={`${h.path}|${h.label}`} type="button" onClick={() => { setText(''); navigate(h.path) }} title={h.sublabel} className="tap t-sub inline-flex min-h-10 max-w-full items-center gap-1 rounded-full border border-slate-200 bg-white px-3 font-semibold text-slate-700 hover:border-brand-300 hover:bg-slate-50 sm:min-h-8" data-testid="home-ask-jump" data-path={h.path}>
+              <span className="truncate">{h.label}</span>
+              <ArrowRight aria-hidden="true" className="size-3.5 shrink-0 text-slate-400" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!expanded ? null : idleBig ? (
+        // D-638 처음 큰 대화창 — 질문은 가로 한 줄(눌러 바로 묻기 · 휴대폰은 옆으로 넘김)
+        <ul className="mx-auto mt-3 flex w-full max-w-3xl gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:flex-wrap sm:justify-center sm:overflow-visible [&::-webkit-scrollbar]:hidden" data-testid="home-ask-suggest" data-row="1">
+          {suggestions.slice(0, 3).map((s) => {
+            const Icon = ICON[s.icon]
+            return (
+              <li key={s.text} className="shrink-0">
+                <button type="button" onClick={() => send(s.text, s.clientId)} disabled={busy} className="tap t-sub inline-flex min-h-10 max-w-[18rem] items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-left text-slate-700 hover:border-brand-300 hover:bg-slate-50 sm:min-h-9" data-testid="home-ask-chip" data-icon={s.icon}>
+                  <Icon aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
+                  <span className="truncate">{s.text}</span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      ) : turns.length === 0 ? (
         <ul className="mx-auto mt-3 flex w-full max-w-3xl flex-col" data-testid="home-ask-suggest">
           {suggestions.map((s) => {
             const Icon = ICON[s.icon]
@@ -552,6 +632,7 @@ function Turn({ turn, names, record, onRecorded, onRecordTalk }: { turn: HomeTur
             </div>
           )}
           {a.caution && <p className="t-sub break-keep text-danger-700">{a.caution}</p>}
+          {turn.cut && <CutLine testId="home-ask-cut" />}
           {turn.talk && (turn.talk.answers.length > 0 || (turn.talk.numbers?.length ?? 0) > 0 || !!turn.talk.next) && (
             // D-502~D-504 질문에서 읽은 업체 사정 · 숫자 · 다음 약속 — 한 번 누르면 업체에 남는다(최종 확인 · 업무 일기 메모와 같은 카드)
             <TalkCard

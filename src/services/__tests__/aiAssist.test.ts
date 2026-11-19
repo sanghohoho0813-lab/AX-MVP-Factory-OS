@@ -3,7 +3,9 @@
  *
  * 서버 함수는 진짜 코드를 부르고, 밖으로 나가는 것(Supabase 로그인 · 권한 RPC · 세 공급자)만 가짜 fetch 로 바꾼다.
  */
-import handler, { __resetAiAssistState } from '../../../api/ai-assist.js'
+import handler, { __resetAiAssistState, askLimit } from '../../../api/ai-assist.js'
+import { chatAnswerOf } from '../aiAssist/looseJson'
+import { aliasText, ASK_MAX_CHAT } from '../aiAssist/context'
 import runHandler, { __resetAiRunState } from '../../../api/ai-run.js'
 import { ASSISTS, ASSIST_EXAMPLE, ASSIST_OUTPUT_SCHEMA, ASSIST_RULES, FREEDOM_RULES, PACKS, RADAR_RULES, SAFE_AX_OWNER, SAFE_RULES, assistSystem, buildAssistPrompt, knowledgeOf, topicPacks } from '../../../api/_ai/assists.js'
 import { KNOWLEDGE } from '../../../api/_ai/knowledge.js'
@@ -1405,8 +1407,28 @@ async function recoverTests() {
   globalThis.fetch = saved
 }
 
+/** D-638 대화 품질 — 모든 대화창이 같은 길로 답을 읽는다 · 긴 물음 · 이름 별칭 */
+function d638QualityTests() {
+  const ok = chatAnswerOf({ structured: { headline: '결론', items: [{ title: '가' }] }, raw: '' })
+  check('D638-Q1 검사를 통과한 답은 그대로(항목 · 잘림 아님)', ok.headline === '결론' && ok.items.length === 1 && !ok.cut, ok)
+  const fenced = chatAnswerOf({ structured: null, raw: '```json\n{"headline":"코드 블록 답","items":[{"title":"하나","detail":"설명"}],"next":["다음"]}\n```' })
+  check('D638-Q2 코드 블록으로 감싼 JSON 답 → 머리글 · 항목 · 다음(JSON 껍데기 0)', fenced.headline === '코드 블록 답' && fenced.items[0]?.title === '하나' && fenced.next?.[0] === '다음', fenced)
+  const broken = chatAnswerOf({ structured: null, raw: '{"headline":"앞만 온 답","items":[{"title":"끝이 잘린' })
+  check('D638-Q3 끝이 잘린 JSON → 살릴 수 있는 만큼(머리글) · 화면에 중괄호 0', broken.headline.includes('앞만 온 답') && !broken.headline.includes('{'), broken)
+  const garbage = chatAnswerOf({ structured: null, raw: '{"x": [1, 2' })
+  check('D638-Q4 읽을 것이 없는 JSON → 쉬운 말 한 줄(중괄호 0)', !garbage.headline.includes('{') && /다시 물어|읽지 못/.test(garbage.headline), garbage)
+  const plain = chatAnswerOf({ structured: null, raw: '그냥 글로 온 답\n둘째 줄' })
+  check('D638-Q5 그냥 글 답 → 그 글 그대로', plain.headline.startsWith('그냥 글로 온 답') && plain.items.length === 0, plain)
+  const cut = chatAnswerOf({ structured: { headline: '길게 쓰다', items: [{ title: '가' }] }, raw: '', finish: 'max_tokens' })
+  check('D638-Q6 공급자가 길이 한도에서 멈춘 답 → cut(화면에 "끝이 잘렸어요" 한 줄)', cut.cut === true && chatAnswerOf({ structured: null, raw: 'x', finish: 'length' }).cut === true && !chatAnswerOf({ structured: null, raw: 'x', finish: 'stop' }).cut)
+  check('D638-Q7 물음 글자 수 — 대화 · 직접 묻기 2,000 · 나머지 단추 500 · 화면 한도 = 서버 한도', askLimit('side.chat') === 2000 && askLimit('home.chat') === 2000 && askLimit('today.ask') === 2000 && askLimit('pv.chat') === 2000 && askLimit('radar.top5') === 500 && askLimit('') === 500 && ASK_MAX_CHAT === askLimit('side.chat'))
+  const aliased = aliasText('김철수 대표님께 김철수 님 서류 요청', { '대표 A': '김철수', '영업자 B': '박' })
+  check('D638-Q8 직접 적은 물음 속 사람 이름 → 화면 자료와 같은 별칭(한 글자 이름은 그대로)', aliased === '대표 A 대표님께 대표 A 님 서류 요청' && aliasText('그대로', undefined) === '그대로', aliased)
+}
+
 await serverTests()
 askTests()
+d638QualityTests()
 bundleTests()
 d241Tests()
 await d263Tests()

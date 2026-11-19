@@ -93,7 +93,7 @@ export function PlanTalk({
         <div className="flex flex-col gap-2" data-testid={`${testId}-options`}>
           <div className="flex flex-wrap gap-1.5">
             {open.options.map((o) => (
-              <AiConfirm keepLabel confirmLabel="이대로 답하기" cancel={false}><button key={o} type="button" onClick={() => onAnswer(o)} className="tap t-sub min-h-11 rounded-full border border-violet-300 bg-white px-3.5 text-left font-semibold break-keep text-violet-900 hover:bg-violet-50" data-testid={`${testId}-option`}>
+              <AiConfirm key={o} keepLabel confirmLabel="이대로 답하기" cancel={false}><button type="button" onClick={() => onAnswer(o)} className="tap t-sub min-h-11 rounded-full border border-violet-300 bg-white px-3.5 text-left font-semibold break-keep text-violet-900 hover:bg-violet-50" data-testid={`${testId}-option`}>
                 {o}
               </button></AiConfirm>
             ))}

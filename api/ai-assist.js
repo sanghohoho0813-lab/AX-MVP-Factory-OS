@@ -118,6 +118,12 @@ function timeoutMs() {
  * 끝나기 8초 전까지만 AI 를 기다린다: 그 뒤의 정산 · 되돌림 · 답 보관이 함수가 잘리기 전에 끝나게
  * (예전: 조사 단추가 검색 55초 + 다시 55초를 기다리다 함수가 잘리면 '센 채 답 없음' 이 될 수 있었다).
  */
+/** D-638 물음 글자 수 — 대화 · 직접 묻기는 2,000자(붙여 넣은 글 · 긴 질문), 나머지 단추는 500자 */
+export const ASK_MAX_CHAT = 2000
+export const ASK_MAX = 500
+export function askLimit(id) {
+  return /\.(?:chat|ask)$/.test(String(id || '')) ? ASK_MAX_CHAT : ASK_MAX
+}
 export const AFTER_AI_MS = 8000
 function maxDurationMs() {
   const v = Number(process.env.AI_MAX_DURATION_MS)
@@ -169,7 +175,7 @@ async function runOnce(assist, choice, body, role, video = null, deadline = Date
   const brand = role === 'pilot' ? cleanBrand(body.brand) : null
   const customerMk = role === 'pilot' && MARKETING_PAGES.has(assist.page)
   const context = customerMk ? stripOwnerContext(scrubbed, brand).context : scrubbed
-  const ask = typeof body.ask === 'string' ? scrubBrand(scrubText(body.ask)).slice(0, 500) : ''
+  const ask = typeof body.ask === 'string' ? scrubBrand(scrubText(body.ask)).slice(0, askLimit(assist.id)) : ''
   // D-263 대표가 붙여 넣은 점검 기준 — 자체점검 · 명세서/사업계획서 쓰기 단추에만(다른 단추는 버림)
   const skill = (assist.judge || assist.final || assist.ideaJudge) && typeof body.skill === 'string' ? scrubBrand(scrubText(body.skill)).slice(0, SKILL_MAX) : ''
   // D-263 대화 단추 — 물어본 말로 기준 문서 장 고르기(물어본 말에 주제가 없으면 앞선 대화 끝부분으로 · 화면 제목은 늘 '특허 · 벤처' 라 쓰지 않음)

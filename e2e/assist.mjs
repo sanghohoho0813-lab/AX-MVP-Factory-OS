@@ -488,7 +488,7 @@ await page.keyboard.press('Escape')
     const user2 = llm.at(-1)?.user ?? ''
     check('G D-626 이어서 묻기: 둘째 질문에 [앞선 대화] 로 첫 질문 · 답이 같이 감', user2.includes('[자료 · 앞선 대화') && user2.includes('이 업체 지난달에 뭐 했어?') && llm.at(-1)?.sys.includes('앞선 대화] 가 있으면 그 대화에 이어지는 질문'), user2.slice(0, 500))
     const carry = page.getByTestId('ai-assist-carry')
-    check("G D-626 질문칸 아래 '이어서 묻기 — 방금 물은 n개와 답을 같이 보내요'", (await carry.count()) === 1 && /방금 물은 [1-5]개/.test(await carry.innerText()), await carry.innerText().catch(() => ''))
+    check("G D-626 질문칸 아래 '이어서 묻기 — 방금 주고받은 n개를 같이 보내요'", (await carry.count()) === 1 && /방금 주고받은 [1-5]개/.test(await carry.innerText()), await carry.innerText().catch(() => ''))
     await shot(page, 'G-ask-carry')
     await page.getByTestId('ai-assist-carry-reset').click()
     check('G D-626 [새로 묻기] → 이어받기 줄이 사라짐', (await page.getByTestId('ai-assist-carry').count()) === 0)

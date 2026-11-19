@@ -33,14 +33,15 @@ import { useBackToClose } from '../../lib/backToClose'
 import { useEscToClose } from '../../lib/escStack'
 import { createJournalEntry } from '../../services/journalService'
 import { betterModel, dueFromWhen, isSamePage, pointsAtTodo, refKind, refLabel, todoText, unalias, unaliasAnswer } from '../../services/aiAssist/actions'
-import { AssistError, PROVIDER_NAME, assistMessage, callAssist, fetchAssistStatus, peekAssistStatus, providerMessage, type ProviderProbe } from '../../services/aiAssist/client'
+import { AssistError, PROVIDER_NAME, assistMessage, callAssist, cutOff, fetchAssistStatus, peekAssistStatus, providerMessage, type ProviderProbe } from '../../services/aiAssist/client'
 import type { AssistAnswer, AssistItem, AssistRun, AssistStatus, ModelInfo, ProviderId } from '../../services/aiAssist/client'
-import { normRef, safeText } from '../../services/aiAssist/context'
+import { ASK_MAX_CHAT, aliasText, normRef, safeText } from '../../services/aiAssist/context'
 import type { AssistBundle } from '../../services/aiAssist/context'
 import { askPresetOf, presetsFor } from '../../services/aiAssist/presets'
 import type { AssistPage, AssistPreset } from '../../services/aiAssist/presets'
 import { CHOICE_EVENT, contextHash, historyOf, markDone, newRequestId, readChoice, saveChoice, allowedProviders, isCheapOnly, addPending, removePending, pendingFor, pushHistoryIfOwner, currentOwner } from '../../services/aiAssist/store'
 import { resumeOnce } from '../../services/aiAssist/resume'
+import { CUT_NOTE, answerOf, chatAnswerOf } from '../../services/aiAssist/looseJson'
 import { askCarry, type AiChoice, type FollowMeta, type HistoryEntry } from '../../services/aiAssist/store'
 import { classifyAsk } from '../../services/aiAssist/autoModel'
 import { autoPlanFor, showsAuto, useLastAutoPick } from '../../lib/modelPickPref'
@@ -541,12 +542,12 @@ function AssistPanel({
    * 지문(hash)은 화면 자료로만 — 이어 쓴 답도 '화면 자료가 바뀌었어요' 를 같은 기준으로 판단한다.
    */
   const run = useCallback(
-    async (preset: AssistPreset, askText = '', opts: { choice?: AiChoice; follow?: FollowMeta } = {}) => {
+    async (preset: AssistPreset, askText = '', opts: { choice?: AiChoice; follow?: FollowMeta; before?: string } = {}) => {
       if (running) return
       setRunning(preset.id)
       setError(null)
       // D-244 직접 적은 질문도 보내기 전에 가린다(연락처 · 이메일 · 주민번호) — 지난 답에도 가린 글만 남긴다
-      const masked = askText ? safeText(askText, [], 500) : ''
+      const masked = askText ? safeText(askText, [], ASK_MAX_CHAT) : ''
       const label = opts.follow ? `${preset.label} · ${opts.follow.title}` : preset.id.endsWith('.ask') ? '직접 물어본 것' : preset.label
       setAsking({ preset, label, ask: masked, at: new Date().toISOString(), opts })
       toEnd()
@@ -557,7 +558,8 @@ function AssistPanel({
         const hash = contextHash(JSON.stringify(bundle.context))
         setNowHash(hash)
         // D-626 직접 물어보기는 이어서 — 이 화면에서 방금 주고받은 것을 '앞선 대화' 로 같이 보낸다(단추 · 이어 쓰기는 그대로)
-        const carry = !opts.follow && preset.id.endsWith('.ask') ? askCarry(historyOf(scope), carryFromRef.current) : []
+        // D-638 [다시 만들기] 는 다시 만드는 그 답 · 그 뒤 것은 빼고 보낸다(같은 답을 되풀이하지 않게)
+        const carry = !opts.follow && preset.id.endsWith('.ask') ? askCarry(historyOf(scope), carryFromRef.current, Date.now(), opts.before ?? '') : []
         const context = opts.follow ? { ...bundle.context, sections: [opts.follow.section, ...bundle.context.sections] } : carry.length ? { ...bundle.context, sections: [{ name: '앞선 대화', rows: carry }, ...bundle.context.sections] } : bundle.context
         // D-638 묻는 중을 적어 둔다 — 판을 닫거나 다른 화면으로 가도(휴대폰이 탭을 버려도) 다시 열면 이 번호로 답을 받아 온다
         const owner = currentOwner()
@@ -565,7 +567,8 @@ function AssistPanel({
         addPending({ ...meta, rid: requestId })
         let runResult: AssistRun
         try {
-          runResult = await callAssist({ requestId, assistId: preset.id, page, choice: opts.choice ?? choice, context, ask: masked })
+          // D-638 물음 속 사람 이름도 화면 자료와 같은 별칭으로 보낸다(답은 보여 줄 때 되돌림)
+          runResult = await callAssist({ requestId, assistId: preset.id, page, choice: opts.choice ?? choice, context, ask: aliasText(masked, bundle.aliases) })
         } finally {
           removePending(requestId)
         }
@@ -593,7 +596,7 @@ function AssistPanel({
   const presetOf = useCallback((id: string) => presets.find((x) => x.id === id) ?? presetsFor([id])[0], [presets])
 
   /** D-289 바로 부르지 않고 '이대로 질문하기' 를 기다린다 */
-  const request = useCallback((preset: AssistPreset, label: string, ask = '', opts: { choice?: AiChoice; follow?: FollowMeta } = {}) => {
+  const request = useCallback((preset: AssistPreset, label: string, ask = '', opts: { choice?: AiChoice; follow?: FollowMeta; before?: string } = {}) => {
     setPending({ preset, ask, opts, label })
   }, [])
   const confirmPending = () => {
@@ -606,7 +609,7 @@ function AssistPanel({
   const rerun = useCallback(
     (entry: NonNullable<Shown>, choiceOverride?: AiChoice, betterLabel?: string) => {
       const p = presetOf(entry.assistId)
-      if (p) request(p, betterLabel ? `${entry.label} — ${betterLabel} 로 다시` : `${entry.label} — 다시 만들기`, entry.ask, { choice: choiceOverride, follow: entry.follow })
+      if (p) request(p, betterLabel ? `${entry.label} — ${betterLabel} 로 다시` : `${entry.label} — 다시 만들기`, entry.ask, { choice: choiceOverride, follow: entry.follow, before: entry.run.createdAt })
     },
     [presetOf, request],
   )
@@ -835,7 +838,7 @@ function AssistPanel({
       {/* D-626 이어서 묻기 — 방금 주고받은 것을 같이 보낸다는 것을 보여 주고, 끊고 싶으면 [새로 묻기] */}
       {askPreset === DIRECT && carryCount > 0 && (
         <p className="t-meta flex flex-wrap items-center gap-x-2 gap-y-1 break-keep text-violet-900" data-testid="ai-assist-carry">
-          <span>이어서 묻기 — 방금 물은 {carryCount}개와 답을 같이 보내요</span>
+          <span>이어서 묻기 — 방금 주고받은 {carryCount}개를 같이 보내요</span>
           <button
             type="button"
             className="tap t-meta rounded-full border border-violet-300 bg-white px-2.5 py-0.5 font-semibold text-violet-800 hover:bg-violet-50"
@@ -858,7 +861,7 @@ function AssistPanel({
           id={`ai-ask-${scope}`}
           ref={askRef}
           value={ask}
-          maxLength={500}
+          maxLength={ASK_MAX_CHAT}
           onChange={(e) => setAsk(e.target.value)}
           onKeyDown={(e) => {
             // Enter = 보내기 · Shift+Enter = 줄바꿈(한글 조합 중에는 보내지 않음)
@@ -1393,8 +1396,11 @@ function ResultView({ entry, stale, last, running, onRerun, better, onBetter, on
   const tid = useTid()
   const { run } = entry
   // D-244 별칭(영업자 A)은 보여 줄 때 실제 이름으로 — 이 브라우저에서만
-  const a = useMemo(() => unaliasAnswer(run.structured, entry.aliases), [run.structured, entry.aliases])
+  // D-638 서버 모양 검사에서 떨어진 답도 너그럽게 읽어 항목으로 — 그래도 못 읽으면 JSON 껍데기 대신 머리글 · 쉬운 말 한 줄
+  const a = useMemo(() => unaliasAnswer(run.structured ?? answerOf(run), entry.aliases), [run, entry.aliases])
   const raw = useMemo(() => unalias(run.raw, entry.aliases), [run.raw, entry.aliases])
+  const shownRaw = useMemo(() => unalias(chatAnswerOf({ structured: null, raw: run.raw }).headline, entry.aliases), [run.raw, entry.aliases])
+  const cut = cutOff(run)
   const done = useMemo(() => new Set(entry.done ?? []), [entry.done])
   const here = useLocation()
   // 로컬 모드에는 AuthProvider 가 없다 — 그때는 작업공간 · 사용자 없이(업무 일기는 이 브라우저에)
@@ -1576,8 +1582,12 @@ function ResultView({ entry, stale, last, running, onRerun, better, onBetter, on
           </>
         ) : (
           <BotBubble first>
-            <p className="t-meta text-slate-600">정리된 모양으로 오지 않아 받은 글을 그대로 보여 드려요.</p>
-            <p className="t-body mt-1 break-keep whitespace-pre-line text-slate-900 [overflow-wrap:anywhere]">{raw}</p>
+            <p className="t-body break-keep whitespace-pre-line text-slate-900 [overflow-wrap:anywhere]" data-testid={tid('ai-assist-plain')}>{shownRaw}</p>
+          </BotBubble>
+        )}
+        {cut && (
+          <BotBubble>
+            <p className="t-sub break-keep text-slate-700" data-testid={tid('ai-assist-cut')}>✂ {CUT_NOTE}</p>
           </BotBubble>
         )}
         {resultActions.length > 0 && (
@@ -1591,7 +1601,7 @@ function ResultView({ entry, stale, last, running, onRerun, better, onBetter, on
           <button
             type="button"
             onClick={async () => {
-              if (await copy(answerText(a, raw))) onCopied()
+              if (await copy(answerText(a, shownRaw))) onCopied()
             }}
             className={`${pill} border-slate-200 bg-white text-slate-700 hover:bg-slate-50`}
             data-testid={tid('ai-assist-copy')}

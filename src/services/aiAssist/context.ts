@@ -63,6 +63,18 @@ const PHONE_MORE: readonly [RegExp, string][] = [
 ]
 
 /** 자유 글 — 주민번호 · 비밀번호 · 키 · 계좌 · 이메일 · 휴대폰 · 유선 전화를 가리고, 알려 준 사람 이름을 '(이름)' 으로 */
+/** D-638 대화 · 직접 묻기 물음 글자 수(서버 askLimit 과 같은 수) */
+export const ASK_MAX_CHAT = 2000
+
+/** D-638 직접 적은 물음 속 사람 이름 → 별칭(영업자 A · 대표 B) — 화면 자료와 같은 별칭으로 보내고 답은 화면에서 되돌린다 */
+export function aliasText(s: string, aliases: Record<string, string> | undefined): string {
+  if (!aliases) return s
+  let out = s
+  const pairs = Object.entries(aliases).filter(([, real]) => typeof real === 'string' && real.trim().length >= 2).sort((a, b) => b[1].length - a[1].length)
+  for (const [alias, real] of pairs) out = out.split(real.trim()).join(alias)
+  return out
+}
+
 export function safeText(s: string | null | undefined, names: readonly string[] = [], max = 300): string {
   let out = String(s ?? '')
   for (const [re, rep] of PHONE_MORE) out = out.replace(re, rep)

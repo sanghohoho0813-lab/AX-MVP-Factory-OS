@@ -9,6 +9,7 @@ import { useSyncExternalStore } from 'react'
 import { callAssist, type AssistAnswer } from '../aiAssist/client'
 import { newRequestId, readChoice } from '../aiAssist/store'
 import { resumable, resumeOnce } from '../aiAssist/resume'
+import { chatAnswerOf } from '../aiAssist/looseJson'
 import type { AssistBundle } from '../aiAssist/context'
 import { EMPTY_FEEDBACK, parseFeedback, preferenceRules, priorTurnsSection, withFeedback, type DownReason, type HomeFeedback, type PlanChip, type RuleAnswer } from './homeAsk'
 import type { ChatDoc, DocCompany } from './homeDocs'
@@ -45,6 +46,8 @@ export interface HomeTurn {
   rid?: string
   /** D-638 다시 받아 오는 중 */
   resume?: boolean
+  /** D-638 답이 길어 끝이 잘림 */
+  cut?: boolean
 }
 
 export interface HomeAskState {
@@ -264,8 +267,9 @@ export async function askHome(plan: AskPlan): Promise<void> {
     const rid = newRequestId()
     commit((cur) => cur.map((t) => (t.id === id ? { ...t, rid, links: prep.bundle.links } : t)))
     const run = await callAssist({ requestId: rid, assistId: 'home.chat', page: 'today', choice: readChoice(), context, ask: q })
-    const s = run.structured
-    finish({ status: 'ai', answer: s ?? { headline: run.raw.slice(0, 2000), items: [] }, links: prep.bundle.links, model: run.servedModel || run.model })
+    // D-638 모든 대화창이 같은 길로 읽는다 — JSON 껍데기 0 · 끝이 잘린 답은 한 줄
+    const { cut, ...answer } = chatAnswerOf(run)
+    finish({ status: 'ai', answer, cut: cut || undefined, links: prep.bundle.links, model: run.servedModel || run.model })
   } catch (e) {
     const why = e instanceof Error && e.message ? e.message : 'AI 연결을 확인해 주세요'
     finish({ status: 'rule', answer: rule ?? { headline: '답을 만들지 못했어요. 잠시 뒤 다시 물어봐 주세요.', items: [] }, links: rule?.links ?? {}, why })
@@ -289,7 +293,10 @@ export async function resumeHomeTurns(): Promise<void> {
         x.id !== t.id
           ? x
           : got
-            ? { ...x, status: 'ai', resume: undefined, why: '', answer: got.structured ?? { headline: got.raw.slice(0, 2000), items: [] }, model: got.servedModel || got.model }
+            ? (() => {
+                const { cut, ...answer } = chatAnswerOf(got)
+                return { ...x, status: 'ai' as const, resume: undefined, why: '', answer, cut: cut || undefined, model: got.servedModel || got.model }
+              })()
             : { ...x, resume: undefined, why: '답을 받기 전에 화면을 닫았어요 — 다시 물어봐 주세요.', answer: { headline: '답을 받지 못했어요.', items: [] } },
       ),
     )

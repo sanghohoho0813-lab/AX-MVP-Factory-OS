@@ -119,6 +119,8 @@ export interface DockTurn {
   items?: { title: string; detail?: string; body?: string }[]
   next?: string[]
   caution?: string
+  /** D-638 답이 길어 끝이 잘림(공급자가 길이 한도에서 멈춤) */
+  cut?: boolean
   model?: string
   error?: string
   /** D-638 요청 번호 — 답을 기다리다 화면이 닫혀도 다시 열면 이 번호로 답을 받아 온다 */
@@ -156,6 +158,7 @@ export function parseDockChat(raw: string | null): DockTurn[] {
         items,
         next: Array.isArray(t.next) ? (t.next as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 6) : undefined,
         caution: str(t.caution, 1000),
+        ...(t.cut === true ? { cut: true } : {}),
         model: str(t.model, 120),
         error: status === 'error' ? (resume ? '화면이 닫혀 있던 사이에 온 답을 받아 오는 중…' : t.status === 'pending' ? '답을 받지 못했어요 — 다시 물어봐 주세요' : (str(t.error, 300) ?? '답을 받지 못했어요 — 다시 물어봐 주세요')) : undefined,
         ...(rid ? { rid } : {}),

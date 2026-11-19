@@ -776,7 +776,11 @@ async function d626Tests() {
   const now = Date.parse('2026-11-17T06:00:00Z')
   const he = (id: string, at: string, ask: string, headline: string, extra: Record<string, unknown> = {}) => ({ scope: 'marketing', assistId: id, label: '', ask, hash: '', run: { requestId: at, assistId: id, createdAt: at, structured: { headline, items: [{ title: '근거', detail: '자세히' }] }, raw: '' }, ...extra })
   const carry = askCarry([he('marketing.ask', '2026-11-17T05:50:00Z', '둘째', '둘째 답'), he('marketing.ask', '2026-11-17T05:40:00Z', '첫째', '첫째 답'), he('marketing.plan', '2026-11-17T05:45:00Z', '', '단추 답'), he('marketing.ask', '2026-11-16T05:00:00Z', '어제', '어제 답'), he('marketing.ask', '2026-11-17T05:55:00Z', '이어 쓴 것', '답', { follow: { title: 'x', section: { name: 'x', rows: [] } } })] as never, '', now)
-  check('D626-16 직접 물어보기 — 이 화면에서 방금 물은 것만(오래된 것부터 · 단추 답 · 이어 쓰기 · 6시간 지난 것 빼고)', carry.length === 2 && carry[0]['질문'] === '첫째' && carry[1]['답'].includes('둘째 답 / 근거 — 자세히'), carry)
+  check('D626-16 → D-638 직접 물어보기 — 이 화면에서 방금 물은 것 + 가장 최근 단추 답 하나(오래된 것부터 · 이어 쓰기 · 6시간 지난 것 빼고)', carry.length === 3 && carry[0]['질문'] === '첫째' && carry[1]['질문'].startsWith('(단추)') && carry[1]['답'].includes('단추 답') && carry[2]['답'].includes('둘째 답 / 근거 — 자세히'), carry)
+  const reCarry = askCarry([he('marketing.ask', '2026-11-17T05:50:00Z', '둘째', '둘째 답'), he('marketing.ask', '2026-11-17T05:40:00Z', '첫째', '첫째 답')] as never, '', now, '2026-11-17T05:50:00Z')
+  check('D-638 [다시 만들기] — 다시 만드는 그 답 · 뒤 것은 앞선 대화에서 빠짐', reCarry.length === 1 && reCarry[0]['질문'] === '첫째', reCarry)
+  const rawCarry = askCarry([{ ...he('marketing.ask', '2026-11-17T05:50:00Z', '셋째', ''), run: { requestId: 'r', assistId: 'marketing.ask', createdAt: '2026-11-17T05:50:00Z', structured: null, raw: '```json\n{"headline":"원문 답","items":[{"title":"가","detail":"나"}]}\n```' } }] as never, '', now)
+  check('D-638 모양 검사에서 떨어진 답도 앞선 대화엔 읽은 글로(JSON 껍데기 0)', rawCarry.length === 1 && rawCarry[0]['답'].startsWith('원문 답') && !rawCarry[0]['답'].includes('{'), rawCarry)
   check('D626-17 [새로 묻기] 뒤에는 그 앞 질문을 이어받지 않음', askCarry([he('marketing.ask', '2026-11-17T05:50:00Z', '둘째', '둘째 답')] as never, '2026-11-17T05:55:00Z', now).length === 0)
 }
 

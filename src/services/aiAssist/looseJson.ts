@@ -113,3 +113,45 @@ export function rawObjectOf(run: Pick<AssistRun, 'raw'>): Record<string, unknown
   const v = looseJson(run.raw)
   return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null
 }
+
+/** 원문이 JSON 처럼 생겼나(코드 블록 · 중괄호로 시작) — 글 그대로 보여 주면 안 되는 답 */
+function looksJson(raw: string): boolean {
+  return /^\s*(?:```(?:json)?\s*)?[{[]/i.test(raw)
+}
+
+/** JSON 처럼 생겼는데 못 읽은 원문에서 머리글만 꺼낸다("headline": "…") */
+function headlineFromBroken(raw: string): string {
+  const m = raw.match(/"headline"\s*:\s*"((?:[^"\\]|\\.)*)/)
+  if (!m) return ''
+  return m[1].replace(/\\n/g, ' ').replace(/\\"/g, '"').replace(/\\\\/g, '\\').trim()
+}
+
+/**
+ * D-638 대화창에 보일 답 — 모든 대화창(오른쪽 판 · 오늘 · 모듈 대화 · AI 도우미)이 같은 길로 읽는다.
+ *   검사를 통과한 답 → 원문을 너그럽게 읽은 답 → 원문의 머리글만 있는 답 → 그냥 글(코드 블록 벗김).
+ *   JSON 껍데기(중괄호 · "items": …)가 화면에 그대로 나오는 일은 없다 — 못 읽으면 쉬운 말 한 줄.
+ *   cut: 답이 길어 끝이 잘렸다(공급자가 max_tokens 로 멈춤) — 화면이 '답이 길어 끝이 잘렸어요' 한 줄을 붙인다.
+ */
+export function chatAnswerOf(run: Pick<AssistRun, 'structured' | 'raw'> & { finish?: string }): AssistAnswer & { cut: boolean } {
+  const cut = /^(?:max_tokens|length)$/i.test(String(run.finish ?? '').trim())
+  const a = answerOf(run)
+  if (a && (a.headline || a.items.length)) return { ...a, next: a.next ?? [], cut }
+  const obj = rawObjectOf(run)
+  if (obj) {
+    const t = (v: unknown) => str(v).trim()
+    const headline = t(obj.headline) || t(obj.answer) || t(obj.summary)
+    if (headline) {
+      return { headline, items: [], next: Array.isArray(obj.next) ? obj.next.map(t).filter(Boolean) : [], caution: t(obj.caution) || undefined, cut }
+    }
+  }
+  const raw = String(run.raw ?? '')
+  if (looksJson(raw)) {
+    const h = headlineFromBroken(raw)
+    return { headline: h || '답을 읽지 못했어요 — 한 번 더 물어봐 주세요.', items: [], next: [], cut: cut || !!h }
+  }
+  const text = raw.replace(/^\s*```[a-z]*\s*/i, '').replace(/```\s*$/, '').trim()
+  return { headline: text.slice(0, 4000) || '답이 비어 있어요 — 한 번 더 물어봐 주세요.', items: [], next: [], cut }
+}
+
+/** 끝이 잘린 답에 붙이는 한 줄 */
+export const CUT_NOTE = '답이 길어 끝이 잘렸어요 — "이어서 써 줘" 라고 물으면 이어서 써요.'
