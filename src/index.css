@@ -26,6 +26,13 @@
   --color-brand-600: #2563eb;
   --color-brand-700: #1d4ed8;
 
+  /*
+   * D-638 AI 색 = 보라(Tailwind violet-*) — 'AI 가 일하는 중' 을 한눈에 알리는 신호라 브랜드 색과 따로 둔다.
+   * 보라는 AI(LLM) 단추 · AI 도우미 · 대화 판에만 쓰는 규칙(CLAUDE.md 박스 색)이라, 나중에 AI 색 자체를 바꾸려면
+   * 여기서 --color-violet-50 ~ 950 을 덮으면 모든 AI 단추 · 대화 판이 한 번에 바뀐다. 회사 이름 · 로고 색이 바뀌면
+   * 위 brand(테마 강조색)만 바꾼다 — AI 표시는 보라로 남는다.
+   */
+
   /* Status — restrained usage only */
   --color-success-50: #ecfdf5;
   --color-success-200: #a7f3d0;

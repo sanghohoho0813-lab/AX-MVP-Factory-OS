@@ -1422,6 +1422,8 @@ function d638QualityTests() {
   const cut = chatAnswerOf({ structured: { headline: '길게 쓰다', items: [{ title: '가' }] }, raw: '', finish: 'max_tokens' })
   check('D638-Q6 공급자가 길이 한도에서 멈춘 답 → cut(화면에 "끝이 잘렸어요" 한 줄)', cut.cut === true && chatAnswerOf({ structured: null, raw: 'x', finish: 'length' }).cut === true && !chatAnswerOf({ structured: null, raw: 'x', finish: 'stop' }).cut)
   check('D638-Q7 물음 글자 수 — 대화 · 직접 묻기 2,000 · 나머지 단추 500 · 화면 한도 = 서버 한도', askLimit('side.chat') === 2000 && askLimit('home.chat') === 2000 && askLimit('today.ask') === 2000 && askLimit('pv.chat') === 2000 && askLimit('radar.top5') === 500 && askLimit('') === 500 && ASK_MAX_CHAT === askLimit('side.chat'))
+  const md = chatAnswerOf({ structured: { headline: '**핵심** 답', items: [{ title: '## 단계', detail: '먼저 **서류**부터', body: '- 목록은 그대로\n**굵게** 끝' }], next: ['**다음**'] }, raw: '' })
+  check('D638-Q9 마크다운 굵게 · 제목 기호는 걷고 내용 · 목록 기호 · 줄바꿈은 그대로', md.headline === '핵심 답' && md.items[0].title === '단계' && md.items[0].detail === '먼저 서류부터' && md.items[0].body === '- 목록은 그대로\n굵게 끝' && md.next?.[0] === '다음', md)
   const aliased = aliasText('김철수 대표님께 김철수 님 서류 요청', { '대표 A': '김철수', '영업자 B': '박' })
   check('D638-Q8 직접 적은 물음 속 사람 이름 → 화면 자료와 같은 별칭(한 글자 이름은 그대로)', aliased === '대표 A 대표님께 대표 A 님 서류 요청' && aliasText('그대로', undefined) === '그대로', aliased)
 }

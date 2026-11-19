@@ -123,6 +123,8 @@ const isProvider = (v: unknown): v is ProviderId => v === 'gemini' || v === 'ope
 export function providerMessage(code: string, provider: ProviderId | '', detail = ''): string {
   if (!provider) return assistMessage(code)
   const name = PROVIDER_NAME[provider]
+  // D-638 대표가 아닌 화면(팀장 · 구독 고객)에는 키 · 결제 · 서버 설정 이야기를 보이지 않는다 — 고칠 수 있는 사람은 관리자뿐
+  if (!autoUpgradeAllowed() && (code === 'provider_billing' || code === 'provider_auth')) return 'AI 연결에 잠깐 문제가 있어요 — 관리자에게 알려 두었어요. 잠시 뒤 다시 해 주세요.'
   const why = detail ? ` (회사가 준 까닭: ${detail})` : ''
   if (code === 'provider_billing') return `${name} 계정의 잔액(크레딧) · 사용 한도가 다 됐어요 — ${PROVIDER_CONSOLE[provider]} 에서 충전하면 바로 됩니다(키는 그대로).${why}`
   if (code === 'provider_auth') return `${name} 키가 틀렸거나 폐기됐어요 — ${PROVIDER_CONSOLE[provider]} 에서 새 키를 만들어 Vercel 환경변수에 넣고 Redeploy 해 주세요.${why}`

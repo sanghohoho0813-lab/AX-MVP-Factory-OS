@@ -39,7 +39,7 @@ import { ASK_MAX_CHAT, aliasText, normRef, safeText } from '../../services/aiAss
 import type { AssistBundle } from '../../services/aiAssist/context'
 import { askPresetOf, presetsFor } from '../../services/aiAssist/presets'
 import type { AssistPage, AssistPreset } from '../../services/aiAssist/presets'
-import { CHOICE_EVENT, contextHash, historyOf, markDone, newRequestId, readChoice, saveChoice, allowedProviders, isCheapOnly, addPending, removePending, pendingFor, pushHistoryIfOwner, currentOwner } from '../../services/aiAssist/store'
+import { CHOICE_EVENT, contextHash, historyOf, markDone, newRequestId, readChoice, saveChoice, allowedProviders, isCheapOnly, addPending, removePending, pendingFor, pushHistoryIfOwner, currentOwner, autoUpgradeAllowed } from '../../services/aiAssist/store'
 import { resumeOnce } from '../../services/aiAssist/resume'
 import { CUT_NOTE, answerOf, chatAnswerOf } from '../../services/aiAssist/looseJson'
 import { askCarry, type AiChoice, type FollowMeta, type HistoryEntry } from '../../services/aiAssist/store'
@@ -1058,6 +1058,8 @@ export function ModelRow({
 }) {
   const [tab, setTab] = useState<ProviderId>(effective.provider)
   const [checking, setChecking] = useState(false)
+  // D-638 키 이름 · 가격 · 연결 점검은 대표 화면에만(팀장 · 고객 · 대표가 팀장 화면으로 볼 때는 숨김)
+  const admin = autoUpgradeAllowed()
   // D-353 [연결 점검] — 공급자마다 아주 짧게 한 번 불러 본 결과(키 없음 · 키 틀림 · 잔액 부족 · 모델 이름 …)
   const [probing, setProbing] = useState(false)
   const [probe, setProbe] = useState<ProviderProbe[] | null>(null)
@@ -1164,7 +1166,7 @@ export function ModelRow({
                 >
                   {PROVIDER_LABEL[id]}
                   <span className={`t-meta rounded-full px-1.5 ${tab === id ? 'bg-white/25' : probeOf(probe, id) ? (probeOf(probe, id)!.code === 'ok' ? 'bg-success-50 text-success-700' : 'bg-amber-100 text-amber-900') : p?.configured ? 'bg-success-50 text-success-700' : 'bg-slate-100 text-slate-500'}`} data-testid="ai-assist-provider-state" data-for={id}>
-                    {probeOf(probe, id) ? PROBE_CHIP[probeOf(probe, id)!.code] ?? '문제 있음' : p ? (p.configured ? '키 있음' : '키 없음') : '…'}
+                    {probeOf(probe, id) ? PROBE_CHIP[probeOf(probe, id)!.code] ?? '문제 있음' : p ? (p.configured ? (admin ? '키 있음' : '쓸 수 있음') : admin ? '키 없음' : '준비 중') : '…'}
                   </span>
                 </button>
               )
@@ -1174,7 +1176,7 @@ export function ModelRow({
           {provider && !provider.configured && (
             <p className="t-sub break-keep rounded-(--radius-control) bg-amber-50 px-3 py-2 text-amber-900">
               {josa(provider.label, '은/는')} 아직 연결되지 않았어요 — 관리자가 연결하면 고를 수 있어요.
-              <span className="t-meta block text-amber-800">관리자용: Vercel › Settings › Environment Variables 에 <b>{provider.keyName}</b> 를 넣고 Redeploy</span>
+              {admin && <span className="t-meta block text-amber-800">관리자용: Vercel › Settings › Environment Variables 에 <b>{provider.keyName}</b> 를 넣고 Redeploy</span>}
             </p>
           )}
           {provider && (
@@ -1198,11 +1200,13 @@ export function ModelRow({
                         <span className="t-sub font-semibold break-keep text-slate-900">
                           {m.label} <span className="t-meta font-normal text-slate-600">· {m.note}</span>
                         </span>
-                        <span className="t-meta break-keep text-slate-500">
-                          {priceText(m)}
-                          {m.verified === true && ' · ✓ 이 키로 확인됨'}
-                          {m.verified === false && ' · 이 키 목록에 없음'}
-                        </span>
+                        {admin && (
+                          <span className="t-meta break-keep text-slate-500">
+                            {priceText(m)}
+                            {m.verified === true && ' · ✓ 이 키로 확인됨'}
+                            {m.verified === false && ' · 이 키 목록에 없음'}
+                          </span>
+                        )}
                       </span>
                     </button>
                   </li>
@@ -1211,6 +1215,8 @@ export function ModelRow({
             </ul>
           )}
           <div className="flex flex-wrap items-center gap-2">
+            {/* D-638 키 · 연결 점검은 대표 화면에만(팀장 · 고객은 고칠 수 없는 것 — 점검 단추가 비용 없이 AI 를 부르는 길도 닫는다) */}
+            {admin && (<>
             <button
               type="button"
               disabled={checking}
@@ -1233,13 +1239,14 @@ export function ModelRow({
             >
               <RefreshCw aria-hidden="true" className={`size-4 ${probing ? 'animate-spin' : ''}`} /> {probing ? '점검 중…' : '연결 점검'}
             </button>
+            </>)}
             {!isDefault && (
               <button type="button" onClick={() => setChoice(null)} className="tap t-sub min-h-10 rounded-(--radius-control) px-2.5 font-semibold text-violet-800 hover:underline" data-testid="ai-assist-model-reset">
                 {canAuto ? '자동으로 되돌리기' : '기본(가장 싼 Gemini)으로'}
               </button>
             )}
           </div>
-          {(probe || probeFail) && (
+          {admin && (probe || probeFail) && (
             <ul className="flex flex-col gap-1 rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-2" data-testid="ai-assist-probe-result">
               {probeFail && <li className="t-sub break-keep text-amber-900">점검하지 못했어요 — 20초 뒤 다시 눌러 주세요(연달아 누르면 잠시 막혀요).</li>}
               {(probe ?? []).map((x) => (
@@ -1296,18 +1303,21 @@ function probeText(x: ProviderProbe): string {
 
 function ErrorBox({ error }: { error: { code: string; message: string; missing: string[]; ref?: string } }) {
   let how: ReactNode = null
-  if (error.code === 'setup_needed')
+  // D-638 키 이름 · 서버 설정 · 문서 이름은 대표 화면에만
+  const admin = autoUpgradeAllowed()
+  if (!admin && (error.code === 'setup_needed' || error.code === 'db_setup_needed')) how = <>관리자에게 'AI 연결' 을 부탁해 주세요.</>
+  else if (error.code === 'setup_needed')
     how = (
       <>
         관리자에게 'AI 키 연결' 을 부탁해 주세요.
         <span className="t-meta block">관리자용: Vercel › Settings › Environment Variables 에 <b>{error.missing[0] ?? 'GEMINI_API_KEY'}</b> 를 넣고 Redeploy(키는 서버에만 — 이름이 VITE_ 로 시작하면 안 됩니다).</span>
       </>
     )
-  if (error.code === 'db_setup_needed')
+  else if (error.code === 'db_setup_needed')
     how = (
       <>
         관리자에게 'AI 권한 설정' 을 부탁해 주세요.
-        <span className="t-meta block">관리자용: Supabase SQL Editor 에서 0021(AI 전략실 권한) 실행 — docs/OWNER_AI_WORKSPACE_V1.md §12.</span>
+        <span className="t-meta block">관리자용: Supabase SQL Editor 에서 0021(AI 전략실 권한) 실행 — 운영 적용 안내 문서 §12.</span>
       </>
     )
   return (

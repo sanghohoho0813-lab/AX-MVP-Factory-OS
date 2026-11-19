@@ -132,16 +132,32 @@ function headlineFromBroken(raw: string): string {
  *   JSON 껍데기(중괄호 · "items": …)가 화면에 그대로 나오는 일은 없다 — 못 읽으면 쉬운 말 한 줄.
  *   cut: 답이 길어 끝이 잘렸다(공급자가 max_tokens 로 멈춤) — 화면이 '답이 길어 끝이 잘렸어요' 한 줄을 붙인다.
  */
+/** D-638 화면은 글 그대로 보인다 — 굵게(**) · 제목(#) 기호만 걷어 낸다(내용 · 줄바꿈 · 목록 기호는 그대로) */
+export function plainMd(s: string): string {
+  return s.replace(/\*\*([^*\n]+)\*\*/g, '$1').replace(/__([^_\n]+)__/g, '$1').replace(/^#{1,6}\s+/gm, '')
+}
+
+function plainAnswer(a: AssistAnswer): AssistAnswer {
+  const p = (v: string | undefined) => (typeof v === 'string' ? plainMd(v) : v)
+  return {
+    ...a,
+    headline: plainMd(a.headline ?? ''),
+    items: a.items.map((i) => ({ ...i, title: plainMd(i.title ?? ''), detail: p(i.detail), body: p(i.body), outline: i.outline?.map(plainMd) })),
+    next: (a.next ?? []).map(plainMd),
+    caution: p(a.caution),
+  }
+}
+
 export function chatAnswerOf(run: Pick<AssistRun, 'structured' | 'raw'> & { finish?: string }): AssistAnswer & { cut: boolean } {
   const cut = /^(?:max_tokens|length)$/i.test(String(run.finish ?? '').trim())
   const a = answerOf(run)
-  if (a && (a.headline || a.items.length)) return { ...a, next: a.next ?? [], cut }
+  if (a && (a.headline || a.items.length)) return { ...plainAnswer(a), cut }
   const obj = rawObjectOf(run)
   if (obj) {
     const t = (v: unknown) => str(v).trim()
     const headline = t(obj.headline) || t(obj.answer) || t(obj.summary)
     if (headline) {
-      return { headline, items: [], next: Array.isArray(obj.next) ? obj.next.map(t).filter(Boolean) : [], caution: t(obj.caution) || undefined, cut }
+      return { headline: plainMd(headline), items: [], next: Array.isArray(obj.next) ? obj.next.map(t).filter(Boolean).map(plainMd) : [], caution: t(obj.caution) || undefined, cut }
     }
   }
   const raw = String(run.raw ?? '')
@@ -150,7 +166,7 @@ export function chatAnswerOf(run: Pick<AssistRun, 'structured' | 'raw'> & { fini
     return { headline: h || '답을 읽지 못했어요 — 한 번 더 물어봐 주세요.', items: [], next: [], cut: cut || !!h }
   }
   const text = raw.replace(/^\s*```[a-z]*\s*/i, '').replace(/```\s*$/, '').trim()
-  return { headline: text.slice(0, 4000) || '답이 비어 있어요 — 한 번 더 물어봐 주세요.', items: [], next: [], cut }
+  return { headline: plainMd(text.slice(0, 4000)) || '답이 비어 있어요 — 한 번 더 물어봐 주세요.', items: [], next: [], cut }
 }
 
 /** 끝이 잘린 답에 붙이는 한 줄 */

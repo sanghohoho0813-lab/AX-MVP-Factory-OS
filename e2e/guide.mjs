@@ -595,11 +595,12 @@ if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-13-bio-390.png`, fullPage
     JSON.stringify({ folded, sum, items, first: first.slice(0, 80), over: m.over, small: m.small, minFont: m.minFont }),
   )
   if (SHOTS) await mp.screenshot({ path: `${SHOTS}/guide-19-whatsnew-390.png` }).catch(() => {})
-  const bulkGo = mp.locator('[data-testid="whats-new-item"][data-key="bulk-email-address"]').getByTestId('whats-new-go')
-  const goText = ((await bulkGo.innerText().catch(() => '')) ?? '').trim()
-  await bulkGo.click()
+  // D-638 목록은 열 개까지(오래된 줄은 아래에서 빠짐) — 맨 위 줄 단추로 그 화면이 바로 열리는지
+  const homeGo = mp.locator('[data-testid="whats-new-item"][data-key="home-chat-big"]').getByTestId('whats-new-go')
+  const goText = ((await homeGo.innerText().catch(() => '')) ?? '').trim()
+  await homeGo.click()
   await mp.waitForTimeout(1200)
-  check('G19 새로 생긴 것 › [엑셀 목록 넣어 보기] → 고객 관리의 붙여넣는 창이 바로 열림(?bulk=1)', goText.includes('엑셀 목록 넣어 보기') && new URL(mp.url()).pathname === '/ops/clients' && (await mp.getByTestId('bulk-paste-text').count()) === 1, `${goText} ${mp.url()}`)
+  check('G19 새로 생긴 것 › [오늘 열기] → 오늘 화면 · 맨 위 대화창', goText.includes('오늘 열기') && new URL(mp.url()).pathname === '/' && (await mp.getByTestId('home-ask').count()) === 1, `${goText} ${mp.url()}`)
   await mp.keyboard.press('Escape').catch(() => {})
   // PC — 접힌 줄에 마우스 → 기능 안내 카드
   const wp = await ctx.newPage()

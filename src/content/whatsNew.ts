@@ -25,6 +25,26 @@ export const WHATS_NEW_MAX = 10
 
 export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
   {
+    id: 'home-chat-big',
+    date: '2026-11-19',
+    title: '오늘 맨 위 대화창이 크게 — 한 번 쓰면 원하는 일로',
+    how: "'일정 열어 줘' 처럼 쓰면 그 화면으로 바로 가요. 궁금한 것은 그대로 물어보세요. 작게 두고 싶으면 [한 줄로] 를 누르면 기억해요.",
+    path: '/',
+    cta: '오늘 열기',
+  },
+  {
+    id: 'ai-keep-going',
+    date: '2026-11-19',
+    title: 'AI 에 물어 놓고 다른 화면 · 다른 앱에 다녀와도 답이 와요',
+    how: '휴대폰에서 다른 앱을 보고 돌아와도 같은 질문을 다시 누를 필요 없어요 — 돌아오면 답을 받아 와요. 같은 질문은 한 번만 셉니다.',
+  },
+  {
+    id: 'chat-wide-size',
+    date: '2026-11-19',
+    title: '대화 판을 화면 끝까지 넓히고, 글자 크기도 −/+ 로',
+    how: "PC 오른쪽 대화 판 경계를 끌면 끝까지 넓어지고 [전체 화면] 단추도 있어요. [모델 바꾸기] 옆 −/+ 로 글자 크기를 5단계로 바꿔요(휴대폰도). 지난 대화에는 날짜가 붙어요.",
+  },
+  {
     id: 'mk-home-tiles',
     date: '2026-11-18',
     title: "마케팅 첫 화면 — '지난번 하던 것' 은 맨 아래 접힌 한 줄로 갔어요",
@@ -77,29 +97,6 @@ export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
     path: '/marketing/threads',
     cta: '스레드 열기',
     marketing: true,
-  },
-  {
-    id: 'contact-path',
-    date: '2026-11-11',
-    title: '연락 받는 길 만드는 법을 알려 줘요',
-    how: "카카오톡 오픈채팅을 다섯 걸음으로 만들고, 그 한 줄을 프로필 소개 글에 바로 넣어요. 기초 7가지 화면 아래에 있어요.",
-    path: '/marketing/basics',
-    cta: '기초 7가지 열기',
-    marketing: true,
-  },
-  {
-    id: 'search-screens',
-    date: '2026-11-11',
-    title: '찾기에 하고 싶은 일을 적어도 찾아 줘요',
-    how: "맨 위 [찾기]에 '스레드' · '엑셀' · '일정' 처럼 적으면 그 화면으로 바로 가요.",
-  },
-  {
-    id: 'bulk-email-address',
-    date: '2026-11-11',
-    title: '엑셀 고객 목록의 이메일 · 주소도 같이 들어가요',
-    how: '목록을 넣으면 이메일 · 주소 칸도 알아서 찾아 업체 기록에 넣어요.',
-    path: '/ops/clients?bulk=1',
-    cta: '엑셀 목록 넣어 보기',
   },
 ]
 
