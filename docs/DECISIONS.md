@@ -10135,5 +10135,5 @@ AFTER:
 
 시험: qa:guide G5 — 카드는 마우스를 올린 칸과 겹치지 않음(아래 · 위 · 자리가 없으면 옆). qa:senior 에 — 접힌 채 · 목록 아래 · 접힌 줄에 주제 없음 → 누르면 주제 · 찍기 · [이어서 하기] · 다시 들어오면 또 접힘 · PC 칸 가로 ÷ 세로 1.1~1.6 · 아이콘 위 · 일곱 칸 같은 크기 ·
 휴대폰 칸 세로 72px 이하(예전 모양) — PC 1440 · 휴대폰 390.
-결과(이번에 잰 것): qa:senior 148/0 · qa:guide 71/0 · qa:chars 0 실패 · qa:hover 0 실패 · qa:youtube · qa:mkpack · qa:keepui 녹색 · test:all 녹색(saasusage 111/0 · keep-ui 이름표 173 · 0 실패).
+결과(main 의 D-636 과 합친 뒤 다시 잰 것): qa:senior 148/0 · qa:guide 71/0 · qa:chat 78/0 · qa:chars 147/0 · qa:hover 113/0 · qa:keepui 10/0 · test:all 녹색(saasusage 111/0 · keep-ui 이름표 173 · 0 실패) · 합치기 전: qa:youtube · qa:mkpack 녹색.
 로그인 · 권한 · DB · api 는 손대지 않았다(qa:db · qa:pilot 대상 아님).
