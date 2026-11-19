@@ -195,7 +195,7 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
   }
   /** D-638 '○○ 열어 줘' 처럼 화면을 여는 말이면 묻지 않고 그 화면으로(AI 0 · 맞는 화면이 분명할 때만) */
   const go = (raw: string): boolean => {
-    const target = openCommandTarget(raw, jumps)
+    const target = openCommandTarget(raw, (q) => searchScreens(q, guide.groups, { pilot: guide.pilot, basic: guide.basic }, 3).filter((h) => !h.path.startsWith('/guide')))
     if (!target) return false
     setText('')
     navigate(target.path)

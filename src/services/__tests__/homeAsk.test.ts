@@ -13,7 +13,7 @@ import { withFactValue } from '../customerFacts'
 import { applyTalk, hasTalk, talkFound } from '../homeAsk/talkApply'
 import { buildInsights, insightChanges } from '../clientInsights'
 import { parseTurns } from '../homeAsk/homeAskStore'
-import { openCommandTarget } from '../homeAsk/homeOpen'
+import { commandSubject, openCommandTarget } from '../homeAsk/homeOpen'
 import { ASSISTS } from '../../../api/_ai/assists.js'
 import { aiFactLines, defaultDocQuestion, docCompanyOf, previewWithDocs, readFactsLines, type ChatDoc } from '../homeAsk/homeDocs'
 import { NEW_DOCS_TTL_MS, clearNewClientDocs, handNewClientDocs, peekNewClientDocs } from '../docHandoff'
@@ -131,7 +131,10 @@ check('저장된 대화(D-638): 번호 있는 30분 안 줄은 "받아 오는 �
 
 // D-638 '○○ 열어 줘' — 화면을 여는 말이면 묻지 않고 그 화면(맞는 화면이 있을 때만 · 규칙)
 const H = [{ key: 'threads', kind: 'screen' as const, label: '스레드', sublabel: '', path: '/marketing/threads' }, { key: 'fn-x', kind: 'function' as const, label: '스레드 글 점수', sublabel: '', path: '/marketing/threads' }]
-check('바로 가기(D-638): "스레드 열어 줘" · "스레드 화면" → 스레드 화면 · 물음("스레드 글 어떻게 써?") · 기능만 맞음 · 아주 긴 글은 묻기로', openCommandTarget('스레드 열어 줘', H)?.path === '/marketing/threads' && openCommandTarget('스레드 화면', H)?.label === '스레드' && openCommandTarget('스레드 글 어떻게 써?', H) === null && openCommandTarget('스레드 열어 줘', [H[1]]) === null && openCommandTarget('스레드 '.repeat(10) + '열어 줘', H) === null && openCommandTarget('열어 줘', []) === null)
+// 찾기 흉내 — 받은 말에 화면 이름이 들어 있을 때만 맞음(진짜 찾기도 '열어 줘' 가 붙으면 못 찾는다 — 그래서 떼고 찾는다)
+const asked: string[] = []
+const S = (list: typeof H) => (q: string) => (asked.push(q), list.filter((h) => q.includes(h.label) && !/열어|화면|줘/.test(q)))
+check('바로 가기(D-638): "스레드 열어 줘" · "스레드 화면" · "스레드 화면을 열어 주세요" → 스레드 화면(찾기에는 \'열어 줘\' 를 뗀 말) · 물음("스레드 글 어떻게 써?") · 기능만 맞음 · 아주 긴 글 · 빈 말은 묻기로', openCommandTarget('스레드 열어 줘', S(H))?.path === '/marketing/threads' && asked.at(-1) === '스레드' && openCommandTarget('스레드 화면', S(H))?.label === '스레드' && openCommandTarget('스레드 화면을 열어 주세요', S(H))?.label === '스레드' && asked.at(-1) === '스레드' && openCommandTarget('스레드 글 어떻게 써?', S(H)) === null && openCommandTarget('스레드 열어 줘', S([H[1]])) === null && openCommandTarget('스레드 '.repeat(10) + '열어 줘', S(H)) === null && openCommandTarget('열어 줘', S([])) === null && commandSubject('일정 열어 줘') === '일정', asked)
 
 // 8. 화면 이름표 = 서버 지시문(같은 id · page · label)
 const p = ASSIST_PRESETS.find((x) => x.id === 'home.chat')

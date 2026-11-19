@@ -618,7 +618,7 @@ check('F5 판을 닫으면 오늘 목록에 그 할 일이 바로 있음(새로�
 // F6~ 마케팅: TOP5 기획 → 담기 · 대본
 await openRadar(page)
 await openTools(page)
-await page.getByTestId('ai-assist-chip').filter({ hasText: 'TOP5' }).click()
+await page.getByTestId('ai-assist-chip').filter({ hasText: '이번 주 기획' }).click()
 await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'radar.top5', null, { timeout: 10000 })
 const plan5 = llm.at(-1)
@@ -643,7 +643,7 @@ await shot(page, 'F-make-focus')
 // 대본 끝까지 → 더 잘 쓰는 모델로 다시 → 저장
 await openRadar(page)
 await openTools(page)
-await page.getByTestId('ai-assist-chip').filter({ hasText: 'TOP5' }).click()
+await page.getByTestId('ai-assist-chip').filter({ hasText: '이번 주 기획' }).click()
 await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.waitForFunction(() => document.querySelector('[data-testid="ai-assist-result"]')?.getAttribute('data-assist') === 'radar.top5', null, { timeout: 10000 })
 await expandAll(page)
@@ -686,7 +686,7 @@ await page.waitForTimeout(800)
 await brief.scrollIntoViewIfNeeded()
 await shot(page, 'F-brief')
 await openTools(page)
-await page.getByTestId('ai-assist-chip').filter({ hasText: 'TOP5' }).click()
+await page.getByTestId('ai-assist-chip').filter({ hasText: '이번 주 기획' }).click()
 await page.getByTestId('ai-assist-confirm-go').click() // D-289 고른 뒤 [이대로 질문하기]
 await page.getByTestId('ai-assist-result').waitFor({ timeout: 10000 })
 check('F16 채널 설계 기준을 고치면 다음 기획 자료에 그대로(새로고침 없이)', llm.at(-1).user.includes('코인 · 주식 종목 추천 · 연예 이야기는 다루지 않는다'))

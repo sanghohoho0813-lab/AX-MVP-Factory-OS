@@ -31,6 +31,12 @@ got="$(echo "$vfy" | grep -cE '^[1-5]\|.*\|좋음$') $(echo "$vfy" | grep -E '^8
 if [ "$got" = "5 꺼짐 0" ]; then out="$out
 PASS  확인 SQL(0029 · 전부 넣은 DB): 1~5 '좋음' · 0028 꺼짐 · 오류 0"; else out="$out
 FAIL  확인 SQL(0029 · 전부 넣은 DB): $got (기대 5 꺼짐 0)"; fi
+# D-638 0030 점검(check_applied_0030.sql) — 전부 넣은 DB: 읽기 전용 on · '들어감'(5/5) → 되돌리기 → '꺼짐(되돌림)' → 0030 다시 → '들어감'
+c30() { su postgres -c "psql -At -F '|' -d $DB -c \"\$(cat supabase/manual/check_applied_0030.sql)\"" 2>&1 | tr '\n' ' '; }
+a=$(c30); psqlq < supabase/manual/rollback_0030.sql > /dev/null 2>&1; b=$(c30); psqlq < supabase/migrations/20261119000030_ai_assist_results.sql > /dev/null 2>&1; c=$(c30)
+if echo "$a" | grep -q '0 확인|0|읽기 전용 거래|on|on' && echo "$a" | grep -q '5/5|들어감' && echo "$b" | grep -q '꺼짐(되돌림)' && echo "$c" | grep -q '5/5|들어감'; then out="$out
+PASS  점검 SQL(0030): 읽기 전용 on · '들어감'(5/5) → 되돌리기 → '꺼짐(되돌림)' → 다시 실행 → '들어감'"; else out="$out
+FAIL  점검 SQL(0030): [$a] [$b] [$c]"; fi
 echo "$out"
 pass=$(echo "$out" | grep -c '^PASS'); bad=$(echo "$out" | grep -cE '^FAIL|ERROR')
 echo "통과 $pass · 실패 $bad"

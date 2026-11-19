@@ -1889,7 +1889,8 @@ try {
     check('고객(D-563) 설정: "모듈 첫 화면" 칸 없음', (await pk.getByTestId('settings-chatfirst').count()) === 0)
     await go(pk, '/')
     await pk.waitForTimeout(900)
-    await pk.getByTestId('home-ask').first().click().catch(() => {})
+    // D-638 오늘 대화창은 기본 크게 — 안내 글은 질문칸을 누르면 나온다(빈 곳을 누를 때가 아니라)
+    await pk.getByTestId('home-ask-input').first().click().catch(() => {})
     await pk.waitForTimeout(500)
     const guideK = (await pk.getByTestId('home-ask-guide').innerText().catch(() => '')) ?? ''
     const todayK2 = (await pk.locator('main').innerText().catch(() => '')) ?? ''
