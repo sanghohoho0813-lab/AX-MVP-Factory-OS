@@ -14,7 +14,7 @@
  * D-507 대표 "60대 이상이 처음 딱 봐도 이해하기 쉽고 계속 쓰기 쉽게"
  *  - 맨 위 한 줄 질문(이번 주 무엇을 올릴까요?) + 1 → 2 → 3(주제 누르기 → 글 · 대본이 나와요 → [복사] 해서 올리기).
  *  - 어려운 기준 줄(벤치마킹 채널 · 칩)은 [사용 방법] 안으로 — 지운 것 없음(같은 글 · 같은 시험 이름).
- *  - 지난번 하던 것이 있으면 맨 위에 [이어서 하기] 한 장 — 다음에 할 일(대본 쓰기 · 찍기 · 올리기)과 이번 달 올린 수.
+ *  - 지난번 하던 것이 있으면 [이어서 하기] 한 장 — 다음에 할 일(대본 쓰기 · 찍기 · 올리기)과 이번 달 올린 수(D-636 첫 화면 맨 아래 접힌 한 줄).
  *  - 말은 쉬운 말로(롱폼 → 긴 영상 · 고정 키워드 → 우리 본업 주제 · 이번 주 키워드 → 이번 주 뜨는 주제).
  * D-511 대표 "이번 주 무엇을 올릴까요? 안에도 글자가 너무 많다" — 첫 화면은 대화창 + 목록(MkAsk)이 되고, 이 판은 [이번 주 찍을 것] 을 눌러야 열린다.
  *  - 제목 아래 설명 줄 · 주제마다 분야 칩(경제 · 경영 등) · 묶음 이름 옆 설명 · 지난주 비교 줄은 [사용 방법] 안으로(지운 것 없음 — 같은 시험 이름).
@@ -665,32 +665,46 @@ function WeekButton({ ai, done, onOpen }: { ai: boolean; done: boolean; onOpen: 
 
 /**
  * D-507 지난번 하던 것 — 다시 왔을 때 어디서부터인지 찾지 않게(계속 쓰기 쉽게).
- * 흰 칸 + 회색 테두리(박스 색 하나) · 큰 단추 하나.
+ * D-636 대표(2026-11-18) "지난번 하던 것 같은 기록은 맨 아래에 · 그것마저도 접어 뒀다가 누르면 내용이 보이게 · PC 도 마찬가지" —
+ *   첫 화면 맨 위 큰 카드 → 살펴보기 · 만들기 목록 아래 접힌 한 줄(흰 칸 + 회색 테두리). 들어올 때마다 접힌 채.
+ *   누르면 주제 · 지금 단계 · 다음 할 일 · [이어서 하기](예전 카드와 같은 글 · 같은 길).
  */
 export function ResumeCard({ kindLabel, topic, stage, next, href, making, posted }: HomeResume) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 sm:px-4" data-testid="mk-resume">
-      <History aria-hidden="true" className="size-6 shrink-0 text-slate-500" />
-      <div className="flex min-w-0 flex-1 basis-56 flex-col gap-0.5">
-        <span className="t-meta font-semibold text-slate-600" data-testid="mk-resume-kind">
-          지난번 하던 것{kindLabel ? ` · ${kindLabel}` : ''}
-        </span>
-        <span className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="mk-resume-topic">
-          {topic}
-        </span>
-        <span className="t-sub break-keep text-slate-700">
-          지금 <b className="font-semibold text-slate-900">{stage}</b> · 다음은 <b className="font-semibold text-brand-700">{next}</b>
-          {making > 1 || posted > 0 ? (
-            <span className="text-slate-600" data-testid="mk-resume-count">
-              {' '}
-              ({[making > 1 ? `만드는 중 ${making}개` : '', posted > 0 ? `이번 달 올린 것 ${posted}개` : ''].filter(Boolean).join(' · ')})
+    <Fold
+      id="mk.home.resume"
+      panel
+      // 대표가 접어 두라고 한 줄 — [모두 펼치기] 를 해 둔 사람에게도 들어올 때마다 접힌 채(forceOpen 없음)
+      keepClosed
+      icon={<History aria-hidden="true" className="size-5 text-slate-500" />}
+      title="지난번 하던 것"
+      hint="지난번에 만들다 만 것이에요. 누르면 주제 · 지금 단계 · 다음 할 일과 [이어서 하기] 가 나와요."
+      testId="mk-resume-fold"
+    >
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pb-1" data-testid="mk-resume">
+        <div className="flex min-w-0 flex-1 basis-56 flex-col gap-0.5">
+          {kindLabel ? (
+            <span className="t-meta font-semibold text-slate-600" data-testid="mk-resume-kind">
+              {kindLabel}
             </span>
           ) : null}
-        </span>
+          <span className="t-body font-bold break-keep text-slate-900 [overflow-wrap:anywhere]" data-testid="mk-resume-topic">
+            {topic}
+          </span>
+          <span className="t-sub break-keep text-slate-700">
+            지금 <b className="font-semibold text-slate-900">{stage}</b> · 다음은 <b className="font-semibold text-brand-700">{next}</b>
+            {making > 1 || posted > 0 ? (
+              <span className="text-slate-600" data-testid="mk-resume-count">
+                {' '}
+                ({[making > 1 ? `만드는 중 ${making}개` : '', posted > 0 ? `이번 달 올린 것 ${posted}개` : ''].filter(Boolean).join(' · ')})
+              </span>
+            ) : null}
+          </span>
+        </div>
+        <Link to={href} className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-4 font-bold text-white hover:bg-brand-700" data-testid="mk-resume-go">
+          이어서 하기 <ArrowRight aria-hidden="true" className="size-4" />
+        </Link>
       </div>
-      <Link to={href} className="tap t-sub inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-(--radius-control) bg-brand-600 px-4 font-bold text-white hover:bg-brand-700" data-testid="mk-resume-go">
-        이어서 하기 <ArrowRight aria-hidden="true" className="size-4" />
-      </Link>
-    </div>
+    </Fold>
   )
 }

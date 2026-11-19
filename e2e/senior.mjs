@@ -241,7 +241,7 @@ for (const vp of [
       if (!then && !path.includes('/build')) check(`${vp.tag} ${name}: 무엇을 하는 곳인지 한 줄이 첫 화면 안`, m.guide)
     }
   }
-  // D-507 계속 쓰기 쉽게 — 주제 하나를 담으면 첫 화면 맨 위 [이어서 하기] · 묶음 끝 '다음엔 이것'
+  // D-507 계속 쓰기 쉽게 — 주제 하나를 담으면 첫 화면 [이어서 하기](D-636 맨 아래 접힌 한 줄) · 묶음 끝 '다음엔 이것'
   if (!REPORT && !ONLY) {
     await page.goto(BASE + '/marketing?view=plan', { waitUntil: 'networkidle' }).catch(() => {})
     await page.waitForTimeout(500)
@@ -261,14 +261,46 @@ for (const vp of [
     const saved = (await page.getByTestId('mk-pack-next-open').count()) === 1
     await page.getByTestId('mk-pack-next-back').click()
     await page.getByTestId('mk-home').waitFor({ timeout: 8000 })
-    // D-511 [이어서 하기] 는 첫 화면(대화창 아래 · 살펴보기 · 만들기 목록 위)
+    // D-636 대표 "지난번 하던 것 같은 기록은 맨 아래에 · 접어 뒀다가 누르면 내용이 보이게 · PC 도 마찬가지" — 살펴보기 · 만들기 목록 아래 접힌 한 줄
+    // (예전 D-511: 첫 화면 대화창 아래 · 목록 위 큰 카드)
     await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' }).catch(() => {})
+    const fold = page.getByTestId('mk-resume-fold')
+    await fold.waitFor({ timeout: 5000 }).catch(() => {})
+    const foldBox = await fold.boundingBox()
+    const tabsBox = await page.getByTestId('mk-tabs').first().boundingBox()
+    const closedFirst = (await fold.getAttribute('data-open').catch(() => '')) === '0' && (await page.getByTestId('mk-resume').count()) === 0
+    const foldLine = ((await fold.innerText().catch(() => '')) ?? '').trim()
+    const belowTabs = !!foldBox && !!tabsBox && foldBox.y >= tabsBox.y + tabsBox.height - 1
+    await fold.getByTestId('fold-toggle').click()
     await page.getByTestId('mk-resume').waitFor({ timeout: 5000 }).catch(() => {})
     const card = page.getByTestId('mk-resume')
     const cardText = (await card.innerText().catch(() => '')) ?? ''
-    const resumeTop = (await card.boundingBox())?.y ?? 9999
-    const keyTop = (await page.getByTestId('mk-tabs').first().boundingBox())?.y ?? 0
-    check(`${vp.tag} 이어서 하기 — 처음엔 없음 · 묶음 끝 [내 콘텐츠에 담기] → [이어서 하기] 단추로 바뀜 · [다른 주제 고르기] → 첫 화면 대화창 아래 '지난번 하던 것'(주제 · 다음은 찍기) · 살펴보기 · 만들기 목록보다 위`, before === 0 && nextOk && saved && cardText.includes(topic) && cardText.includes('찍기') && resumeTop < keyTop, { before, nextOk, saved, cardText: cardText.slice(0, 120), topic })
+    check(`${vp.tag} 이어서 하기 — 처음엔 없음 · 묶음 끝 [내 콘텐츠에 담기] → [이어서 하기] 단추로 바뀜 · [다른 주제 고르기] → 첫 화면 살펴보기 · 만들기 목록 아래 접힌 한 줄 '지난번 하던 것'(주제 안 보임) → 누르면 주제 · 다음은 찍기 · [이어서 하기]`, before === 0 && nextOk && saved && closedFirst && belowTabs && foldLine.startsWith('지난번 하던 것') && !foldLine.includes(topic) && cardText.includes(topic) && cardText.includes('찍기') && (await page.getByTestId('mk-resume-go').isVisible()), { before, nextOk, saved, closedFirst, belowTabs, foldLine, cardText: cardText.slice(0, 120), topic })
+    // 다시 들어오면 또 접힌 채(펼친 것을 기억하지 않는다)
+    await page.goto(BASE + '/marketing', { waitUntil: 'networkidle' }).catch(() => {})
+    await page.getByTestId('mk-resume-fold').waitFor({ timeout: 5000 }).catch(() => {})
+    check(`${vp.tag} 지난번 하던 것 — 다시 들어오면 또 접힌 채`, (await page.getByTestId('mk-resume-fold').getAttribute('data-open').catch(() => '')) === '0' && (await page.getByTestId('mk-resume').count()) === 0)
+    // D-636 대표 "PC 에서는 정사각형에 가까운 직사각형" — 첫 화면 칸(살펴보기 · 만들기)은 가로 ÷ 세로 1.1~1.6 · 아이콘 위 · 이름 아래 · 칸 크기 같음
+    //   휴대폰은 예전 모양 그대로(두 칸씩 · 낮은 칸 — 세로 72px 이하)
+    const tiles = await page.evaluate(() =>
+      ['yt-view-top', 'yt-view-make', 'yt-view-plan', 'mk-tab-threads', 'mk-tab-shorts', 'mk-tab-content', 'mk-tab-homepage'].map((id) => {
+        const el = document.querySelector(`[data-testid="mk-tabs"] [data-testid="${id}"]`)
+        if (!el) return null
+        const r = el.getBoundingClientRect()
+        const icon = el.querySelector('span[aria-hidden="true"]')?.getBoundingClientRect()
+        const label = [...el.querySelectorAll(':scope > span:not([aria-hidden])')].map((s) => s.getBoundingClientRect()).find((b) => b.width > 0)
+        return { id, w: Math.round(r.width), h: Math.round(r.height), iconAbove: !!icon && !!label && icon.bottom <= label.top + 1 }
+      }),
+    )
+    const shown = tiles.filter(Boolean)
+    if (vp.phone) {
+      check(`${vp.tag} 첫 화면 칸 — 휴대폰은 예전 모양 그대로(두 칸씩 · 세로 72px 이하 · 아이콘 위)`, shown.length === 7 && shown.every((t) => t.h <= 72 && t.iconAbove), shown)
+    } else {
+      const ws = shown.map((t) => t.w)
+      check(`${vp.tag} 첫 화면 칸 — 정사각형에 가까운 직사각형(가로 ÷ 세로 1.1~1.6 · 아이콘 위 · 이름 아래 · 일곱 칸 같은 크기)`, shown.length === 7 && shown.every((t) => t.w / t.h >= 1.1 && t.w / t.h <= 1.6 && t.iconAbove) && Math.max(...ws) - Math.min(...ws) <= 2, shown)
+    }
+    await page.getByTestId('mk-resume-fold').getByTestId('fold-toggle').click()
+    await page.getByTestId('mk-resume-go').waitFor({ timeout: 5000 }).catch(() => {})
     await page.getByTestId('mk-resume-go').click()
     await page.waitForTimeout(800)
     const u = new URL(page.url())

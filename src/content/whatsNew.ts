@@ -25,6 +25,15 @@ export const WHATS_NEW_MAX = 10
 
 export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
   {
+    id: 'mk-home-tiles',
+    date: '2026-11-18',
+    title: "마케팅 첫 화면 — '지난번 하던 것' 은 맨 아래 접힌 한 줄로 갔어요",
+    how: "살펴보기 · 만들기 칸 아래 '지난번 하던 것' 을 누르면 주제 · 다음 할 일 · [이어서 하기] 가 나와요. PC 에서도 칸이 휴대폰처럼 아이콘 위 · 이름 아래 네모 칸이에요.",
+    path: '/marketing',
+    cta: '마케팅 열기',
+    marketing: true,
+  },
+  {
     id: 'chat-bubbles',
     date: '2026-11-18',
     title: '대화창이 카카오톡처럼 바뀌었어요 — 내 말은 오른쪽, 답은 왼쪽',
@@ -91,15 +100,6 @@ export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
     how: '목록을 넣으면 이메일 · 주소 칸도 알아서 찾아 업체 기록에 넣어요.',
     path: '/ops/clients?bulk=1',
     cta: '엑셀 목록 넣어 보기',
-  },
-  {
-    id: 'profile-bio',
-    date: '2026-11-11',
-    title: '프로필 소개 글을 만들어 줘요',
-    how: '이름 · 분야 · 누구를 돕는지만 적으면 스레드 · 인스타그램 · 틱톡 · 유튜브 프로필 글이 세 가지로 나와요.',
-    path: '/marketing/basics',
-    cta: '소개 글 만들어 보기',
-    marketing: true,
   },
 ]
 

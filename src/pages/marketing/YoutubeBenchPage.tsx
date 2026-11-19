@@ -1029,12 +1029,12 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
         />
       ) : firstScreen ? (
         <>
-          {/* D-511 첫 화면 — 대화창 하나 · 지난번 하던 것 한 줄 · 살펴보기 · 만들기 목록. 키워드 판 · 자세히 보기 · 시장 신호는 [이번 주 찍을 것] 안 */}
+          {/* D-511 첫 화면 — 대화창 하나 · 살펴보기 · 만들기 목록 · (D-636 맨 아래) 지난번 하던 것 접힌 한 줄. 키워드 판 · 자세히 보기 · 시장 신호는 [이번 주 찍을 것] 안 */}
           {/* D-564 대표가 아닌 계정이 처음 왔을 때 — 내 채널(이름 · 회사 · 분야 · 올릴 주제)부터. 적으면 다시 안 보인다 */}
           {!readOnly && customer && <MkStart workspaceId={workspaceId} picked={prefs.interests ?? []} prefsReady={prefsReady} onSaveInterests={(ids) => savePrefs({ ...prefs, interests: ids })} />}
           {/* D-566 처음 시작 길 — 지금 할 한 가지(다섯 걸음) → 다 하면 오늘의 한 가지(요일마다). 대표가 아닌 계정에만 */}
           {!readOnly && customer && <MkPath workspaceId={workspaceId} ideas={notebook.ideas.length} interests={(prefs.interests ?? []).length} prefsReady={prefsReady} />}
-          {/* D-628 첫 화면 대화창(무엇을 만들까요?)은 오른쪽 판으로 — 가운데는 이어서 하기 · 살펴보기 · 만들기 목록. 처음은 [대화 시작] 카드 */}
+          {/* D-628 첫 화면 대화창(무엇을 만들까요?)은 오른쪽 판으로 — 가운데는 살펴보기 · 만들기 목록 · 지난번 하던 것(접힘). 처음은 [대화 시작] 카드 */}
           {readOnly ? null : (
             <PageChat scope="mk" auto={autoChat}>
               <ChatStartGate scope="mk" title="무엇을 만들까요?" sub="한 줄만 쓰면 글 · 대본을 만들어요">
@@ -1042,7 +1042,6 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
               </ChatStartGate>
             </PageChat>
           )}
-          {!readOnly && resume && <ResumeCard {...resume} />}
           <div role="tablist" data-testid="yt-views">
             <MarketingTabs
               active={null}
@@ -1053,6 +1052,8 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
               }}
             />
           </div>
+          {/* D-636 지난번 하던 것 — 목록 아래 접힌 한 줄(누르면 주제 · 다음 할 일 · [이어서 하기]) */}
+          {!readOnly && resume && <ResumeCard {...resume} />}
         </>
       ) : home ? (
         <>

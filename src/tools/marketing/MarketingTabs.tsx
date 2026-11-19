@@ -9,7 +9,7 @@
  * D-295 대표가 준 아이콘(마케팅 한 장 — config/iconSlots 'mk-*'): 찍을 것 = YouTube · 스레드 = Threads · 릴스 · 틱톡 = Reels · TikTok ·
  *   블로그 · 플레이스 = 블로그 실제 로고, 나머지(인기 · 채널 · 분석 · 내 콘텐츠 · 홈페이지)는 입체 아이콘. 여러 색 그림이라 흰 칸 위에 그린다.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AtSign, BarChart3, ChevronDown, ChevronUp, Clapperboard, Film, Flame, Globe, Home, NotebookPen, PenLine, Tv, type LucideIcon } from 'lucide-react'
 import { useIsPilot } from '../../auth/osAccess'
@@ -62,135 +62,104 @@ const TOOLS: Array<Item & { to: string; on: string }> = [
 ]
 
 /*
- * D-478 대표 "마케팅 · 브랜딩 — 돈 받고 팔아도 될 만큼" — 휴대폰에서 목차가 첫 화면의 절반(약 250px · 아이콘 위 · 글자 아래 두 줄 9칸)을 먹었다.
- *  - 휴대폰(sm 아래): 한 줄 가로 넘김 띠(칸마다 아이콘 + 짧은 이름 · 지금 화면은 파란 테두리 · 처음 열 때 지금 칸이 보이게 띠를 옮긴다).
- *    두 묶음(콘텐츠 레이더 · 만들기)은 띠 안 작은 이름표로 — 묶음 칸은 display: contents 로 풀어 한 줄에 둔다(같은 단추 하나 — 시험 이름 · 순서 그대로).
- *  - PC(sm 이상): 예전 두 줄 그대로(위 레이더 · 아래 만들기 칸 — D-282 · D-354).
+ * 첫 화면(/marketing) 큰 목록 — 살펴보기 · 만들기 두 묶음.
+ *  - D-478 · D-511 휴대폰: 묶음 이름 한 줄 + 두 칸씩(아이콘 위 · 짧은 이름 아래) — 옆으로 밀어 찾지 않는다.
+ *  - D-636 대표(2026-11-18) "휴대폰에서는 유튜브 · 스레드 박스 모양이 괜찮은데 PC 에서는 정사각형에 가까운 직사각형이었으면" —
+ *    PC 도 휴대폰과 같은 모양(아이콘 위 · 이름 아래)으로, 4:3 칸에. 예전 PC 는 넓고 납작한 가로 띠(살펴보기 한 판 · 만들기 3칸)였다.
+ *    · 칸 폭은 9.5rem 안팎 — 넓은 화면에서 띠처럼 늘어나지 않게 칸 수를 늘린다(남는 자리는 비워 둔다).
+ *    · 두 묶음이 같은 칸 폭을 쓴다(위아래 칸이 줄 맞춤). 묶음 이름은 칸 위 한 줄(휴대폰과 같게).
+ *  - 칸 순서 · 시험 이름(yt-view-* · mk-tab-*) · 주소 · 안내 열쇠(data-guide)는 그대로.
+ * D-627 칸 아래 작은 설명(sub)은 화면에 늘 깔지 않는다 — 그 칸이 무엇인지는 마우스를 올리면 뜨는 메뉴 안내 카드(data-guide)가 말한다.
  */
-const cls = (on: boolean) =>
-  `tap t-sub inline-flex min-h-11 shrink-0 snap-start flex-col items-center justify-center gap-0.5 rounded-[10px] border px-2.5 py-1 text-center leading-tight font-semibold whitespace-nowrap sm:min-w-max sm:flex-auto sm:flex-row sm:gap-1.5 sm:rounded-[8px] sm:border-transparent sm:px-3 sm:py-2 ${on ? 'border-brand-500 bg-white text-brand-700 ring-2 ring-brand-100 sm:bg-brand-50 sm:ring-1 sm:ring-brand-200' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`
+/** D-511 휴대폰 — 두 칸씩 다 보이게 */
+const HOME_CELL = 'max-sm:grow max-sm:basis-[calc((100%-0.375rem)/2)]'
+const HOME_GRID = 'max-sm:contents sm:grid sm:w-full sm:min-w-0 sm:grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] sm:gap-2.5'
+const homeCls = (on: boolean) =>
+  `tap t-sub flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-[10px] border px-2.5 py-1 text-center leading-tight font-semibold whitespace-nowrap ${HOME_CELL} sm:aspect-[4/3] sm:gap-2.5 sm:rounded-xl sm:px-3 sm:py-3 sm:whitespace-normal sm:break-keep ${on ? 'border-brand-500 bg-white text-slate-900 ring-2 ring-brand-100' : 'border-slate-200 bg-white text-slate-700 hover:border-brand-300 hover:bg-slate-50'}`
 
-/** D-282 만들기 칸 — 흰 칸 + 형식 색 아이콘. 지금 화면이면 테두리 강조 */
-const makeCls = (on: boolean) =>
-  `tap t-sub flex min-h-11 shrink-0 snap-start flex-col items-center justify-center gap-0.5 rounded-[10px] border px-2.5 py-1 leading-tight font-semibold whitespace-nowrap sm:min-h-12 sm:min-w-0 sm:shrink sm:flex-row sm:justify-start sm:gap-2 sm:rounded-(--radius-control) sm:px-2.5 sm:py-1.5 sm:whitespace-normal sm:break-keep ${on ? 'border-brand-500 bg-white text-slate-900 ring-2 ring-brand-100' : 'border-slate-200 bg-white text-slate-700 hover:border-brand-200'}`
-
-/** 휴대폰 띠 안 묶음 이름표 · PC 왼쪽 이름 칸 · D-511 첫 화면(home)은 휴대폰에서 한 줄 머리 */
-function GroupLabel({ long, short, home }: { long: string; short: string; home?: boolean }) {
-  return (
-    <span className={`t-meta flex shrink-0 items-center font-semibold whitespace-nowrap text-slate-500 sm:w-[6.5rem] ${home ? 'max-sm:basis-full max-sm:pt-1 max-sm:text-[0.9375rem] max-sm:text-slate-700' : 'max-sm:snap-start max-sm:px-1 max-sm:text-[0.6875rem]'}`}>
-      <span className="sm:hidden">{short}</span>
-      <span className="max-sm:hidden">{long}</span>
-    </span>
-  )
+/** 묶음 이름 — 휴대폰 · PC 모두 칸 위 한 줄 */
+function GroupLabel({ children }: { children: string }) {
+  return <span className="t-meta flex shrink-0 items-center text-[0.9375rem] font-semibold whitespace-nowrap text-slate-700 max-sm:basis-full max-sm:pt-1">{children}</span>
 }
 
-/*
- * D-627 대표 "목차를 눌러 들어갔을 때 한 화면 글자 수를 엄격하게" — 칸 아래 작은 설명(sub)은 화면에 늘 깔지 않는다.
- * 그 칸이 무엇인지는 마우스를 올리면 뜨는 메뉴 안내 카드(data-guide — 무엇 · 왜 · 효과 · 앞으로)가 말한다.
+/**
+ * 칸 안 — 여러 색 아이콘(D-295 · 흰 칸 위 · 칸을 넘지 않게 그대로 크기) + 이름.
+ * 휴대폰은 작은 아이콘 + 짧은 이름 · PC 는 큰 아이콘 위 + 이름 아래(살펴보기 칸은 긴 이름 '남의 인기 영상').
  */
-
-function Label({ it }: { it: Item }) {
+function HomeTileLabel({ it, long = false }: { it: Item; long?: boolean }) {
   const Icon = it.icon
   return (
     <>
-      {/* D-295 여러 색 아이콘 — 빨간 칸(지금 화면)에서도 보이게 흰 칸 위에 · 칸을 넘지 않게 그대로 크기(--icon-art-scale 1) */}
-      <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-md bg-white [--icon-art-scale:1] sm:size-7">
-        <Icon aria-hidden="true" className="size-5 shrink-0 sm:size-6" />
+      <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-md bg-white [--icon-art-scale:1] sm:size-12 sm:rounded-xl">
+        <Icon aria-hidden="true" className="size-5 shrink-0 sm:size-11" />
       </span>
-      <span className="lg:hidden">{it.short}</span>
-      <span className="hidden lg:inline">{it.label}</span>
-    </>
-  )
-}
-
-/** 만들기 칸 안 — 형식 색 아이콘 + 짧은 이름(D-627 설명은 title) */
-function MakeLabel({ it }: { it: Item }) {
-  return (
-    <>
-      <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-white [--icon-art-scale:1] sm:size-9">
-        <it.icon className="size-5 sm:size-8" />
-      </span>
-      <span className="min-w-0 truncate text-center sm:text-left">{it.short}</span>
+      {long ? (
+        <>
+          <span className="sm:hidden">{it.short}</span>
+          <span className="max-sm:hidden">{it.label}</span>
+        </>
+      ) : (
+        <span className="min-w-0 max-sm:truncate">{it.short}</span>
+      )}
     </>
   )
 }
 
 /** onRadar 가 있으면(레이더 화면) 레이더 칸은 그 자리에서 바꾼다 — 예전 시험 이름(yt-view-*) 그대로 */
-/** D-511 첫 화면 목록 — 휴대폰에서 띠(옆으로 넘김) 대신 두 칸씩 다 보이게 */
-const HOME_CELL = 'max-sm:grow max-sm:basis-[calc((100%-0.375rem)/2)]'
-
 export function MarketingTabs({ active, onRadar, home = false }: { active: MarketingTab | null; onRadar?: (v: RadarView) => void; home?: boolean }) {
-  // MK-SIMPLE(D-553) 첫 화면(살펴보기 · 만들기 목록)만 예전 큰 목록 — 나머지 화면은 얇은 한 줄(PC) · '다른 화면' 판(휴대폰)
-  return home ? <BigTabs active={active} onRadar={onRadar} home /> : <SlimTabs active={active} onRadar={onRadar} />
+  // MK-SIMPLE(D-553) 첫 화면(살펴보기 · 만들기 목록)만 큰 목록 — 나머지 화면은 얇은 한 줄(PC) · '다른 화면' 판(휴대폰)
+  return home ? <HomeTabs active={active} onRadar={onRadar} /> : <SlimTabs active={active} onRadar={onRadar} />
 }
 
-function BigTabs({ active, onRadar, home = false }: { active: MarketingTab | null; onRadar?: (v: RadarView) => void; home?: boolean }) {
+function HomeTabs({ active, onRadar }: { active: MarketingTab | null; onRadar?: (v: RadarView) => void }) {
   const pilot = useIsPilot()
   // SAAS-2 서버가 마케팅을 연 고객 계정 — 레이더 · 스레드 · 릴스/틱톡까지(홍보 글 · 홈페이지는 1차 상품 정리 전까지 닫힘)
   const open = usePilotMarketingScreens()
-  const strip = useRef<HTMLDivElement>(null)
-  // D-478 휴대폰 띠 — 처음 열 때 지금 칸이 화면 안에 오게(띠만 옮긴다 · 화면은 그대로)
-  useEffect(() => {
-    const el = strip.current
-    if (!el || el.scrollWidth <= el.clientWidth + 1) return
-    const on = el.querySelector<HTMLElement>('[aria-selected="true"], [aria-current="page"]')
-    if (!on) return
-    const left = on.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft
-    el.scrollLeft = Math.max(0, left - (el.clientWidth - on.offsetWidth) / 2)
-  }, [active])
   // 도구 화면에서 마케팅이 닫힌 팀장(Pilot)에게는 그리지 않는다
   if (pilot && !open && !onRadar) return null
   const tools = pilot ? TOOLS.filter((t) => t.key === 'threads' || t.key === 'shorts') : TOOLS
   const showTools = !pilot || open
   // D-560 유튜브(plan)는 만들기 줄 맨 앞 — 만들기 줄이 없는 화면(마케팅이 닫힌 팀장)은 살펴보기 줄에
   const lookItems = showTools ? LOOK_ITEMS : [PLAN_ITEM, ...LOOK_ITEMS]
-  /*
-   * D-282 두 줄 — 위: 콘텐츠 레이더 보기(그 자리에서 바뀜) · 아래: 만들기(형식마다 색 아이콘 칸). 예전 한 줄은 넓은 화면에서도 두 줄로 어색하게 접혔다.
-   * 칸 순서 · 시험 이름 · 주소는 그대로(찍을 것 · 인기 · 채널 · 분석 · 내 콘텐츠 → 스레드 · 릴스 · 틱톡 · 홍보 글 · 홈페이지).
-   */
   return (
     <nav aria-label="마케팅 · 브랜딩 목차" data-testid="mk-tabs">
-      <div ref={strip} data-testid="mk-tabs-strip" data-home={home ? '1' : undefined} className={`flex gap-1.5 sm:flex-col sm:gap-2 ${home ? 'max-sm:flex-wrap' : 'max-sm:snap-x max-sm:overflow-x-auto max-sm:pb-1 max-sm:[scrollbar-width:none]'}`}>
-        <div className="max-sm:contents sm:flex sm:flex-row sm:items-center sm:gap-2">
+      <div data-testid="mk-tabs-strip" data-home="1" className="flex gap-1.5 max-sm:flex-wrap sm:flex-col sm:gap-5">
+        <div className="max-sm:contents sm:flex sm:flex-col sm:gap-2">
           {/* D-507 '콘텐츠 레이더' → 쉬운 말 '살펴보기'(남의 인기 영상을 보고 고른다) */}
-          <GroupLabel long="살펴보기" short="살펴보기" home={home} />
-          <div className="max-sm:contents sm:flex sm:min-w-0 sm:flex-1 sm:flex-wrap sm:gap-1 sm:rounded-(--radius-control) sm:border sm:border-slate-200 sm:bg-white sm:p-1">
+          <GroupLabel>살펴보기</GroupLabel>
+          <div className={HOME_GRID}>
             {lookItems.map((it) =>
               onRadar ? (
-                <button key={it.key} type="button" role="tab" aria-selected={isOn(it.key, active)} data-testid={`yt-view-${it.key}`} data-guide={MARKETING_GUIDE_KEYS[it.key]} onClick={() => onRadar(it.key as RadarView)} className={`${cls(isOn(it.key, active))} ${home ? HOME_CELL : ''}`}>
-                  <Label it={it} />
+                <button key={it.key} type="button" role="tab" aria-selected={isOn(it.key, active)} data-testid={`yt-view-${it.key}`} data-guide={MARKETING_GUIDE_KEYS[it.key]} onClick={() => onRadar(it.key as RadarView)} className={homeCls(isOn(it.key, active))}>
+                  <HomeTileLabel it={it} long />
                 </button>
               ) : (
-                <Link key={it.key} to={`/marketing?view=${it.key}`} className={`${cls(false)} ${home ? HOME_CELL : ''}`} data-testid={`mk-tab-${it.key}`} data-guide={MARKETING_GUIDE_KEYS[it.key]}>
-                  <Label it={it} />
+                <Link key={it.key} to={`/marketing?view=${it.key}`} className={homeCls(false)} data-testid={`mk-tab-${it.key}`} data-guide={MARKETING_GUIDE_KEYS[it.key]}>
+                  <HomeTileLabel it={it} long />
                 </Link>
               ),
             )}
           </div>
         </div>
         {showTools && (
-          <div className="max-sm:contents sm:flex sm:flex-row sm:items-center sm:gap-2">
-            {!home && <span aria-hidden="true" className="w-px shrink-0 self-stretch bg-slate-200 sm:hidden" />}
-            <GroupLabel long="만들기" short="만들기" home={home} />
-            {/* D-354 넓은 화면 4칸은 칸이 좁아 이름 · 설명이 서너 줄로 접혔다 — 칸 폭(@container)이 넉넉할 때만 4칸, 아니면 2칸에 한 줄씩 */}
-            <div className="max-sm:contents sm:@container sm:min-w-0 sm:flex-1">
-              <div className={`max-sm:contents sm:grid sm:min-w-0 sm:gap-1.5 ${tools.length < TOOLS.length ? 'sm:grid-cols-3' : 'sm:grid-cols-3 sm:@[70rem]:grid-cols-5'}`}>
-                {/* D-560 유튜브(이번 주 주제 → 긴 영상 대본) — 스레드 옆, 레이더 화면에서는 그 자리에서 바뀐다(yt-view-plan) */}
-                {onRadar ? (
-                  <button type="button" role="tab" aria-selected={active === 'plan'} onClick={() => onRadar('plan')} className={`${makeCls(active === 'plan')} ${home ? HOME_CELL : ''}`} data-testid="yt-view-plan" data-guide="mk-plan">
-                    <MakeLabel it={PLAN_ITEM} />
-                  </button>
-                ) : (
-                  <Link to="/marketing?view=plan" className={`${makeCls(false)} ${home ? HOME_CELL : ''}`} data-testid="mk-tab-plan" data-guide="mk-plan">
-                    <MakeLabel it={PLAN_ITEM} />
-                  </Link>
-                )}
-                {tools.map((it) => (
-                  <Link key={it.key} to={it.to} aria-current={active === it.key ? 'page' : undefined} className={`${makeCls(active === it.key)} ${home ? HOME_CELL : ''}`} data-testid={`mk-tab-${it.key}`} data-guide={MARKETING_GUIDE_KEYS[it.key]}>
-                    <MakeLabel it={it} />
-                  </Link>
-                ))}
-              </div>
+          <div className="max-sm:contents sm:flex sm:flex-col sm:gap-2">
+            <GroupLabel>만들기</GroupLabel>
+            <div className={HOME_GRID}>
+              {/* D-560 유튜브(이번 주 주제 → 긴 영상 대본) — 스레드 옆, 레이더 화면에서는 그 자리에서 바뀐다(yt-view-plan) */}
+              {onRadar ? (
+                <button type="button" role="tab" aria-selected={active === 'plan'} onClick={() => onRadar('plan')} className={homeCls(active === 'plan')} data-testid="yt-view-plan" data-guide="mk-plan">
+                  <HomeTileLabel it={PLAN_ITEM} />
+                </button>
+              ) : (
+                <Link to="/marketing?view=plan" className={homeCls(false)} data-testid="mk-tab-plan" data-guide="mk-plan">
+                  <HomeTileLabel it={PLAN_ITEM} />
+                </Link>
+              )}
+              {tools.map((it) => (
+                <Link key={it.key} to={it.to} aria-current={active === it.key ? 'page' : undefined} className={homeCls(active === it.key)} data-testid={`mk-tab-${it.key}`} data-guide={MARKETING_GUIDE_KEYS[it.key]}>
+                  <HomeTileLabel it={it} />
+                </Link>
+              ))}
             </div>
           </div>
         )}

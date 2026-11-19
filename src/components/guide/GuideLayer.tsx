@@ -163,8 +163,23 @@ export function GuideLayer() {
       left = r.right + 10
       top = r.top - 6
     } else {
-      left = r.left
-      top = vh - r.bottom >= h + 16 || r.top < h + 16 ? r.bottom + 8 : r.top - h - 8
+      const fitsBelow = vh - r.bottom >= h + 16
+      const fitsAbove = r.top >= h + 16
+      if (fitsBelow || fitsAbove) {
+        left = r.left
+        top = fitsBelow ? r.bottom + 8 : r.top - h - 8
+      } else if (vw - r.right >= CARD_W + 20) {
+        // D-636 위아래 어디에도 다 들어가지 않으면(키 큰 칸 — 마케팅 첫 화면 4:3 칸 · 낮은 창) 옆에 —
+        // 예전처럼 아래로 두고 화면 안으로 끌어올리면 마우스를 올린 그 칸을 통째로 덮었다
+        left = r.right + 10
+        top = r.top - 6
+      } else if (r.left >= CARD_W + 20) {
+        left = r.left - CARD_W - 10
+        top = r.top - 6
+      } else {
+        left = r.left
+        top = r.bottom + 8
+      }
     }
     left = Math.max(8, Math.min(left, vw - CARD_W - 8))
     top = Math.max(8, Math.min(top, vh - h - 8))
