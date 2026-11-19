@@ -954,3 +954,15 @@ header[data-fit='5'] .hdr-tight {
 
 /* 큰 숫자 칸(D-166) — 360px 휴대폰에서 '3억 2,997만원' 이 칸을 넘으면 '억' 뒤에서 한 번 접는다(단위는 안 쪼갠다) */
 @media (max-width: 639px) { .t-num.t-num-wrap { white-space: normal; word-break: keep-all; } }
+
+/*
+ * D-638 대화창 글자 크기(대표 2026-11-19 "−/+ 다섯 단계") — 대화창 감싸개(오른쪽 판 · 휴대폰 아래 판 · 오늘 대화창 · 기획 대화)만.
+ * 값은 lib/chatSize 가 :root 의 --chat-zoom 에 둔다(85 · 92 · 100 · 110 · 120%). 화면 전체 글자 크기(설정 › 보기)와는 따로.
+ */
+.chat-zoom {
+  zoom: var(--chat-zoom, 1);
+}
+/* 겹쳐 그려지는 대화창(오른쪽 판 안의 화면 대화창 등)은 한 번만 — 85% × 85% 처럼 곱해지지 않게 */
+.chat-zoom .chat-zoom {
+  zoom: 1;
+}

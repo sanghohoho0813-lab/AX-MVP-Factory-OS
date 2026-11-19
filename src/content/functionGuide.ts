@@ -544,7 +544,7 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
   'fn-mk-look': {
     label: '인기 영상 · 참고 채널 · 올리는 때',
     menu: 'mk-top',
-    what: '남의 잘된 영상 · 눈여겨볼 채널 · 잘되는 요일과 길이를 하나씩 바꿔 가며 봐요.',
+    what: '지금 뜨는 영상 · 눈여겨볼 채널 · 잘되는 요일과 길이를 하나씩 바꿔 가며 봐요.',
     why: '한 화면에 다 늘어놓으면 복잡해서, 한 번에 한 가지만 보게 나눴어요.',
     effect: '보고 싶은 것 하나만 화면에 남아요. 마음에 드는 영상은 내 주제로 담을 수 있어요.',
     next: '내 분야와 가까운 채널을 먼저 권해 줘요.',

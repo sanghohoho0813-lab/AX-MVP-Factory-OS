@@ -20,6 +20,7 @@ import { assistOn, useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { callAssist } from '../../services/aiAssist/client'
 import { readChoice } from '../../services/aiAssist/store'
 import { ModelPicker } from '../ai/ModelPicker'
+import { ChatTextSize } from './ChatTextSize'
 import type { AssistPage } from '../../services/aiAssist/presets'
 import type { AssistContext } from '../../services/aiAssist/context'
 import { copyText } from '../../services/grants/grantView'
@@ -27,8 +28,8 @@ import { toneClass, type FeatureTone } from '../../config/featureVisual'
 import type { HeroArt } from '../../config/heroArt'
 import { PageHero } from '../ui/pageFrame'
 import { ChatStartCard, PageChat } from './PageChat'
-import { BotRow, MeBubble, TypingBubble } from './bubbles'
-import { chatTime } from '../../lib/chatTime'
+import { BotRow, ChatNotice, MeBubble, TypingBubble } from './bubbles'
+import { chatDayKey, chatDayLine, chatTime } from '../../lib/chatTime'
 import { startPageChat, usePageChat } from '../../lib/pageChat'
 import { HISTORY_MAX, answerFromAi, answerText, historyKey, parseHistory, type ChatActKind, type ChatAnswer, type ChatGuideStep, type ChatModule, type ChatStarter, type ChatTurn } from '../../services/workChat/chatTypes'
 import { AiConfirm } from '../ai/AiConfirm'
@@ -385,6 +386,8 @@ export function WorkChat(p: WorkChatProps) {
         </p>
         {/* D-255 대화창도 고른 모델로(전에는 늘 기본 모델) — 여기서 바꿔도 모든 AI 단추가 같이 */}
         {aiReady && <ModelPicker popover testId="chat-model" />}
+        {/* D-638 대화 글자 크기 — 모델 고르기 옆 */}
+        <ChatTextSize testId="chat-size" />
       </div>
     </div>
   )
@@ -480,9 +483,11 @@ export function WorkChat(p: WorkChatProps) {
     </section>
   ) : null
   const turnsList = !empty && (
-    <ol className="flex flex-col gap-4" data-testid="chat-turns" aria-live="polite">
-      {turns.map((t) => (
+    <ol className="chat-zoom flex flex-col gap-4" data-testid="chat-turns" aria-live="polite">
+      {turns.map((t, i) => (
         <li key={t.id} ref={t.id === lastId ? endRef : undefined} className="flex scroll-mt-2 flex-col gap-2" data-testid="chat-turn" data-status={t.status}>
+          {/* D-638 날짜 줄 — 앞 대화와 날이 다를 때(첫 대화는 오늘이 아닐 때) */}
+          {t.at && chatDayKey(t.at) !== (i > 0 ? chatDayKey(turns[i - 1].at) : chatDayKey(new Date())) && <ChatNotice testId="chat-day">{chatDayLine(t.at)}</ChatNotice>}
           {/* D-634 카카오톡처럼 — 내 말은 오른쪽 말풍선 · 답은 왼쪽 프로필 아래 말풍선 */}
           <MeBubble testId="chat-q" time={chatTime(t.at)}>
             {t.q}

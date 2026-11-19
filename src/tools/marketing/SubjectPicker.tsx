@@ -20,6 +20,7 @@ import { useToast } from '../../components/ui/toastContext'
 import { HelpHeading } from '../../components/ui/fold'
 import { inputClass } from '../homepage/BlockFields'
 import { josa } from '../../lib/josa'
+import { isMarketingCustomer } from '../../services/marketing/persona'
 import { TrialForm } from './TrialForm'
 import { TONE } from './mkTheme'
 import { useTrials } from './trialStore'
@@ -74,6 +75,8 @@ export function SubjectPicker({
   headIcon?: ReactNode
 }) {
   const t = TONE[tone]
+  // D-638 '미래AI랩으로 만들기' 자리는 대표 계정만(팀장 · 구독 고객 화면에는 대표 회사 이름을 띄우지 않는다)
+  const ownSlot = !isMarketingCustomer()
   const { loadClients, workspaceId } = useToolClient()
   const trialsStore = useTrials(workspaceId)
   const navigate = useNavigate()
@@ -206,7 +209,7 @@ export function SubjectPicker({
           type="button"
           onClick={() => setTrialOpen((v) => !v)}
           aria-expanded={trialOpen}
-          title="미래AI랩 · 가상 업체 · 컨설턴트로 먼저 만들어 보고, 마음에 들면 임시등록하세요."
+          title={`${ownSlot ? '미래AI랩 · ' : ''}가상 업체 · 컨설턴트로 먼저 만들어 보고, 마음에 들면 임시등록하세요.`}
           className={`tap t-sub inline-flex min-h-11 items-center gap-1.5 self-start rounded-(--radius-control) px-1 font-semibold break-keep ${t.deep} hover:bg-slate-50`}
           data-testid="trial-start-open"
         >
@@ -215,13 +218,13 @@ export function SubjectPicker({
           <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${trialOpen ? 'rotate-180' : ''}`} />
         </button>
         {trialOpen && (
-        <p className={`t-sub break-keep ${t.deep}`}>미래AI랩 · 가상 업체 · 컨설턴트로 먼저 만들어 보고, 마음에 들면 임시등록하세요.</p>
+        <p className={`t-sub break-keep ${t.deep}`}>{ownSlot ? '미래AI랩 · ' : ''}가상 업체 · 컨설턴트로 먼저 만들어 보고, 마음에 들면 임시등록하세요.</p>
         )}
         <div className={`flex flex-wrap gap-2 ${trialOpen ? '' : 'hidden'}`}>
-          {/* D-239 대표 "미래AI랩으로 만들기도 있었으면 — 기록이 다 쌓이게" */}
-          <button type="button" onClick={() => void openMirae()} disabled={saving || trialsStore.status === 'loading'} className={`tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-transparent px-3 font-semibold shadow-sm disabled:opacity-60 ${t.solid}`} data-testid="trial-mirae">
+          {/* D-239 대표 "미래AI랩으로 만들기도 있었으면 — 기록이 다 쌓이게" · D-638 대표 계정에서만(팀장 · 고객 화면에 대표 회사 이름 0) */}
+          {ownSlot && <button type="button" onClick={() => void openMirae()} disabled={saving || trialsStore.status === 'loading'} className={`tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-transparent px-3 font-semibold shadow-sm disabled:opacity-60 ${t.solid}`} data-testid="trial-mirae">
             <Building className="size-4" aria-hidden="true" /> 미래AI랩으로 만들기
-          </button>
+          </button>}
           <button type="button" onClick={() => openForm('company')} className={`tap t-sub inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border bg-white px-3 font-semibold ${t.line} ${t.deep} ${t.hover}`} data-testid="trial-new-company">
             <Plus className="size-4" aria-hidden="true" /> 가상 업체로 만들기
           </button>

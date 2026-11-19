@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import handler, { MARKETING_PAGES, __resetAiAssistState } from '../../../api/ai-assist.js'
 import { ASSISTS, assistSystem } from '../../../api/_ai/assists.js'
 import { OWNER_IDENTITY_WORDS, cleanBrand, customerize } from '../../../api/_ai/brand.js'
-import { OWNER_FACT_MARKERS, customerOutput, customerPack, stripOwnerContext } from '../../../api/_ai/customerMarketing.js'
+import { OWNER_FACT_MARKERS, customerLabel, customerOutput, customerPack, stripOwnerContext } from '../../../api/_ai/customerMarketing.js'
 import { MK_KNOWLEDGE } from '../../../api/_ai/mkKnowledge.js'
 import { usageUnits } from '../../../api/_ai/usage.js'
 import { __setBrandForTest, normalizeBrand } from '../brandProfile'
@@ -25,7 +25,7 @@ import { adaptContext } from '../marketing/videoStudy'
 import { KIM_FACTS, ourFactsList, unknownNumbers } from '../marketing/snsRules'
 import { DEFAULT_BRIEF, defaultBrief } from '../marketing/radarStore'
 import { withoutOwnerChannel, type YtFeed } from '../marketing/ytBench'
-import { presetOf } from '../aiAssist/presets'
+import { ASSIST_PRESETS, customerLabelText, presetOf } from '../aiAssist/presets'
 import { isCustomerMarketingPath, pilotMarketingScreens, pilotMarketingState, setPilotMarketing, setPilotMarketingScreens } from '../../config/pilotMarketing'
 import { enabledModulesByGroup, isPilotHiddenPath } from '../../config/moduleRegistry'
 import type { RadarVideo } from '../marketing/ytRadar'
@@ -487,7 +487,24 @@ async function run() {
   check('C2 고객 묶음에 카드뉴스 칸 없음 · 규칙집에 카드뉴스 · 김팀장 끝인사 없음(대표 규칙집은 그대로)', !!pack && !pack.sections.some((x) => x.id === 'cards') && !packRules().join('\n').includes('카드뉴스') && !packRules().join('\n').includes('김팀장') && PACK_RULES.join('\n').includes('카드뉴스'))
   check('C3 고객 기본 채널 기준 = 그 사람 브랜드(김팀장의 경영노트 아님)', defaultBrief().channel.includes('은혜경영') && defaultBrief().ending === BRAND.ending && customerBrief().host.startsWith('최은혜') && !JSON.stringify(defaultBrief()).includes('경영노트'))
   check('C4 고객 사실 목록 = 그 사람 "확인된 사실" 칸 · 숫자 대조도 그 목록으로(대표 숫자 9년은 모르는 숫자)', ourFactsList().join('|') === '경력 5년|상담 80곳' && unknownNumbers('경력 5년 · 9년', '').join() === '9년')
-  check('C5 고객 단추 이름 — "미래AI랩 맞춤" → "내 채널 맞춤" · 카드뉴스 없음', presetOf('radar.top5')?.label === '내 채널 맞춤 이번 주 TOP5 기획' && !(presetOf('bench.copy')?.label ?? '').includes('미래AI랩'), presetOf('radar.top5')?.label)
+  // D-638 대표(2026-11-19) "다른 팀장 · 고객이 쓸 때는 미래AI랩 얘기가 없어야 — 그 회사명으로 'OO가 따라 할 틀'"
+  check('C5 고객 단추 이름 — 그 사람 회사 이름으로(은혜경영 맞춤 이번 주 기획 · 은혜경영이 따라 할 틀 · 은혜경영이 참고할 것) · 고정 개수(TOP5 · 3개 · 5) 없음 · 카드뉴스 없음',
+    presetOf('radar.top5')?.label === '은혜경영 맞춤 이번 주 기획' && presetOf('bench.copy')?.label === '은혜경영이 따라 할 틀' && presetOf('rising.ref')?.label === '인기 급상승 — 은혜경영이 참고할 것' && presetOf('rising.shorts')?.label === '급상승 키워드로 쇼츠 아이디어' &&
+      ASSIST_PRESETS.filter((p) => ['radar', 'content', 'threads', 'shorts'].includes(p.page)).every((p) => !/미래AI랩|MIRAE/.test(presetOf(p.id)?.label ?? '') && !/미래AI랩|MIRAE/.test(presetOf(p.id)?.hint ?? '')),
+    [presetOf('radar.top5')?.label, presetOf('bench.copy')?.label, presetOf('rising.ref')?.label])
+  const LABELS = ['미래AI랩 맞춤 이번 주 기획', '미래AI랩이 따라 할 틀', '인기 급상승 — 미래AI랩이 참고할 것']
+  const cases: [Record<string, string> | null, string[]][] = [
+    [{ company: '은혜경영' }, ['은혜경영 맞춤 이번 주 기획', '은혜경영이 따라 할 틀', '인기 급상승 — 은혜경영이 참고할 것']],
+    [{ name: '박하나' }, ['박하나 맞춤 이번 주 기획', '박하나가 따라 할 틀', '인기 급상승 — 박하나가 참고할 것']],
+    [{ company: 'IBM' }, ['IBM 맞춤 이번 주 기획', 'IBM이 따라 할 틀', '인기 급상승 — IBM이 참고할 것']],
+    [{ company: '컨설팅 2' }, ['컨설팅 2 맞춤 이번 주 기획', '컨설팅 2가 따라 할 틀', '인기 급상승 — 컨설팅 2가 참고할 것']],
+    [null, ['내 채널 맞춤 이번 주 기획', '내가 따라 할 틀', '인기 급상승 — 내가 참고할 것']],
+  ]
+  check('C5b 받침 따라 이/가 · 이름 없으면 "내 채널 · 내가" — 화면(customerLabelText)과 서버(customerLabel)가 같은 글',
+    cases.every(([b, want]) => LABELS.every((l, i) => customerLabel(l, b) === want[i] && customerLabelText(l, String(b?.company || b?.name || '')) === want[i])),
+    cases.map(([b]) => LABELS.map((l) => customerLabel(l, b))))
+  const longName = customerLabel('미래AI랩 맞춤 이번 주 기획', { company: '아주아주긴이름의경영컨설팅주식회사입니다' })
+  check('C5c 긴 회사 이름은 14자에서 줄임(단추가 넘치지 않게)', longName.startsWith('아주아주긴이름의경영컨설팅…') && longName.length < 30, longName)
   const talk = SHORT_FORMATS.find((f) => f.key === 'talk')
   check('C6 숏폼 대화형 예시로 시작 — "김팀장:" 줄이 그 사람 이름으로', !!talk && !exampleOf(talk, 'tiktok').script.includes('김팀장') && exampleOf(talk, 'tiktok').script.includes('최은혜:'))
   check('C7 화면 글 — MIRAE 관점 · 김팀장 → 우리 · 그 사람', mkText('MIRAE 가 미리 골라 둔 채널') === '내가 미리 골라 둔 채널' && !mkText('MIRAE AX형').includes('MIRAE'))
@@ -497,7 +514,7 @@ async function run() {
 
   __setMarketingCustomerForTest(false)
   const ownerRb = JSON.stringify(radarBundle({ today, view: 'plan', plan: null, rising: [], breakouts: [], videos: [], ideas: [], mine: [], brief: null }).context)
-  check('C9 대표 계정 화면 자료 · 기본값은 그대로(미래AI랩 소개 · 김팀장의 경영노트 · 사실 목록 · 단추 이름)', ownerRb.includes('미래AI랩') && defaultBrief() === DEFAULT_BRIEF && ourFactsList() === KIM_FACTS && presetOf('radar.top5')?.label === '미래AI랩 맞춤 이번 주 TOP5 기획' && mkText('MIRAE 관점') === 'MIRAE 관점')
+  check('C9 대표 계정 화면 자료 · 기본값은 그대로(미래AI랩 소개 · 김팀장의 경영노트 · 사실 목록 · 단추 이름)', ownerRb.includes('미래AI랩') && defaultBrief() === DEFAULT_BRIEF && ourFactsList() === KIM_FACTS && presetOf('radar.top5')?.label === '미래AI랩 맞춤 이번 주 기획' && mkText('MIRAE 관점') === 'MIRAE 관점')
   __setBrandForTest(null, null)
 
   /* ---- 4. 메뉴 스위치(D-564 — 화면은 팀장 등급이면 열림 · AI 단추는 서버 답) ---- */

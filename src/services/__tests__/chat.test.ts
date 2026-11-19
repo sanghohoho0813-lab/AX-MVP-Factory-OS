@@ -12,6 +12,8 @@ import { parseSpecText } from '../patent/specParse'
 import { ASSIST_PRESETS } from '../aiAssist/presets'
 import { HISTORY_MAX, answerFromAi, answerText, historyKey, historyRows, parseHistory, topicOf, type ChatTurn } from '../workChat/chatTypes'
 import { PV_GUIDE, PV_STARTERS, PV_TOPICS, pvAiContext, pvAnswer, pvFileAnswer, pvHelpAnswer, type PvChatData } from '../workChat/pvChat'
+import { chatDay, chatDayKey, chatDayLine, chatStamp, chatTime } from '../../lib/chatTime'
+import { CHAT_SIZES, CHAT_SIZE_DEFAULT, parseChatSize } from '../../lib/chatSize'
 import { CERT_GUIDE, CERT_STARTERS, certAiContext, certChatAnswer, certOfText, certTopicOf, type CertChatData } from '../workChat/certChat'
 
 let passed = 0
@@ -220,6 +222,19 @@ const done = (q: string, title: string): ChatTurn => ({ id: `t_${q}`, at: '2026-
   const pvP = ASSIST_PRESETS.find((p) => p.id === 'pv.chat')
   const certP = ASSIST_PRESETS.find((p) => p.id === 'cert.chat')
   check('S1 화면 질문 목록에 pv.chat(patent) · cert.chat(cert)', pvP?.page === 'patent' && certP?.page === 'cert', { pvP, certP })
+}
+
+// D-638 지난 대화 날짜 · 대화 글자 크기 다섯 단계
+{
+  const now = new Date(2026, 10, 19, 15, 0)
+  const today = new Date(2026, 10, 19, 9, 5)
+  const yday = new Date(2026, 10, 18, 23, 59)
+  const before = new Date(2026, 10, 16, 14, 12)
+  const lastYear = new Date(2025, 11, 3, 0, 30)
+  check('D1 날짜 — 오늘 · 어제 · 11월 16일 (월) · 해가 다르면 2025년 12월 3일 (수)', chatDay(today, now) === '오늘' && chatDay(yday, now) === '어제' && chatDay(before, now) === '11월 16일 (월)' && chatDay(lastYear, now) === '2025년 12월 3일 (수)', [chatDay(before, now), chatDay(lastYear, now)])
+  check('D2 시각 · 날짜+시각 — 오전 9:05 · 오후 12시 · 자정 12:30 · 11월 16일 (월) 오후 2:12', chatTime(today) === '오전 9:05' && chatTime(new Date(2026, 10, 19, 12, 0)) === '오후 12:00' && chatTime(lastYear) === '오전 12:30' && chatStamp(before, now) === '11월 16일 (월) 오후 2:12', chatStamp(before, now))
+  check('D3 날짜 줄 · 열쇠 — 2026년 11월 19일 목요일 · 같은 날은 같은 열쇠 · 빈 값/깨진 값은 빈 글', chatDayLine(today) === '2026년 11월 19일 목요일' && chatDayKey(today) === chatDayKey(now) && chatDayKey(yday) !== chatDayKey(now) && chatDay('', now) === '' && chatDay('깨짐', now) === '' && chatTime(null) === '' && chatDayLine(undefined) === '')
+  check('D4 글자 크기 — 다섯 단계 · 처음은 100% · 깨진 값은 처음 · 범위 밖은 끝으로', CHAT_SIZES.length === 5 && CHAT_SIZES[CHAT_SIZE_DEFAULT] === 1 && parseChatSize(null) === CHAT_SIZE_DEFAULT && parseChatSize('x') === CHAT_SIZE_DEFAULT && parseChatSize('-3') === 0 && parseChatSize('9') === 4 && parseChatSize('1') === 1 && CHAT_SIZES[0] < 1 && CHAT_SIZES[4] > 1)
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

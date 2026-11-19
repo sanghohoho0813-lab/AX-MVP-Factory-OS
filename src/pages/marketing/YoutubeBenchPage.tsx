@@ -235,7 +235,7 @@ function RadarPage({ workspaceId }: { workspaceId: string | null }) {
   const firstScreen = /^\/marketing\/?$/.test(location.pathname) && !params.get('view') && !params.get('pack') && params.get('week') !== '1'
   // D-235 경로 줄 끝에 지금 보는 탭(영업 › 마케팅 · 브랜딩 › 콘텐츠 레이더 › 이번 주 찍을 것) — 첫 화면은 꼬리 없음
   // D-560 남의 인기 영상(인기 영상 · 참고 채널 · 올리는 때 · 길이)은 두 칸 — '남의 인기 영상 › 참고 채널'
-  usePageCrumbs(firstScreen ? [] : isLookView(view) ? [{ label: '남의 인기 영상', to: '/marketing?view=top' }, { label: RADAR_VIEWS.find((v) => v.key === view)?.label ?? '' }] : [{ label: RADAR_VIEWS.find((v) => v.key === view)?.label ?? '' }])
+  usePageCrumbs(firstScreen ? [] : isLookView(view) ? [{ label: '지금 뜨는 영상', to: '/marketing?view=top' }, { label: RADAR_VIEWS.find((v) => v.key === view)?.label ?? '' }] : [{ label: RADAR_VIEWS.find((v) => v.key === view)?.label ?? '' }])
   const period = (PERIODS.includes(params.get('p') as YtPeriod) ? params.get('p') : 'week') as YtPeriod
   const kw = params.get('kw') ?? ''
   const [type, setType] = useState<YtType>('all')

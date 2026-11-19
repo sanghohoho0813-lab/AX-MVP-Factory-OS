@@ -160,7 +160,7 @@ async function runOnce(assist, choice, body, role, video = null) {
   // SAAS-1 대표가 아닌 계정은 그 사람 브랜드 · AI 설정으로(대표 개인 정보 없이) — 예전 '팀장이 보냈다' 한 줄도 이 안에
   const system = assistSystem(assist, { skill, topicText, customer: role === 'pilot' ? { brand } : null })
   // SAAS-2 고객 마케팅 — [요청] 줄의 단추 이름도 고객판('미래AI랩 맞춤' → '내 채널 맞춤')
-  const built = buildAssistPrompt(customerMk ? { ...assist, label: customerLabel(assist.label) } : assist, context, ask)
+  const built = buildAssistPrompt(customerMk ? { ...assist, label: customerLabel(assist.label, brand) } : assist, context, ask)
   const { sent } = built
   // D-260 영상 단추 — 맨 앞에 붙인 영상의 어느 구간인지(시각은 영상 처음부터)
   const user = video ? `${built.user}\n[영상] 맨 앞에 붙인 YouTube 영상\n[구간] ${clock(video.start)} ~ ${clock(video.end)} — 이 구간만(시각은 영상 처음부터 센 것)` : built.user

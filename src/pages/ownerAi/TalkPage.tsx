@@ -25,6 +25,7 @@ import { Button } from '../../components/ui/Button'
 import { PageHero } from '../../components/ui/pageFrame'
 import { IconTile } from '../../components/ui/visual'
 import { ModelPicker } from '../../components/ai/ModelPicker'
+import { ChatTextSize } from '../../components/chat/ChatTextSize'
 import { MemoryEditor } from './parts/MemoryCard'
 import { fmtShort } from './parts/runStatus'
 import { skillIcon } from './skillVisual'
@@ -274,6 +275,7 @@ function Talk({ caseId }: { caseId: string }) {
           {mode === 'prompt' && !board ? '개발 프롬프트는 기획서 판을 먼저 굳힌 뒤에 뽑을 수 있어요.' : `${MODE_LABEL[mode]} — ${MODE_HINT[mode]}`}
         </p>
         {aiReady && <ModelPicker popover testId="talk-model" />}
+        <ChatTextSize testId="talk-size" />
       </div>
     </div>
   )
@@ -327,7 +329,7 @@ function Talk({ caseId }: { caseId: string }) {
 
   const chat = (
     <div className="flex min-w-0 flex-col gap-4">
-      <ol className="flex flex-col gap-4" data-testid="talk-turns" aria-live="polite">
+      <ol className="chat-zoom flex flex-col gap-4" data-testid="talk-turns" aria-live="polite">
         {turns.map((r) => (
           <li key={r.id} className="flex scroll-mt-20 flex-col gap-2" data-testid="talk-turn" data-mode={modeOfRun(r)} data-status={r.status}>
             {/* D-634 카카오톡처럼 — 내 말은 오른쪽 · AI 답은 왼쪽 프로필 아래 */}

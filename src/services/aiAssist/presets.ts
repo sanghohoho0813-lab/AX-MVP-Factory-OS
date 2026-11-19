@@ -2,7 +2,8 @@
  * AI 도우미 — 화면마다 미리 만든 질문 단추의 이름표(D-239).
  * 지시문은 서버(api/_ai/assists.js)에만 있다. 여기는 id · page · label · kind 가 서버와 같아야 한다(단위 시험이 맞춘다).
  */
-import { isMarketingCustomer, mkText } from '../marketing/persona'
+import { brandShortName, isMarketingCustomer, mkText } from '../marketing/persona'
+import { josa } from '../../lib/josa'
 
 export type AssistPage = 'today' | 'sales' | 'clients' | 'inbox' | 'agents' | 'money' | 'calendar' | 'grants' | 'client' | 'module' | 'radar' | 'content' | 'threads' | 'shorts' | 'site' | 'venture' | 'patent' | 'cert' | 'side'
 
@@ -51,12 +52,12 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   { id: 'module.all', page: 'module', label: '고객 전체에서 받을 수 있는 것 정리', kind: 'list', hint: '업체별 · 금액 · 할 일' },
   { id: 'module.first', page: 'module', label: '먼저 연락할 업체 3곳', kind: 'list', hint: '가장 빨리 돈이 되는 곳' },
   { id: 'module.missing', page: 'module', label: '서류만 받으면 되는 업체', kind: 'list', hint: '받을 서류 이름까지' },
-  { id: 'radar.top5', page: 'radar', label: '미래AI랩 맞춤 이번 주 TOP5 기획', kind: 'write', hint: '주제 · 구성 · 첫 15초 대본' },
+  { id: 'radar.top5', page: 'radar', label: '미래AI랩 맞춤 이번 주 기획', kind: 'write', hint: '잘 될 것만 · 주제 · 구성 · 첫 15초 대본' },
   { id: 'radar.view', page: 'radar', label: '지금 순위로 "이렇게 말해요" 새로 쓰기', kind: 'write', hint: '순위가 바뀌면 관점도 새로' },
   { id: 'bench.why', page: 'radar', label: '잘 나가는 채널 · 영상 왜 잘 됐나', kind: 'list', hint: '제목 틀 · 길이 · 주제 · 때' },
-  { id: 'bench.copy', page: 'radar', label: '미래AI랩이 따라 할 틀 3개', kind: 'write', hint: '우리 주제로 바꾼 예시' },
+  { id: 'bench.copy', page: 'radar', label: '미래AI랩이 따라 할 틀', kind: 'write', hint: '잘 된 영상의 틀 · 우리 주제로 바꾼 예시' },
   { id: 'rising.ref', page: 'radar', label: '인기 급상승 — 미래AI랩이 참고할 것', kind: 'list', hint: '우리 고객과 이어지는 것만' },
-  { id: 'rising.shorts', page: 'radar', label: '급상승 키워드로 쇼츠 아이디어 5', kind: 'write', hint: '제목 · 3컷 · 첫 3초' },
+  { id: 'rising.shorts', page: 'radar', label: '급상승 키워드로 쇼츠 아이디어', kind: 'write', hint: '제목 · 3컷 · 첫 3초' },
   { id: 'mine.detail', page: 'radar', label: '내 콘텐츠 — 만든 것 자세히 정리', kind: 'list', hint: '다룬 것 · 단계 · 메모 · 숫자' },
   { id: 'mine.next', page: 'radar', label: '잘 된 것 기준 다음에 찍을 것', kind: 'write', hint: '공통점에서 다음 3개' },
   // D-241 기획 답의 [대본 끝까지] 로만 부른다(띠 · 판 단추 목록에는 넣지 않는다)
@@ -141,18 +142,25 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
 
 const MARKETING_PAGES: readonly AssistPage[] = ['radar', 'content', 'threads', 'shorts']
 
-/** SAAS-2 고객 계정의 마케팅 단추 이름 — 서버 customerLabel 과 같은 말('미래AI랩 맞춤' → '내 채널 맞춤' · 카드뉴스 없이). 대표 계정은 그대로 */
+/**
+ * SAAS-2 고객 계정의 마케팅 단추 이름 — 서버 customerLabel 과 같은 말(카드뉴스 없이). 대표 계정은 그대로.
+ * D-638 대표(2026-11-19) "다른 팀장 · 고객이 쓸 때는 미래AI랩 얘기가 없어야 — 그 사람 이름(회사명)으로 'OO가 따라 할 틀'".
+ *   설정 › 내 브랜드의 회사 이름 → 이름 → 비었으면 '내 채널 맞춤' · '내가 따라 할'.
+ */
 export function customerPreset(p: AssistPreset): AssistPreset {
   if (!isMarketingCustomer() || !MARKETING_PAGES.includes(p.page)) return p
-  const fix = (s: string) =>
-    mkText(
-      s
-        .replace(/카드뉴스 · /g, '')
-        .replace(/미래AI랩 맞춤/g, '내 채널 맞춤')
-        .replace(/미래AI랩이 따라 할/g, '내가 따라 할')
-        .replace(/미래AI랩이 참고할/g, '내가 참고할'),
-    )
+  const who = brandShortName()
+  const fix = (s: string) => mkText(customerLabelText(s, who))
   return { ...p, label: fix(p.label), hint: fix(p.hint) }
+}
+
+/** 단추 이름 속 대표 회사 이름 → 이 사람 이름(서버 api/_ai/customerMarketing.js customerLabel 과 같은 규칙) */
+export function customerLabelText(s: string, who: string): string {
+  const name = who.trim()
+  return s
+    .replace(/카드뉴스 · /g, '')
+    .replace(/미래AI랩 맞춤/g, name ? `${name} 맞춤` : '내 채널 맞춤')
+    .replace(/미래AI랩이 (따라 할|참고할)/g, (_m, verb: string) => `${name ? josa(name, '이/가') : '내가'} ${verb}`)
 }
 
 export function presetOf(id: string): AssistPreset | undefined {

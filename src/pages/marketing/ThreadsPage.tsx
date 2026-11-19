@@ -846,7 +846,7 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, weekRef, brie
               {/* D-602 꺾쇠(flex) 옆에 글 한 덩어리 — 휴대폰에서 글이 칸처럼 쪼개지지 않게 */}
               <span className="min-w-0 break-keep">
                 <FilePlus2 aria-hidden="true" className="mr-1 inline size-4 align-[-0.15em] text-slate-500" />
-                잘 된 남의 글 붙여넣기 <span className="font-normal text-slate-600">— 그 모양대로 써요 · 저장 안 함</span>
+                잘된 글 붙여넣기 <span className="font-normal text-slate-600">— 그 모양대로 써요 · 저장 안 함</span>
               </span>
             </summary>
             <textarea value={draft.reference} onChange={(e) => set({ reference: e.target.value })} rows={4} className="t-body mt-2 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2" placeholder="반응 좋았던 남의 스레드 글을 붙여 넣으세요 — 첫 줄 기법 · 줄 수 · 끝 방식만 빌리고 문장은 새로 씁니다" data-testid="thr-ref" />
@@ -1432,7 +1432,7 @@ function RoutinePanel({ week, readOnly, onWrite, onRecords }: { week: ReturnType
           </div>
         </Surface>
         <Surface className="flex flex-col gap-2">
-          <h2 className="t-section break-keep text-slate-900">남의 글에 다는 전문가 답글</h2>
+          <h2 className="t-section break-keep text-slate-900">다른 사람 글에 다는 전문가 답글</h2>
           <p className="t-sub break-keep text-slate-600">칭찬 한 줄 말고, 정보를 하나 더합니다(하루 3개).</p>
           <p className="t-sub rounded-(--radius-control) bg-slate-50 px-3 py-2 break-keep whitespace-pre-line text-slate-800" data-testid="thr-expert">
             {EXPERT_REPLY}

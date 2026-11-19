@@ -86,10 +86,17 @@ check('K3 javascript · data · file · 깨진 주소는 절대 안 띄움', !ca
   const d = dockLayout(1366, 256, 420)
   const e = dockLayout(1023, 0, 420)
   const f = dockLayout(1440, 0, 420)
-  check('K5 놓는 법 — 1440 · 메뉴 256 → 옆에 붙임 416(본문 768 남김) · 1920 → 720 끝 · 1280 · 메뉴 288 → 덮어 띄움 · 1023 → 없음', a.mode === 'dock' && a.width === 416 && 1440 - 256 - a.width === 768 && b.mode === 'dock' && b.width === DOCK_MAX && c.mode === 'over' && c.width === 420 && d.mode === 'dock' && d.width === 342 && e.mode === 'none' && f.mode === 'dock' && f.width === 420, { a, b, c, d, e, f })
+  check('K5 놓는 법 — 1440 · 메뉴 256 → 옆에 붙임 416(본문 768 남김) · 1920 · 900 → 남는 자리 864 · 1280 · 메뉴 288 → 덮어 띄움 · 1366 → 342(본문 안 덮음) · 1023 → 없음', a.mode === 'dock' && a.width === 416 && 1440 - 256 - a.width === 768 && b.mode === 'dock' && b.width === 864 && b.reserve === 864 && c.mode === 'over' && c.width === 420 && d.mode === 'dock' && d.width === 342 && d.reserve === 342 && e.mode === 'none' && f.mode === 'dock' && f.width === 420, { a, b, c, d, e, f })
   const g = dockLayout(1100, 256, 100)
   const h = dockLayout(1024, 80, 2000)
   check('K6 폭 범위 — 덮을 때도 320 아래로 안 줄고 화면 밖으로 안 나감', g.mode === 'over' && g.width === DOCK_MIN && h.width <= 1024 - 48 && h.width >= DOCK_MIN, { g, h })
+  // D-638 대표(2026-11-19) "절반쯤에서 더 안 늘어나 — 100% 까지 · 전체 화면 단추"
+  const w1 = dockLayout(1920, 256, 1400)
+  const w2 = dockLayout(1920, 256, 9999)
+  const fu = dockLayout(1440, 256, 420, true)
+  const fn = dockLayout(1000, 0, 420, true)
+  check('K6b 넓게 끌기 — 1920 · 메뉴 256 · 1400 → 판 1400 · 본문은 768 에서 멈춤(비키는 폭 896) · 끝까지 끌면 메뉴 오른쪽 끝(1664)', w1.mode === 'dock' && w1.width === 1400 && w1.reserve === 896 && w2.width === 1664 && w2.reserve === 896 && DOCK_MAX >= 1664, { w1, w2 })
+  check('K6c 전체 화면 — 메뉴 오른쪽 전부를 덮음(본문 안 비킴) · 1024 아래는 없음(휴대폰은 아래 판)', fu.mode === 'over' && fu.full && fu.width === 1184 && fu.reserve === 0 && fn.mode === 'none' && !fn.full, { fu, fn })
 }
 {
   const p0 = parseDock(null)

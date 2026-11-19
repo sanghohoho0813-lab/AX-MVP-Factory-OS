@@ -19,6 +19,7 @@ import { BotRow, MeBubble, TypingBubble } from '../chat/bubbles'
 import { handDocsTo, handNewClientDocs } from '../../services/docHandoff'
 import { CHAT_DOC_MAX, defaultDocQuestion, labelOfDoc, type ChatDoc, type DocCompany } from '../../services/homeAsk/homeDocs'
 import { ModelPicker } from '../ai/ModelPicker'
+import { ChatTextSize } from '../chat/ChatTextSize'
 import { ClientPickerOptions } from '../ops/ClientPickerOptions'
 import { useToast } from '../ui/toastContext'
 import { useIsPhone } from '../../lib/useIsPhone'
@@ -352,14 +353,16 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
           })}
         </ul>
       ) : (
-        <div className="mx-auto mt-4 flex w-full max-w-3xl flex-col gap-4" data-testid="home-ask-thread">
+        <div className="chat-zoom mx-auto mt-4 flex w-full max-w-3xl flex-col gap-4" data-testid="home-ask-thread">
           <div className="flex items-center gap-2">
             {turns.length > 2 && (
               <button type="button" onClick={() => setShowOld((v) => !v)} className="tap t-sub font-semibold text-slate-500 hover:text-slate-800" data-testid="home-ask-older">
                 {showOld ? '지난 대화 접기' : `지난 대화 ${turns.length - 2}개 보기`}
               </button>
             )}
-            <button type="button" onClick={clear} className="tap t-sub ml-auto inline-flex items-center gap-1 text-slate-500 hover:text-slate-800" data-testid="home-ask-clear">
+            {/* D-638 대화 글자 크기 −/+ (모든 대화창 같은 값) */}
+            <ChatTextSize className="ml-auto" testId="home-ask-size" />
+            <button type="button" onClick={clear} className="tap t-sub inline-flex items-center gap-1 text-slate-500 hover:text-slate-800" data-testid="home-ask-clear">
               <Trash2 aria-hidden="true" className="size-4" /> 대화 지우기
             </button>
           </div>

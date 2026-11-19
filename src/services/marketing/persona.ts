@@ -31,6 +31,17 @@ export function ourName(): string {
   return b?.company || b?.name || '우리 회사'
 }
 
+/**
+ * D-638 단추 이름에 넣을 이 사람 이름 — 고객(팀장 · 구독 고객): 회사 이름 → 이름(14자까지) · 비었으면 빈 글(부른 쪽이 '내 채널').
+ * 대표 계정은 빈 글(대표 단추 이름은 그대로 두므로 쓰지 않는다).
+ */
+export function brandShortName(): string {
+  if (!customer) return ''
+  const b = brandNow()
+  const who = (b?.company || b?.name || '').replace(/\s+/g, ' ').trim()
+  return who.length > 14 ? `${who.slice(0, 13)}…` : who
+}
+
 /** 화자 이름 — 대표: 김팀장 · 고객: 적은 이름(없으면 빈 글) */
 export function speakerName(): string {
   if (!customer) return '김팀장'

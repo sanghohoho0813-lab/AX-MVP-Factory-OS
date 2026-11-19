@@ -31,7 +31,6 @@ import { useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { todayLocalDate } from '../../lib/appClock'
 import { useBackToClose } from '../../lib/backToClose'
 import { useEscToClose } from '../../lib/escStack'
-import { activityTimeText } from '../../services/clientOpsActivity'
 import { createJournalEntry } from '../../services/journalService'
 import { betterModel, dueFromWhen, isSamePage, pointsAtTodo, refKind, refLabel, todoText, unalias, unaliasAnswer } from '../../services/aiAssist/actions'
 import { AssistError, PROVIDER_NAME, assistMessage, callAssist, fetchAssistStatus, peekAssistStatus, providerMessage, type ProviderProbe } from '../../services/aiAssist/client'
@@ -50,7 +49,8 @@ import { josa } from '../../lib/josa'
 import { ChatStartCard, PageChat } from '../chat/PageChat'
 import { CHAT_TINT, closeAssistInDock, closePageDock, nextPageChatKey, openAssistInDock, startPageChat, usePageChat } from '../../lib/pageChat'
 import { BotAvatar, BotBubble, BotRow, ChatNotice, MeBubble, TypingBubble } from '../chat/bubbles'
-import { chatTime } from '../../lib/chatTime'
+import { chatDay, chatDayKey, chatDayLine, chatStamp, chatTime } from '../../lib/chatTime'
+import { ChatTextSize } from '../chat/ChatTextSize'
 import { useChatAutoOpen } from '../../lib/useChatFirst'
 
 const PROVIDER_LABEL: Record<ProviderId, string> = { gemini: 'Gemini', openai: 'GPT', anthropic: 'Claude' }
@@ -727,8 +727,12 @@ function AssistPanel({
 
       {turns.map((t, i) => {
         const isLive = i === turns.length - 1
+        // D-638 날짜 줄(카카오톡처럼) — 앞 대화와 날이 다르거나 오늘이 아닌 지난 대화를 다시 열었을 때
+        const day = chatDayKey(t.run.createdAt)
+        const prevDay = i > 0 ? chatDayKey(turns[i - 1].run.createdAt) : chatDayKey(new Date())
         return (
           <LiveCtx.Provider key={t.run.requestId} value={isLive && !asking}>
+            {day && day !== prevDay && <ChatNotice testId="ai-assist-day">{chatDayLine(t.run.createdAt)}</ChatNotice>}
             <div ref={isLive ? turnRef : undefined} className="flex scroll-mt-2 flex-col gap-3">
               <ResultView
                 entry={t}
@@ -896,17 +900,27 @@ function AssistPanel({
           <X aria-hidden="true" className="size-5" />
         </button>
       </div>
-      <ul className="flex min-h-0 flex-1 flex-col divide-y divide-slate-100 overflow-y-auto">
-        {history.map((h) => (
-          <li key={h.run.requestId}>
-            <button type="button" onClick={() => reopen(h)} className={`tap flex w-full min-w-0 flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-slate-50 ${live?.run.requestId === h.run.requestId ? 'bg-violet-50' : ''}`}>
-              <span className="t-sub min-w-0 font-semibold break-keep text-slate-800 [overflow-wrap:anywhere]">{h.ask && h.assistId.endsWith('.ask') ? h.ask : h.label}</span>
-              <span className="t-meta text-slate-500">
-                {activityTimeText(h.run.createdAt)} · {PROVIDER_LABEL[h.run.provider] ?? h.run.provider}
-              </span>
-            </button>
-          </li>
-        ))}
+      {/* D-638 날짜별로 묶어(오늘 · 어제 · 11월 17일 (월)) 줄마다 시각 — '3일 전' 같은 말 대신 날짜 · 시각 그대로 */}
+      <ul className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {history.map((h, i) => {
+          const day = chatDayKey(h.run.createdAt)
+          const head = i === 0 || chatDayKey(history[i - 1].run.createdAt) !== day
+          return (
+            <li key={h.run.requestId} className={head ? '' : 'border-t border-slate-100'}>
+              {head && (
+                <p className="t-meta sticky top-0 bg-slate-50 px-3 py-1 font-semibold text-slate-600" data-testid="ai-assist-history-day">
+                  {chatDay(h.run.createdAt)}
+                </p>
+              )}
+              <button type="button" onClick={() => reopen(h)} className={`tap flex w-full min-w-0 flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-slate-50 ${live?.run.requestId === h.run.requestId ? 'bg-violet-50' : ''}`} data-testid="ai-assist-history-item">
+                <span className="t-sub min-w-0 font-semibold break-keep text-slate-800 [overflow-wrap:anywhere]">{h.ask && h.assistId.endsWith('.ask') ? h.ask : h.label}</span>
+                <span className="t-meta text-slate-500" data-testid="ai-assist-history-when" title={chatStamp(h.run.createdAt)}>
+                  {chatTime(h.run.createdAt)} · {PROVIDER_LABEL[h.run.provider] ?? h.run.provider}
+                </span>
+              </button>
+            </li>
+          )
+        })}
       </ul>
     </section>
   )
@@ -1039,7 +1053,9 @@ export function ModelRow({
           {/* D-634 대화 판 머리 아래 한 줄(slim)에서는 자동의 긴 뜻만 마우스 설명으로 — 줄이 두 줄로 늘지 않게('기본 · 가장 쌈' 은 짧아 그대로) */}
           {auto ? !open && !slim && <span className="t-meta ml-1 font-normal text-slate-500">(물음은 가장 싼 모델 · 일은 좋은 모델)</span> : isDefault && <span className="t-meta ml-1 font-normal text-slate-500">(기본 · 가장 쌈)</span>}
         </button>
-        <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="tap t-sub ml-auto inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50" data-testid="ai-assist-model-toggle">
+        {/* D-638 대화 판에서는 모델 바꾸기 옆에 글자 크기 [가−][가+] */}
+        {slim && <ChatTextSize className="ml-auto" testId="ai-assist-size" />}
+        <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className={`tap t-sub ${slim ? '' : 'ml-auto'} inline-flex min-h-10 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50`} data-testid="ai-assist-model-toggle">
           <Settings2 aria-hidden="true" className="size-4" /> {open ? '닫기' : '모델 바꾸기'}
         </button>
       </div>

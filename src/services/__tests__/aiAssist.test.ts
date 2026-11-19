@@ -657,11 +657,11 @@ function d241Tests() {
     const bc = ASSISTS['bench.copy']
     const names = rb.context.sections.map((x) => x.name)
     const refs = [...bc.instruction.join(' ').matchAll(/\[자료 · ([^\]]+)\]/g)].map((m) => m[1])
-    check('R7(D-632) [따라 할 틀 3개] 지시 — 가리키는 자료 이름이 실제 자료에 다 있음(남의 잘 된 영상 · 많이 쓴 제목 틀 · 내 채널 잘 된 영상 · 채널 설계 기준 · 후보)',
+    check('R7(D-632) [따라 할 틀] 지시 — 가리키는 자료 이름이 실제 자료에 다 있음(남의 잘 된 영상 · 많이 쓴 제목 틀 · 내 채널 잘 된 영상 · 채널 설계 기준 · 후보)',
       refs.length >= 5 && refs.every((r) => names.some((n) => n.startsWith(r))), refs.filter((r) => !names.some((n) => n.startsWith(r))))
     const bi = bc.instruction.join(' ')
-    check('R8(D-632) [따라 할 틀 3개] — 틀은 남의 잘 된 영상에서 · 셋은 서로 다른 틀 · 장면(같은 것은 하나까지) · 한 형식으로 묶지 않음 · 주제는 채널 설계 기준 본업 · 찍기 키트를 옮기지 않음 · 판정 기준 묶음',
-      /틀은 \[자료 · 남의 채널/.test(bi) && /서로 다른 틀 · 다른 장면/.test(bi) && /같은 것은 하나까지/.test(bi) && /한 형식으로 묶지 않는다/.test(bi) && /채널 설계 기준\] 의 본업/.test(bi) && /찍기 키트[^—]*옮기지 않는다/.test(bi) && knowledgeOf(bc).some((k: { key: string }) => k.key === 'mk_judge'))
+    check('R8(D-632 · D-638) [따라 할 틀] — 틀은 남의 잘 된 영상에서 · 개수는 자료만큼(2~5 · 늘 셋 아님) · 서로 다른 틀 · 장면(같은 것은 하나까지) · 한 형식으로 묶지 않음 · 주제는 채널 설계 기준 본업 · 찍기 키트를 옮기지 않음 · 판정 기준 묶음',
+      /틀은 \[자료 · 남의 채널/.test(bi) && /2~5개/.test(bi) && !/틀 3개/.test(bc.label) && /서로 다른 틀 · 다른 장면/.test(bi) && /같은 것은 하나까지/.test(bi) && /한 형식으로 묶지 않는다/.test(bi) && /채널 설계 기준\] 의 본업/.test(bi) && /찍기 키트[^—]*옮기지 않는다/.test(bi) && knowledgeOf(bc).some((k: { key: string }) => k.key === 'mk_judge'))
     const vary = FREEDOM_RULES[FREEDOM_RULES.length - 1]
     const mkIds = ['bench.copy', 'radar.top5', 'radar.script', 'radar.pack.video', 'threads.write', 'shorts.write', 'threads.hooks', 'radar.ask']
     check('R9(D-632 · D-633) 성공 공식 먼저 끝 줄 — 한 답 안 항목은 서로 다른 모양(같은 장면 · 장치 · N단계/N칸 꼴은 한 번까지) · 찍기 키트는 공통 뼈대 — 마케팅 단추 모두 · 대표 · 고객 지시문 모두',

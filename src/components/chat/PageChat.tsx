@@ -10,10 +10,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigationType } from 'react-router-dom'
-import { MessageCircle, X } from 'lucide-react'
+import { Maximize2, MessageCircle, Minimize2, X } from 'lucide-react'
 import { useBackToClose } from '../../lib/backToClose'
 import { useEscToClose } from '../../lib/escStack'
 import { isMarketingArea } from '../../lib/marketingArea'
+import { setDock, useDock } from '../../lib/sideDock'
 import { CHAT_TINT, basePageChat, closePageSheet, currentPageChat, launchPageChat, nextPageChatKey, registerPageChat, setPageChatSlot, startPageChat, usePageChat } from '../../lib/pageChat'
 
 
@@ -187,6 +188,8 @@ export function PageChatSheet() {
 }
 
 function SheetBody() {
+  // D-638 크게 보기(화면 가득) — 오른쪽 판과 같은 값 하나(닫으면 처음으로)
+  const full = useDock().full
   useBackToClose(true, closePageSheet)
   useEscToClose(true, closePageSheet)
   // 답 단추 · 직접 눌러서 하기로 다른 화면에 가면 판을 내린다(가운데 화면이 보이게).
@@ -207,15 +210,26 @@ function SheetBody() {
   }, [])
   return (
     <div className="no-print ax-fade fixed inset-0 z-50 flex flex-col justify-end bg-navy-950/40" role="dialog" aria-modal="true" aria-label="대화" data-testid="page-chat-sheet">
-      <div className={`ax-pop flex h-[calc(100dvh-2.5rem)] w-full flex-col overflow-hidden rounded-t-2xl ${CHAT_TINT}`}>
-        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-slate-200 bg-white pr-1 pl-4">
+      <div className={`ax-pop flex w-full flex-col overflow-hidden ${full ? 'h-dvh' : 'h-[calc(100dvh-2.5rem)] rounded-t-2xl'} ${CHAT_TINT}`} data-full={full ? '1' : '0'}>
+        <div className="flex h-12 shrink-0 items-center gap-1 border-b border-slate-200 bg-white pr-1 pl-4">
           <MessageCircle aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
           <h2 className="t-body min-w-0 flex-1 font-bold text-slate-900">대화</h2>
+          <button
+            type="button"
+            onClick={() => setDock({ full: !full })}
+            aria-pressed={full}
+            aria-label={full ? '원래 크기로' : '크게 보기(화면 가득)'}
+            className={`tap flex size-11 shrink-0 items-center justify-center rounded-(--radius-control) ${full ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-100'}`}
+            data-testid="page-chat-sheet-full"
+          >
+            {full ? <Minimize2 aria-hidden="true" className="size-5" /> : <Maximize2 aria-hidden="true" className="size-5" />}
+          </button>
           <button type="button" onClick={closePageSheet} aria-label="대화 닫기" className="tap flex size-11 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100" data-testid="page-chat-sheet-close">
             <X aria-hidden="true" className="size-5" />
           </button>
         </div>
-        <div ref={setPageChatSlot} className="flex min-h-0 flex-1 flex-col" data-testid="page-chat-slot" />
+        {/* D-638 대화 글자 크기(chat-zoom) */}
+        <div ref={setPageChatSlot} className="chat-zoom flex min-h-0 flex-1 flex-col" data-testid="page-chat-slot" />
       </div>
     </div>
   )

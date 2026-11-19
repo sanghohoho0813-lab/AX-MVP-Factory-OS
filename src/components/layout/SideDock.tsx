@@ -14,7 +14,7 @@
  */
 import { useCustomerAudience } from '../../config/customerAudience'
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import { ArrowUpRight, Copy, Globe, Loader2, MessageCircle, MessagesSquare, RotateCcw, SendHorizontal, Sparkles, Trash2, X } from 'lucide-react'
+import { ArrowUpRight, Copy, Globe, Loader2, Maximize2, MessageCircle, MessagesSquare, Minimize2, RotateCcw, SendHorizontal, Sparkles, Trash2, X } from 'lucide-react'
 import { inFrame } from '../../lib/deviceView'
 import { navPx, useNavSize } from '../../lib/navWidth'
 import { DOCK_MAX, DOCK_MIN, GOOGLE_FRAME_HOME, canFrame, dockLayout, frameUrlOf, setDock, useDock, type DockTab, type DockTurn } from '../../lib/sideDock'
@@ -25,8 +25,10 @@ import { askDock, dockTurns, setDockTurns, syncDockChat, useDockChat } from '../
 import { copyText } from '../../services/grants/grantView'
 import { useToast } from '../ui/toastContext'
 import { ModelPicker } from '../ai/ModelPicker'
+import { ChatTextSize } from '../chat/ChatTextSize'
 import { AiConfirm } from '../ai/AiConfirm'
-import { BotBubble, BotRow, MeBubble, TypingBubble } from '../chat/bubbles'
+import { BotBubble, BotRow, ChatNotice, MeBubble, TypingBubble } from '../chat/bubbles'
+import { chatDayKey, chatDayLine, chatTime } from '../../lib/chatTime'
 
 const DOCK_DEFAULT_W = 420
 const STEP = 24
@@ -116,6 +118,8 @@ function ChatTab() {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2">
         <ModelPicker popover className="min-w-0 flex-1" testId="dock-model" />
+        {/* D-638 대화 글자 크기 — 모델 고르기 옆 */}
+        <ChatTextSize testId="dock-chat-size" />
         {turns.length > 0 && (
           <button type="button" onClick={clear} className="tap flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100" aria-label="대화 지우기" title="대화 지우기" data-testid="dock-chat-clear">
             <Trash2 aria-hidden="true" className="size-4" />
@@ -154,8 +158,10 @@ function ChatTab() {
         )}
         {turns.map((t, i) => (
           <li key={t.id} ref={i === turns.length - 1 ? endRef : undefined} className="flex min-w-0 flex-col gap-1.5" data-testid="dock-turn" data-status={t.status}>
+            {/* D-638 날짜 줄 — 앞 대화와 날이 다를 때(첫 대화는 오늘이 아닐 때) */}
+            {t.at && chatDayKey(t.at) !== (i > 0 ? chatDayKey(turns[i - 1].at) : chatDayKey(new Date())) && <ChatNotice testId="dock-day">{chatDayLine(t.at)}</ChatNotice>}
             {/* D-634 카카오톡처럼 — 내 말은 오른쪽 · AI 답은 왼쪽 프로필 아래 말풍선 */}
-            <MeBubble small className="pl-6">
+            <MeBubble small className="pl-6" time={chatTime(t.at)}>
               {t.q}
             </MeBubble>
             {t.status === 'pending' && <TypingBubble testId="dock-pending" note="답을 쓰는 중…" />}
@@ -348,7 +354,7 @@ export function SideDock() {
   // D-254 옆 창(팝업)이 오른쪽을 덮고 있으면 그 왼쪽에 붙인다
   const sideReserve = useSideAi().reserve
   const navW = navPx(nav) ?? (vw >= 1280 ? 288 : 256)
-  const lay = dockLayout(vw - sideReserve, navW, dock.width)
+  const lay = dockLayout(vw - sideReserve, navW, dock.width, dock.full)
   // D-617 외부 구독 고객 — 여는 단추([ChatGPT 옆에 띄우기])가 없다. 같은 브라우저에 열어 둔 판이 남아 있어도 그리지 않는다
   //       (D-628 이 화면 대화창이 있을 때만 그 대화창을 띄운다 — 자유 대화 · 웹 탭은 그대로 없음)
   const customer = useCustomerAudience()
@@ -379,7 +385,8 @@ export function SideDock() {
 
   // 본문이 판만큼 비키게(옆에 붙일 때만) — 바깥 부품은 CSS 변수만 읽는다
   // 맨 위로 단추 · 알림은 덮어 띄울 때도 판 왼쪽으로(--dock-float) — 판 밑에 숨지 않게
-  const reserve = shown && lay.mode === 'dock' ? lay.width : 0
+  // D-638 넓게 끌었으면 본문은 768px 에서 멈추고(reserve) 판이 본문 위로 넓어진다
+  const reserve = shown && lay.mode === 'dock' ? lay.reserve : 0
   const float = shown ? lay.width : 0
   useEffect(() => {
     const root = document.documentElement.style
@@ -398,6 +405,8 @@ export function SideDock() {
     e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
     drag.current = { x: e.clientX, w: lay.width, raf: 0, next: lay.width }
+    // D-638 크게 보기에서 끌기 시작하면 그 폭에서부터 손으로 맞춘다
+    if (dock.full) setDock({ full: false, width: lay.width }, false)
     setDragging(true)
   }
   const onMove = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -438,6 +447,7 @@ export function SideDock() {
       style={{ width: lay.width, right: sideReserve }}
       data-testid="side-dock"
       data-mode={lay.mode}
+      data-full={lay.full ? '1' : '0'}
       data-tab={tab}
       data-page-chat={pageView && base ? base.scope : ''}
     >
@@ -505,12 +515,26 @@ export function SideDock() {
             <MessagesSquare aria-hidden="true" className="size-5" />
           </button>
         )}
+        {/* D-638 크게 보기 — 메뉴 오른쪽 전부를 대화창으로 · 다시 누르면 원래 폭(끌어서 맞춘 폭) */}
+        <button
+          type="button"
+          onClick={() => setDock({ full: !lay.full })}
+          aria-pressed={lay.full}
+          aria-label={lay.full ? '원래 크기로' : '크게 보기(화면 가득)'}
+          title={lay.full ? '원래 크기로' : '크게 보기 — 화면 가득'}
+          className={`tap flex size-11 shrink-0 items-center justify-center rounded-(--radius-control) ${lay.full ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-100'}`}
+          data-testid="dock-full"
+          data-full={lay.full ? '1' : '0'}
+        >
+          {lay.full ? <Minimize2 aria-hidden="true" className="size-5" /> : <Maximize2 aria-hidden="true" className="size-5" />}
+        </button>
         <button type="button" onClick={closePageDock} className="tap flex size-11 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-500 hover:bg-slate-100" aria-label="오른쪽 판 닫기" title="닫기" data-testid="dock-close">
           <X aria-hidden="true" className="size-5" />
         </button>
       </div>
       {/* D-628 대화 칸 — 바탕을 살짝 진하게(대화라고 보이게). 이 화면 대화창은 화면이 이 자리(slot)로 그려 보낸다 */}
-      <div className={tab === 'chat' ? `flex min-h-0 flex-1 flex-col ${CHAT_TINT}` : 'hidden'} data-testid="dock-chat-area">
+      {/* D-638 대화 글자 크기(chat-zoom — 모델 고르기 옆 [가−][가+]) */}
+      <div className={tab === 'chat' ? `chat-zoom flex min-h-0 flex-1 flex-col ${CHAT_TINT}` : 'hidden'} data-testid="dock-chat-area">
         {/* 자리는 이 화면 대화를 보여 줄 때만 둔다 — 자유 대화를 보는 동안 화면 대화창은 그리지 않는다(이미 그린 것은 살아 있다) */}
         {pageView && <div ref={setPageChatSlot} className="flex min-h-0 flex-1 flex-col" data-testid="page-chat-slot" />}
         {!pageView && !customer && <ChatTab />}

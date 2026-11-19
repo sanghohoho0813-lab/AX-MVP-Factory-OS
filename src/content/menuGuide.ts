@@ -309,7 +309,7 @@ const GUIDES: Record<string, Entry> = {
     next: '내 채널 기록을 보고 잘된 주제를 다시 권하는 기능을 준비하고 있어요.',
   },
   'mk-top': {
-    what: '요즘 잘되는 남의 영상 · 참고 채널 · 올리는 요일과 길이를 살펴보는 곳이에요.',
+    what: '지금 뜨는 영상 · 참고 채널 · 올리는 요일과 길이를 살펴보는 곳이에요.',
     why: '잘되는 것을 먼저 봐야 내 것을 어떻게 만들지 감이 와서요.',
     effect: '숫자에 마우스를 올리면 그 영상 목록이 나오고, 마음에 드는 것은 내 주제로 담을 수 있어요.',
     next: '내 분야만 골라 보는 묶음을 더 늘려 가요.',
@@ -412,7 +412,7 @@ export const MARKETING_GUIDE_LIST: ReadonlyArray<{ key: string; label: string; p
   { key: 'mk-week', label: '1주일치 한 번에', path: '/marketing' },
   { key: 'mk-threads', label: '스레드', path: '/marketing/threads' },
   { key: 'mk-shorts', label: '릴스 · 틱톡', path: '/marketing/shorts' },
-  { key: 'mk-top', label: '남의 인기 영상', path: '/marketing/youtube?view=top' },
+  { key: 'mk-top', label: '지금 뜨는 영상', path: '/marketing/youtube?view=top' },
   { key: 'mk-make', label: '내 콘텐츠', path: '/marketing/youtube?view=make' },
   { key: 'mk-content', label: '블로그 · 플레이스 홍보 글 만들기', path: '/tools/content', basicHidden: true },
   { key: 'mk-homepage', label: '홈페이지 만들기', path: '/tools/homepage', basicHidden: true },

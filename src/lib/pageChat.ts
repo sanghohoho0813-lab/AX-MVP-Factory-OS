@@ -270,6 +270,8 @@ export function closePageDock(): void {
 
 export function closePageSheet(): void {
   set({ sheet: false })
+  // D-638 휴대폰 아래 판을 닫으면 크게 보기도 처음으로
+  setDock({ full: false })
 }
 
 /** 시험 · 로그아웃 — 처음으로 */

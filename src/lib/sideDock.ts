@@ -7,6 +7,9 @@
  *   AI 대화   — Gemini 를 우리 서버(/api/ai-assist · side.chat)로 불러 판 안에서 대화(대표는 고른 모델 · 팀장은 Gemini 만)
  *   웹        — Google 은 igu=1 주소로 안에 들어간다(막지 않음) · 기업마당 · 홈택스도 막지 않는다. 막는 곳은 [옆 창으로] 로 연다.
  * 판 폭은 끌어서(320~720) · 이 브라우저에 기억. PC(1024px~)에서만.
+ * D-638 대표(2026-11-19) "절반 정도까지 되면 더 안 늘어난다 — 100% 로 다 대화창으로 · 본인이 원하는 비율로 자유롭게":
+ *   끌면 메뉴 오른쪽 끝까지(본문이 768px 아래로 줄지 않는 데서 멈추고 · 그 뒤로는 판이 본문 위로 넓어진다) ·
+ *   머리 [크게] 단추 = 메뉴 오른쪽 전부를 대화창으로(full) · 다시 누르면 원래 폭. 휴대폰 아래 판도 [크게] 면 화면 전체.
  */
 import { useSyncExternalStore } from 'react'
 import { MAIN_MIN } from './navWidth'
@@ -18,11 +21,16 @@ export interface DockState {
   width: number
   /** 웹 탭에 지금 띄운 주소(판 안 iframe) */
   webUrl: string
+  /** D-638 크게 보기 — PC 는 메뉴 오른쪽 전부 · 휴대폰 아래 판은 화면 전체 */
+  full: boolean
 }
 
 const KEY = 'axmvp.ui.side_dock'
 export const DOCK_MIN = 320
-export const DOCK_MAX = 720
+/** D-638 끌어서 넓힐 수 있는 끝(실제로는 화면 폭 · 메뉴가 먼저 막는다) */
+export const DOCK_MAX = 2400
+/** 본문을 비켜 세우며 붙일 때 바라는 폭이 남는 자리보다 이만큼까지 크면 남는 자리에 맞춘다(처음 폭 420 이 1366 노트북의 342 자리에서 본문을 덮지 않게) */
+const FIT_SLACK = 96
 const DOCK_DEFAULT = 420
 export const GOOGLE_FRAME_HOME = 'https://www.google.com/webhp?igu=1'
 
@@ -73,15 +81,29 @@ export function frameUrlOf(url: string): string | null {
 /**
  * 판을 어떻게 놓을까 — 화면 폭 · 지금 메뉴 폭 · 바라는 폭으로.
  *   dock  본문 옆에 붙인다(본문이 판만큼 비킨다) — 본문이 768px(머리줄이 넘치지 않는 폭 · 실측) 이상 남을 때만
- *   over  본문 위에 덮어 띄운다(1024~ 좁은 PC · 메뉴를 넓혀 둔 때) — 본문은 그대로
+ *         D-638 바라는 폭이 남는 자리보다 크게 끌었으면 판은 그 폭으로 넓어지고 본문은 768px 에서 멈춘다(reserve = 본문이 비키는 만큼)
+ *   over  본문 위에 덮어 띄운다(1024~ 좁은 PC · 메뉴를 넓혀 둔 때 · 크게 보기) — 본문은 그대로
  *   none  휴대폰 · 태블릿(1024 아래) — 그리지 않는다
+ * full(D-638 크게 보기) — 메뉴 오른쪽 전부를 판으로(over).
  */
-export function dockLayout(viewport: number, nav: number, want: number): { mode: 'dock' | 'over' | 'none'; width: number } {
+export function dockLayout(viewport: number, nav: number, want: number, full = false): { mode: 'dock' | 'over' | 'none'; width: number; reserve: number; full: boolean } {
   const v = Math.round(viewport)
-  if (!Number.isFinite(v) || v < 1024) return { mode: 'none', width: 0 }
+  if (!Number.isFinite(v) || v < 1024) return { mode: 'none', width: 0, reserve: 0, full: false }
+  const avail = Math.max(DOCK_MIN, v - Math.max(0, nav))
+  if (full) return { mode: 'over', width: avail, reserve: 0, full: true }
   const room = v - Math.max(0, nav) - MAIN_MIN
-  if (room >= DOCK_MIN) return { mode: 'dock', width: Math.round(Math.max(DOCK_MIN, Math.min(want, DOCK_MAX, room))) }
-  return { mode: 'over', width: Math.round(Math.max(DOCK_MIN, Math.min(want, DOCK_MAX, v - 48))) }
+  if (room >= DOCK_MIN) {
+    // 남는 자리 안(조금 넘쳐도) — 예전처럼 남는 자리에 맞춰 붙인다
+    if (want <= room + FIT_SLACK) {
+      const w = Math.round(Math.max(DOCK_MIN, Math.min(want, room)))
+      return { mode: 'dock', width: w, reserve: w, full: false }
+    }
+    // 더 넓게 끌었다 — 본문은 768px 에서 멈추고 판이 본문 위로 넓어진다(메뉴 오른쪽 끝까지)
+    const w = Math.round(Math.min(want, avail))
+    return { mode: 'dock', width: w, reserve: Math.round(room), full: false }
+  }
+  const w = Math.round(Math.max(DOCK_MIN, Math.min(want, v - 48)))
+  return { mode: 'over', width: w, reserve: 0, full: false }
 }
 
 /* ------------------------------------------------------------------ */
@@ -149,7 +171,7 @@ export function dockChatContext(turns: readonly DockTurn[], today: string, scree
 }
 
 export function parseDock(raw: string | null): DockState {
-  const base: DockState = { open: false, tab: 'chat', width: DOCK_DEFAULT, webUrl: GOOGLE_FRAME_HOME }
+  const base: DockState = { open: false, tab: 'chat', width: DOCK_DEFAULT, webUrl: GOOGLE_FRAME_HOME, full: false }
   try {
     const v = raw ? (JSON.parse(raw) as Partial<DockState>) : {}
     return {
@@ -157,6 +179,7 @@ export function parseDock(raw: string | null): DockState {
       tab: v.tab === 'web' ? 'web' : 'chat',
       width: typeof v.width === 'number' && Number.isFinite(v.width) ? clampWidth(v.width) : DOCK_DEFAULT,
       webUrl: typeof v.webUrl === 'string' && frameUrlOf(v.webUrl) && canFrame(frameUrlOf(v.webUrl) as string) ? (frameUrlOf(v.webUrl) as string) : GOOGLE_FRAME_HOME,
+      full: v.full === true,
     }
   } catch {
     return base
@@ -191,7 +214,8 @@ export function setDock(patch: Partial<DockState>, save = true): void {
   state = next
   if (save) {
     try {
-      window.localStorage.setItem(KEY, JSON.stringify(state))
+      // D-638 크게 보기는 기억하지 않는다 — 다음에 저절로 열리는 판이 본문을 통째로 덮지 않게(이번 화면에서만)
+      window.localStorage.setItem(KEY, JSON.stringify({ ...state, full: false }))
     } catch {
       /* 저장이 안 돼도 이번 화면에서는 바뀐다 */
     }
@@ -205,7 +229,8 @@ export function openDock(tab: DockTab, webUrl?: string): void {
 }
 
 export function closeDock(): void {
-  setDock({ open: false })
+  // D-638 닫으면 크게 보기도 처음으로 — 다음에 열 때 본문을 통째로 덮지 않게
+  setDock({ open: false, full: false })
 }
 
 function subscribe(l: () => void): () => void {

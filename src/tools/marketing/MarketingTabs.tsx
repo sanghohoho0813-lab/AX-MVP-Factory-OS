@@ -40,16 +40,16 @@ export const RADAR_VIEWS: Item[] = [
   { key: 'analysis', label: '올리는 때 · 길이', short: '분석', icon: slotIcon('mk-analysis', BarChart3) },
   { key: 'make', label: '내 콘텐츠', short: '내 콘텐츠', sub: '(만든 것 모음)', icon: slotIcon('mk-make', NotebookPen) },
 ]
-/** D-560 '남의 인기 영상' 한 칸에 묶인 화면 셋(안에서 탭) */
+/** D-560 '지금 뜨는 영상' 한 칸에 묶인 화면 셋(안에서 탭) */
 export const LOOK_VIEWS: readonly RadarView[] = ['top', 'channels', 'analysis']
 export const isLookView = (v: MarketingTab | null) => !!v && (LOOK_VIEWS as readonly string[]).includes(v)
 const PLAN_ITEM = RADAR_VIEWS[0]
-/** 살펴보기 줄 — 남의 인기 영상(셋을 한 칸) · 내 콘텐츠 */
+/** 살펴보기 줄 — 지금 뜨는 영상(셋을 한 칸 · 예전 이름 '남의 인기 영상') · 내 콘텐츠 */
 const LOOK_ITEMS: Item[] = [
-  { key: 'top', label: '남의 인기 영상', short: '인기 영상', sub: '(인기 영상 · 참고 채널 · 올리는 때)', icon: slotIcon('mk-top', Flame) },
+  { key: 'top', label: '지금 뜨는 영상', short: '뜨는 영상', sub: '(인기 영상 · 참고 채널 · 올리는 때)', icon: slotIcon('mk-top', Flame) },
   RADAR_VIEWS[4],
 ]
-/** 목차 칸이 켜졌나 — '남의 인기 영상' 은 안의 세 화면 어디서든 켜짐 */
+/** 목차 칸이 켜졌나 — '지금 뜨는 영상' 은 안의 세 화면 어디서든 켜짐 */
 const isOn = (key: MarketingTab, active: MarketingTab | null) => (key === 'top' ? isLookView(active) : active === key)
 const TOOLS: Array<Item & { to: string; on: string }> = [
   // D-273 대표 "쓰레드는 원래 없던 부분 — 기능을 잘 만들어 달라" — 실측 공식 틀 23가지 · 규칙 검사 · 기록표
@@ -84,7 +84,7 @@ function GroupLabel({ children }: { children: string }) {
 
 /**
  * 칸 안 — 여러 색 아이콘(D-295 · 흰 칸 위 · 칸을 넘지 않게 그대로 크기) + 이름.
- * 휴대폰은 작은 아이콘 + 짧은 이름 · PC 는 큰 아이콘 위 + 이름 아래(살펴보기 칸은 긴 이름 '남의 인기 영상').
+ * 휴대폰은 작은 아이콘 + 짧은 이름 · PC 는 큰 아이콘 위 + 이름 아래(살펴보기 칸은 긴 이름 '지금 뜨는 영상').
  */
 function HomeTileLabel({ it, long = false }: { it: Item; long?: boolean }) {
   const Icon = it.icon
@@ -125,7 +125,7 @@ function HomeTabs({ active, onRadar }: { active: MarketingTab | null; onRadar?: 
     <nav aria-label="마케팅 · 브랜딩 목차" data-testid="mk-tabs">
       <div data-testid="mk-tabs-strip" data-home="1" className="flex gap-1.5 max-sm:flex-wrap sm:flex-col sm:gap-5">
         <div className="max-sm:contents sm:flex sm:flex-col sm:gap-2">
-          {/* D-507 '콘텐츠 레이더' → 쉬운 말 '살펴보기'(남의 인기 영상을 보고 고른다) */}
+          {/* D-507 '콘텐츠 레이더' → 쉬운 말 '살펴보기'(지금 뜨는 영상을 보고 고른다) */}
           <GroupLabel>살펴보기</GroupLabel>
           <div className={HOME_GRID}>
             {lookItems.map((it) =>
@@ -253,7 +253,7 @@ function SlimTabs({ active, onRadar }: { active: MarketingTab | null; onRadar?: 
         className={`${more ? 'grid sm:flex' : 'hidden'} grid-cols-2 gap-2 rounded-(--radius-control) border border-slate-200 bg-white p-2 sm:flex-col sm:gap-1.5`}
       >
         <div className="max-sm:contents sm:flex sm:flex-wrap sm:items-center sm:gap-1.5">
-          {groupHead('살펴보기', '남의 인기 영상을 보고 고르기')}
+          {groupHead('살펴보기', '지금 뜨는 영상을 보고 고르기')}
           <span className="t-sub w-[4.5rem] shrink-0 font-semibold text-slate-600 max-sm:hidden">살펴보기</span>
           {!showTools && planBtn}
           {LOOK_ITEMS.map((it) =>
@@ -297,7 +297,7 @@ function SlimTabs({ active, onRadar }: { active: MarketingTab | null; onRadar?: 
 export function LookTabs({ view, onPick }: { view: RadarView; onPick: (v: RadarView) => void }) {
   const items = RADAR_VIEWS.filter((it) => isLookView(it.key))
   return (
-    <div role="tablist" aria-label="남의 인기 영상 — 볼 것 고르기" className="grid grid-cols-3 gap-1 rounded-(--radius-control) bg-slate-100 p-1" data-testid="yt-look-tabs">
+    <div role="tablist" aria-label="지금 뜨는 영상 — 볼 것 고르기" className="grid grid-cols-3 gap-1 rounded-(--radius-control) bg-slate-100 p-1" data-testid="yt-look-tabs">
       {items.map((it) => {
         const on = view === it.key
         return (

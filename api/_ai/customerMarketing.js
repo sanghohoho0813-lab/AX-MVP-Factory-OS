@@ -76,13 +76,35 @@ export function customerInstruction(lines) {
     .map((l) => l.replace(/항목 5~6\(tag = "올릴 때 글"\)/, '항목 4~5(tag = "올릴 때 글")'))
 }
 
-/** 고객 단추 이름 — '미래AI랩 맞춤 · 미래AI랩이 따라 할' 같은 이름은 '내 채널' 로 */
-export function customerLabel(label) {
+/** 끝 글자 받침이 있으면 '이', 없으면 '가'(한글 · 숫자 · 영문 읽는 소리 — 화면 src/lib/josa.ts 와 같은 규칙) */
+function subjectParticle(word) {
+  const t = String(word).replace(/[\s)\]}'"’”·.,!?]+$/u, '').replace(/\([^()]*\)$/u, '').trimEnd()
+  const ch = t.slice(-1)
+  if (!ch) return '가'
+  const code = ch.charCodeAt(0)
+  if (code >= 0xac00 && code <= 0xd7a3) return (code - 0xac00) % 28 === 0 ? '가' : '이'
+  if (/[0-9]/.test(ch)) return '013678'.includes(ch) ? '이' : '가'
+  if (/[a-z]/i.test(ch)) return 'lmnr'.includes(ch.toLowerCase()) ? '이' : '가'
+  return '가'
+}
+
+/** 이 사람 이름(회사 → 이름 · 14자까지) — 비었으면 빈 글 */
+export function brandShort(brand) {
+  const who = String(brand?.company || brand?.name || '').replace(/\s+/g, ' ').trim()
+  return who.length > 14 ? `${who.slice(0, 13)}…` : who
+}
+
+/**
+ * 고객 단추 이름 — '미래AI랩 맞춤 · 미래AI랩이 따라 할' 같은 이름은 그 사람 이름으로(D-638 — 대표 2026-11-19
+ * "다른 팀장 · 고객이 쓸 때는 미래AI랩 얘기가 없어야 — 그 회사명으로 'OO가 따라 할 틀'"). 이름이 비었으면 '내 채널' · '내가'.
+ * 화면(src/services/aiAssist/presets.ts customerLabelText)과 같은 규칙.
+ */
+export function customerLabel(label, brand) {
+  const name = brandShort(brand)
   return String(label ?? '')
     .replace(/카드뉴스 · /g, '')
-    .replace(/미래AI랩 맞춤/g, '내 채널 맞춤')
-    .replace(/미래AI랩이 따라 할/g, '내가 따라 할')
-    .replace(/미래AI랩이 참고할/g, '내가 참고할')
+    .replace(/미래AI랩 맞춤/g, name ? `${name} 맞춤` : '내 채널 맞춤')
+    .replace(/미래AI랩이 (따라 할|참고할)/g, (_m, verb) => `${name ? `${name}${subjectParticle(name)}` : '내가'} ${verb}`)
 }
 
 /* ------------------------------------------------------------------ */
