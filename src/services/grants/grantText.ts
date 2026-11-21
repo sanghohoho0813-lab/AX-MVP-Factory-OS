@@ -53,10 +53,11 @@ function datesAt(text: string): { date: string; at: number; end: number }[] {
 
 /** D-150: 날짜 바로 뒤의 시각 — '2026.10.15 18:00' · '2026.10.15(목) 18:00' · '10.15 오후 6시' → 'HH:MM' */
 function timeAfter(text: string, from: number): string {
+  // D-639 공고 원문 꼴 '2026. 3. 5.(목) 18:00까지' — 날짜 끝 점 뒤의 시각도
   const rest = text.slice(from, from + 24)
-  const hm = /^\s*(?:\([^)]{0,4}\)\s*)?(\d{1,2})\s*:\s*(\d{2})/.exec(rest)
+  const hm = /^\s*\.?\s*(?:\([^)]{0,4}\)\s*)?(\d{1,2})\s*:\s*(\d{2})/.exec(rest)
   if (hm && Number(hm[1]) <= 24 && Number(hm[2]) < 60) return `${hm[1].padStart(2, '0')}:${hm[2]}`
-  const kr = /^\s*(?:\([^)]{0,4}\)\s*)?(오전|오후)?\s*(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?/.exec(rest)
+  const kr = /^\s*\.?\s*(?:\([^)]{0,4}\)\s*)?(오전|오후)?\s*(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?/.exec(rest)
   if (kr) {
     let h = Number(kr[2])
     if (kr[1] === '오후' && h < 12) h += 12

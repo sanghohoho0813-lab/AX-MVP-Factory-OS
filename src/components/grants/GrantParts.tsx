@@ -3,11 +3,11 @@
  * 큰 글자 · 누르기 44px · 쉬운 말. 판정은 '조건 맞음 · 확인 필요' 만 말한다(선정 가능성 아님).
  */
 import { useMemo, useState, type ReactNode } from 'react'
-import { Check, CircleHelp, ExternalLink, Star, X } from 'lucide-react'
+import { Check, CircleHelp, ExternalLink, FileUp, Star, X } from 'lucide-react'
 import { isGrantBookmark, type FundingApplication } from '../../types/clientOps'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
-import { AiSoonButton } from '../ui/AiSoonButton'
+import { docReadLine, readNoticeDoc, type DocRead } from '../../services/grants/grantDoc'
 import {
   CERT_LABEL,
   GRANT_CATEGORY_LABEL,
@@ -194,6 +194,21 @@ export function NoticeForm({ value, onChange }: { value: NoticeInput; onChange: 
       <Field label="지원 대상(공고 글 그대로)">
         <textarea value={value.target} onChange={(e) => set({ target: e.target.value })} rows={2} className={inputCls} />
       </Field>
+      {/* D-639 제출 서류 — 공고에서 읽은 목록을 저장 전에 본다(신청 준비가 서류함과 맞춰 본다 · 비우면 기본 목록) */}
+      <Field label="제출 서류(한 줄에 하나)" hint="비우면 신청 준비에서 기본 목록으로 맞춰 봐요">
+        <textarea
+          id="grant-docs"
+          data-testid="grant-docs"
+          value={(value.documents ?? []).join('\n')}
+          onChange={(e) => {
+            const list = e.target.value.split('\n').map((x) => x.trim())
+            // 줄을 지우는 중인 빈 줄은 그대로 두고, 저장하면 normalizeNotice 가 빈 줄을 뺀다
+            set({ documents: list.some(Boolean) ? e.target.value.split('\n') : undefined })
+          }}
+          rows={Math.min(6, Math.max(2, (value.documents ?? []).length))}
+          className={inputCls}
+        />
+      </Field>
       <Field label="공고 주소(링크)">
         <input value={value.url} onChange={(e) => set({ url: e.target.value })} className={inputCls} placeholder="https://www.bizinfo.go.kr/…" inputMode="url" />
       </Field>
@@ -283,6 +298,48 @@ export function NoticeForm({ value, onChange }: { value: NoticeInput; onChange: 
 /* 공고 넣기 창                                                          */
 /* ------------------------------------------------------------------ */
 
+/** D-639 공고 파일에서 읽은 뒤 한 장 — 읽은 칸 · 못 찾은 칸 · 짐작한 칸 · [어디서 읽었나](쪽 · 그 줄) */
+function DocReadNote({ file, onReset }: { file: { name: string; read: DocRead; note?: string }; onReset: () => void }) {
+  const [open, setOpen] = useState(false)
+  const r = file.read
+  return (
+    <div className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="grant-doc-done">
+      <p className="t-sub font-semibold text-success-800">공고 파일({r.pages}쪽)에서 읽었어요 — 틀린 칸만 고치고 저장하세요.</p>
+      <p className="t-meta mt-0.5 break-keep text-slate-600" data-testid="grant-doc-line">
+        {docReadLine(r)}
+      </p>
+      {r.missing.length > 0 && (
+        <p className="t-meta mt-0.5 break-keep text-warning-800" data-testid="grant-doc-missing">
+          못 찾은 칸: {r.missing.join(' · ')} — 직접 적어 주세요
+        </p>
+      )}
+      {r.unsure.length > 0 && (
+        <p className="t-meta mt-0.5 break-keep text-slate-600" data-testid="grant-doc-unsure">
+          짐작한 칸: {r.unsure.join(' · ')} — 한 번 확인해 주세요
+        </p>
+      )}
+      {file.note && <p className="t-meta mt-0.5 break-keep text-slate-500">{file.note}</p>}
+      <div className="mt-1 flex flex-wrap gap-x-4">
+        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} data-testid="grant-doc-where" className="tap t-meta py-1 font-semibold text-brand-700">
+          {open ? '읽은 곳 접기' : '어디서 읽었나 보기'}
+        </button>
+        <button type="button" onClick={onReset} data-testid="grant-doc-reset" className="tap t-meta py-1 font-semibold text-slate-600">
+          다른 파일로
+        </button>
+      </div>
+      {open && (
+        <ul className="mt-1 flex flex-col gap-1" data-testid="grant-doc-found">
+          {r.found.map((f) => (
+            <li key={f.field} className="t-meta break-keep text-slate-600">
+              <span className="font-semibold text-slate-800">{f.field}</span> · {f.page}쪽 · “{f.line}”
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 type AddMode = 'paste' | 'manual' | 'file'
 
 export function AddNoticeSheet({
@@ -305,6 +362,30 @@ export function AddNoticeSheet({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const parsed = useMemo(() => (fileText.trim() ? parseBizinfoJson(fileText) : null), [fileText])
+  // D-639 공고 원문 파일(PDF · 한글 · 사진) — 글을 뽑아(서류 올리기와 같은 길) 공고 칸으로 읽는다. 규칙 읽기(AI 아님)
+  const [docRead, setDocRead] = useState<{ name: string; read: DocRead; note?: string } | null>(null)
+  const [reading, setReading] = useState('')
+
+  const readFile = async (f: File) => {
+    setError('')
+    setReading('파일 여는 중')
+    try {
+      const { canExtractText, extractTextFromFile } = await import('../../services/docTextExtract')
+      if (!canExtractText(f)) throw new Error('PDF · 한글(HWP) · 워드 · 사진 파일을 올려 주세요.')
+      const res = await extractTextFromFile(f, (_, label) => setReading(label), { pdfPages: 40 })
+      const r = readNoticeDoc(res.text)
+      if (r.found.length === 0) {
+        setError('이 파일에서 공고 글을 찾지 못했어요 — 공고 글을 복사해 붙여 넣거나 [직접 적기]로 적어 주세요.')
+        return
+      }
+      setDocRead({ name: f.name, read: r, note: res.note })
+      setDraft({ ...r.draft, published: false })
+    } catch (cause) {
+      setError(cause instanceof Error && cause.message ? cause.message : '파일을 읽지 못했어요 — 다시 올려 주세요.')
+    } finally {
+      setReading('')
+    }
+  }
 
   const read = () => {
     const d = parseNoticeText(paste)
@@ -326,7 +407,11 @@ export function AddNoticeSheet({
       } else {
         const v = draft ?? emptyNotice()
         if (!v.title.trim()) throw new Error('공고 이름을 적어 주세요.')
-        await onSave({ ...v, rules: normalizeRules(v.rules) })
+        // D-639 제출 서류 칸의 빈 줄은 빼고 저장(비면 칸 없음 — 신청 준비가 기본 목록을 쓴다)
+        const docs = (v.documents ?? []).map((x) => x.trim()).filter(Boolean)
+        const { documents: _drop, ...rest } = v
+        void _drop
+        await onSave({ ...rest, rules: normalizeRules(v.rules), ...(docs.length ? { documents: docs } : {}) })
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
@@ -357,7 +442,7 @@ export function AddNoticeSheet({
           <div role="tablist" className="flex rounded-(--radius-control) border border-slate-200 bg-slate-50 p-0.5">
             {(
               [
-                ['paste', '공고 글 붙여넣기'],
+                ['paste', '파일 · 붙여넣기'],
                 ['manual', '직접 적기'],
                 ['file', '기업마당 파일'],
               ] as [AddMode, string][]
@@ -383,16 +468,52 @@ export function AddNoticeSheet({
 
         {mode === 'paste' && !draft && (
           <>
-            <AiSoonButton size="sm" label="AI로 공고 PDF 읽기" what="공고문 · 첨부 PDF를 읽어 조건 · 준비 서류 · 지원 금액을 더 정확히 채워 줍니다" className="self-start" />
-            <p className="t-sub break-keep text-slate-600">기업마당 · 부처 누리집의 공고 화면을 통째로 복사해서 붙여 넣으세요. 공고명 · 신청기간 · 지원대상 · 조건을 읽어서 칸을 채웁니다. 저장 전에 한 번 보여 드려요.</p>
-            <textarea id="grant-paste" value={paste} onChange={(e) => setPaste(e.target.value)} rows={9} className={inputCls} placeholder={'[경기] 2026년 ○○ 지원사업 공고\n소관부처 …\n신청기간 2026.10.01 ~ 2026.10.31\n지원대상 …'} />
+            <label
+              data-guide="fn-grant-doc-file"
+              data-testid="grant-doc-pick"
+              aria-disabled={!!reading}
+              className={`tap flex items-center gap-3 rounded-(--radius-control) border border-slate-300 bg-white px-4 py-3 hover:border-brand-300 hover:bg-slate-50 ${reading ? 'pointer-events-none opacity-70' : 'cursor-pointer'}`}
+            >
+              <FileUp aria-hidden="true" className="size-5 shrink-0 text-brand-600" />
+              <span className="flex min-w-0 flex-col">
+                <span className="t-body font-semibold text-slate-900">{reading ? '공고 읽는 중…' : '공고 파일 올리기'}</span>
+                <span className="t-meta text-slate-500" data-testid="grant-doc-progress">
+                  {reading || 'PDF · 한글 · 사진 — 기간 · 대상 · 금액 · 서류를 칸에 채워요'}
+                </span>
+              </span>
+              <input
+                type="file"
+                className="sr-only"
+                data-testid="grant-doc-file"
+                accept=".pdf,.hwp,.hwpx,.docx,.doc,.txt,image/*,application/pdf"
+                disabled={!!reading}
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  e.target.value = ''
+                  if (f) void readFile(f)
+                }}
+              />
+            </label>
+            <p className="t-sub break-keep text-slate-600">또는 공고 화면 글을 통째로 복사해 붙여 넣으세요. 저장 전에 한 번 보여 드려요.</p>
+            <textarea id="grant-paste" value={paste} onChange={(e) => setPaste(e.target.value)} rows={7} className={inputCls} placeholder={'[경기] 2026년 ○○ 지원사업 공고\n소관부처 …\n신청기간 2026.10.01 ~ 2026.10.31\n지원대상 …'} />
           </>
         )}
 
-        {mode === 'paste' && draft && (
+        {mode === 'paste' && draft && !docRead && (
           <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 text-success-800" data-testid="grant-read-done">
             읽었습니다. 틀린 칸만 고치고 저장하세요.
           </p>
+        )}
+
+        {mode === 'paste' && draft && docRead && (
+          <DocReadNote
+            file={docRead}
+            onReset={() => {
+              setDocRead(null)
+              setDraft(null)
+              setError('')
+            }}
+          />
         )}
 
         {showForm && draft && <NoticeForm value={draft} onChange={setDraft} />}

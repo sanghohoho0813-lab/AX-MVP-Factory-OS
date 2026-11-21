@@ -38,7 +38,7 @@ export interface ExtractResult {
 export type ProgressFn = (ratio: number, label: string) => void
 
 /** PDF에서 텍스트 추출 (스캔본이면 빈 문자열에 가깝다) */
-async function extractPdfText(file: File, onProgress?: ProgressFn): Promise<{ text: string; pages: string[] }> {
+async function extractPdfText(file: File, onProgress?: ProgressFn, pageLimit = 10): Promise<{ text: string; pages: string[] }> {
   ensureMapUpsert()
   const pdfjs = await import('pdfjs-dist')
   // 워커를 번들에서 함께 제공한다 (CDN 의존 없음)
@@ -49,7 +49,7 @@ async function extractPdfText(file: File, onProgress?: ProgressFn): Promise<{ te
   // pdf.js 6: 문서 닫기는 불러오기 작업(task)이 맡는다 (6 판부터 글꼴 코드 실행 자체가 없다)
   const task = pdfjs.getDocument({ data: buf })
   const doc = await task.promise
-  const maxPages = Math.min(doc.numPages, 10)
+  const maxPages = Math.min(doc.numPages, pageLimit)
   const chunks: string[] = []
   for (let i = 1; i <= maxPages; i += 1) {
     onProgress?.(i / maxPages, `PDF ${i}/${maxPages}쪽 읽는 중`)
@@ -603,7 +603,8 @@ function hasEnoughText(text: string): boolean {
   return hangul >= 20
 }
 
-export async function extractTextFromFile(file: File, onProgress?: ProgressFn): Promise<ExtractResult> {
+/** D-639 opts.pdfPages — 글자 PDF 를 몇 쪽까지 읽을지(기본 10 · 공고 원문은 40 — 제출서류가 뒤쪽에 있다) */
+export async function extractTextFromFile(file: File, onProgress?: ProgressFn, opts: { pdfPages?: number } = {}): Promise<ExtractResult> {
   const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
   // 엑셀 — 칸 안의 글자만 뽑는다 (라이브러리 없이, D-89)
   if (isXlsxFile(file)) {
@@ -638,7 +639,7 @@ export async function extractTextFromFile(file: File, onProgress?: ProgressFn): 
   if (isPdf) {
     onProgress?.(0, 'PDF 여는 중')
     // D-463 암호가 걸린 PDF(은행 거래내역 · 4대보험 EDI 명부 등) — 예전에는 까닭 없이 빈 글('기타'). 한 줄로 알린다(파일은 그대로 보관)
-    const { text, pages } = await extractPdfText(file, onProgress).catch((e: unknown) => {
+    const { text, pages } = await extractPdfText(file, onProgress, opts.pdfPages).catch((e: unknown) => {
       if (isPdfPasswordError(e)) throw new OfficeReadError(PDF_PASSWORD_NOTE)
       // D-464 깨진 PDF(받다 끊김 · 이름만 .pdf) — 까닭 한 줄
       if ((e as { name?: string } | null)?.name === 'InvalidPDFException') throw new OfficeReadError(PDF_BROKEN_NOTE)

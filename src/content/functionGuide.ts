@@ -674,6 +674,16 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     next: '보낼 요일을 정해 두면 그날 오늘 화면에 알려 줘요.',
     basicHidden: true,
   },
+  // D-639 공고 원문 파일 읽기(규칙 — AI 아님)
+  'fn-grant-doc-file': {
+    label: '공고 파일 올리기',
+    menu: 'grants',
+    what: '부처 · 지자체가 낸 공고 PDF · 한글 파일 · 사진을 올리면 공고명 · 신청 기간 · 지원 대상 · 금액 · 제출 서류를 칸에 채워요.',
+    why: '공고문은 수십 쪽이라 필요한 칸을 찾아 옮겨 적는 데 시간이 오래 걸려서요.',
+    effect: '어디서 읽었는지 쪽 · 그 줄을 같이 보여 주고, 못 찾은 칸은 따로 알려 줘요. 제출 서류는 신청 준비에서 업체 서류함과 바로 맞춰 봐요.',
+    next: '공고에 붙은 신청 양식 · 첨부 파일도 같이 읽게 넓혀요.',
+    basicHidden: true,
+  },
   // D-626 기획 대화(대표만 — 업체의 AI 전략실 안) — 이어서 묻기 · 리서치 · 자체점검 · 기획서 판 · 개발 프롬프트
   'fn-talk-open': {
     label: '기획 대화',

@@ -969,6 +969,128 @@ https://www.bizinfo.go.kr/web/view.do?pblancId=PBLN_${days}`
   await m.close()
 }
 
+/* ---------------- D-639 공고 원문 파일 올리기(진짜 PDF · 여러 쪽) ---------------- */
+{
+  const { writeFileSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const ymdParts = (ymd) => ymd.split('-').map(Number)
+  const spaced = (ymd) => {
+    const [y, m, d] = ymdParts(ymd)
+    return `${y}. ${m}. ${d}.`
+  }
+  const START = kst(-5)
+  const DUE = kst(12)
+  // 부처 공고 원문 꼴 — 1쪽 표지(번호 줄 · 공고명 · 서명) · 2쪽 개요 · 자격 · 3쪽 기간 · 서류
+  const html = `<html><head><meta charset="utf-8"><style>
+    body{font-family:'WenQuanYi Zen Hei',sans-serif;font-size:14px;line-height:1.7;margin:48px}
+    .pg{page-break-after:always} p{margin:0 0 6px}
+  </style></head><body>
+  <div class="pg">
+    <p>경기도 공고 제2026 - 4410호</p>
+    <p>2026년 경기도 제조기업 디지털전환 바우처 참여기업 모집 공고</p>
+    <p>경기도 내 제조 중소기업의 디지털 전환을 돕기 위해 다음과 같이 참여기업을 모집합니다.</p>
+    <p>${dot(START)}</p>
+    <p>경기도지사</p>
+  </div>
+  <div class="pg">
+    <p>1. 사업 개요</p>
+    <p>❍ (지원규모) 총 40억원, 80개사 내외</p>
+    <p>❍ (지원내용) 기업당 최대 4천만원 이내 바우처(자부담 30%)</p>
+    <p>❍ (사업기간) 협약일 ~ ${spaced(kst(200))}</p>
+    <p>2. 신청 자격</p>
+    <p>❍ (지원대상) 경기도 소재 제조업 중소기업(상시 근로자 5명 이상)</p>
+    <p>* 국세·지방세 체납 기업 제외</p>
+    <p>❍ (우대사항) 여성기업 가점</p>
+  </div>
+  <div>
+    <p>3. 신청 기간 및 방법</p>
+    <p>❍ (신청기간) ${spaced(START)}(월) ~ ${spaced(DUE)}(금) 18:00까지</p>
+    <p>❍ (신청방법) 누리집 온라인 접수</p>
+    <p>4. 제출서류</p>
+    <p>① 참여신청서 1부(서식 제1호)</p>
+    <p>② 사업자등록증 사본 1부</p>
+    <p>③ 국세·지방세 완납증명서 각 1부</p>
+    <p>④ 4대보험 가입자 명부 1부</p>
+    <p>5. 문의처</p>
+    <p>❍ 경기도 산업정책과 031-000-0000</p>
+  </div></body></html>`
+  const maker = await browser.newPage()
+  await maker.setContent(html, { waitUntil: 'load' })
+  const pdfPath = join(tmpdir(), 'axmvp-d639-notice.pdf')
+  writeFileSync(pdfPath, await maker.pdf({ format: 'A4' }))
+  await maker.close()
+  const txtPath = join(tmpdir(), 'axmvp-d639-empty.txt')
+  writeFileSync(txtPath, '안내\n자세한 내용은 붙임 파일을 참고하시기 바랍니다.')
+
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(prepClients)
+  await page.evaluate(() => {
+    const list = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    for (const c of list) if (c.id === 'cli_hansol') c.fundingApplications = []
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(list))
+  })
+  await page.goto(BASE + '/grants', { waitUntil: 'networkidle' })
+  await page.getByTestId('grant-add-open').click()
+  check('D639 공고 넣기: [공고 파일 올리기] 칸 · AI 준비 중 자리 없음', (await page.getByTestId('grant-doc-pick').count()) === 1 && !(await page.getByTestId('grant-add').innerText()).includes('AI로 공고 PDF'))
+
+  // 읽을 것 없는 파일 → 까닭 한 줄 · 칸은 그대로
+  await page.getByTestId('grant-doc-file').setInputFiles(txtPath)
+  await page.getByRole('alert').filter({ hasText: '공고 글을 찾지 못했어요' }).waitFor({ timeout: 15000 })
+  check('D639 읽을 것 없는 파일: 까닭 한 줄 · 고르기 칸 그대로', (await page.getByTestId('grant-doc-pick').count()) === 1 && (await page.getByTestId('notice-form').count()) === 0)
+
+  const t0 = Date.now()
+  await page.getByTestId('grant-doc-file').setInputFiles(pdfPath)
+  await page.getByTestId('grant-doc-done').waitFor({ timeout: 30000 })
+  const took = Date.now() - t0
+  check(`D639 진짜 PDF 3쪽 읽기 ${took}ms(10초 안)`, took < 10000)
+  check('D639 공고명: 번호 줄 · 서명이 아니라 공고 이름', (await page.locator('#grant-title').inputValue()) === '2026년 경기도 제조기업 디지털전환 바우처 참여기업 모집 공고', await page.locator('#grant-title').inputValue())
+  check('D639 소관: 번호 줄 앞(경기도)', (await page.locator('#grant-agency').inputValue()) === '경기도', await page.locator('#grant-agency').inputValue())
+  check('D639 기간: 시작 · 마감(사업기간은 안 읽음)', (await page.locator('#grant-start').inputValue()) === START && (await page.locator('#grant-end').inputValue()) === DUE, [await page.locator('#grant-start').inputValue(), await page.locator('#grant-end').inputValue()])
+  const docs = (await page.getByTestId('grant-docs').inputValue()).split('\n')
+  check('D639 제출 서류 칸: 다섯(국세 · 지방세 나눔)', JSON.stringify(docs) === JSON.stringify(['참여신청서', '사업자등록증 사본', '국세 완납증명서', '지방세 완납증명서', '4대보험 가입자 명부']), docs)
+  const line = await page.getByTestId('grant-doc-line').innerText()
+  check('D639 한 줄: 읽은 칸 · 제출 서류 5개 · 3쪽', line.includes('신청 기간') && line.includes('제출 서류 5개') && (await page.getByTestId('grant-doc-done').innerText()).includes('3쪽'), line)
+  check('D639 못 찾은 칸 줄 없음', (await page.getByTestId('grant-doc-missing').count()) === 0)
+  await page.getByTestId('grant-doc-where').click()
+  const where = await page.getByTestId('grant-doc-found').innerText()
+  check('D639 어디서 읽었나: 공고명 1쪽 · 대상 2쪽 · 기간 3쪽', /공고명 · 1쪽/.test(where) && /지원 대상 · 2쪽/.test(where) && /신청 기간 · 3쪽/.test(where), where)
+  check('D639 조건 줄: 경기 · 제조 · 직원 5명 이상', /경기.*제조 업종.*직원 5명 이상/.test(await page.getByTestId('grant-rules-toggle').innerText()), await page.getByTestId('grant-rules-toggle').innerText())
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/d639-pc.png`, fullPage: false })
+
+  await page.getByTestId('grant-save').click()
+  await page.getByTestId('grant-row').filter({ hasText: '디지털전환 바우처' }).first().waitFor()
+  await page.getByTestId('grant-row').filter({ hasText: '디지털전환 바우처' }).first().click()
+  await page.getByTestId('notice-sheet').waitFor()
+  const row = page.locator('[data-testid="notice-client"][data-client="cli_hansol"]')
+  check('D639 저장 → 맞는 업체(파주 제조)에 [신청 준비]', (await row.getByTestId('notice-apply').count()) === 1)
+  await row.getByTestId('notice-apply').click()
+  await row.getByTestId('notice-applied').waitFor()
+  check('D639 신청 준비: 파일에서 읽은 서류 5가지로 맞춰 봄', /서류 \d\/5/.test(await row.getByTestId('notice-applied').innerText()), await row.getByTestId('notice-applied').innerText())
+  check('D639 화면 오류 0', errors.length === 0, errors)
+  await ctx.close()
+
+  // 휴대폰 390 — 고르기 칸 · 읽은 뒤 한 장 넘침 0
+  const m = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const mp = await m.newPage()
+  await mp.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await mp.evaluate(seedScript())
+  await mp.goto(BASE + '/grants', { waitUntil: 'networkidle' })
+  await mp.getByTestId('grant-add-open').click()
+  const pickBox = await mp.getByTestId('grant-doc-pick').boundingBox()
+  check('D639 390: 고르기 칸 높이 44px 이상', (pickBox?.height ?? 0) >= 44, pickBox)
+  await mp.getByTestId('grant-doc-file').setInputFiles(pdfPath)
+  await mp.getByTestId('grant-doc-done').waitFor({ timeout: 30000 })
+  check('D639 390: 읽은 뒤 가로 넘침 0', (await overflowX(mp)) <= 0, await overflowX(mp))
+  if (SHOTS) await mp.screenshot({ path: `${SHOTS}/d639-390.png`, fullPage: false })
+  await m.close()
+}
+
 await browser.close()
 console.log(`\ngrants e2e: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

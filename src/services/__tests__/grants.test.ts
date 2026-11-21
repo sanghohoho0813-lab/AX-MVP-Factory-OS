@@ -61,6 +61,7 @@ import { clip, grantBriefOf } from '../grants/grantBrief'
 import { DIGEST_LIMIT, defaultDigestPicks, digestCandidates, digestExtra, digestHistory, digestMessage, digestSummary, noticeDay, sentIndexOf, type DigestItem } from '../grants/grantDigest'
 import type { SentRecord } from '../grants/grantStore'
 import { isGrantBookmark } from '../../types/clientOps'
+import { DOC_FIELDS, docReadLine, readNoticeDoc } from '../grants/grantDoc'
 
 let pass = 0
 let fail = 0
@@ -1170,6 +1171,103 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   const oldRec: SentRecord[] = [{ id: 'o', clientId: 'c1', noticeIds: ['gone', 'told'], channel: 'kakao', at: '2026-11-01T03:00:00Z' }]
   const h2 = digestHistory(oldRec, 'c1', (id) => (id === 'told' ? '지금 이름' : ''))
   check('D623-17 예전 기록(이름을 안 남긴 것): 지금 목록에 있으면 그 이름 · 없으면 빈 이름', h2[0].items.map((x) => x.title).join('|') === '|지금 이름', h2)
+}
+
+/* ---------------- D-639 공고 원문 파일 읽기 ---------------- */
+{
+  // ① 부처 PDF 꼴 — 번호 줄 · 공고명 · 서명 · 칸 머리(1.) · 괄호 칸 이름(❍) · 쪽 나눔 · 쪽 번호
+  const pdf = `중소벤처기업부 공고 제2026 - 98호
+
+2026년 중소기업 혁신바우처사업 참여기업 모집 공고
+
+중소기업의 성장을 위한 컨설팅, 기술지원, 마케팅을 지원하는 「2026년 중소기업 혁신바우처사업」 참여기업 모집을 다음과 같이 공고합니다.
+2026년 2월 10일
+중소벤처기업부 장관
+- 1 -
+\f
+1. 사업 개요
+ ❍ (사업목적) 제조 중소기업의 경쟁력 강화를 위한 컨설팅 · 기술지원 · 마케팅 바우처 지원
+ ❍ (지원규모) 총 300억원, 약 900개사
+ ❍ (지원내용) 기업당 최대 5천만원 이내 바우처 지급(정부지원금 50~80%)
+ ❍ (사업기간) 협약일 ~ 2026. 12. 31.
+2. 신청 자격
+ ❍ (지원대상) 최근 3년 평균 매출액 140억원 이하 제조 중소기업
+   * 휴·폐업 기업, 국세·지방세 체납 기업 제외
+ ❍ (우대사항) 여성기업, 장애인기업 가점 부여
+- 2 -
+\f
+3. 신청 기간 및 방법
+ ❍ (신청기간) 2026. 2. 10.(화) ~ 2026. 3. 5.(목) 18:00까지
+ ❍ (신청방법) 혁신바우처 누리집(www.mssmiv.com) 온라인 신청
+4. 제출서류
+ ① 사업신청서 1부(서식 제1호)
+ ② 중소기업확인서 1부
+ ③ 국세·지방세 완납증명서 각 1부
+ ④ 최근 3년 재무제표 각 1부
+5. 문의처
+ ❍ 중소기업 통합콜센터 ☎ 1357`
+  const r = readNoticeDoc(pdf)
+  const d = r.draft
+  check('D639-1 공고명: 번호 줄 · 서명이 아니라 공고 이름 줄', d.title === '2026년 중소기업 혁신바우처사업 참여기업 모집 공고', d.title)
+  check('D639-2 소관: 번호 줄 앞(중소벤처기업부)', d.agency === '중소벤처기업부', d.agency)
+  check('D639-3 신청 기간: 날짜 끝 점 · 요일 뒤 시각까지 · 사업기간(협약일 ~)은 안 읽음', d.applyStart === '2026-02-10' && d.applyEnd === '2026-03-05' && d.applyEndTime === '18:00' && d.deadlineKind === 'date', [d.applyStart, d.applyEnd, d.applyEndTime])
+  check('D639-4 지원 대상: 괄호 칸 글 + 아래 * 줄(제외) · 우대사항은 안 섞임', d.target.startsWith('최근 3년 평균 매출액 140억원 이하 제조 중소기업') && d.target.includes('체납 기업 제외') && !d.target.includes('여성기업'), d.target)
+  check('D639-5 조건: 매출 140억 이하 · 제조 · 중소기업 · 여성 대표 조건 아님(우대)', d.rules.maxRevenueM === 14000 && d.rules.industries.includes('제조') && d.rules.sizes.includes('small') && !d.rules.womenCeo, d.rules)
+  check('D639-6 지원 금액: 기업당 최대 5천만원(총 300억원 예산이 아님)', /5천만원/.test(d.amountText) && !/300억/.test(d.amountText), d.amountText)
+  check('D639-7 개요에 지원규모(선정 900개사)가 들어가 선정 규모가 읽힘', slotsOf(d) === 900, slotsOf(d))
+  check('D639-8 제출 서류: ① ~ ④ → 다섯 서류(국세 · 지방세 나눔)', JSON.stringify(d.documents) === JSON.stringify(['사업신청서', '중소기업확인서', '국세 완납증명서', '지방세 완납증명서', '최근 3년 재무제표']), d.documents)
+  check('D639-9 주소: www 만 적힌 신청 누리집 → https://', d.url === 'https://www.mssmiv.com', d.url)
+  check('D639-10 못 찾은 칸 0 · 짐작한 칸 0 · 3쪽', r.missing.length === 0 && r.unsure.length === 0 && r.pages === 3, r)
+  const pageOf = (f: string) => r.found.find((x) => x.field === f)?.page
+  check('D639-11 읽은 곳: 공고명 1쪽 · 대상 2쪽 · 기간 · 서류 3쪽', pageOf('공고명') === 1 && pageOf('지원 대상') === 2 && pageOf('신청 기간') === 3 && pageOf('제출 서류') === 3, r.found)
+  check('D639-12 한 줄: 칸 이름 · 서류 개수', docReadLine(r) === '공고명 · 소관 · 신청 기간 · 지원 대상 · 지원 금액 · 제출 서류 5개', docReadLine(r))
+  check('D639-13 갈래: 바우처 → 자금', d.category === 'money', d.category)
+
+  // ② 한글 표 꼴 — 칸 사이 탭 · 띄어 쓴 칸 이름 · 표 머리 줄(구 분)
+  const hwp = `[경기] 2026년 파주시 소상공인 온라인 판로 지원사업 모집 공고
+구 분\t내 용
+소 관 기 관\t경기도 파주시
+지 원 대 상\t파주시 소재 소상공인(창업 3년 이내)
+지 원 규 모\t20개사 내외, 업체당 최대 300만원
+신 청 기 간\t2026. 4. 1.(수) ~ 4. 15.(수) 17:00
+제 출 서 류\t신청서, 사업자등록증 사본 1부, 소상공인확인서
+문 의 처\t파주시 일자리경제과 031-940-0000`
+  const h = readNoticeDoc(hwp)
+  check('D639-14 표: 공고명 · 소관(띄어 쓴 칸 이름)', h.draft.title.startsWith('[경기] 2026년 파주시 소상공인') && h.draft.agency === '경기도 파주시', [h.draft.title, h.draft.agency])
+  check('D639-15 표: 기간(끝날에 해 없음) · 시각', h.draft.applyStart === '2026-04-01' && h.draft.applyEnd === '2026-04-15' && h.draft.applyEndTime === '17:00', [h.draft.applyStart, h.draft.applyEnd, h.draft.applyEndTime])
+  check('D639-16 표: 대상 → 경기 파주시 · 소상공인 · 창업 3년 이내', h.draft.rules.regions.join() === '경기' && h.draft.rules.cities.join() === '파주시' && h.draft.rules.sizes.includes('micro') && h.draft.rules.withinYears === 3, h.draft.rules)
+  check('D639-17 표: 금액 업체당 최대 300만원 · 선정 20곳 · 서류 셋', /300만원/.test(h.draft.amountText) && slotsOf(h.draft) === 20 && JSON.stringify(h.draft.documents) === JSON.stringify(['신청서', '사업자등록증 사본', '소상공인확인서']), [h.draft.amountText, h.draft.documents])
+  check('D639-18 표: 문의처 줄이 서류 · 대상에 안 섞임', !h.draft.target.includes('031') && !(h.draft.documents ?? []).some((x) => x.includes('031')))
+
+  // ③ 칸 머리만 있고 내용은 아래 '가.' 줄 · 신청기간 칸 없이 '접수' 줄 · 사업기간(~) 먼저 나옴 · 서류 칸 없음
+  const loose = `서울특별시 공고 제2026-1150호
+2026년 서울형 R&D 지원사업
+기술개발 과제 모집 공고
+□ 사업 개요
+ ㅇ 사업기간: 2026. 6. 1. ~ 2027. 5. 31.(12개월)
+ ㅇ 과제당 최대 2억원 지원(총 15개 과제 내외)
+□ 신청자격
+ 가. 공고일 기준 서울시 소재 중소기업
+ 나. 업력 3년 이상 기업
+□ 접수
+ ㅇ 온라인 접수: 2026. 4. 20.(월) ~ 5. 8.(금) 16:00까지
+□ 문의: 서울경제진흥원 02-0000-0000`
+  const l = readNoticeDoc(loose)
+  check('D639-19 두 줄로 나뉜 공고명 이어 붙임', l.draft.title === '2026년 서울형 R&D 지원사업 기술개발 과제 모집 공고', l.draft.title)
+  check('D639-20 소관: 서울특별시 → 지역 서울', l.draft.agency === '서울특별시' && l.draft.rules.regions.join() === '서울', [l.draft.agency, l.draft.rules.regions])
+  check('D639-21 칸 머리만 있는 신청자격 → 아래 가. 나. 줄이 대상 · 업력 3년 이상', l.draft.target.includes('서울시 소재 중소기업') && l.draft.target.includes('업력 3년 이상') && l.draft.rules.minYears === 3, [l.draft.target, l.draft.rules.minYears])
+  check('D639-22 기간: 사업기간(~) 은 건너뛰고 접수 줄에서 짐작 · 짐작 표시', l.draft.applyStart === '2026-04-20' && l.draft.applyEnd === '2026-05-08' && l.draft.applyEndTime === '16:00' && l.unsure.includes('신청 기간'), [l.draft.applyStart, l.draft.applyEnd, l.unsure])
+  check('D639-23 금액: 과제당 최대 2억원 · 서류 칸 없음 → 못 찾은 칸', /2억원/.test(l.draft.amountText) && l.missing.join() === '제출 서류', [l.draft.amountText, l.missing])
+  check('D639-24 갈래: R&D', l.draft.category === 'rnd', l.draft.category)
+
+  // ④ 글이 거의 없는 파일(사진 인식 실패 등) — 지어내지 않는다
+  const thin = readNoticeDoc('안내\n자세한 내용은 붙임 파일을 참고하시기 바랍니다.')
+  check('D639-25 읽을 것 없음: 공고명 빈 칸 · 못 찾은 칸 여섯 · 조건 없음', thin.draft.title === '' && thin.missing.length === DOC_FIELDS.length && rulesText(thin.draft.rules).length === 0, thin)
+  // ⑤ 문장 속 칸 이름 낱말은 칸이 아니다 — '신청기간 내에 …' · '대상 기업은 …'
+  const sentence = readNoticeDoc('2026년 스마트공장 보급사업 공고\n신청기간 내에 제출한 서류만 인정합니다.\n대상 기업은 선정 뒤 협약을 맺습니다.\n신청기간: 2026.07.01 ~ 2026.07.31\n지원대상: 제조업 중소기업')
+  check('D639-26 문장 속 낱말은 칸 아님: 기간 · 대상은 진짜 칸에서', sentence.draft.applyEnd === '2026-07-31' && sentence.draft.target === '제조업 중소기업', [sentence.draft.applyEnd, sentence.draft.target])
+  // 붙여넣기 읽기도 같은 시각 고침을 받는다(날짜 끝 점 뒤 시각)
+  check('D639-27 붙여넣기 기간: 2026. 3. 5.(목) 18:00 → 18:00', periodOf('2026. 2. 10.(화) ~ 2026. 3. 5.(목) 18:00까지').applyEndTime === '18:00')
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)
