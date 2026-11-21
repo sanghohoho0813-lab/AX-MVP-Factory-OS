@@ -9,8 +9,9 @@
  */
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, ChevronDown, FileText, FileUp, History, MessageCircle, Send, Sparkles } from 'lucide-react'
+import { ArrowRight, CalendarRange, ChevronDown, FileText, FileUp, History, MessageCircle, Send, Sparkles } from 'lucide-react'
 import { ClientDiagnosisSheet } from './ClientDiagnosisSheet'
+import { ClientYearPlanSheet } from './ClientYearPlanSheet'
 import { ClientTalkSheet } from './ClientTalkSheet'
 import { activityTimeText } from '../../services/clientOpsActivity'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -39,7 +40,10 @@ export function TopPicksCard({
   onDiagnosis,
   diagNote,
   onTalk,
+  onYearPlan,
 }: {
+  /** D-640 1년 자금 일정표(이번 달부터 12달 — 기한 · 맞는 공고 · 제안 · 신고 달) — 없으면 단추를 그리지 않는다 */
+  onYearPlan?: () => void
   /** D-508 상담 자리에서 읽을 말하기 대본(미팅 순서 · 제안마다 말하기) — 없으면 단추를 그리지 않는다 */
   onTalk?: () => void
   /** D-352 대표님께 드릴 맞춤 진단서 한 장(없으면 단추를 그리지 않는다) */
@@ -86,8 +90,13 @@ export function TopPicksCard({
             <FileText aria-hidden="true" className="size-4" /> 맞춤 진단서
           </Button>
         )}
+        {onYearPlan && insights.length > 0 && (
+          <Button size="sm" variant="secondary" onClick={onYearPlan} className={onTalk || onDiagnosis ? '' : 'ml-auto'} data-testid="top-picks-yearplan" data-guide="fn-year-plan" title="이번 달부터 12달 — 언제 무엇을 하면 되는지 한 장(인쇄 · 카톡 요약)">
+            <CalendarRange aria-hidden="true" className="size-4" /> 1년 일정표
+          </Button>
+        )}
         {onShowAll && insights.length > 0 && (
-          <button type="button" onClick={onShowAll} data-testid="top-picks-all" className={`tap t-sub inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline ${onDiagnosis || onTalk ? '' : 'ml-auto'}`}>
+          <button type="button" onClick={onShowAll} data-testid="top-picks-all" className={`tap t-sub inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline ${onDiagnosis || onTalk || onYearPlan ? '' : 'ml-auto'}`}>
             모듈별 판정 {insights.length}개 <ArrowRight aria-hidden="true" className="size-4" />
           </button>
         )}
@@ -243,6 +252,8 @@ export default function ClientTopPicks({
   const [diag, setDiag] = useState(false)
   // D-508 말하기 대본(미팅 순서 · 제안마다 말하기)
   const [talk, setTalk] = useState(false)
+  // D-640 1년 자금 일정표
+  const [year, setYear] = useState(false)
   // D-447 확인 기다리는 사실(스캔본에서 읽음)
   const pendingKeys = useMemo(() => new Set(pendingFacts(record).map((p) => p.key)), [record])
   const text = useMemo(() => recoRequestMessage(record, insights, pendingKeys), [record, insights, pendingKeys])
@@ -269,12 +280,14 @@ export default function ClientTopPicks({
     <>
       {diag && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={() => setDiag(false)} onGiven={onCommitQuiet} />}
       {talk && <ClientTalkSheet record={record} insights={insights} onClose={() => setTalk(false)} memo={onCommitQuiet ? { workspaceId, userId, onCommit: onCommitQuiet } : undefined} />}
+      {year && <ClientYearPlanSheet record={record} insights={insights} notices={featureUsable(ent, 'grants') ? notices : []} today={today} onClose={() => setYear(false)} />}
       <TopPicksCard
         insights={insights}
         onUpload={onUpload}
         onShowAll={onShowAll}
         onDiagnosis={() => setDiag(true)}
         onTalk={() => setTalk(true)}
+        onYearPlan={() => setYear(true)}
         diagNote={diagNote}
         onRequest={onRequestText && text ? () => onRequestText(text) : undefined}
         onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined}

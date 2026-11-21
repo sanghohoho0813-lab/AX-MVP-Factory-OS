@@ -674,6 +674,16 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     next: '보낼 요일을 정해 두면 그날 오늘 화면에 알려 줘요.',
     basicHidden: true,
   },
+  // D-640 업체 1년 자금 일정표(먼저 제안할 것 카드 머리 — 외부 구독 고객 화면에는 이 카드가 없다)
+  'fn-year-plan': {
+    label: '1년 일정표',
+    menu: 'client-ops',
+    what: '이번 달부터 12달 동안 이 업체가 언제 무엇을 하면 되는지 한 장으로 보여 줘요 — 신청 마감 · 맞는 공고 마감 · 먼저 제안할 것 · 신고 달 · 경정청구 마감.',
+    why: '판정 · 기한 · 공고가 화면마다 흩어져 있어서, 대표님께 1년 흐름을 한 번에 설명하기 어려웠어요.',
+    effect: '놓치면 끝나는 기한이 달마다 빨간 글자로 보여요. 인쇄 · PDF · 카톡 요약으로 대표님께 바로 드릴 수 있어요.',
+    next: '고른 일을 한 번에 할 일 · 달력에 거는 길을 붙여요.',
+    basicHidden: true,
+  },
   // D-639 공고 원문 파일 읽기(규칙 — AI 아님)
   'fn-grant-doc-file': {
     label: '공고 파일 올리기',

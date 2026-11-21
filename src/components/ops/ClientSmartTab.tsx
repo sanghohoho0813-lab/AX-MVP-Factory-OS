@@ -37,6 +37,7 @@ import { TopPicksCard } from './ClientTopPicks'
 import { ClientScenarios } from './ClientScenarios'
 import { ClientSituationPlan } from './ClientSituationPlan'
 import { ClientDiagnosisSheet } from './ClientDiagnosisSheet'
+import { ClientYearPlanSheet } from './ClientYearPlanSheet'
 import { ClientTalkSheet } from './ClientTalkSheet'
 import { talkCard } from '../../services/consultTalk'
 import { TermText } from '../ui/TermText'
@@ -179,6 +180,8 @@ export default function ClientSmartTab({
       setParams(next, { replace: true })
     }
   }
+  // D-640 1년 자금 일정표(주소 ?year=1 로도)
+  const [yearOpen, setYearOpen] = useState(() => params.get('year') === '1')
   // D-366 지난번 드린 진단서와 견준 한 줄
   const diagNote = useMemo(() => diagnosisNote(record, insights, today), [record, insights, today])
   // D-242: 아래 상황 예시 줄의 '한 장 설계서로' → 위 설계서가 그 상황으로 펼쳐진다
@@ -203,6 +206,7 @@ export default function ClientSmartTab({
   return (
     <div className="flex flex-col gap-4" data-testid="smart-tab">
       {diagOpen && !customer && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={closeDiag} onGiven={onCommitQuiet} />}
+      {yearOpen && !customer && <ClientYearPlanSheet record={record} insights={insights} notices={usable('grants') ? notices : []} today={today} onClose={() => setYearOpen(false)} />}
       {talk !== undefined && !customer && (
         <ClientTalkSheet record={record} insights={insights} focus={talk} onClose={closeTalk} memo={onCommitQuiet ? { workspaceId, userId: userId ?? null, onCommit: onCommitQuiet } : undefined} />
       )}
@@ -210,7 +214,7 @@ export default function ClientSmartTab({
       <CriticalIdCheck record={record} now={nowIso} onSave={(next, msg) => void onCommit(next, msg)} />
       {/* 0. D-190: 먼저 제안할 것 — 아래 '모듈별 판정' 중 좋은 것 3개를 맨 위에 */}
       {!customer && (
-        <TopPicksCard insights={insights} pendingKeys={pendingKeySet} onUpload={onUpload} showUpload={false} onDiagnosis={() => setDiagOpen(true)} onTalk={() => setTalk(null)} diagNote={diagNote} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined} onShowAll={() => {
+        <TopPicksCard insights={insights} pendingKeys={pendingKeySet} onUpload={onUpload} showUpload={false} onDiagnosis={() => setDiagOpen(true)} onTalk={() => setTalk(null)} onYearPlan={() => setYearOpen(true)} diagNote={diagNote} onRequest={onRequestText && requestText ? () => onRequestText(requestText) : undefined} onPickRequest={onRequestText ? (p) => p.request && onRequestText(p.request.text, { title: p.request.title, description: p.request.description }) : undefined} onShowAll={() => {
             openFold('smart.verdicts')
             window.setTimeout(() => document.getElementById('module-verdicts')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
           }} />

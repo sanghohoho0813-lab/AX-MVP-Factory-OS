@@ -62,6 +62,8 @@ import { DIGEST_LIMIT, defaultDigestPicks, digestCandidates, digestExtra, digest
 import type { SentRecord } from '../grants/grantStore'
 import { isGrantBookmark } from '../../types/clientOps'
 import { DOC_FIELDS, docReadLine, readNoticeDoc } from '../grants/grantDoc'
+import { buildYearPlan, refundDeadline, yearItemText, yearPlanKakao } from '../yearPlan'
+import type { Insight } from '../clientInsights'
 
 let pass = 0
 let fail = 0
@@ -1268,6 +1270,96 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   check('D639-26 문장 속 낱말은 칸 아님: 기간 · 대상은 진짜 칸에서', sentence.draft.applyEnd === '2026-07-31' && sentence.draft.target === '제조업 중소기업', [sentence.draft.applyEnd, sentence.draft.target])
   // 붙여넣기 읽기도 같은 시각 고침을 받는다(날짜 끝 점 뒤 시각)
   check('D639-27 붙여넣기 기간: 2026. 3. 5.(목) 18:00 → 18:00', periodOf('2026. 2. 10.(화) ~ 2026. 3. 5.(목) 18:00까지').applyEndTime === '18:00')
+}
+
+/* ---------------- D-640 업체 1년 자금 일정표 ---------------- */
+{
+  const T2 = '2026-11-21'
+  const ins = (key: string, tone: Insight['tone'], action: string | null, headline = '', extra: Partial<Insight> = {}): Insight => ({ key, label: { 'policy-funding': '정책자금', 'startup-tax': '창업감면', labcare: '연구소', employment: '고용지원금', grants: '지원사업', cretop: '크레탑', tax: '절세' }[key] ?? key, tone, headline, detail: '', missing: [], openPath: `/tools/${key}`, openLabel: '', action, ...extra })
+  const rec = normalizeClientOps({
+    id: 'yp1',
+    companyName: '한빛정밀',
+    status: 'active',
+    corporateNumber: '110111-1234567',
+    businessAddress: '경기도 파주시 문산읍 1',
+    industry: '제조업',
+    establishedAt: '2020-03-02',
+    nextAction: '견적 회신',
+    nextActionDueDate: '2026-11-28',
+    fundingApplications: [
+      { id: 'a1', programName: '스마트공장 구축 지원', status: 'preparing', applyDueDate: '2026-12-10', institution: '경기도' },
+      { id: 'a2', programName: '늦은 신청', status: 'preparing', applyDueDate: '2026-11-10', institution: '' },
+      { id: 'a3', programName: '아주 늦은 신청', status: 'preparing', applyDueDate: '2026-09-01', institution: '' },
+      { id: 'a4', programName: '먼 훗날 신청', status: 'preparing', applyDueDate: '2028-01-05', institution: '' },
+      { id: 'a5', programName: '결과 기다림', status: 'submitted', applyDueDate: '2026-10-01', resultDueDate: '2027-01-20', institution: '중기부' },
+    ],
+    fees: [{ id: 'f1', label: '착수금', amount: 3000000, dueDate: '2026-12-01', receivedAt: null, serviceKey: 'policyFund' }],
+    documents: { payrollRoster: { received: true, issuedAt: '2026-10-15', fileName: '명부.pdf' } },
+    toolResults: [{ id: 't1', toolKey: 'employment', title: '고용지원금 진단', summary: '', createdAt: '2026-11-01T00:00:00Z', deadlines: [{ date: '2027-02-28', title: '청년도약 참여신청 마감', note: '입사 후 3개월', hard: true }] }],
+  } as never)
+  const notice = (id: string, title: string, end: string, rules: Partial<GrantRules> = {}) => normalizeNotice({ id, title, agency: '경기도', applyStart: '2026-11-01', applyEnd: end, deadlineKind: 'date', amountText: '최대 3천만원', rules: { ...rules } }, id, T2)!
+  const prof = profileOfRecord(rec, T2)
+  const ns = [
+    notice('g1', '경기 제조 디지털 바우처', '2027-02-15', { regions: ['경기'] }),
+    notice('g2', '스마트공장 구축 지원', '2026-12-10'),
+    notice('g3', '서울만 공고', '2027-01-10', { regions: ['서울'] }),
+    notice('g4', '지난 공고', '2026-11-01'),
+    ...Array.from({ length: 8 }, (_, i) => notice(`m${i}`, `경기 공고 ${i}`, `2027-0${(i % 6) + 3}-1${i}`, { regions: ['경기'] })),
+    notice('w1', '전국 공통 공고', '2027-04-01'),
+  ]
+  const ms = matchesFor(ns, prof, T2, { includeUpcoming: true })
+  const picks: Insight[] = [
+    ins('startup-tax', 'maybe', '창업감면 — 2021년분 경정청구 세무사와 검토', '2021년분 창업감면이 신고서에 없어요'),
+    ins('policy-funding', 'good', '정책자금 상담 — 중진공 쪽으로 준비', '중진공이 가장 맞아요', { amount: '최대 1억원' }),
+    ins('employment', 'need', null, '명부를 올리면'),
+    ins('grants', 'maybe', null, '확인하면 맞을 공고 2건'),
+    ins('cretop', 'good', null, '크레탑 분석 있음'),
+  ]
+  const p = buildYearPlan(rec, picks, ms, T2)
+  const month = (k: string) => p.months.find((m) => m.key === k)!
+  const all = p.months.flatMap((m) => m.items)
+  check('YP1 12달 · 2026년 11월 ~ 2027년 10월 · 해 바뀌면 해 이름', p.months.length === 12 && p.range === '2026년 11월 ~ 2027년 10월' && p.months[0].label === '2026년 11월' && p.months[1].label === '12월' && p.months[2].label === '2027년 1월', p.months.map((m) => m.label))
+  check('YP2 신청 마감 → 그 달 · 놓치면 끝 · 업체 지원사업 신청 탭', month('2026-12').items.some((x) => x.title === '스마트공장 구축 지원' && x.hard && x.date === '2026-12-10' && x.path.endsWith('?tab=funding')), month('2026-12').items)
+  check('YP3 고객 종이: 수금(착수금) · 내부 다음 약속(견적 회신) 없음', !all.some((x) => x.title.includes('착수금') || x.title.includes('견적 회신')), all.map((x) => x.title))
+  const late = month('2026-11').items[0]
+  check('YP4 지난 기한(30일 안) → 이번 달 맨 위 늦음 · 30일 넘으면 빼기', late.title === '늦은 신청' && late.late && late.detail.startsWith('11.10 지났어요') && !all.some((x) => x.title === '아주 늦은 신청'), month('2026-11').items)
+  check('YP5 12달 밖 기한은 빼기 · 결과 발표는 놓치면 끝 아님', !all.some((x) => x.title === '먼 훗날 신청') && month('2027-01').items.some((x) => x.title === '결과 발표 — 결과 기다림' && !x.hard), month('2027-01').items)
+  check('YP6 서류 만료(명부 3개월) → 그 달 · 서류 탭 · 놓치면 끝 아님', month('2027-01').items.some((x) => x.title === '4대보험 가입자 명부 만료' && !x.hard && x.path.endsWith('?tab=docs')), month('2027-01').items)
+  check('YP7 도구 기한(청년도약 참여신청) → 놓치면 끝', month('2027-02').items.some((x) => x.title === '청년도약 참여신청 마감' && x.hard), month('2027-02').items)
+  const grants = all.filter((x) => x.kind === 'grant')
+  check('YP8 맞는 공고 마감(조건 맞음 · 확인 필요 — 골라서 보내기와 같은 기준): 서울만 · 지난 공고 · 전국 공통 빼고 · 이미 신청 건(스마트공장)은 한 번만 · 많아야 6건', grants.length === 6 && !grants.some((x) => /서울만|지난 공고|스마트공장|전국 공통/.test(x.title)) && grants.every((x) => x.hard && x.path.startsWith('/grants?open=')), grants.map((x) => x.title))
+  check('YP9 공고 줄: 이름 · 마감 · 금액 · 조건', month('2027-02').items.some((x) => x.kind === 'grant' && x.title === '경기 제조 디지털 바우처 마감' && x.detail.startsWith('최대 3천만원')), month('2027-02').items)
+  const nov = month('2026-11').items.filter((x) => x.kind === 'propose')
+  check('YP10 먼저 제안할 것 → 이번 달(가능성 높음 · 검토해 볼 만함만 · 지원사업 · 크레탑은 따로 안 넣음)', nov.length === 2 && nov.some((x) => x.title === '정책자금 상담 — 중진공 쪽으로 준비' && x.detail === '최대 1억원') && nov.some((x) => x.title.startsWith('창업감면 — 2021년분')) && !all.some((x) => x.title.includes('명부를 올리면')), nov)
+  check('YP11 2021년분 경정청구 → 2027-03-31 마감(법인 · 5년) · 놓치면 끝', month('2027-03').items.some((x) => x.title === '2021년분 경정청구 마감 — 창업감면' && x.date === '2027-03-31' && x.hard) && refundDeadline(2021, 'corporation') === '2027-03-31' && refundDeadline(2021, 'individual') === '2027-05-31')
+  check('YP12 법인세 신고 달 — 반영 확인: 창업감면(확인 · 짐작한 때)', month('2027-03').items.some((x) => x.title === '법인세 신고 — 반영 확인: 창업감면' && x.approx && !x.hard), month('2027-03').items)
+  check('YP13 정책자금이 제안이면 새해 1월 융자 공고 확인(확인)', month('2027-01').items.some((x) => x.title === '새해 정책자금 융자 공고 확인' && x.approx), month('2027-01').items)
+  check('YP14 달 안 순서: 늦음 → 날짜 → 달 안 아무 때나', month('2026-11').items.map((x) => x.late ? 'late' : x.date ? 'date' : 'any').join(',').replace(/,?date/g, '') === 'late,any,any' || month('2026-11').items[0].late, month('2026-11').items.map((x) => x.title))
+  check('YP15 합계 · 놓치면 끝 수', p.total === all.length && p.hardCount === all.filter((x) => x.hard).length && p.months.every((m) => m.hardCount === m.items.filter((x) => x.hard).length))
+
+  // 지난 해분 경정청구(2020년분 → 2026-03-31 지남)는 넣지 않는다 · 개인사업자는 종합소득세 5월
+  const indiv = normalizeClientOps({ id: 'yp2', companyName: '새봄상회', status: 'active', businessNumber: '123-45-67890' } as never)
+  const pi = buildYearPlan(indiv, [ins('startup-tax', 'maybe', '창업감면 — 2020년분 경정청구 세무사와 검토'), ins('labcare', 'good', '연구소 — 연구개발비 세액공제 챙기기')], [], T2)
+  const ai = pi.months.flatMap((m) => m.items)
+  check('YP16 개인: 2020년분 경정청구 마감(2026-05-31) 지남 → 안 넣음', !ai.some((x) => x.title.includes('경정청구 마감')), ai.map((x) => x.title))
+  check('YP17 개인: 종합소득세 신고 5월 31일 — 창업감면 · 연구개발비 세액공제', ai.some((x) => x.date === '2027-05-31' && x.title === '종합소득세 신고 — 반영 확인: 창업감면 · 연구개발비 세액공제'), ai)
+  check('YP18 정책자금 제안 없으면 새해 공고 줄 없음', !ai.some((x) => x.title.includes('새해 정책자금')))
+  // 1월에 열면 새해 공고 줄은 따로 안 넣음(이번 달 제안이 곧 그것)
+  const pj = buildYearPlan(rec, [ins('policy-funding', 'good', '정책자금 상담')], [], '2027-01-05')
+  check('YP19 1월에 열면 새해 공고 줄 없음 · 범위 2027년 1월 ~ 12월', !pj.months.flatMap((m) => m.items).some((x) => x.title.includes('새해 정책자금')) && pj.range === '2027년 1월 ~ 2027년 12월', pj.range)
+  // 판정 없는 빈 업체 — 빈 일정표(지어내지 않음)
+  const blank = buildYearPlan(normalizeClientOps({ id: 'yp3', companyName: '빈상사', status: 'active' } as never), [], [], T2)
+  check('YP20 빈 업체: 할 일 0 · 12달은 그대로', blank.total === 0 && blank.months.length === 12)
+
+  const k = yearPlanKakao(p, '담당 김대리')
+  check('YP21 카톡: 회사 · 기간 · 일 있는 달만 · 놓치면 끝 · 확인 · 안내 · 서명', k.startsWith('한빛정밀 대표님, 앞으로 1년 자금 일정을 정리했어요(2026년 11월 ~ 2027년 10월).') && k.includes('[12월]') && k.includes('· 12.10 스마트공장 구축 지원 (놓치면 끝)') && k.includes('새해 정책자금 융자 공고 확인 (확인)') && !k.includes('[2027년 10월]') && k.includes('※ 선정 · 승인 · 환급을 약속하는 일정이 아니에요.') && k.trim().endsWith('담당 김대리'), k)
+  check('YP22 카톡: 수수료 · AI 말 없음', !/착수금|수수료|AI/.test(k))
+  check('YP23 빈 업체 카톡: 지금은 정해진 기한 없음', yearPlanKakao(blank).includes('지금은 정해진 기한이 없어요'))
+  check('YP24 한 줄 글: 늦음 · 날짜 · 달 안', yearItemText(late).startsWith('늦음 늦은 신청') && yearItemText(month('2026-12').items[0]).startsWith('12.'), [yearItemText(late), yearItemText(month('2026-12').items[0])])
+  // 할 일 문장이 없는 제안(검토해 볼 만함) — 제목은 짧게, 긴 판정 문장은 아래 한 줄
+  const pn = buildYearPlan(rec, [ins('labcare', 'maybe', null, '연구소 설립 — 기업 규모(소기업 · 중기업) · 연구전담요원 후보(학위 · 전공 · 경력)만 확인하면 돼요', { amount: '연 1,200만원' })], [], T2)
+  const lab = pn.months[0].items.find((x) => x.kind === 'propose')
+  check('YP25 할 일 문장 없는 제안: 제목 "연구소 검토" · 아래 줄 금액 · 판정 문장', lab?.title === '연구소 검토' && lab.detail.startsWith('연 1,200만원 · 연구소 설립 — 기업 규모'), lab)
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)
