@@ -62,7 +62,7 @@ import { DIGEST_LIMIT, defaultDigestPicks, digestCandidates, digestExtra, digest
 import type { SentRecord } from '../grants/grantStore'
 import { isGrantBookmark } from '../../types/clientOps'
 import { DOC_FIELDS, docReadLine, readNoticeDoc } from '../grants/grantDoc'
-import { buildYearPlan, refundDeadline, yearItemText, yearPlanKakao } from '../yearPlan'
+import { buildYearPlan, refundDeadline, yearItemText, yearPlanKakao, yearTodoChoices, yearTodoOf, type YearItem } from '../yearPlan'
 import { expectedRetryMonth, programKey, rejectReasonText, rejectedTwinOf, retryHits, retrySourceOf, retryTips, sameProgramAcrossYears, withRejectInfo } from '../grants/grantRetry'
 import type { Insight } from '../clientInsights'
 
@@ -1447,6 +1447,32 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   const ypSkip = buildYearPlan(withRejectInfo(rec1, 'r2', { reasons: [], note: '', retryPlan: 'skip' }, '2026-11-21T05:00:00Z'), [], ms3, T3)
   check('RT24 다시 도전 접은 건은 일정표에도 없음', !ypSkip.months.flatMap((m) => m.items).some((x) => x.id === 'ra:r2'))
   check('RT25 다시 신청 중이면 일정표 "다시 도전 · 공고 확인" 줄 없음', !buildYearPlan(withGrantApplication(rec1, ns3[1]).record, [], ms3, T3).months.flatMap((m) => m.items).some((x) => x.id === 'ra:r1'))
+}
+
+/* ---------------- D-642 1년 일정표 → 할 일 ---------------- */
+{
+  const T = '2026-11-21' // 토요일
+  const it = (x: Partial<YearItem>): YearItem => ({ id: 'i', month: '2026-12', date: '', kind: 'deadline', title: '일', detail: '', hard: false, late: false, approx: false, path: '', ...x })
+  const hard = yearTodoOf(it({ id: 'h', date: '2026-12-10', title: '스마트공장 구축 지원', hard: true }), '한빛정밀', T)
+  check('YT1 놓치면 끝 기한: 1주 전(12.3 목) · "마감 12.10 전에" · 골라 둠', hard.dueDate === '2026-12-03' && hard.content === '한빛정밀 · 스마트공장 구축 지원 — 마감 12.10 전에' && hard.preselect, hard)
+  const near = yearTodoOf(it({ id: 'n', month: '2026-11', date: '2026-11-25', title: '법인인감증명서 만료' }), '한빛정밀', T)
+  check('YT2 1주 안 기한: 오늘이 토요일이면 다음 월요일(11.23) · 기한을 넘지 않음', near.dueDate === '2026-11-23' && near.content === '한빛정밀 · 법인인감증명서 만료 (11.25)', near)
+  const wk = yearTodoOf(it({ id: 'w', month: '2027-01', date: '2027-01-24', title: '결과 발표' }), '한빛정밀', T)
+  check('YT3 1주 전이 토요일(1.17)이면 앞 금요일(1.15) · 다음 달 넘은 일은 골라 두지 않음', wk.dueDate === '2027-01-15' && !wk.preselect, wk)
+  const late = yearTodoOf(it({ id: 'l', month: '2026-11', late: true, title: '늦은 신청' }), '한빛정밀', T)
+  check('YT4 늦은 일: 오늘(토 → 월 11.23) · "늦었어요, 오늘 확인" · 골라 둠', late.dueDate === '2026-11-23' && late.content.endsWith('늦었어요, 오늘 확인') && late.preselect, late)
+  const now = yearTodoOf(it({ id: 'p', month: '2026-11', title: '정책자금 상담 — 중진공 쪽으로 준비' }), '한빛정밀', T)
+  check('YT5 이번 달 아무 때나: 3일 뒤(11.24 화) · 골라 둠', now.dueDate === '2026-11-24' && now.preselect, now)
+  const jan = yearTodoOf(it({ id: 'j', month: '2027-05', title: '새해 정책자금 융자 공고 확인', approx: true }), '한빛정밀', T)
+  check('YT6 먼 달 아무 때나: 그달 첫 평일(2027-05-03 월 — 1일 토)', jan.dueDate === '2027-05-03' && !jan.preselect, jan)
+  check('YT7 업체 이름 없으면 "업체"', yearTodoOf(it({ title: '일' }), ' ', T).content === '업체 · 일')
+  const plan = buildYearPlan(normalizeClientOps({ id: 'yt', companyName: '한빛정밀', status: 'active', corporateNumber: '110111-1234567', fundingApplications: [
+    { id: 'a1', programName: '스마트공장 구축 지원', status: 'preparing', applyDueDate: '2026-12-10', institution: '' },
+    { id: 'a2', programName: '늦은 신청', status: 'preparing', applyDueDate: '2026-11-10', institution: '' },
+    { id: 'a3', programName: '결과 기다림', status: 'submitted', applyDueDate: '2026-10-01', resultDueDate: '2027-03-20', institution: '' },
+  ] } as never), [], [], T)
+  const ch = yearTodoChoices(plan, T)
+  check('YT8 고를 목록: 늦음 → 놓치면 끝 → 날짜 순 · 일정표 일 수와 같음', ch.length === plan.total && ch[0].item.late && ch[1].item.hard && ch.slice(2).every((c, i, a) => i === 0 || a[i - 1].todo.dueDate <= c.todo.dueDate), ch.map((c) => c.todo.content))
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

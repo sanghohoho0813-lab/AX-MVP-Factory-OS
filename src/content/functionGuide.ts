@@ -684,6 +684,16 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     next: '고른 일을 한 번에 할 일 · 달력에 거는 길을 붙여요.',
     basicHidden: true,
   },
+  // D-642 1년 일정표 → 할 일(규칙 — AI 아님)
+  'fn-year-plan-todo': {
+    label: '할 일로 걸기',
+    menu: 'client-ops',
+    what: '1년 일정표에서 고른 일을 업무 일기 할 일로 한 번에 걸어요 — 기한이 있는 일은 1주 전 날짜로 잡아요.',
+    why: '일정표를 보고 나서 할 일을 하나씩 다시 적어야 했어요.',
+    effect: '놓치면 끝인 일 · 다음 달까지 할 일은 골라 둬서 한 번만 누르면 돼요. 이미 걸어 둔 할 일은 다시 걸지 않아요.',
+    next: '할 일을 끝내면 일정표에도 끝냈다고 보이게 이어요.',
+    basicHidden: true,
+  },
   // D-641 떨어진 신청 — 까닭 기록 · 다음 해 다시 도전(규칙 — AI 아님)
   'fn-reject-retry': {
     label: '떨어진 까닭 남기기',

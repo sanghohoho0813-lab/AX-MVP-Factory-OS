@@ -280,7 +280,7 @@ export default function ClientTopPicks({
     <>
       {diag && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={() => setDiag(false)} onGiven={onCommitQuiet} />}
       {talk && <ClientTalkSheet record={record} insights={insights} onClose={() => setTalk(false)} memo={onCommitQuiet ? { workspaceId, userId, onCommit: onCommitQuiet } : undefined} />}
-      {year && <ClientYearPlanSheet record={record} insights={insights} notices={featureUsable(ent, 'grants') ? notices : []} today={today} onClose={() => setYear(false)} />}
+      {year && <ClientYearPlanSheet record={record} insights={insights} notices={featureUsable(ent, 'grants') ? notices : []} today={today} onClose={() => setYear(false)} todo={{ workspaceId, userId }} />}
       <TopPicksCard
         insights={insights}
         onUpload={onUpload}

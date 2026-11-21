@@ -266,3 +266,76 @@ export function yearPlanKakao(p: YearPlan, sender = ''): string {
   if (sender) lines.push('', sender)
   return lines.join('\n')
 }
+
+/* ------------------------------------------------------------------ */
+/* D-642 1년 일정표 → 할 일(업무 일기 '다음 할 일')                      */
+/* ------------------------------------------------------------------ */
+
+export interface YearTodo {
+  itemId: string
+  /** 업무 일기에 적을 글 — 같은 글이 이미 있으면 다시 걸지 않는다 */
+  content: string
+  /** 할 일 날(YYYY-MM-DD · 토 · 일은 피한다) */
+  dueDate: string
+  /** 처음부터 골라 둘 것 — 놓치면 끝인 일 · 이번 달 · 다음 달 일 */
+  preselect: boolean
+}
+
+const dayAdd = (ymd: string, n: number) => {
+  const t = Date.UTC(Number(ymd.slice(0, 4)), Number(ymd.slice(5, 7)) - 1, Number(ymd.slice(8, 10))) + n * 86_400_000
+  return new Date(t).toISOString().slice(0, 10)
+}
+const dow = (ymd: string) => new Date(`${ymd}T00:00:00Z`).getUTCDay()
+/** 토 · 일이면 앞 금요일로(오늘보다 앞이면 다음 월요일로) */
+function weekdayNear(ymd: string, today: string): string {
+  const d = dow(ymd)
+  if (d !== 0 && d !== 6) return ymd
+  const back = dayAdd(ymd, d === 6 ? -1 : -2)
+  return back >= today ? back : dayAdd(ymd, d === 6 ? 2 : 1)
+}
+const monthAdd = (ym: string, n: number) => {
+  const y = Number(ym.slice(0, 4))
+  const m = Number(ym.slice(5, 7)) - 1 + n
+  return `${y + Math.floor(m / 12)}-${String((((m % 12) + 12) % 12) + 1).padStart(2, '0')}`
+}
+
+/**
+ * 일정표 한 줄 → 할 일 한 줄. 기한이 있는 일은 기한 1주 전(지났으면 오늘) · 지난 일은 오늘 ·
+ * 달 안 아무 때나인 일은 이번 달이면 3일 뒤 · 다음 달부터는 그달 첫 평일. 글은 '업체 · 일 — 마감 M.D 전에'.
+ */
+export function yearTodoOf(x: YearItem, companyName: string, today: string): YearTodo {
+  const co = companyName.trim() || '업체'
+  let due: string
+  let content: string
+  if (x.late) {
+    due = weekdayNear(today, today)
+    content = `${co} · ${x.title} — 늦었어요, 오늘 확인`
+  } else if (x.date) {
+    const before = dayAdd(x.date, -7)
+    due = weekdayNear(before > today ? before : today, today)
+    if (due > x.date) due = x.date
+    content = `${co} · ${x.title}${x.hard ? ` — 마감 ${md(x.date)} 전에` : ` (${md(x.date)})`}`
+  } else {
+    const thisMonth = today.slice(0, 7)
+    due = x.month <= thisMonth ? weekdayNear(dayAdd(today, 3), today) : weekdayNear(`${x.month}-01`, `${x.month}-01`)
+    content = `${co} · ${x.title}`
+  }
+  const soon = x.month <= monthAdd(today.slice(0, 7), 1)
+  return { itemId: x.id, content, dueDate: due, preselect: x.hard || x.late || soon }
+}
+
+/** 고를 목록 — 놓치면 끝 · 늦음 먼저, 그다음 날짜 순(같은 글은 한 번) */
+export function yearTodoChoices(p: YearPlan, today: string): { item: YearItem; todo: YearTodo }[] {
+  const seen = new Set<string>()
+  const out: { item: YearItem; todo: YearTodo }[] = []
+  for (const m of p.months) {
+    for (const x of m.items) {
+      const todo = yearTodoOf(x, p.companyName, today)
+      if (seen.has(todo.content)) continue
+      seen.add(todo.content)
+      out.push({ item: x, todo })
+    }
+  }
+  const rank = (c: { item: YearItem }) => (c.item.late ? 0 : c.item.hard ? 1 : 2)
+  return out.sort((a, b) => rank(a) - rank(b) || a.todo.dueDate.localeCompare(b.todo.dueDate))
+}

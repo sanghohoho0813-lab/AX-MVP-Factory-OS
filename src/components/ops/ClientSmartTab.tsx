@@ -206,7 +206,7 @@ export default function ClientSmartTab({
   return (
     <div className="flex flex-col gap-4" data-testid="smart-tab">
       {diagOpen && !customer && <ClientDiagnosisSheet record={record} insights={insights} today={today} onClose={closeDiag} onGiven={onCommitQuiet} />}
-      {yearOpen && !customer && <ClientYearPlanSheet record={record} insights={insights} notices={usable('grants') ? notices : []} today={today} onClose={() => setYearOpen(false)} />}
+      {yearOpen && !customer && <ClientYearPlanSheet record={record} insights={insights} notices={usable('grants') ? notices : []} today={today} onClose={() => setYearOpen(false)} todo={{ workspaceId, userId: userId ?? null }} />}
       {talk !== undefined && !customer && (
         <ClientTalkSheet record={record} insights={insights} focus={talk} onClose={closeTalk} memo={onCommitQuiet ? { workspaceId, userId: userId ?? null, onCommit: onCommitQuiet } : undefined} />
       )}
