@@ -243,6 +243,9 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
     const run = { requestId: req.requestId, assistId: req.assistId, page: req.page, provider: 'gemini', model: 'test-model', status: 'succeeded', structured: { headline: 'x', items }, raw: '', usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 1, rowsCut: 0 }, createdAt: new Date().toISOString(), grounded: req.assistId === 'venture.market' && marketCalls !== 2, sources: req.assistId === 'venture.market' && marketCalls !== 2 ? [{ title: '통계청', url: 'https://kosis.kr/x' }] : [] }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, run }) })
   })
+  // D-638 끊김(504) 뒤 화면은 같은 번호로 답을 찾는다 — 서버처럼 '보관된 답 없음(404)' → 같은 번호로 다시 보냄(resume)
+  const resultRoute = /\/api\/ai-assist\?result=/
+  await page.route(resultRoute, (route) => route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ ok: false, code: 'not_found' }) }))
   const row = (k) => page.locator(`[data-testid="vplan-ai-row"][data-key="${k}"]`)
   const planAiRow = (k) => page.locator(`[data-testid="vplan-plan-row"][data-key="${k}"]`)
   const vIdle = () => page.waitForFunction(() => !document.querySelector('[data-testid="vplan-ai"] button[disabled][data-testid^="vplan-plan-"]') && ![...document.querySelectorAll('[data-testid="vplan-plan-row"]')].some((e) => e.getAttribute('data-phase') === 'run'), null, { timeout: 20000 })
@@ -344,7 +347,8 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('요약에 보낸 것 — 시장조사(TAM · 출처) · 출원번호(출원 중 · 등록 아님) · 연구개발 인원 2명 · 대표 정의', sumReq.context.sections.some((x) => x.name.startsWith('시장조사') && JSON.stringify(x.rows).includes('1조 2,000억 원') && JSON.stringify(x.rows).includes('통계청 광업제조업조사 2024')) && sumReq.context.facts.some((f) => f.includes('10-2026-0012345') && f.includes('등록 아님')) && sumReq.context.facts.some((f) => f.includes('연구개발 인원(확인): 2명')) && sumReq.skill === SKILL)
   const j1 = run2.filter((r) => r.assistId === 'venture.judge')
   check('자체점검 — 대표 정의 같이 감 · ① 은 요약 범위 · 두 번째 판정엔 자체점검이 고친 글이 들어감 · ② 는 전체', j1.length === 3 && j1.every((r) => r.skill === SKILL) && j1[0].context.purpose.includes('요약') && JSON.stringify(j1[1].context.sections).includes('JUDGE 고친 차별성') && j1[2].context.purpose.includes('전체'))
-  check('잠깐 끊김(504) → 3초 쉬고 저절로 다시 · p2 씀(예전엔 실패로 멈춤)', run2.filter((r) => r.assistId === 'venture.p2').length === 2 && (await row('p2').getAttribute('data-phase')) === 'done')
+  const p2s = run2.filter((r) => r.assistId === 'venture.p2')
+  check('잠깐 끊김(504) → 같은 번호로 답 찾기 → 없으면 같은 번호로 다시 보냄(D-638) · p2 씀(예전엔 실패로 멈춤)', p2s.length === 2 && p2s[1].resume === true && p2s[1].requestId === p2s[0].requestId && (await row('p2').getAttribute('data-phase')) === 'done', p2s.map((r) => `${r.requestId}:${r.resume ?? ''}`))
   const g2s = run2.filter((r) => r.assistId === 'venture.g2')
   check('답 모양 어긋남 → 이름표를 알려 주고 두 번 더(ask) · 세 번 다 어긋나면 그 단계만 못 씀', g2s.length === 3 && !g2s[0].ask && g2s.slice(1).every((r) => /칸 id 그대로/.test(r.ask ?? '')), g2s.map((r) => r.ask ?? ''))
   const p1 = run2.find((r) => r.assistId === 'venture.p1')
@@ -385,6 +389,7 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('화면 어디에도 쓰지 않는 이름 · 출처 이름 없음(자체점검 · 대표 기준으로만)', !BANNED.test(await page.locator('body').innerText()) && /자체점검/.test(await page.getByTestId('vplan-ai').innerText()))
   check('다 씀 — 서술 10 · 핵심 요약 7', /서술 10\/10/.test(await page.getByTestId('vplan-progress').innerText()) && /핵심 요약 7\/7/.test(await page.getByTestId('vplan-progress').innerText()))
   await page.unroute('**/api/ai-assist')
+  await page.unroute(resultRoute)
 
   // 돌아가기 → 벤처 진행 · 제출 전 확인 '사업계획' 줄
   await page.getByTestId('vplan-back').click()

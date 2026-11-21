@@ -289,15 +289,19 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
       {/* 목차 제목이 아니라 인사 — 목차 설명(ⓘ) 규칙(D-192)은 h2 목차에만 */}
       {expanded && (
         <>
-          {/* D-638 크게 / 한 줄로 — 이 기기에 기억 */}
-          {turns.length === 0 && (
-            <button type="button" onClick={() => keepBig(!big)} className="tap t-meta absolute top-2 right-2 inline-flex min-h-10 items-center rounded-(--radius-control) px-2.5 font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800 sm:min-h-8" data-testid="home-ask-size-toggle" aria-pressed={big}>
-              {big ? '한 줄로' : '늘 크게'}
-            </button>
-          )}
-          <p className={`text-center leading-snug font-bold break-keep text-slate-900 ${idleBig ? 'text-[1.2rem]' : 'text-[1.2rem] sm:text-[1.55rem]'}`} data-testid="home-ask-title">
-            무엇을 도와드릴까요?
-          </p>
+          {/* G8 휴대폰 · 글자 '매우 크게' 에서 가운데 제목이 오른쪽 위 [한 줄로] 와 겹쳤다 —
+              휴대폰은 제목 | 단추 한 줄(제목은 왼쪽 · 남는 폭에서 줄바꿈), 넓은 화면은 예전처럼 가운데 제목 + 오른쪽 위 단추 */}
+          <div className={turns.length === 0 ? 'flex items-start gap-2 sm:block' : ''}>
+            <p className={`leading-snug font-bold break-keep text-slate-900 ${turns.length === 0 ? 'min-w-0 flex-1 pt-1.5 text-left sm:px-20 sm:pt-0 sm:text-center' : 'text-center'} ${idleBig ? 'text-[1.2rem]' : 'text-[1.2rem] sm:text-[1.55rem]'}`} data-testid="home-ask-title">
+              무엇을 도와드릴까요?
+            </p>
+            {/* D-638 크게 / 한 줄로 — 이 기기에 기억 */}
+            {turns.length === 0 && (
+              <button type="button" onClick={() => keepBig(!big)} className="tap t-meta inline-flex min-h-10 shrink-0 items-center rounded-(--radius-control) px-2.5 font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800 sm:absolute sm:top-2 sm:right-2 sm:min-h-8" data-testid="home-ask-size-toggle" aria-pressed={big}>
+                {big ? '한 줄로' : '늘 크게'}
+              </button>
+            )}
+          </div>
           {!idleBig && (
             <p className="t-sub mt-1 text-center break-keep text-slate-500" data-testid="home-ask-guide">
               {customer ? '업체 이름과 함께 물어보거나 서류를 올리면 그 업체 자료로 답해요' : '업체 이름과 함께 물어보거나 서류를 올리면 모듈 판정까지 보고 답해요'}
@@ -375,7 +379,8 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
             // 휴대폰은 칸이 좁아 긴 예시가 두 줄로 잘린다 — 짧게
             placeholder={!expanded && !phone ? '무엇이든 물어보세요 · 업체 이름과 함께' : readyDocs.length && !phone ? '서류만 보내도 돼요 — 무엇을 제안할지 정리해요' : pinnedName ? (phone ? '무엇이 궁금하세요?' : `${pinnedName} — 무엇이 궁금하세요?`) : phone ? '무엇이든 물어보세요' : '예: ○○ 1차 미팅 — 무엇을 제안할까?'}
             aria-label="질문"
-            className={`t-body min-h-10 w-full resize-none ${text ? 'overflow-y-auto' : 'overflow-hidden'} bg-transparent px-1.5 py-2 leading-snug text-slate-900 outline-none placeholder:text-slate-400`}
+            // G8 빈 칸의 안내 글은 한 줄로(넘치면 … ) — 큰 글자 휴대폰에서 두 줄째가 칸 밖으로 잘렸다
+            className={`t-body min-h-10 w-full resize-none ${text ? 'overflow-y-auto' : 'overflow-hidden placeholder-shown:text-ellipsis placeholder-shown:whitespace-nowrap'} bg-transparent px-1.5 py-2 leading-snug text-slate-900 outline-none placeholder:text-slate-400`}
             data-testid="home-ask-input"
           />
         </div>

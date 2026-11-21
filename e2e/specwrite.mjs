@@ -220,7 +220,8 @@ let draftUrl = ''
   await page.route('**/api/ai-assist', async (route) => {
     const req = JSON.parse(route.request().postData() || '{}')
     sent.push(req)
-    if (req.assistId === 'spec.c' && cCalls++ === 0) return route.fulfill({ status: 504, contentType: 'text/html', body: '<html>timeout</html>' })
+    // c 첫 번은 실패 — D-638 부터 504(끊김)는 같은 번호로 이어 받으므로 실패가 아니다. 공급자 오류(이어 받지 않음 · 멈추지 않음)로 흉내
+    if (req.assistId === 'spec.c' && cCalls++ === 0) return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ ok: false, code: 'provider_error' }) })
     const run = { requestId: req.requestId, assistId: req.assistId, page: req.page, provider: 'gemini', model: 'test-model', status: 'succeeded', structured: { headline: 'x', items: ITEMS[req.assistId] ?? [] }, raw: '', usage: { input: 1, output: 1, total: 2 }, estimatedCostUsd: null, ms: 5, sent: { userChars: 1, rows: 1, rowsCut: 0 }, createdAt: new Date().toISOString() }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, run }) })
   })

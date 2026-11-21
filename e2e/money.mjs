@@ -74,7 +74,9 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('들어온 돈 500만원', /들어온 돈 500만원/.test(await tile(page, 0)), await tile(page, 0))
   const expected = (later ? 10_000_000 : 0) + (earlier ? 2_000_000 : 0)
   const t1 = await tile(page, 1)
-  check(`들어올 예정 ${expected / 10_000}만원${earlier ? ' · 그중 미수금 200만원' : ''}`, t1.includes(`${(expected / 10_000).toLocaleString('ko-KR')}만원`) && (!earlier || /그중 미수금 200만원/.test(t1)), t1)
+  // '그중 미수금' 은 들어올 돈이 미수금만이 아닐 때만 붙는다(전부 미수금이면 같은 숫자를 두 번 쓰지 않는 화면 규칙) — 달 끝에는 중도금(10일 뒤)이 다음 달로 빠진다
+  const partOverdue = !!earlier && !!later
+  check(`들어올 예정 ${expected / 10_000}만원${partOverdue ? ' · 그중 미수금 200만원' : ''}`, t1.includes(`${(expected / 10_000).toLocaleString('ko-KR')}만원`) && (partOverdue ? /그중 미수금 200만원/.test(t1) : !/그중 미수금/.test(t1)), t1)
   const kinds = await page.getByTestId('revenue-line').evaluateAll((els) => els.map((e) => e.getAttribute('data-kind')))
   check('매출 줄: 입금 완료 먼저 · 성공보수(조건 대기)는 없음', kinds[0] === 'received' && !(await page.getByTestId('revenue-list').innerText()).includes('성공보수'), kinds)
   check('앞으로 6달', (await page.getByTestId('money-outlook').locator('li').count()) === 6)

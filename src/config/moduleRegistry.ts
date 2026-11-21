@@ -381,7 +381,19 @@ export function moduleForPath(pathname: string): ModuleDefinition | null {
  * 머리줄에 쓸 화면 이름 (D-94) — 검토중 도구(영업 도구 모음 등)는 메뉴 줄 이름(‘도입 검토중’)이 아니라 도구 이름을 쓴다.
  * 예전에는 이 주소를 맡는 메뉴가 없어 휴대폰 머리줄에 회사 이름만 떴다.
  */
+/**
+ * G8 메뉴에 없는 화면(머리줄 · 계정 메뉴에서 여는 곳) — 예전에는 휴대폰 머리줄이 화면 이름 대신 제품 이름을 띄웠다
+ * (고객이 [문의하기] 를 열어도 머리줄은 '미래AI랩'). 긴 주소가 먼저 맞게 순서대로.
+ */
+const EXTRA_SCREEN_TITLES: ReadonlyArray<readonly [string, string]> = [
+  ['/feedback/inbox', '받은 피드백함'],
+  ['/feedback', '개발자에게 피드백'],
+  ['/support', '문의하기'],
+]
+
 export function screenTitleForPath(pathname: string): string | null {
+  const extra = EXTRA_SCREEN_TITLES.find(([p]) => underPath(pathname, p))
+  if (extra) return extra[1]
   const review = [...reviewTools(), ...movedTools()].find((t) => t.path && underPath(pathname, t.path))
   if (review) return review.label
   // D-233: 마케팅 · 브랜딩이 함께 맡는 화면(콘텐츠 레이더 · 홍보 글 · 홈페이지)은 이름 하나 — '마케팅 · 브랜딩'

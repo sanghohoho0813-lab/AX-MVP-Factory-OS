@@ -256,6 +256,9 @@ check('modules: AX STUDIO 는 전문 모듈의 분야 한 줄(D-127) — 안의 
   check('메뉴(D-233): 머리줄 이름 하나 — 영업 › 마케팅 · 브랜딩(콘텐츠 레이더 · 홍보 글 · 홈페이지 모두)',
     ['/tools/content', '/tools/content/build', '/tools/homepage/build', '/marketing/youtube', '/marketing', '/marketing/threads', '/marketing/shorts'].every((p) => screenTitleForPath(p) === '마케팅 · 브랜딩' && screenGroupForPath(p)?.title === screenGroupForPath('/marketing')?.title) && screenGroupForPath('/marketing')?.title === '영업',
     ['/tools/content', '/marketing/youtube'].map((p) => `${screenGroupForPath(p)?.title}›${screenTitleForPath(p)}`).join())
+  check('G8 메뉴 밖 화면도 머리줄에 화면 이름 — 문의하기 · 피드백 · 받은 피드백함(예전엔 제품 이름) · 묶음 줄은 띄우지 않음',
+    screenTitleForPath('/support') === '문의하기' && screenTitleForPath('/feedback') === '개발자에게 피드백' && screenTitleForPath('/feedback/inbox') === '받은 피드백함' && screenGroupForPath('/support') === null && screenTitleForPath('/supportx') !== '문의하기',
+    ['/support', '/feedback', '/feedback/inbox'].map((p) => screenTitleForPath(p)).join())
   check('메뉴(D-233): 사이드바 불 — 세 화면 모두 마케팅 · 브랜딩 줄 주소로 본다(웹 스튜디오 묶음이 저절로 펼쳐지지 않게) · 다른 주소는 그대로',
     ['/marketing/youtube', '/marketing/threads', '/marketing/shorts', '/tools/content/build', '/tools/homepage'].every((p) => navPathForSidebar(p) === '/marketing') && navPathForSidebar('/tools/tax') === '/tools/tax' && navPathForSidebar('/ops/clients') === '/ops/clients')
   check('메뉴(D-206 · D-233): 팀장 화면에는 세 화면 모두 닫힘(부모 줄 · 주소)', ['/marketing/youtube', '/marketing/threads', '/marketing/shorts', '/tools/content', '/tools/homepage'].every((p) => isPilotHiddenPath(p)) && enabledModulesByGroup({ pilot: true }).every((g) => g.items.every((m) => m.key !== 'marketing')))
