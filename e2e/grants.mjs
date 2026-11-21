@@ -1091,6 +1091,99 @@ https://www.bizinfo.go.kr/web/view.do?pblancId=PBLN_${days}`
   await m.close()
 }
 
+/* ---------------- D-641 떨어진 신청 — 까닭 기록 · 다시 올라온 공고 · 다시 도전 ---------------- */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const page = await ctx.newPage()
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await page.route('**/api/grants-feed*', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'no_key' }) }))
+  await page.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await page.evaluate(seedScript())
+  await page.evaluate(prepClients)
+  await page.evaluate((today) => {
+    const plus = (n) => new Date(new Date(today + 'T00:00:00Z').getTime() + n * 86_400_000).toISOString().slice(0, 10)
+    const rules = { regions: ['경기'], cities: ['파주시'], withinYears: null, minYears: null, industries: ['제조'], excludeIndustries: [], minEmployees: null, maxEmployees: null, minRevenueM: null, maxRevenueM: null, sizes: [], youthCeo: false, womenCeo: false, certs: [], preStartupOnly: false }
+    const mk = (id, title, end) => ({ id, clientId: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), data: { title, agency: '경기도 파주시', operator: '', category: 'money', applyStart: '', applyEnd: end, deadlineKind: 'date', amountText: '기업당 최대 3,000만원', target: '파주시 소재 제조업 중소기업', summary: '', url: 'https://www.bizinfo.go.kr/web/view.do?pblancId=' + id, rules, source: 'paste', published: false } })
+    localStorage.setItem('axmvp.module.grants.notices', JSON.stringify([mk('rt1', '[경기] 2026년 파주시 스마트 설비 지원사업 모집 공고', plus(20)), mk('rt2', '[경기] 파주시 디자인 개발 지원', plus(25))]))
+    const all = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const r = all.find((x) => x.id === 'cli_hansol')
+    r.fundingApplications = [...(r.fundingApplications ?? []), { id: 'rt-app', programName: '2025년 파주시 스마트 설비 지원사업', institution: '파주시', status: 'rejected', applyDueDate: plus(-345), submittedAt: plus(-350), resultAt: plus(-300), requestedAmount: null, approvedAmount: null, note: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }]
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(all))
+  }, kst(0))
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=funding', { waitUntil: 'networkidle' })
+  const rowR = page.getByTestId('reject-row')
+  await rowR.waitFor({ timeout: 8000 })
+  await rowR.getByTestId('retry-hit').waitFor({ timeout: 8000 })
+  check('D641 떨어진 건: [떨어진 까닭 남기기] 한 줄 · 같은 사업 공고 "다시 올라왔어요" · [신청 준비]', (await rowR.getByTestId('reject-open').count()) === 1 && /다시 올라왔어요 — \[경기\] 2026년 파주시 스마트 설비/.test(await rowR.getByTestId('retry-hit').innerText()) && (await rowR.getByTestId('retry-prepare').count()) === 1, await rowR.innerText())
+  check('D641 다른 사업 공고(디자인)는 다시 올라온 공고 아님', !(await rowR.innerText()).includes('디자인'))
+
+  await rowR.getByTestId('reject-open').click()
+  const form = page.getByTestId('reject-form')
+  await form.waitFor()
+  check('D641 처음엔 접힌 한 줄 → 누르면 까닭 넷 · 메모 · 다시 도전/접기', (await form.getByTestId('reject-reason').count()) === 4 && (await form.getByTestId('reject-plan').count()) === 2)
+  await form.locator('[data-testid="reject-reason"][data-key="plan"]').click()
+  await form.locator('[data-testid="reject-reason"][data-key="docs"]').click()
+  await form.getByLabel('떨어진 까닭 메모').fill('발표 때 매출 근거 질문')
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/d641-form-pc.png` }).catch(() => {})
+  await form.getByTestId('reject-save').click()
+  await page.getByTestId('reject-summary').waitFor()
+  const sum = await page.getByTestId('reject-summary').innerText()
+  check('D641 저장 → "지난번: 사업계획서 · 발표 · 서류 빠짐 · 늦음 — 메모 · n월 무렵 다시 도전"', /지난번: 사업계획서 · 발표 · 서류 빠짐 · 늦음 — '발표 때 매출 근거 질문'/.test(sum) && /\d+월 무렵 다시 도전/.test(sum), sum)
+  await page.reload({ waitUntil: 'networkidle' })
+  await page.getByTestId('reject-summary').waitFor()
+  check('D641 새로 고쳐도 그대로(업체 기록에 저장)', (await page.getByTestId('reject-summary').innerText()) === sum)
+
+  // 오늘 '확인할 것 모두 보기' — 다시 도전할까요?(지난 까닭 같이)
+  await page.goto(BASE + '/ops/decide', { waitUntil: 'networkidle' })
+  const dz = page.getByTestId('decision').filter({ hasText: '작년에 떨어진' })
+  await dz.first().waitFor({ timeout: 8000 }).catch(() => {})
+  check('D641 확인할 것: "작년에 떨어진 … 다시 올라왔어요 — 다시 도전할까요?"', (await dz.count()) === 1, await page.getByTestId('decision-title').allInnerTexts().catch(() => []))
+  check('D641 같은 업체에 같은 공고를 "도전해 볼까요?" 로 또 묻지 않음(다른 파주 업체는 그대로)', (await page.locator('[data-testid="decision"][data-client="cli_hansol"]').filter({ hasText: '스마트 설비 지원사업 모집 공고 — 도전해 볼까요?' }).count()) === 0)
+
+  // 1년 일정표 — 다시 올라온 공고 마감에 '다시 도전'
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=smart&year=1', { waitUntil: 'networkidle' })
+  await page.getByTestId('year-plan').waitFor({ timeout: 8000 })
+  const dueYm = kst(20).slice(0, 7)
+  await page.locator(`[data-testid="year-month"][data-key="${dueYm}"] button`).first().click()
+  const yItems = await page.getByTestId('year-month-items').innerText()
+  check('D641 1년 일정표: 다시 올라온 공고 마감 · "다시 도전" · 까닭은 안 씀', /파주시 스마트 설비/.test(yItems) && yItems.includes('다시 도전') && !yItems.includes('매출 근거'), yItems)
+  await page.keyboard.press('Escape')
+
+  // [신청 준비] → 새 신청 건에 지난 까닭 · 이번엔 이것부터
+  await page.goto(BASE + '/ops/clients/cli_hansol?tab=funding', { waitUntil: 'networkidle' })
+  await page.getByTestId('retry-prepare').click()
+  await page.getByTestId('retry-of').first().waitFor({ timeout: 8000 })
+  const of = await page.getByTestId('retry-of').first().innerText()
+  check('D641 [신청 준비] → 새 건에 "다시 도전 — 지난번: …" · "이번엔: …" 두 줄', /다시 도전 — 지난번: 사업계획서 · 발표/.test(of) && (of.match(/이번엔:/g) ?? []).length === 2, of)
+  check('D641 다시 신청 중이면 "다시 올라왔어요" 줄 사라짐', (await page.getByTestId('retry-hit').count()) === 0)
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/d641-pc.png`, fullPage: true }).catch(() => {})
+  check('D641 화면 오류 0', errors.length === 0, errors)
+  await ctx.close()
+
+  // 휴대폰 390 — 까닭 고르기 판 넘침 0 · 칩 높이
+  const m = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  const mp = await m.newPage()
+  await mp.route('**/api/grants-feed*', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'no_key' }) }))
+  await mp.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await mp.evaluate(seedScript())
+  await mp.evaluate(prepClients)
+  await mp.evaluate((today) => {
+    const plus = (n) => new Date(new Date(today + 'T00:00:00Z').getTime() + n * 86_400_000).toISOString().slice(0, 10)
+    const all = JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]')
+    const r = all.find((x) => x.id === 'cli_hansol')
+    r.fundingApplications = [...(r.fundingApplications ?? []), { id: 'rt-app', programName: '2025년 파주시 스마트 설비 지원사업', institution: '파주시', status: 'rejected', applyDueDate: plus(-345), submittedAt: null, resultAt: plus(-300), requestedAmount: null, approvedAmount: null, note: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }]
+    localStorage.setItem('axmvp.v1.operations_clients', JSON.stringify(all))
+  }, kst(0))
+  await mp.goto(BASE + '/ops/clients/cli_hansol?tab=funding', { waitUntil: 'networkidle' })
+  await mp.getByTestId('reject-open').click()
+  await mp.getByTestId('reject-form').waitFor()
+  const chipBox = await mp.getByTestId('reject-reason').first().boundingBox()
+  check('D641 390: 까닭 고르기 판 넘침 0 · 칩 높이 44px 이상', (await overflowX(mp)) <= 0 && (chipBox?.height ?? 0) >= 44, [await overflowX(mp), chipBox])
+  if (SHOTS) await mp.screenshot({ path: `${SHOTS}/d641-390.png` }).catch(() => {})
+  await m.close()
+}
+
 await browser.close()
 console.log(`\ngrants e2e: ${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)

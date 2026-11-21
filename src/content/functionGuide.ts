@@ -684,6 +684,16 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     next: '고른 일을 한 번에 할 일 · 달력에 거는 길을 붙여요.',
     basicHidden: true,
   },
+  // D-641 떨어진 신청 — 까닭 기록 · 다음 해 다시 도전(규칙 — AI 아님)
+  'fn-reject-retry': {
+    label: '떨어진 까닭 남기기',
+    menu: 'client-ops',
+    what: '떨어진 신청 건에 까닭(점수 · 자격 · 사업계획서 · 서류)과 한 줄 메모를 남기고, 다음 해 다시 도전할지 정해요.',
+    why: '떨어진 까닭이 머릿속에만 있어서, 다음 해 같은 공고가 나와도 같은 데서 또 막히기 쉬웠어요.',
+    effect: '같은 사업 공고가 다시 올라오면 신청 탭 · 오늘 확인할 것에 알려 주고, [신청 준비] 를 누르면 지난 까닭과 이번에 먼저 할 일이 새 신청 건에 붙어요.',
+    next: '평가 의견을 사업계획서 고칠 곳과 바로 잇는 길을 붙여요.',
+    basicHidden: true,
+  },
   // D-639 공고 원문 파일 읽기(규칙 — AI 아님)
   'fn-grant-doc-file': {
     label: '공고 파일 올리기',

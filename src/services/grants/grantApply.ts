@@ -21,6 +21,7 @@ import { withFee, withFunding, withNewFee, withNewFunding, withoutFunding } from
 import { withActivity } from '../clientOpsActivity'
 import type { GrantNotice } from './grantMatch'
 import { nowDate } from '../../lib/appClock'
+import { rejectedTwinOf } from './grantRetry'
 
 /** 공고 글에 제출서류가 없을 때 — 정부 지원사업에 흔히 내는 것 */
 export const DEFAULT_APPLY_DOCS: readonly string[] = [
@@ -218,6 +219,8 @@ export function withGrantApplication(
     ...(notice.applyEndTime ? { applyDueTime: notice.applyEndTime } : {}),
   }
   const existing = applicationFor(record, notice)
+  // D-641 작년에 떨어진 같은 사업이면 그 건에 잇는다(지난 까닭 · '이번엔 이것부터' 를 신청 건에서 보게)
+  const twin = rejectedTwinOf(record, notice)
   if (existing) {
     if (existing.noticeId === notice.id && existing.docs) return { record, app: existing, created: false }
     // 공고에 마감이 있으면 공고 마감으로(손으로 적은 옛 날짜보다 공고가 맞다). D-156: '도전해 볼 만함' 으로 체크해 둔 건이면 신청 준비로 올린다
@@ -226,6 +229,7 @@ export function withGrantApplication(
       ...(existing.docs ? {} : { docs: applyDocsFor(notice) }),
       ...(due ? { applyDueDate: due } : {}),
       ...(existing.status === 'watching' ? { status: 'preparing' as const } : {}),
+      ...(twin && !existing.retryOf && twin.id !== existing.id ? { retryOf: twin.id } : {}),
     }
     const next = withFunding(record, existing.id, patch)
     return { record: next, app: next.fundingApplications.find((a) => a.id === existing.id) ?? existing, created: false }
@@ -237,7 +241,7 @@ export function withGrantApplication(
     applyDueDate: due,
   })
   const [first, ...rest] = made.fundingApplications
-  const app: FundingApplication = { ...first, ...extra, docs: applyDocsFor(notice) }
+  const app: FundingApplication = { ...first, ...extra, docs: applyDocsFor(notice), ...(twin ? { retryOf: twin.id } : {}) }
   const activity = made.activity.map((x, i) => (i === 0 && x.kind === 'funding_added' ? { ...x, text: `지원사업 신청 준비 — ${notice.title}` } : x))
   return { record: { ...made, fundingApplications: [app, ...rest], activity }, app, created: true }
 }
@@ -257,13 +261,15 @@ export function withGrantChallenge(record: ClientOpsRecord, notice: GrantNotice)
     applyDueDate: notice.deadlineKind !== 'always' ? notice.applyEnd : '',
   })
   const [first, ...rest] = made.fundingApplications
+  const twin = rejectedTwinOf(record, notice)
   const app: FundingApplication = {
     ...first,
     noticeId: notice.id,
     ...(notice.url ? { noticeUrl: notice.url } : {}),
     ...(notice.applyEndTime ? { applyDueTime: notice.applyEndTime } : {}),
+    ...(twin ? { retryOf: twin.id } : {}),
   }
-  const activity = made.activity.map((x, i) => (i === 0 && x.kind === 'funding_added' ? { ...x, text: `지원사업 도전 체크 — ${notice.title}` } : x))
+  const activity = made.activity.map((x, i) => (i === 0 && x.kind === 'funding_added' ? { ...x, text: `지원사업 ${twin ? '다시 도전' : '도전'} 체크 — ${notice.title}` } : x))
   return { record: { ...made, fundingApplications: [app, ...rest], activity }, app, created: true }
 }
 

@@ -275,6 +275,14 @@ export interface FundingApplication {
   successFeeId?: string
   /** D-153: 고객 화면에 올린 소식(접수 · 선정 · 탈락) — 두 번 올리지 않게 */
   newsPosted?: ('submitted' | 'selected' | 'rejected')[]
+  /** D-641 떨어진 까닭(점수 · 자격 · 사업계획서 · 서류) — 우리 쪽 기록 · 고객 글에는 쓰지 않는다 */
+  rejectReasons?: ('score' | 'eligibility' | 'plan' | 'docs')[]
+  /** D-641 떨어진 까닭 한 줄 메모(평가 의견 등 · 200자 안) */
+  rejectNote?: string
+  /** D-641 다음 해 다시 도전할지 — 'skip' 이면 다시 올라와도 알리지 않는다(없으면 다시 도전으로 본다) */
+  retryPlan?: 'retry' | 'skip'
+  /** D-641 다시 도전 건 — 지난번 떨어진 건의 id(그 까닭 · '이번엔 이것부터' 를 보여 준다) */
+  retryOf?: string
   createdAt: string
   updatedAt: string
 }

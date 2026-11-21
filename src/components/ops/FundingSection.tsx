@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Landmark, Plus } from 'lucide-react'
 import { InlineConfirm } from '../ui/InlineConfirm'
 import type { ClientOpsRecord, FundingStatus } from '../../types/clientOps'
@@ -10,6 +10,13 @@ import { HelpHeading } from '../ui/fold'
 import { Panel } from '../ui/Panel'
 import { GrantApplyChecklist } from '../grants/GrantApplyChecklist'
 import { ApplyStageBar } from '../grants/ApplyStageBar'
+import { RejectRetryRow, RetryOfLine } from '../grants/RejectRetryRow'
+import type { GrantNotice } from '../../services/grants/grantMatch'
+import { matchesFor } from '../../services/grants/grantMatch'
+import { profileOfRecord } from '../../services/grants/grantProfile'
+import { isRetryable, retryHits } from '../../services/grants/grantRetry'
+import { featureUsable, useEntitlements } from '../../lib/entitlementsStore'
+import { useGrantNotices } from '../grants/useGrants'
 
 const FUNDING_STATUS_ORDER: FundingStatus[] = [
   'watching',
@@ -32,6 +39,8 @@ const STATUS_CLASS: Record<FundingStatus, string> = {
   given_up: 'border-slate-200 bg-slate-100 text-slate-500',
 }
 
+const NO_NOTICES: readonly GrantNotice[] = []
+
 const inputCls =
   'rounded-(--radius-control) border border-slate-300 px-2.5 py-2 text-[0.9375rem] focus:border-brand-500 focus:outline-none'
 
@@ -47,7 +56,10 @@ export function FundingSection({
   onUpdate,
   feesHref,
   portal,
+  workspaceId = null,
 }: {
+  /** D-641 이 작업공간의 공고(지원사업 알림을 쓸 수 있는 계정만) — 떨어진 사업이 다시 올라왔는지 본다 */
+  workspaceId?: string | null
   portal?: { requested: string[]; request: (items: { title: string; documentType: string }[]) => Promise<number>; publish?: (title: string, body: string, result: boolean) => Promise<void> } | null
   /** D-152: 다음 단계 단추(접수 · 결과 · 성공보수) — 최신 기록 위에서 바꾼다 */
   onUpdate?: (change: (r: ClientOpsRecord) => ClientOpsRecord, message: string) => void
@@ -69,6 +81,16 @@ export function FundingSection({
     if (rank(a.status) !== rank(b.status)) return rank(a.status) - rank(b.status)
     return (a.applyDueDate || '9999').localeCompare(b.applyDueDate || '9999')
   })
+
+  // D-641 떨어진 사업이 다시 올라왔나 — 떨어진 건이 있을 때만 공고를 맞춰 본다(지원사업 알림을 못 쓰는 계정은 공고 없음)
+  const { ent } = useEntitlements()
+  const allNotices = useGrantNotices(workspaceId)
+  const notices: readonly GrantNotice[] = featureUsable(ent, 'grants') ? allNotices : NO_NOTICES
+  const hasRejected = record.fundingApplications.some(isRetryable)
+  const hits = useMemo(
+    () => (hasRejected && notices.length ? retryHits(record, matchesFor(notices, profileOfRecord(record, today), today, { includeUpcoming: true })) : []),
+    [hasRejected, notices, record, today],
+  )
 
   const selectedTotal = apps
     .filter((a) => a.status === 'selected')
@@ -152,6 +174,7 @@ export function FundingSection({
                         )}
                       </div>
                       {a.institution && <p className="mt-0.5 text-[0.875rem] text-slate-500">{a.institution}</p>}
+                      {a.retryOf && a.status !== 'rejected' && <div className="mt-1"><RetryOfLine record={record} app={a} /></div>}
                     </div>
                     <div className="flex items-center gap-2">
                       <select
@@ -237,6 +260,9 @@ export function FundingSection({
 
                   {/* D-211: 지원사업(공고로 만든) 건만 — 손으로 적은 정책자금 건은 계약의 성공보수를 따로 갖고 있어 '수금에 걸기' 를 또 두면 받을 돈이 두 번 잡혔다 */}
                   {onUpdate && (a.docs || a.noticeId) && <ApplyStageBar record={record} app={a} today={today} onUpdate={onUpdate} feesHref={feesHref ?? '?tab=fees'} publish={portal?.publish ?? null} />}
+
+                  {/* D-641 떨어진 건 — 까닭 남기기 · 다시 올라온 공고 [신청 준비] */}
+                  {onUpdate && a.status === 'rejected' && <RejectRetryRow app={a} today={today} hit={hits.find((h) => h.app.id === a.id) ?? null} onUpdate={onUpdate} />}
 
                   {(a.submittedAt || a.resultAt) && (
                     <p className="text-[0.875rem] text-slate-500">

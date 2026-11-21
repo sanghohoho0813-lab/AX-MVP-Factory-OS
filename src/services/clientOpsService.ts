@@ -564,6 +564,13 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
           ...(typeof a.resultDueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.resultDueDate) ? { resultDueDate: a.resultDueDate } : {}),
           ...(typeof a.successFeeId === 'string' && a.successFeeId ? { successFeeId: a.successFeeId } : {}),
           ...(Array.isArray(a.newsPosted) ? { newsPosted: a.newsPosted.filter((k) => k === 'submitted' || k === 'selected' || k === 'rejected') } : {}),
+          // D-641 떨어진 까닭 · 다시 도전 — 없던 기록은 그대로 없다
+          ...(Array.isArray(a.rejectReasons) && a.rejectReasons.some((k) => k === 'score' || k === 'eligibility' || k === 'plan' || k === 'docs')
+            ? { rejectReasons: [...new Set(a.rejectReasons.filter((k) => k === 'score' || k === 'eligibility' || k === 'plan' || k === 'docs'))] }
+            : {}),
+          ...(typeof a.rejectNote === 'string' && a.rejectNote.trim() ? { rejectNote: a.rejectNote.trim().slice(0, 200) } : {}),
+          ...(a.retryPlan === 'retry' || a.retryPlan === 'skip' ? { retryPlan: a.retryPlan } : {}),
+          ...(typeof a.retryOf === 'string' && a.retryOf ? { retryOf: a.retryOf.slice(0, 80) } : {}),
           ...(Array.isArray(a.docs)
             ? {
                 docs: a.docs

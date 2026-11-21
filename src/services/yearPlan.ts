@@ -5,6 +5,7 @@
  *  1. 기한(buildClientSchedule 그대로) — 지원사업 · 정책자금 신청 마감 · 결과 발표 · 서류 만료 · 임원 중임 등기 · 도구 기한(고용지원금 회차 · 연구소 사후관리)
  *     고객 종이라 수수료(수금) · 내부 다음 약속 · 우리 업무 마감은 넣지 않는다(진단서 D-352 와 같은 기준).
  *  2. 이 업체에 맞는 공고(matchesFor — 조건 맞음 · 확인 필요) 마감 — 이미 신청 건으로 잡힌 공고는 한 번만.
+ *  2-1. D-641 작년에 떨어진 사업 — 다시 올라온 공고 마감 또는 작년 그 달의 '다시 도전 · 공고 확인'(짐작 · 까닭은 쓰지 않는다).
  *  3. 먼저 제안할 것(buildInsights 의 가능성 높음 · 검토해 볼 만함) — 이번 달에 시작할 일.
  *     세액공제 · 감면이 걸린 판정은 신고 달(법인 3월 31일 · 개인 5월 31일 — 12월 결산 기준)에 '반영 확인'.
  *     판정에 'n년분 경정청구' 가 있으면 그 경정청구 마감(법정신고기한 뒤 5년 — 국세기본법 제45조의2)이 12개월 안이면 '놓치면 끝나는 기한'.
@@ -16,6 +17,7 @@ import type { Insight } from './clientInsights'
 import type { GrantMatch } from './grants/grantMatch'
 import { buildClientSchedule, type ScheduleEvent } from './clientOpsSchedule'
 import { businessTypeOf } from '../tools/shared/clientPrefill'
+import { expectedRetryMonth, isRetryable, retryHits } from './grants/grantRetry'
 
 export type YearItemKind = 'deadline' | 'grant' | 'propose' | 'tax'
 
@@ -143,6 +145,47 @@ export function buildYearPlan(record: ClientOpsRecord, insights: readonly Insigh
       detail: [n.amountText, m.verdict === 'fit' ? '조건 맞음' : `확인할 조건 ${m.unknownCount}가지`].filter(Boolean).join(' · '),
       hard: true,
       path: `/grants?open=${encodeURIComponent(n.id)}`,
+    })
+  }
+
+  // 2-1. D-641 작년에 떨어진 사업 — 다시 올라왔으면 그 공고 마감('다시 도전' · 전국 공통 공고라도), 아직이면 작년 그 달에 '공고 확인'(짐작).
+  //      고객 종이라 떨어진 까닭은 쓰지 않는다. 다시 도전을 접은 건 · 이미 다시 신청 중인 건은 빼고.
+  const hits = retryHits(record, matches)
+  const hitApp = new Set(hits.map((h) => h.app.id))
+  for (const h of hits) {
+    const n = h.match.notice
+    const prev = items.find((x) => x.id === `gr:${n.id}`)
+    if (prev) {
+      prev.detail = ['다시 도전', prev.detail].filter(Boolean).join(' · ')
+      continue
+    }
+    const end = n.applyEnd && n.applyEnd >= today && inWindow(n.applyEnd) ? n.applyEnd : ''
+    push({
+      id: `rt:${n.id}`,
+      date: end,
+      month: end ? ymOf(end) : start,
+      kind: 'grant',
+      title: `${clip(n.title, 40)} ${end ? '마감' : '— 다시 올라왔어요'}`,
+      detail: ['다시 도전', n.amountText].filter(Boolean).join(' · '),
+      hard: Boolean(end),
+      path: `/grants?open=${encodeURIComponent(n.id)}`,
+    })
+  }
+  for (const app of record.fundingApplications) {
+    if (!isRetryable(app) || hitApp.has(app.id)) continue
+    // 같은 사업으로 이미 다시 신청 중이면(이 건 뒤에 만든 진행 중인 건) 빼기
+    if (record.fundingApplications.some((l) => l.retryOf === app.id && l.status !== 'rejected' && l.status !== 'given_up')) continue
+    const ym = expectedRetryMonth(app, today)
+    if (!ym || ym < start || ym >= endYm) continue
+    push({
+      id: `ra:${app.id}`,
+      date: '',
+      month: ym,
+      kind: 'grant',
+      title: `${clip(app.programName || '지원사업', 40)} — 다시 도전 · 공고 확인`,
+      detail: '해마다 비슷한 때 공고가 나와요 — 지난번 부족했던 점부터 미리',
+      approx: true,
+      path: `/ops/clients/${record.id}?tab=funding`,
     })
   }
 

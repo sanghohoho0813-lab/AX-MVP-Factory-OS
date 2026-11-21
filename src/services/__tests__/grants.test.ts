@@ -63,6 +63,7 @@ import type { SentRecord } from '../grants/grantStore'
 import { isGrantBookmark } from '../../types/clientOps'
 import { DOC_FIELDS, docReadLine, readNoticeDoc } from '../grants/grantDoc'
 import { buildYearPlan, refundDeadline, yearItemText, yearPlanKakao } from '../yearPlan'
+import { expectedRetryMonth, programKey, rejectReasonText, rejectedTwinOf, retryHits, retrySourceOf, retryTips, sameProgramAcrossYears, withRejectInfo } from '../grants/grantRetry'
 import type { Insight } from '../clientInsights'
 
 let pass = 0
@@ -1360,6 +1361,92 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   const pn = buildYearPlan(rec, [ins('labcare', 'maybe', null, '연구소 설립 — 기업 규모(소기업 · 중기업) · 연구전담요원 후보(학위 · 전공 · 경력)만 확인하면 돼요', { amount: '연 1,200만원' })], [], T2)
   const lab = pn.months[0].items.find((x) => x.kind === 'propose')
   check('YP25 할 일 문장 없는 제안: 제목 "연구소 검토" · 아래 줄 금액 · 판정 문장', lab?.title === '연구소 검토' && lab.detail.startsWith('연 1,200만원 · 연구소 설립 — 기업 규모'), lab)
+}
+
+/* ---------------- D-641 떨어진 신청 — 까닭 기록 · 다음 해 다시 도전 ---------------- */
+{
+  const T3 = '2026-11-21'
+  // 이름 뼈대 — 해 · 차수 · 반기 · 공고 꾸밈말을 빼면 같은 사업
+  check('RT1 이름 뼈대: 2025년도 · 2차 · 모집 공고 · [경기] 빼면 같음', programKey('[경기] 2025년도 스마트공장 구축 지원사업 2차 모집 공고') === programKey('2026년 스마트공장 구축 지원사업 공고'), [programKey('[경기] 2025년도 스마트공장 구축 지원사업 2차 모집 공고'), programKey('2026년 스마트공장 구축 지원사업 공고')])
+  check('RT2 같은 사업: 상반기/하반기 · 재공고 · 띄어쓰기 · (공고)', sameProgramAcrossYears('2025년 하반기 수출바우처 사업 참여기업 모집', '2026 상반기 수출 바우처 사업(재공고)') && sameProgramAcrossYears('청년창업사관학교 15기 입교생 모집', '2026년 청년창업사관학교 입교생 모집') === false)
+  check('RT3 다른 사업: 짧은 뼈대(4자 미만) · 다른 이름은 아님', !sameProgramAcrossYears('2026년 공고', '2027년 공고') && !sameProgramAcrossYears('스마트공장 구축 지원', '스마트상점 기술보급'))
+  check('RT4 긴 뼈대가 다른 쪽에 통째로 — 같은 사업', sameProgramAcrossYears('경기도 수출바우처', '2026년 경기도 수출바우처 지원사업'))
+
+  const rec0 = normalizeClientOps({
+    id: 'rt1',
+    companyName: '새솔기계',
+    status: 'active',
+    corporateNumber: '110111-7654321',
+    businessAddress: '경기도 화성시 향남읍 1',
+    industry: '제조업',
+    establishedAt: '2019-05-01',
+    fundingApplications: [
+      { id: 'r1', programName: '2025년 스마트공장 구축 지원사업', status: 'rejected', applyDueDate: '2025-12-12', resultAt: '2026-02-20', institution: '경기도', noticeId: 'old1' },
+      { id: 'r2', programName: '2025 수출바우처', status: 'rejected', applyDueDate: '2025-04-30', institution: '' },
+      { id: 'r3', programName: '포기한 사업', status: 'given_up', applyDueDate: '2025-06-01', institution: '' },
+    ],
+  } as never)
+  check('RT5 기준 날 · 다음 해 그 달(짐작)', expectedRetryMonth(rec0.fundingApplications[0]) === '2026-12' && expectedRetryMonth(rec0.fundingApplications[1]) === '2026-04')
+
+  // 까닭 적기 — 고른 것 · 메모 · 다시 도전
+  const rec1 = withRejectInfo(rec0, 'r1', { reasons: ['plan', 'docs', 'plan', 'bad' as never], note: '  발표 때 매출 근거 질문에 답을 못 함  ', retryPlan: 'retry' }, '2026-11-21T01:00:00Z')
+  const r1 = rec1.fundingApplications.find((a) => a.id === 'r1')!
+  check('RT6 까닭 적기: 겹침 · 모르는 값 빼고 · 메모 다듬고 · 다시 도전', JSON.stringify(r1.rejectReasons) === '["plan","docs"]' && r1.rejectNote === '발표 때 매출 근거 질문에 답을 못 함' && r1.retryPlan === 'retry', r1)
+  check('RT7 까닭 한 줄 · 이번엔 이것부터', rejectReasonText(r1) === "사업계획서 · 발표 · 서류 빠짐 · 늦음 — '발표 때 매출 근거 질문에 답을 못 함'" && retryTips(r1).length === 2 && retryTips(r1)[0].includes('사업계획서'), [rejectReasonText(r1), retryTips(r1)])
+  const cleared = withRejectInfo(rec1, 'r1', { reasons: [], note: ' ', retryPlan: 'skip' }, '2026-11-21T02:00:00Z').fundingApplications.find((a) => a.id === 'r1')!
+  check('RT8 비우면 지움 · 다시 도전 접기', cleared.rejectReasons === undefined && cleared.rejectNote === undefined && cleared.retryPlan === 'skip')
+  const long = withRejectInfo(rec0, 'r2', { reasons: ['score'], note: '가'.repeat(260), retryPlan: 'retry' }, '2026-11-21T01:00:00Z').fundingApplications.find((a) => a.id === 'r2')!
+  check('RT9 메모 200자까지 · 저장했다 다시 읽어도 그대로', long.rejectNote?.length === 200 && (() => {
+    const back = normalizeClientOps(JSON.parse(JSON.stringify(rec1)) as never).fundingApplications.find((a) => a.id === 'r1')!
+    return JSON.stringify(back.rejectReasons) === JSON.stringify(r1.rejectReasons) && back.rejectNote === r1.rejectNote && back.retryPlan === r1.retryPlan
+  })())
+  check('RT9b 다음 회차 짐작: 그 사이 회차가 지났으면 그다음 해', expectedRetryMonth(rec0.fundingApplications[1], '2026-11-21') === '2027-04' && expectedRetryMonth(rec0.fundingApplications[0], '2026-11-21') === '2026-12')
+
+  // 다시 올라온 공고
+  const nt = (id: string, title: string, start: string, end: string, rules: Partial<GrantRules> = {}) => normalizeNotice({ id, title, agency: '경기도', applyStart: start, applyEnd: end, deadlineKind: 'date', amountText: '최대 5천만원', rules: { ...rules } }, id, T3)!
+  const ns3 = [
+    nt('old1', '2025년 스마트공장 구축 지원사업', '2025-11-01', '2025-12-12'),
+    nt('new1', '[경기] 2026년도 스마트공장 구축 지원사업 모집 공고', '2026-11-10', '2026-12-15', { regions: ['경기'] }),
+    nt('new1b', '2026 스마트공장 구축 지원사업 2차', '2027-03-01', '2027-03-31', { regions: ['경기'] }),
+    nt('seoul', '2026 수출바우처', '2026-11-01', '2026-12-30', { regions: ['서울'] }),
+    nt('other', '스마트상점 기술보급', '2026-11-01', '2026-12-20'),
+  ]
+  const ms3 = matchesFor(ns3, profileOfRecord(rec1, T3), T3, { includeUpcoming: true })
+  const hits = retryHits(rec1, ms3)
+  check('RT10 다시 올라온 공고: 같은 사업 · 마감 가까운 것 · 작년 공고(마감)는 아님 · 조건 안 맞는(서울) 공고는 아님', hits.length === 1 && hits[0].app.id === 'r1' && hits[0].match.notice.id === 'new1', hits.map((h) => [h.app.id, h.match.notice.id]))
+  check('RT11 다시 도전 접으면 알리지 않음', retryHits(withRejectInfo(rec1, 'r1', { reasons: ['plan'], note: '', retryPlan: 'skip' }, '2026-11-21T03:00:00Z'), ms3).length === 0)
+  check('RT12 포기한 건 · 진행 중인 건은 다시 도전 대상 아님', rejectedTwinOf(rec1, { id: 'x', title: '포기한 사업' }) === null)
+
+  // 공고로 신청 준비 → 떨어진 건에 이어짐 · 다시 올라와도 두 번 알리지 않음
+  const prep = withGrantApplication(rec1, hits[0].match.notice)
+  check('RT13 [신청 준비] → 떨어진 건에 이음(retryOf) · 이번엔 이것부터를 그 건에서', prep.created && prep.app.retryOf === 'r1' && retrySourceOf(prep.record, prep.app)?.id === 'r1', prep.app)
+  check('RT14 다시 신청 중이면 다시 올라왔다고 또 알리지 않음', retryHits(prep.record, ms3).length === 0)
+  const bm = withGrantChallenge(rec1, hits[0].match.notice)
+  check('RT15 [도전해 볼 만함](확인할 것 [다시 도전]) 도 이음 · 활동 기록 "다시 도전"', bm.app.retryOf === 'r1' && bm.record.activity[0].text.startsWith('지원사업 다시 도전 체크'), [bm.app.retryOf, bm.record.activity[0]?.text])
+  const plain = withGrantApplication(rec1, ns3[4])
+  check('RT16 다른 사업 공고는 잇지 않음', plain.app.retryOf === undefined)
+
+  // 오늘 '확인할 것' — 다시 도전할까요?(지난 까닭 같이) · 같은 공고를 '도전해 볼까요?' 로 또 묻지 않음
+  const ds = buildDecisions(rec1, T3, ns3)
+  const rt = ds.find((d) => d.id === 'retry:new1')
+  check('RT17 확인할 것: "작년에 떨어진 … 다시 올라왔어요" · 지난 까닭 · [다시 도전] · 신청 탭으로', !!rt && rt.title.includes('작년에 떨어진') && rt.why.includes('지난번: 사업계획서 · 발표') && rt.yesLabel === '다시 도전' && rt.openPath === '/ops/clients/rt1?tab=funding' && !ds.some((d) => d.id === 'grant:new1'), ds.map((d) => d.id))
+  const answered = withDecisionAnswer(rec1, rt!, 'yes', ns3, '2026-11-21T04:00:00Z')
+  const made = answered.fundingApplications.find((a) => a.noticeId === 'new1')
+  check('RT18 [다시 도전] → 지켜보는 건(마감이 일정 · 오늘에) · 떨어진 건에 이음', made?.status === 'watching' && made.retryOf === 'r1', made)
+  check('RT19 까닭을 안 적었으면 "까닭을 아직 안 적었어요"', (buildDecisions(rec0, T3, ns3).find((d) => d.id === 'retry:new1')?.why ?? '').includes('까닭을 아직 안 적었어요'))
+  check('RT20 지원사업 알림을 못 쓰는 계정은 묻지 않음', !buildDecisions(rec1, T3, ns3, (k) => k !== 'grants').some((d) => d.id.startsWith('retry:')))
+
+  // 1년 일정표 — 다시 올라온 공고 마감 '다시 도전' · 아직이면 작년 그 달 '공고 확인'(짐작) · 까닭은 고객 종이에 안 씀
+  const yp = buildYearPlan(rec1, [], ms3, T3)
+  const yall = yp.months.flatMap((m) => m.items)
+  const reGrant = yall.find((x) => x.id === 'gr:new1' || x.id === 'rt:new1')
+  check('RT21 일정표: 다시 올라온 공고 마감(12.15) · "다시 도전" · 놓치면 끝', !!reGrant && reGrant.date === '2026-12-15' && reGrant.detail.startsWith('다시 도전') && reGrant.hard, reGrant)
+  const exp = yall.find((x) => x.id === 'ra:r2')
+  check('RT22 일정표: 아직 안 올라온 사업은 작년 그 달(2027년 4월) "다시 도전 · 공고 확인"(확인)', !!exp && exp.month === '2027-04' && exp.approx && exp.title.includes('다시 도전 · 공고 확인'), exp)
+  check('RT23 고객 종이(일정표 · 카톡)에 떨어진 까닭 · 메모 0', !yall.some((x) => /발표 때 매출|사업계획서 · 발표|서류 빠짐/.test(`${x.title} ${x.detail}`)) && !/발표 때 매출|서류 빠짐/.test(yearPlanKakao(yp)))
+  const ypSkip = buildYearPlan(withRejectInfo(rec1, 'r2', { reasons: [], note: '', retryPlan: 'skip' }, '2026-11-21T05:00:00Z'), [], ms3, T3)
+  check('RT24 다시 도전 접은 건은 일정표에도 없음', !ypSkip.months.flatMap((m) => m.items).some((x) => x.id === 'ra:r2'))
+  check('RT25 다시 신청 중이면 일정표 "다시 도전 · 공고 확인" 줄 없음', !buildYearPlan(withGrantApplication(rec1, ns3[1]).record, [], ms3, T3).months.flatMap((m) => m.items).some((x) => x.id === 'ra:r1'))
 }
 
 console.log(`\ngrants: ${pass} passed, ${fail} failed`)

@@ -46,6 +46,7 @@ import { koCompare } from '../lib/koCompare'
 
 // D-481 이름표 · 주말 피하기는 작은 파일에 — 오늘 화면이 판정 엔진을 받기 전에 그릴 수 있게(여기서 다시 내보낸다)
 import { DECISION_BULK_KINDS, DECISION_KIND_LABEL, weekdayOnOrAfter, type DecisionKind } from './decisionLabels'
+import { isRetryable, rejectReasonText, retryHits } from './grants/grantRetry'
 export { DECISION_BULK_KINDS, DECISION_KIND_LABEL, weekdayOnOrAfter }
 export type { DecisionKind }
 
@@ -209,11 +210,37 @@ export function buildDecisions(record: ClientOpsRecord, today: string, notices: 
     // 한 모듈 엔진이 실패해도 멈추지 않는다
   }
 
+  // 3-0) D-641 작년에 떨어진 사업이 다시 올라왔다 — 다시 도전할까요?(떨어진 건이 있을 때만 계산 · 지난 까닭을 같이)
+  const retried = new Set<string>()
+  if (usable('grants') && notices.length && record.fundingApplications.some(isRetryable)) {
+    try {
+      for (const h of retryHits(record, matchesFor(notices, profileOfRecord(record, today), today, { includeUpcoming: true })).slice(0, 2)) {
+        retried.add(h.match.notice.id)
+        const why = rejectReasonText(h.app)
+        push({
+          id: `retry:${h.match.notice.id}`,
+          kind: 'grant',
+          title: `작년에 떨어진 '${h.app.programName.length > 30 ? `${h.app.programName.slice(0, 30)}…` : h.app.programName}' 공고가 다시 올라왔어요 — 다시 도전할까요?`,
+          why: `${h.match.deadline.label}${h.match.notice.amountText ? ` · ${h.match.notice.amountText}` : ''} · 지난번: ${why || '까닭을 아직 안 적었어요'}`,
+          yesLabel: '다시 도전',
+          noLabel: '이번엔 안 함',
+          effect: { type: 'grant', noticeId: h.match.notice.id },
+          openPath: `/ops/clients/${encodeURIComponent(record.id)}?tab=funding`,
+          rank: 32,
+          doneText: '다시 도전 체크 — 지난번 까닭을 신청 건에 이었어요 · 마감을 일정 · 오늘에 띄웁니다',
+          grant: grantBriefOf(h.match),
+        })
+      }
+    } catch {
+      // 공고 판정이 실패해도 멈추지 않는다
+    }
+  }
+
   // 3) 꼭 맞는 공고 — 도전해 볼까요? (이미 신청 건이 있는 공고 · 마감 지난 공고는 빼고, 마감 가까운 둘)
   if (usable('grants') && notices.length) {
     try {
       const fits = matchesFor(notices, profileOfRecord(record, today), today)
-        .filter((m) => m.verdict === 'fit' && !applicationFor(record, m.notice))
+        .filter((m) => m.verdict === 'fit' && !applicationFor(record, m.notice) && !retried.has(m.notice.id))
         .sort((a, b) => (a.deadline.days ?? 9999) - (b.deadline.days ?? 9999))
         .slice(0, 2)
       for (const m of fits) {

@@ -2056,6 +2056,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           onUpdate={(change, message) => void commit(change(current() ?? record)).then((ok) => ok && showToast(message))}
           feesHref={`/ops/clients/${record.id}?tab=fees`}
           portal={portalReq}
+          workspaceId={workspaceId}
         />
       )}
 
