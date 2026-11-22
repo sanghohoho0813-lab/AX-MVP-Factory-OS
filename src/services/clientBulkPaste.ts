@@ -11,7 +11,7 @@
  * 규칙 계산이다 — AI 가 아니다. 저장은 하지 않는다(등록은 화면이 있는 저장 길 createClient 로 한다).
  */
 import { contractStageOf, type ClientOpsRecord } from '../types/clientOps'
-import { companyKey, findClientForCretop } from './salesCretop'
+import { companyKey, findClientForCretop } from './clientMatch'
 
 export type PasteField = 'companyName' | 'contactName' | 'contactPhone' | 'contactEmail' | 'businessNumber' | 'businessAddress' | 'industry' | 'skip'
 

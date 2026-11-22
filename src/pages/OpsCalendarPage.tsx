@@ -1,8 +1,6 @@
-import { AiAssist } from '../components/ai/AiAssist'
-import { calendarBundle } from '../services/aiAssist/builders'
 import { ArrangeArea, ArrangeItem } from '../components/ui/arrange'
 import { usePageLayout, visibilityOf } from '../lib/pageLayout'
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type LiHTMLAttributes } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type LiHTMLAttributes } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, TriangleAlert } from 'lucide-react'
 import { WorkspaceScope } from '../components/workspace/WorkspaceScope'
@@ -42,6 +40,9 @@ import { hintFor } from '../content/sectionHints'
 import { PERSONAL_KEY, isPersonalEntry } from '../services/journalKind'
 import { ghostsByDate, recordMove, shortDay, todoDay, useTodoTrail } from '../services/todoTrail'
 import { PrivateNote } from '../components/journal/PrivateNote'
+
+// D-646 머리 [AI 도우미] 단추는 달력을 그린 뒤에 받는다
+const AiAssist = lazy(() => import('../components/ai/AiAssist').then((m) => ({ default: m.AiAssist })))
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 const KINDS: ScheduleKind[] = ['next', 'task', 'funding', 'payment', 'document', 'tool']
@@ -127,7 +128,8 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
 
   const offMap = useMemo(() => daysOffByDate(daysOff), [daysOff])
   const offSet = useMemo(() => new Set(daysOff.map((d) => d.date)), [daysOff])
-  const assistBuild = useCallback(() => calendarBundle({ today, events: buildAllSchedule(records, today), journal, clients: records, daysOff }), [today, records, journal, daysOff])
+  // D-646 AI 도우미에 보낼 자료는 단추를 눌렀을 때 만든다(그 묶음도 그때 받는다)
+  const assistBuild = useCallback(async () => (await import('../services/aiAssist/builders')).calendarBundle({ today, events: buildAllSchedule(records, today), journal, clients: records, daysOff }), [today, records, journal, daysOff])
   const workdays = useMemo(() => monthWorkdays(ym[0], ym[1], offSet), [ym, offSet])
   const missingHolidays = useMemo(() => missingPublicHolidays(ym[0], daysOff), [ym, daysOff])
   const pickedOff = picked ? (offMap.get(picked) ?? []) : []
@@ -281,7 +283,11 @@ function CalendarContent({ workspaceId, userId }: { workspaceId: string | null; 
         actions={
           <>
             {/* U5(D-542) 예전 띠의 질문 단추(이번 주 한눈에 · 빡빡한 날 · 꼭 지킬 마감 · 직접 묻기)는 누르면 열리는 판 안에 그대로 */}
-            {assistShown && <AiAssist variant="button" page="calendar" title="일정" presets={['calendar.week', 'calendar.busy', 'calendar.month']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />}
+            {assistShown && (
+              <Suspense fallback={null}>
+                <AiAssist variant="button" page="calendar" title="일정" presets={['calendar.week', 'calendar.busy', 'calendar.month']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />
+              </Suspense>
+            )}
             <Button variant="secondary" onClick={() => { const [y,m]=today.split('-'); setYm([Number(y),Number(m)]); setPicked(today) }}>
               <CalendarDays aria-hidden="true" className="size-4" />
               오늘로

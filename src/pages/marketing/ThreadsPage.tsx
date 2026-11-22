@@ -7,7 +7,7 @@
  *  ④ 하루 10분    오늘 할 일 체크 · 태그 검색 열기 · 전문가 답글 틀 · 요일 계획
  * 대표 전용(마케팅 · 브랜딩 모듈 · 팀장에게 안 보임). 저장은 기존 모듈 기록(marketing / threads).
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { DraftSyncLine, useDraftSync } from './useDraftSync'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AtSign, BookOpen, CalendarCheck, CheckCircle2, ClipboardCopy, Download, ExternalLink, FilePlus2, Heart, Lightbulb, MessageCircle, NotebookPen, RefreshCw, Save, Send, Share2, SlidersHorizontal, TriangleAlert, UserPlus } from 'lucide-react'
@@ -30,7 +30,6 @@ import { Fold, HelpHeading, HintTip, openFold, useFold } from '../../components/
 import { readWeekTopics, recommendThread, topicChips, topicTag } from '../../services/marketing/quickStart'
 import { todayLocalDate } from '../../lib/appClock'
 import { AssistError, callAssist, type AssistAnswer } from '../../services/aiAssist/client'
-import { AiAssist } from '../../components/ai/AiAssist'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
 import { useThreadPosts, useWeekRef } from '../../services/marketing/useSnsPosts'
 import { isMarketingCustomer, mkText } from '../../services/marketing/persona'
@@ -75,14 +74,17 @@ import {
   type ThreadTemplateKey,
 } from '../../services/marketing/threads'
 import { josa } from '../../lib/josa'
-import { weekBadge } from '../../services/marketing/weekCollect'
+import { weekBadge } from '../../services/marketing/weekBadge'
 import { useRadarPrefs } from '../../services/marketing/useRadarStore'
 import { briefOf, type ChannelBrief } from '../../services/marketing/radarStore'
 import { briefCores } from '../../services/marketing/brandAngle'
-import { withWriteExtras } from '../../services/aiAssist/marketingBuilders'
+import { withWriteExtras } from '../../services/aiAssist/writeExtras'
 import { AiConfirm } from '../../components/ai/AiConfirm'
 import { bestFirst, EXTRA_SCORE_KEYS, fixLines, needsPolish, polishedWins, scorePost, type PostScore } from '../../services/marketing/postScore'
 import { PostScoreBar } from './PostScoreBar'
+
+// D-646 아래쪽 AI 도우미 판(오른쪽 대화)은 글 쓰는 칸을 그린 뒤에 받는다
+const AiAssist = lazy(() => import('../../components/ai/AiAssist').then((m) => ({ default: m.AiAssist })))
 
 type Tab = 'write' | 'records' | 'library' | 'routine'
 // D-298 대표 "기록표 · 틀 23가지 · 하루 10분 — 뭘 위한 칸인지 모르겠다" — 칸마다 색 · 마우스를 올리면(휴대폰은 아래 한 줄) 무엇을 하는 곳인지
@@ -956,32 +958,34 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, weekRef, brie
       {/* D-299 대표 "마케팅 · 브랜딩 어디서든 LLM 모델을 골라 요청" — 이 화면에도 AI 도우미 판: 모델 고르기 · 직접 묻기(스레드 공식으로 답) ·
           [스레드 글 3개 쓰기] 를 고른 모델로 → 답의 [글 칸에 넣기]. 띠에는 단추를 늘어놓지 않는다(위 [AI로 바로 쓰기] 와 겹치지 않게) */}
       {aiOk && (
-        <AiAssist
-          page="threads"
-          title="스레드"
-          // D-628 이 화면의 대화창 — 오른쪽 판에(붙일 폭이 되면 저절로 · 오른쪽 끝 [대화])
-          dock="auto"
-          presets={['threads.write']}
-          quick={0}
-          build={() => ({ context: writeContext({ goal: draft.goal, template: draft.template, tag: draft.tag }), links: {} })}
-          itemActions={(id) =>
-            id === 'threads.write'
-              ? [
-                  {
-                    id: 'thr-use',
-                    label: '글 칸에 넣기',
-                    primary: true,
-                    run: (item) => {
-                      const d = parseThreadDrafts({ headline: '', items: [item] } as AssistAnswer, myTags).drafts[0]
-                      if (!d) return false
-                      takeDraft(d)
-                      return true
+        <Suspense fallback={null}>
+          <AiAssist
+            page="threads"
+            title="스레드"
+            // D-628 이 화면의 대화창 — 오른쪽 판에(붙일 폭이 되면 저절로 · 오른쪽 끝 [대화])
+            dock="auto"
+            presets={['threads.write']}
+            quick={0}
+            build={() => ({ context: writeContext({ goal: draft.goal, template: draft.template, tag: draft.tag }), links: {} })}
+            itemActions={(id) =>
+              id === 'threads.write'
+                ? [
+                    {
+                      id: 'thr-use',
+                      label: '글 칸에 넣기',
+                      primary: true,
+                      run: (item) => {
+                        const d = parseThreadDrafts({ headline: '', items: [item] } as AssistAnswer, myTags).drafts[0]
+                        if (!d) return false
+                        takeDraft(d)
+                        return true
+                      },
                     },
-                  },
-                ]
-              : null
-          }
-        />
+                  ]
+                : null
+            }
+          />
+        </Suspense>
       )}
     </div>
   )

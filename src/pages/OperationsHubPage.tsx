@@ -1,7 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMoneyWords } from '../components/ops/useMoneyWords'
-import { AiAssist } from '../components/ai/AiAssist'
-import { clientsBundle } from '../services/aiAssist/builders'
 import { useSerialSave } from '../lib/useSerialSave'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryInUrl } from '../lib/useQueryInUrl'
@@ -28,7 +26,6 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { useIsPilot } from '../auth/osAccess'
-import { ServiceCatalogModal } from '../components/ops/ServiceCatalogModal'
 // D-159: 기본 정렬을 '요즘 챙기는 순' 으로 바꾸며 새 이름에 기억한다(예전에 기억해 둔 '급한 순' 에 묶이지 않게)
 const SORT_KEY = 'axmvp.clients.sort.v2'
 const FILTER_KEY = 'axmvp.clients.filter'
@@ -58,7 +55,7 @@ import { usePageLayout, visibilityOf } from '../lib/pageLayout'
 import { ArrangeArea, ArrangeItem } from '../components/ui/arrange'
 import { loadCustomServicesIntoCatalog } from '../services/customServiceService'
 import { withNewProspect } from '../services/salesPipeline'
-import { findClientForCretop } from '../services/salesCretop'
+import { findClientForCretop } from '../services/clientMatch'
 import { getDataModeConfig } from '../data/dataMode'
 import { CloudUpload, Handshake } from 'lucide-react'
 import {
@@ -97,10 +94,9 @@ import { useClientReco } from '../components/ops/useClientReco'
 import { useGrowingCount } from '../lib/useGrowingCount'
 import { CLIENT_TYPE_LABEL, CLIENT_TYPE_VIEW_KEY, CLIENT_TYPES, clientTypeOf, isClientType, rememberClientTypeView, type ClientType } from '../services/clientType'
 import { ClientTypePicker } from '../components/ops/ClientTypePicker'
-import { NewClientDocDrop } from '../components/ops/NewClientDocDrop'
 import { BulkClientPasteSheet } from '../components/ops/BulkClientPasteSheet'
 import { clientsCsv } from '../services/clientBulkPaste'
-import { EMPTY_DOCS_READ, applyNewClientGuess, type NewClientDocsRead, type NewClientField, type NewClientGuess } from '../services/newClientFromDocs'
+import { EMPTY_DOCS_READ, applyNewClientGuess, type NewClientDocsRead, type NewClientField, type NewClientGuess } from '../services/newClientGuess'
 import { clearNewClientDocs, handDocsTo, peekNewClientDocs } from '../services/docHandoff'
 import { HintTip, foldAllOpen } from '../components/ui/fold'
 import { hintFor } from '../content/sectionHints'
@@ -108,6 +104,10 @@ import { FirstClientSteps } from '../components/ops/FirstClientSteps'
 import { useClientSaveNews } from '../services/clientSaveNews'
 
 // D-481 서류 한꺼번에 올리기 창(글자 읽기 · 서류 분석 엔진)은 카드에서 누를 때 받는다 — 목록 첫 화면이 이것 때문에 무거웠다
+// D-646 첫 화면에 없는 것은 쓸 때 받는다 — 등록 창의 서류 넣는 칸(서류 분류 · 글자 읽기) · 머리 [AI 도우미] 단추
+const ServiceCatalogModal = lazy(() => import('../components/ops/ServiceCatalogModal').then((m) => ({ default: m.ServiceCatalogModal })))
+const NewClientDocDrop = lazy(() => import('../components/ops/NewClientDocDrop').then((m) => ({ default: m.NewClientDocDrop })))
+const AiAssist = lazy(() => import('../components/ai/AiAssist').then((m) => ({ default: m.AiAssist })))
 const BulkDocUploadSheet = lazy(() => import('../components/ops/BulkDocUploadSheet').then((m) => ({ default: m.BulkDocUploadSheet })))
 
 /** D-181: 처음 열 때 고객 종류 — 주소(?type=consultant)가 먼저, 없으면 지난번에 보던 쪽 */
@@ -439,7 +439,8 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
       /* 저장 못 해도 화면은 돈다 */
     }
   }, [segment])
-  const assistBuild = useCallback(() => clientsBundle(typed, today, reco, segment), [typed, today, reco, segment])
+  // D-646 AI 도우미에 보낼 자료는 단추를 눌렀을 때 만든다(그 묶음도 그때 받는다)
+  const assistBuild = useCallback(async () => (await import('../services/aiAssist/builders')).clientsBundle(typed, today, reco, segment), [typed, today, reco, segment])
   // U3(D-543) 꾸미기 'AI 도우미'(clients:assist) 를 숨겼으면 머리 단추도 숨긴다
   const hubLayout = usePageLayout('clients')
   const assistShown = visibilityOf(hubLayout, 'assist') === 'show'
@@ -705,14 +706,16 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
         actions={
           <>
             {assistShown && typed.length > 0 && (
-              <AiAssist
-                variant="button"
-                page="clients"
-                scope={`clients:${segment}`}
-                title={segment === 'prospect' ? '고객 관리 · 잠재고객' : segment === 'contract' ? '고객 관리 · 계약 고객' : '고객 관리'}
-                presets={segment === 'prospect' ? ['clients.convert', 'clients.quiet', 'clients.reco'] : segment === 'contract' ? ['clients.care', 'clients.reco', 'clients.quiet'] : ['clients.quiet', 'clients.convert', 'clients.reco', 'clients.care']}
-                build={assistBuild}
-              />
+              <Suspense fallback={null}>
+                <AiAssist
+                  variant="button"
+                  page="clients"
+                  scope={`clients:${segment}`}
+                  title={segment === 'prospect' ? '고객 관리 · 잠재고객' : segment === 'contract' ? '고객 관리 · 계약 고객' : '고객 관리'}
+                  presets={segment === 'prospect' ? ['clients.convert', 'clients.quiet', 'clients.reco'] : segment === 'contract' ? ['clients.care', 'clients.reco', 'clients.quiet'] : ['clients.quiet', 'clients.convert', 'clients.reco', 'clients.care']}
+                  build={assistBuild}
+                />
+              </Suspense>
             )}
             <Button variant="primary" onClick={openForm} data-testid="clients-add" data-guide="fn-clients-add">
               <CirclePlus aria-hidden="true" className="size-4" />
@@ -1392,11 +1395,9 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
       )}
 
       {catalogOpen && (
-        <ServiceCatalogModal
-          workspaceId={workspaceId}
-          onClose={() => setCatalogOpen(false)}
-          onChanged={() => void load()}
-        />
+        <Suspense fallback={null}>
+          <ServiceCatalogModal workspaceId={workspaceId} onClose={() => setCatalogOpen(false)} onChanged={() => void load()} />
+        </Suspense>
       )}
 
       {/* 새 업체 등록 */}
@@ -1423,7 +1424,9 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
               {/* D-181: 고객 종류 — 대표만 고른다(팀장 화면은 늘 중소기업 고객) */}
               {!pilot && <ClientTypePicker value={newType} onChange={setNewType} />}
               {/* D-187: 서류만 넣어도 — 사업자등록증 · 크레탑 · 등기부등본을 읽어 아래 칸을 채운다 */}
-              <NewClientDocDrop onChange={setDocsRead} preload={preDocs} />
+              <Suspense fallback={<p className="t-sub rounded-(--radius-control) border border-dashed border-slate-300 px-3 py-4 text-center text-slate-500" data-testid="new-client-docs-loading">서류 넣는 칸 불러오는 중…</p>}>
+                <NewClientDocDrop onChange={setDocsRead} preload={preDocs} />
+              </Suspense>
               <label className="text-[0.9375rem] font-medium text-slate-700">
                 {!pilot && newType === 'consultant' ? '이름(회사명)' : '업체명'}
                 <input

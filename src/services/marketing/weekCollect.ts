@@ -17,12 +17,7 @@ export const WEEKS_BUCKET = 'weeks'
 
 const wsTag = (ws: string | null) => (ws ?? 'local').replace(/[^a-zA-Z0-9]/g, '').slice(0, 40) || 'local'
 export const weekRowId = (ws: string | null, start: string) => `mkw_${wsTag(ws)}_${start}`
-/** 기록표에서 '1주일치 · 11/3(화)' 표시 — 1주일치에서 모은 줄이 아니면 null */
-export function weekBadge(p: { id: string; topic: string }): string | null {
-  if (!p.id.startsWith('mkw_')) return null
-  const day = /^\d{1,2}\/\d{1,2}\([월화수목금토일]\)/.exec(p.topic)?.[0]
-  return day ? `1주일치 · ${day}` : '1주일치'
-}
+export { weekBadge } from './weekBadge'
 
 /** 목록 줄 id — 롱폼 l · 쇼츠 s1~s3 · 스레드 t1~t7 */
 export const weekItemId = (ws: string | null, start: string, slot: string) => `${weekRowId(ws, start)}_${slot}`

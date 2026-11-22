@@ -6,7 +6,7 @@
  *  기록표: 조회 · 좋아요 · 댓글 · 저장 · 공유 · 문의 → 점수(좋아요 + 댓글×3) · 저장 · 공유율 · 형식별 평균.
  * 대표 전용(마케팅 · 브랜딩 모듈). 저장은 기존 모듈 기록(marketing / shorts).
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { DraftSyncLine, useDraftSync } from './useDraftSync'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BookOpen, CalendarCheck, ClipboardCopy, Clapperboard, Download, Eye, FilePlus2, Lightbulb, MessageCircle, RefreshCw, Save, Send, SlidersHorizontal, TriangleAlert } from 'lucide-react'
@@ -21,7 +21,6 @@ import { useMarketingAiOn } from '../../auth/ownerAiAccess'
 import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
 import { todayLocalDate } from '../../lib/appClock'
 import { AssistError, callAssist, type AssistAnswer } from '../../services/aiAssist/client'
-import { AiAssist } from '../../components/ai/AiAssist'
 import { newRequestId, readChoice } from '../../services/aiAssist/store'
 import { useShortPosts } from '../../services/marketing/useSnsPosts'
 import {
@@ -64,13 +63,16 @@ import { Fold, HelpHeading, HintTip, openFold, useFold } from '../../components/
 import { readWeekTopics, recommendShort, topicChips } from '../../services/marketing/quickStart'
 import { mkText } from '../../services/marketing/persona'
 import { exampleText } from '../../services/marketing/shorts'
-import { weekBadge } from '../../services/marketing/weekCollect'
+import { weekBadge } from '../../services/marketing/weekBadge'
 import { useRadarPrefs } from '../../services/marketing/useRadarStore'
 import { briefOf, type ChannelBrief } from '../../services/marketing/radarStore'
-import { withWriteExtras } from '../../services/aiAssist/marketingBuilders'
+import { withWriteExtras } from '../../services/aiAssist/writeExtras'
 import { AiConfirm } from '../../components/ai/AiConfirm'
 import { bestFirst, EXTRA_SCORE_KEYS, fixLines, needsPolish, polishedWins, scorePost, type PostScore } from '../../services/marketing/postScore'
 import { PostScoreBar } from './PostScoreBar'
+
+// D-646 아래쪽 AI 도우미 판(오른쪽 대화)은 글 쓰는 칸을 그린 뒤에 받는다
+const AiAssist = lazy(() => import('../../components/ai/AiAssist').then((m) => ({ default: m.AiAssist })))
 
 type Tab = 'write' | 'records' | 'guide'
 // D-298 대표 "릴스 · 틱톡도 글자가 구구절절 — 처음 보는 사람은 이게 뭐지 싶다 · 색도 더" — 칸마다 색 · 마우스를 올리면(휴대폰은 아래 한 줄) 무엇을 하는 곳인지
@@ -804,32 +806,34 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, brief, aiOk, 
       {/* D-602 AI 도우미 판은 맨 아래로 — 1단계 · 2단계 사이를 끊지 않게 */}
       {/* D-299 AI 도우미 판 — 모델 고르기 · 직접 묻기(숏폼 공식으로 답) · [대본 2개 쓰기] 를 고른 모델로 → 답의 [대본 칸에 넣기] */}
       {aiOk && (
-        <AiAssist
-          page="shorts"
-          title="릴스 · 틱톡"
-          // D-628 이 화면의 대화창 — 오른쪽 판에(붙일 폭이 되면 저절로 · 오른쪽 끝 [대화])
-          dock="auto"
-          presets={['shorts.write']}
-          quick={0}
-          build={() => ({ context: writeContext({ aim: draft.aim, format: draft.format }), links: {} })}
-          itemActions={(id) =>
-            id === 'shorts.write'
-              ? [
-                  {
-                    id: 'sht-use',
-                    label: '대본 칸에 넣기',
-                    primary: true,
-                    run: (item) => {
-                      const d = parseShortDrafts({ headline: '', items: [item] } as AssistAnswer).drafts[0]
-                      if (!d) return false
-                      start({ script: d.script, caption: d.caption, hashtags: d.hashtags, source: 'ai', ...(d.format ? { format: d.format } : {}) })
-                      return true
+        <Suspense fallback={null}>
+          <AiAssist
+            page="shorts"
+            title="릴스 · 틱톡"
+            // D-628 이 화면의 대화창 — 오른쪽 판에(붙일 폭이 되면 저절로 · 오른쪽 끝 [대화])
+            dock="auto"
+            presets={['shorts.write']}
+            quick={0}
+            build={() => ({ context: writeContext({ aim: draft.aim, format: draft.format }), links: {} })}
+            itemActions={(id) =>
+              id === 'shorts.write'
+                ? [
+                    {
+                      id: 'sht-use',
+                      label: '대본 칸에 넣기',
+                      primary: true,
+                      run: (item) => {
+                        const d = parseShortDrafts({ headline: '', items: [item] } as AssistAnswer).drafts[0]
+                        if (!d) return false
+                        start({ script: d.script, caption: d.caption, hashtags: d.hashtags, source: 'ai', ...(d.format ? { format: d.format } : {}) })
+                        return true
+                      },
                     },
-                  },
-                ]
-              : null
-          }
-        />
+                  ]
+                : null
+            }
+          />
+        </Suspense>
       )}
     </div>
   )
