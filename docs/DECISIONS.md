@@ -10455,4 +10455,4 @@ D-648 을 운영처럼(HTTP/2) 재다가 찾은 것. 동작 · 화면은 그대�
 
 **바뀌는 것 하나** — 모듈 대화창이 첫 주소인 모듈(정책자금 · 고용지원금 · 연구소 · 창업감면 · 크레탑 · 홍보 글 · 홈페이지 · 지원사업 · 세금 계산기)을 앱을 연 지 몇 초 안에 처음 열면, 틀을 그때 받는다(예전엔 뼈대와 함께 이미 받아 두었다). 5초쯤 지나면 미리 받아 둔 것을 쓴다.
 
-**시험** — tsc · oxlint 오류 0 · build · test:all(K28b — 뼈대가 기다리는 조각 3개 · 대화창 틀 0 · 뜬 뒤 받기 · local 앱 정적 import 0) · 앱을 연 직후 모듈 첫 화면을 바로 열기(PC · 390 — 정책자금 · 고용지원금 · 창업감면 · 오류 0 · 사진 확인) · qa:modchat · qa:link · qa:chat · qa:shell · qa:homeask · qa:modules · qa:scenarios · qa:wayfinding · qa:sideai · qa:keepui · qa:guide · qa:studio · qa:hover · qa:firstscreen 녹색(qa:chars 진행 중) · 로그인 방식으로 뼈대를 받는 길이 바뀌어 qa:pilot(478/0) · qa:session(14/0)도 녹색.
+**시험** — tsc · oxlint 오류 0 · build · test:all(K28b — 뼈대가 기다리는 조각 3개 · 대화창 틀 0 · 뜬 뒤 받기 · local 앱 정적 import 0) · 앱을 연 직후 모듈 첫 화면을 바로 열기(PC · 390 — 정책자금 · 고용지원금 · 창업감면 · 오류 0 · 사진 확인) · qa:modchat · qa:link · qa:chat · qa:shell · qa:homeask · qa:modules · qa:scenarios · qa:wayfinding · qa:sideai · qa:keepui · qa:guide · qa:studio · qa:hover · qa:firstscreen · qa:chars(147/0) 녹색 · 로그인 방식으로 뼈대를 받는 길이 바뀌어 qa:pilot(478/0) · qa:session(14/0)도 녹색.
