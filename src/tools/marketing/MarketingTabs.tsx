@@ -15,7 +15,7 @@ import { AtSign, BarChart3, ChevronDown, ChevronUp, Clapperboard, Film, Flame, G
 import { useIsPilot } from '../../auth/osAccess'
 import { usePilotMarketingScreens } from '../../config/pilotMarketing'
 import { slotIcon } from '../../config/iconSlots'
-import { MARKETING_GUIDE_KEYS } from '../../content/menuGuide'
+import { MARKETING_GUIDE_KEYS } from '../../content/guideSections'
 
 export type RadarView = 'plan' | 'top' | 'channels' | 'analysis' | 'make'
 export type MarketingTab = RadarView | 'threads' | 'shorts' | 'content' | 'homepage'

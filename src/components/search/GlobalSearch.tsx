@@ -3,78 +3,54 @@
  * 고객 관리 업체(D-120 — 대표자 · 사업자번호 · 전화 뒷자리로도)·고객사·프로젝트·지금 해야 할 일·도구함·결과 자료를
  * 그룹으로 찾아 실제 화면으로 이동한다.
  * 외부 라이브러리 없이 구현한다.
+ *
+ * D-647 여기에는 머리줄 단추 · 단축키 · 여닫기만 — 찾기 창 속(SearchDialog · 화면 이름 표 · 안내 글)은 열 때 받는다.
+ * 화면을 그린 뒤 한가할 때 미리 받아 두어 Ctrl+K 를 바로 눌러도 기다리지 않게.
  */
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
-import { Search, CornerDownLeft } from 'lucide-react'
-import { organizationRepository, projectRepository } from '../../repositories'
-import { normalizeQuery } from '../../lib/format'
-import { computeProjectJourney } from '../../services/journeyService'
-import { useActiveProject } from '../../context/activeProject'
-import { peekProjectCache } from '../../domain/consulting/projectCache'
-import { searchTools } from '../../config/toolRegistry'
-import { AuthContext } from '../../auth/authContext'
-import { useIsPilot } from '../../auth/osAccess'
-import { isPilotHiddenPath } from '../../config/moduleRegistry'
-import { listClients } from '../../services/clientOpsService'
-import { matchesClientSearch } from '../../services/clientOpsSearch'
-import { isProspect } from '../../services/salesPipeline'
-import type { ClientOpsRecord } from '../../types/clientOps'
+import { Search } from 'lucide-react'
 import { useBackToClose } from '../../lib/backToClose'
-import { useGuideGroups } from '../guide/useGuideGroups'
-import { searchScreens } from '../../content/screenSearch'
 
-interface Hit {
-  group: '고객 관리' | '고객사' | '프로젝트' | '특허·MVP' | '지금 해야 할 일' | '전문 모듈' | '화면 · 기능' | '결과·자료'
-  label: string
-  sublabel?: string
-  onSelect: () => void
+const loadSearchDialog = () => import('./SearchDialog')
+const SearchDialog = lazy(() => loadSearchDialog().then((m) => ({ default: m.SearchDialog })))
+
+/** 창 속을 받는 동안 — 같은 자리 · 같은 이름의 틀(바깥을 누르면 닫힘) */
+function SearchLoading({ onClose }: { onClose: () => void }) {
+  return createPortal(
+    <div className="fixed inset-0 z-[10000] flex items-start justify-center bg-navy-950/40 p-4 pt-[10vh]" role="dialog" aria-modal="true" aria-label="빠른 이동 검색">
+      <button type="button" aria-label="검색 닫기" className="absolute inset-0 cursor-default" onClick={onClose} />
+      <div className="relative flex w-full max-w-xl items-center gap-2 rounded-(--radius-panel) border border-slate-200 bg-white px-4 shadow-(--shadow-overlay)">
+        <Search aria-hidden="true" className="size-5 shrink-0 text-slate-400" />
+        <p className="flex h-14 items-center text-[1rem] text-slate-400" data-testid="search-loading">찾기 준비 중…</p>
+      </div>
+    </div>,
+    document.body,
+  )
 }
-
-const RESULT_SHORTCUTS: { label: string; keywords: string; path: string }[] = [
-  { label: '제출자료·보고서', keywords: '제출자료 보고서 결과 자료', path: '/deliverables/results' },
-  { label: '검증 결과', keywords: '검증 결과 테스트', path: '/validation/results' },
-  { label: '사례 라이브러리', keywords: '사례 라이브러리 레퍼런스', path: '/cases' },
-  { label: '전체 진행 현황', keywords: '전체 진행 현황 리포트 대시보드', path: '/reports' },
-]
 
 /**
  * compact: 좁은 화면(1360px 아래)용 '찾기' 단추(D-120) — 예전에는 그 폭에서 검색 칸이 사라지고 Ctrl+K 로만 열렸다.
  * 단축키는 넓은 칸 하나만 듣는다(두 곳이 함께 열리지 않게).
  */
 export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
-  const navigate = useNavigate()
-  const { setActiveProject } = useActiveProject()
   const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const [active, setActive] = useState(0)
-  const inputRef = useRef<HTMLInputElement>(null)
-  // D-120: 고객 관리 업체 — 열 때마다 새로 읽는다(못 읽으면 이 묶음만 빠진다)
-  const auth = useContext(AuthContext)
-  const pilot = useIsPilot()
-  const workspaceId = auth?.currentWorkspaceId ?? null
-  const [opsClients, setOpsClients] = useState<ClientOpsRecord[]>([])
-  // D-592 화면 · 기능 이름으로도 찾기 — 사용법 안내와 같은 표(이 계정에 보이는 것만)
-  const guide = useGuideGroups()
-  useEffect(() => {
-    if (!open) return
-    let alive = true
-    listClients(workspaceId)
-      .then((list) => {
-        if (alive) setOpsClients(list.filter((r) => r.archivedAt === null))
-      })
-      .catch(() => {
-        /* 검색은 다른 묶음으로 계속 */
-      })
-    return () => {
-      alive = false
-    }
-  }, [open, workspaceId])
 
-  const close = useCallback(() => { setOpen(false); setQuery(''); setActive(0) }, [])
+  const close = useCallback(() => setOpen(false), [])
   useBackToClose(open, close)
+
+  // D-647 화면을 그린 뒤 한가할 때 창 속을 미리 받아 둔다(누르면 바로 · 못 받아도 누를 때 다시)
+  useEffect(() => {
+    if (compact) return
+    const go = () => void loadSearchDialog().catch(() => {})
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(go, { timeout: 4000 })
+      return () => window.cancelIdleCallback(id)
+    }
+    const t = window.setTimeout(go, 1500)
+    return () => window.clearTimeout(t)
+  }, [compact])
 
   // 전역 단축키
   // D-94: 붙잡는 단계(capture)에서 먼저 듣는다 — 검색 창이 열려 있을 때 Esc 는 검색 창만 닫고,
@@ -113,101 +89,13 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [compact, open, close])
 
-  useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 20)
-  }, [open])
-
-  const hits = useMemo<Hit[]>(() => {
-    if (!open) return []
-    const q = normalizeQuery(query)
-    // D-162: Pilot 에게는 AX 고객사 · 프로젝트 · 특허·MVP · 결과자료(대표 전용 화면)를 찾아 주지 않는다
-    const orgs = pilot ? [] : organizationRepository.getAll()
-    const projects = pilot ? [] : projectRepository.getAll().filter((p) => p.status !== 'archived')
-    const out: Hit[] = []
-
-    // 고객 관리 업체 — 회사명 · 대표자 · 담당자 · 사업자번호 · 전화 뒷자리 · 직접 만든 칸
-    if (q) {
-      for (const r of opsClients.filter((c) => matchesClientSearch(c, query)).slice(0, 8)) {
-        const who = r.representativeName || r.contactName
-        out.push({
-          group: '고객 관리',
-          label: r.companyName,
-          sublabel: [isProspect(r) ? '잠재고객' : '계약 고객', who, r.contactPhone || r.businessNumber].filter(Boolean).join(' · '),
-          onSelect: () => { navigate(`/ops/clients/${r.id}`); close() },
-        })
-      }
-    }
-
-    for (const o of orgs) {
-      if (!q || `${o.name} ${o.industry} ${o.primaryContact.name}`.toLowerCase().includes(q)) {
-        out.push({ group: '고객사', label: o.name, sublabel: o.industry, onSelect: () => { navigate(`/clients/${o.id}`); close() } })
-      }
-    }
-    for (const p of projects) {
-      const orgName = orgs.find((o) => o.id === p.organizationId)?.name ?? ''
-      if (!q || `${p.name} ${p.projectCode} ${orgName}`.toLowerCase().includes(q)) {
-        out.push({ group: '프로젝트', label: p.name, sublabel: `${orgName} · ${p.projectCode}`, onSelect: () => { setActiveProject(p.id); navigate(`/projects/${p.id}`); close() } })
-      }
-    }
-    // 특허·MVP(예전 컨설팅 작업실) — 마지막으로 읽은 목록에서 (화면을 한 번 연 뒤부터 잡힌다)
-    for (const c of pilot ? [] : peekProjectCache()) {
-      if (c.status === 'archived') continue
-      if (!q || `${c.clientName} ${c.title} ${c.currentStage}`.toLowerCase().includes(q)) {
-        out.push({ group: '특허·MVP', label: `${c.clientName} · ${c.title}`, sublabel: `현재 ${c.currentStage}`, onSelect: () => { navigate(`/studio/${c.id}`); close() } })
-      }
-    }
-    // 지금 해야 할 일 (행동이 필요한 프로젝트)
-    for (const p of projects) {
-      const j = computeProjectJourney(p)
-      if (!j.needsAction) continue
-      if (!q || `${j.actionText} ${j.orgName} ${p.name}`.toLowerCase().includes(q)) {
-        out.push({ group: '지금 해야 할 일', label: j.actionText, sublabel: `${j.orgName} · ${p.name}`, onSelect: () => { setActiveProject(p.id); navigate(j.actionPath); close() } })
-      }
-    }
-    // 도구함 — "부채비율" 처럼 도구 이름이 아닌 말로도 찾게 한다 (D-89)
-    const toolPaths = new Set<string>()
-    for (const t of searchTools(query)) {
-      if (!t.path || (pilot && isPilotHiddenPath(t.path))) continue
-      const path = t.path
-      out.push({ group: '전문 모듈', label: t.label, sublabel: t.navHint ?? t.desc.slice(0, 40), onSelect: () => { navigate(path); close() } })
-      toolPaths.add(path)
-    }
-    // D-592 화면 · 기능 — 메뉴 이름 · 화면 안 기능 이름(안내 글)으로. 위 전문 모듈에 이미 나온 화면은 겹쳐 적지 않는다
-    for (const h of searchScreens(query, guide.groups, { pilot: guide.pilot, basic: guide.basic })) {
-      if (toolPaths.has(h.path)) continue
-      out.push({ group: '화면 · 기능', label: h.label, sublabel: h.sublabel, onSelect: () => { navigate(h.path); close() } })
-    }
-    for (const s of pilot ? [] : RESULT_SHORTCUTS) {
-      if (!q || s.keywords.includes(q) || s.label.toLowerCase().includes(q)) {
-        out.push({ group: '결과·자료', label: s.label, onSelect: () => { navigate(s.path); close() } })
-      }
-    }
-    return out.slice(0, 24)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, query, opsClients, pilot, guide.groups, guide.basic])
-
-  useEffect(() => { setActive(0) }, [query])
-
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => Math.min(i + 1, hits.length - 1)) }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)) }
-    else if (e.key === 'Enter') { e.preventDefault(); hits[active]?.onSelect() }
-  }
-
-  // 그룹핑 (표시 순서 유지)
-  const grouped: { group: Hit['group']; items: { hit: Hit; index: number }[] }[] = []
-  hits.forEach((hit, index) => {
-    let g = grouped.find((x) => x.group === hit.group)
-    if (!g) { g = { group: hit.group, items: [] }; grouped.push(g) }
-    g.items.push({ hit, index })
-  })
-
   return (
     <>
       {compact ? (
         <button
           type="button"
           onClick={() => setOpen(true)}
+          onPointerEnter={() => void loadSearchDialog().catch(() => {})}
           aria-label="찾기 — 업체 · 대표 · 전화번호 · 화면 이름"
           data-testid="search-compact"
           className="flex size-10 shrink-0 items-center justify-center rounded-(--radius-control) text-slate-600 hover:bg-slate-100 hover:text-slate-800 sm:w-auto sm:gap-1.5 sm:px-3"
@@ -219,6 +107,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
       <button
         type="button"
         onClick={() => setOpen(true)}
+          onPointerEnter={() => void loadSearchDialog().catch(() => {})}
         data-guide="fn-search"
         className="flex h-10 w-full min-w-0 cursor-pointer items-center gap-2 overflow-hidden rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 text-[0.9375rem] text-slate-400 hover:border-slate-300"
       >
@@ -230,55 +119,10 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
       )}
 
       {/* D-94: body 로 띄운다 — 머리줄 안에 있으면 머리줄 층(z) 에 갇혀 모듈 창(영업 고객 등록 등) 뒤에 깔렸다 */}
-      {open && createPortal(
-        <div className="fixed inset-0 z-[10000] flex items-start justify-center bg-navy-950/40 p-4 pt-[10vh]" role="dialog" aria-modal="true" aria-label="빠른 이동 검색">
-          <button type="button" aria-label="검색 닫기" className="absolute inset-0 cursor-default" onClick={close} />
-          <div className="relative flex max-h-[70vh] w-full max-w-xl flex-col overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white shadow-(--shadow-overlay)">
-            <div className="flex items-center gap-2 border-b border-slate-100 px-4">
-              <Search aria-hidden="true" className="size-5 shrink-0 text-slate-400" />
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={onKeyDown}
-                placeholder="업체 · 대표 · 전화번호 뒷자리 · 화면 이름"
-                className="h-14 w-full bg-transparent text-[1rem] text-slate-900 outline-none placeholder:text-slate-400"
-              />
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-2">
-              {hits.length === 0 ? (
-                <p className="px-3 py-6 text-center text-[0.9375rem] break-keep text-slate-500" data-testid="search-empty">
-                  {query.trim() ? '일치하는 항목이 없습니다.' : '업체 이름이나 화면 이름을 적어 보세요 — 예: 일정 · 서류 · 스레드'}
-                </p>
-              ) : (
-                grouped.map((g) => (
-                  <div key={g.group} className="mb-1">
-                    <p className="px-3 py-1.5 text-[0.875rem] font-semibold text-slate-400" data-testid="search-group">{g.group}</p>
-                    <ul>
-                      {g.items.map(({ hit, index }) => (
-                        <li key={index}>
-                          <button
-                            type="button"
-                            onMouseEnter={() => setActive(index)}
-                            onClick={hit.onSelect}
-                            className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left ${active === index ? 'bg-brand-50' : 'hover:bg-slate-50'}`}
-                          >
-                            <span className="min-w-0">
-                              <span className="block truncate text-[1rem] font-medium text-slate-800">{hit.label}</span>
-                              {hit.sublabel && <span className="block truncate text-[0.875rem] text-slate-500">{hit.sublabel}</span>}
-                            </span>
-                            {active === index && <CornerDownLeft aria-hidden="true" className="size-4 shrink-0 text-brand-500" />}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>,
-        document.body,
+      {open && (
+        <Suspense fallback={<SearchLoading onClose={close} />}>
+          <SearchDialog onClose={close} />
+        </Suspense>
       )}
     </>
   )

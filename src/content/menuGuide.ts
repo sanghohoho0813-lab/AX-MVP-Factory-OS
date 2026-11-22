@@ -392,18 +392,8 @@ export function hasMenuGuide(key: string): boolean {
   return (SAME[key] ?? key) in GUIDES
 }
 
-/** 마케팅 목차 칸 → 안내 열쇠 */
-export const MARKETING_GUIDE_KEYS: Record<string, string> = {
-  plan: 'mk-plan',
-  top: 'mk-top',
-  channels: 'mk-top',
-  analysis: 'mk-top',
-  make: 'mk-make',
-  threads: 'mk-threads',
-  shorts: 'mk-shorts',
-  content: 'mk-content',
-  homepage: 'mk-homepage',
-}
+/** 마케팅 목차 칸 → 안내 열쇠 — D-647 작은 파일(guideSections)로(마케팅 화면이 안내 글 묶음 없이 쓰게) */
+export { MARKETING_GUIDE_KEYS } from './guideSections'
 
 /** 사용법 안내 화면에서 마케팅 아래에 펼쳐 보일 화면들(이름 · 열쇠 · 주소) */
 export const MARKETING_GUIDE_LIST: ReadonlyArray<{ key: string; label: string; path: string; basicHidden?: boolean }> = [
@@ -418,8 +408,6 @@ export const MARKETING_GUIDE_LIST: ReadonlyArray<{ key: string; label: string; p
   { key: 'mk-homepage', label: '홈페이지 만들기', path: '/tools/homepage', basicHidden: true },
 ]
 
-export const GUIDE_LABELS = { what: '무엇을 하나요', why: '왜 있나요', effect: '쓰면 이렇게 돼요', next: '앞으로' } as const
-
-/** D-598 네 칸 순서 — 카드 · 휴대폰 안내 · 사용법 안내 화면이 같은 순서 · 같은 아이콘(components/guide/GuideSectionIcon) */
-export type GuideSectionKey = keyof typeof GUIDE_LABELS
-export const GUIDE_SECTION_ORDER: ReadonlyArray<GuideSectionKey> = ['what', 'why', 'effect', 'next']
+// D-647 네 칸 이름 · 순서는 작은 파일(guideSections)에 — 마우스 안내 층이 앱 뼈대에서 이 큰 글 묶음 없이 쓰게
+export { GUIDE_LABELS, GUIDE_SECTION_ORDER } from './guideSections'
+export type { GuideSectionKey } from './guideSections'

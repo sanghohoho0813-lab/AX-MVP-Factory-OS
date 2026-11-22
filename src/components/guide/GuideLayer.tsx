@@ -13,12 +13,12 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { PlayCircle } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
-import { GUIDE_LABELS, GUIDE_SECTION_ORDER, hasMenuGuide, menuGuide } from '../../content/menuGuide'
+import { GUIDE_LABELS, GUIDE_SECTION_ORDER } from '../../content/guideSections'
+import type { hasMenuGuide, menuGuide } from '../../content/menuGuide'
 import { GuideSectionIcon } from './GuideSectionIcon'
 import { MODULES } from '../../config/moduleRegistry'
 import { menuVideo } from '../../config/menuVideos'
 import { useCustomerAudience } from '../../config/customerAudience'
-import { guideTitle } from './guideTitle'
 import { guideHoverOn, useGuideHoverOn } from '../../lib/guideHoverPref'
 
 interface Shown {
@@ -35,6 +35,32 @@ const GUIDE_WARM_DELAY_MS = 80
 const WARM_FOR_MS = 1000
 const CARD_W = 320
 
+/**
+ * D-647 안내 글 묶음(메뉴 · 기능 안내 — 압축 19KB)은 앱 뼈대에 넣지 않는다. 마우스가 있는 기기에서만 화면을 그린 뒤 한가할 때 받고,
+ * 그 전에 마우스를 올리면 그때 받아 아직 그 칸 위에 있으면 바로 띄운다. 휴대폰(올릴 수 없음)은 받지 않는다.
+ */
+interface GuideText {
+  menuGuide: typeof menuGuide
+  hasMenuGuide: typeof hasMenuGuide
+  guideTitle: (key: string) => string
+}
+let guideText: GuideText | null = null
+let guideLoading: Promise<GuideText> | null = null
+function loadGuideText(): Promise<GuideText> {
+  if (guideText) return Promise.resolve(guideText)
+  if (!guideLoading) {
+    guideLoading = Promise.all([import('../../content/menuGuide'), import('./guideTitle')]).then(([m, t]) => {
+      guideText = { menuGuide: m.menuGuide, hasMenuGuide: m.hasMenuGuide, guideTitle: t.guideTitle }
+      return guideText
+    })
+    // 못 받으면 다음에 다시
+    guideLoading.catch(() => {
+      guideLoading = null
+    })
+  }
+  return guideLoading
+}
+
 export function GuideLayer() {
   const [shown, setShown] = useState<Shown | null>(null)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
@@ -50,6 +76,9 @@ export function GuideLayer() {
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return
     if (!window.matchMedia('(hover: hover)').matches) return
+    const preload = () => void loadGuideText().catch(() => {})
+    const hasIdle = typeof window.requestIdleCallback === 'function'
+    const idle = hasIdle ? window.requestIdleCallback(preload, { timeout: 3000 }) : window.setTimeout(preload, 1200)
     let timer = 0
     let current: Element | null = null
     // 누른 칸은 떠날 때까지 다시 띄우지 않는다(누른 뒤 화면이 바뀌어도 마우스는 그 자리에 있다)
@@ -80,16 +109,30 @@ export function GuideLayer() {
         const r = el.getBoundingClientRect()
         if (r.width === 0 && r.height === 0) return
         visible = true
-        setShown({ key, label: el.getAttribute('data-guide-label') || guideTitle(key), rect: { top: r.top, left: r.left, right: r.right, bottom: r.bottom }, side: !!el.closest('aside') })
+        setShown({ key, label: el.getAttribute('data-guide-label') || (guideText?.guideTitle(key) ?? key), rect: { top: r.top, left: r.left, right: r.right, bottom: r.bottom }, side: !!el.closest('aside') })
       }, warm ? GUIDE_WARM_DELAY_MS : GUIDE_DELAY_MS)
     }
     // 글이 있는 열쇠만 — 메뉴 표의 key · 출시 예정(up-…) · 따로 쓴 안내(메뉴 · 기능). 모르는 값에는 카드를 띄우지 않는다
-    const known = (key: string) => hasMenuGuide(key) || key.startsWith('up-') || MODULES.some((m) => m.key === key)
+    const known = (key: string) => !!guideText && (guideText.hasMenuGuide(key) || key.startsWith('up-') || MODULES.some((m) => m.key === key))
     const guideOf = (t: EventTarget | null) => {
       const el = t instanceof Element ? t.closest('[data-guide]') : null
       return el && known(el.getAttribute('data-guide') ?? '') ? el : null
     }
+    // 글을 아직 못 받았을 때 올린 칸 — 받은 뒤에도 그 위에 있으면 띄운다
+    let waiting: Element | null = null
     const over = (e: MouseEvent) => {
+      if (!guideText) {
+        const cand = e.target instanceof Element ? e.target.closest('[data-guide]') : null
+        waiting = cand
+        if (cand) {
+          void loadGuideText()
+            .then(() => {
+              if (waiting === cand && cand.isConnected && cand.matches(':hover') && known(cand.getAttribute('data-guide') ?? '')) arm(cand)
+            })
+            .catch(() => {})
+        }
+        return
+      }
       const el = guideOf(e.target)
       if (!el) {
         if (current) hide()
@@ -100,6 +143,19 @@ export function GuideLayer() {
       arm(el)
     }
     const focusIn = (e: FocusEvent) => {
+      if (!guideText) {
+        // 글을 받기 전에 키보드로 옮겼으면 받은 뒤에도 그 칸에 있을 때만
+        const t = e.target
+        if (t instanceof Element && t.matches(':focus-visible') && t.closest('[data-guide]')) {
+          void loadGuideText()
+            .then(() => {
+              const el = guideOf(t)
+              if (el && document.activeElement === t) arm(el)
+            })
+            .catch(() => {})
+        }
+        return
+      }
       const el = guideOf(e.target)
       // 마우스로 눌러 생긴 초점에는 띄우지 않는다(키보드로 옮겼을 때만)
       if (el && e.target instanceof Element && e.target.matches(':focus-visible')) arm(el)
@@ -129,6 +185,8 @@ export function GuideLayer() {
     window.addEventListener('blur', hide)
     return () => {
       window.clearTimeout(timer)
+      if (hasIdle) window.cancelIdleCallback(idle)
+      else window.clearTimeout(idle)
       document.removeEventListener('mouseover', over)
       document.removeEventListener('focusin', focusIn)
       document.removeEventListener('focusout', hide)
@@ -186,8 +244,8 @@ export function GuideLayer() {
     setPos({ top, left })
   }, [shown])
 
-  if (!shown || typeof document === 'undefined') return null
-  const g = menuGuide(shown.key, { label: shown.label, basic })
+  if (!shown || !guideText || typeof document === 'undefined') return null
+  const g = guideText.menuGuide(shown.key, { label: shown.label, basic })
   const video = menuVideo(shown.key)
   return createPortal(
     <div

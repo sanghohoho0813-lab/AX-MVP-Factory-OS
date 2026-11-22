@@ -20,8 +20,7 @@ import { handDocsTo, handNewClientDocs } from '../../services/docHandoff'
 import { CHAT_DOC_MAX, defaultDocQuestion, labelOfDoc, type ChatDoc, type DocCompany } from '../../services/homeAsk/homeDocs'
 import { ModelPicker } from '../ai/ModelPicker'
 import { ChatTextSize } from '../chat/ChatTextSize'
-import { useGuideGroups } from '../guide/useGuideGroups'
-import { searchScreens } from '../../content/screenSearch'
+import { useLazyScreenSearch, type ScreenSearchFn } from '../guide/useLazyScreenSearch'
 import { openCommandTarget } from '../../services/homeAsk/homeOpen'
 import { ClientPickerOptions } from '../ops/ClientPickerOptions'
 import { useToast } from '../ui/toastContext'
@@ -107,8 +106,9 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
     if (!on) setOpen(false)
   }
   // D-638 화면 · 기능 이름을 치면 바로 가기(찾기와 같은 표 — 이 계정에 보이는 화면만)
-  const guide = useGuideGroups()
-  const jumps = useMemo(() => (text.trim().length >= 2 ? searchScreens(text, guide.groups, { pilot: guide.pilot, basic: guide.basic }, 3).filter((h) => !h.path.startsWith('/guide')) : []), [text, guide])
+  // D-647 화면 이름 표 · 찾기는 첫 화면 밖에서 받는다(한가할 때 · 적기 시작하면)
+  const screens = useLazyScreenSearch(text.trim().length > 0)
+  const jumps = useMemo(() => (screens.search && text.trim().length >= 2 ? screens.search(text, 3).filter((h) => !h.path.startsWith('/guide')) : []), [text, screens.search])
   // D-498 함께 보낼 서류(이 기기에서 읽기만 — 저장은 답 아래 단추로)
   const [docs, setDocs] = useState<ChatDoc[]>([])
   const [over, setOver] = useState(false)
@@ -194,23 +194,31 @@ export function HomeAsk({ clients, suggestions, canAI, prepare, onRecorded, onRe
     void askHome({ question: q, clientIds: ids, canAI, docs: sent, prepare: () => prepare(q, ids, intents, sent) })
   }
   /** D-638 '○○ 열어 줘' 처럼 화면을 여는 말이면 묻지 않고 그 화면으로(AI 0 · 맞는 화면이 분명할 때만) */
-  const go = (raw: string): boolean => {
-    const target = openCommandTarget(raw, (q) => searchScreens(q, guide.groups, { pilot: guide.pilot, basic: guide.basic }, 3).filter((h) => !h.path.startsWith('/guide')))
+  const go = async (raw: string): Promise<boolean> => {
+    // 아직 못 받았으면 지금 받는다(보통은 이미 받아 둠 — 받지 못하면 열기 말 없이 그냥 묻기로)
+    const search: ScreenSearchFn | null = screens.search ?? (await screens.ensure().catch(() => null))
+    if (!search) return false
+    const target = openCommandTarget(raw, (q) => search(q, 3).filter((h) => !h.path.startsWith('/guide')))
     if (!target) return false
     setText('')
     navigate(target.path)
     showToast(`${target.label} 화면을 열었어요`)
     return true
   }
+  const submit = (raw: string) => {
+    void go(raw).then((opened) => {
+      if (!opened) send(raw)
+    })
+  }
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
-    if (!go(text)) send(text)
+    submit(text)
   }
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // 한글 조합 중 Enter 는 글자 확정 — 보내지 않는다
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      if (!go(text)) send(text)
+      submit(text)
     }
   }
   const toggleMic = () => {
