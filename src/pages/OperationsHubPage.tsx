@@ -106,7 +106,8 @@ import { useClientSaveNews } from '../services/clientSaveNews'
 // D-481 서류 한꺼번에 올리기 창(글자 읽기 · 서류 분석 엔진)은 카드에서 누를 때 받는다 — 목록 첫 화면이 이것 때문에 무거웠다
 // D-646 첫 화면에 없는 것은 쓸 때 받는다 — 등록 창의 서류 넣는 칸(서류 분류 · 글자 읽기) · 머리 [AI 도우미] 단추
 const ServiceCatalogModal = lazy(() => import('../components/ops/ServiceCatalogModal').then((m) => ({ default: m.ServiceCatalogModal })))
-const NewClientDocDrop = lazy(() => import('../components/ops/NewClientDocDrop').then((m) => ({ default: m.NewClientDocDrop })))
+const loadNewClientDocDrop = () => import('../components/ops/NewClientDocDrop')
+const NewClientDocDrop = lazy(() => loadNewClientDocDrop().then((m) => ({ default: m.NewClientDocDrop })))
 const AiAssist = lazy(() => import('../components/ai/AiAssist').then((m) => ({ default: m.AiAssist })))
 const BulkDocUploadSheet = lazy(() => import('../components/ops/BulkDocUploadSheet').then((m) => ({ default: m.BulkDocUploadSheet })))
 
@@ -163,6 +164,17 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
   const [error, setError] = useState('')
   // D-162: 오늘 화면의 '첫 업체 등록' 이 ?new=1 로 등록 창을 바로 연다
   const [formOpen, setFormOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1')
+  // D-646 등록 창의 서류 넣는 칸은 첫 화면엔 받지 않지만, 목록을 그린 뒤 한가할 때 미리 받아 둔다 — 누르면 바로 보이게
+  useEffect(() => {
+    const go = () => void loadNewClientDocDrop().catch(() => undefined)
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void }
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(go, { timeout: 4000 })
+      return () => w.cancelIdleCallback?.(id)
+    }
+    const t = window.setTimeout(go, 1500)
+    return () => window.clearTimeout(t)
+  }, [])
   // D-498 오늘 대화창에서 [새 업체로 등록] — 거기서 읽은 서류가 등록 창에 미리 들어온다(한 번만 꺼냄)
   const [preDocs] = useState(() => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1' ? peekNewClientDocs() : []))
   /** D-125: 이번 등록에서 이미 만든 업체(영업 칸 저장만 실패한 경우 다시 쓰려고) */

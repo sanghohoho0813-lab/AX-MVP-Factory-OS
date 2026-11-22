@@ -904,6 +904,8 @@ for (const [w, h, tag] of [[1440, 900, 'PC'], [390, 844, '390']]) {
   // 1) 서류 셋(사업자등록증 · 명부 · 메모)을 넣으면 업체명 · 대표자 · 사업자번호가 채워진다
   await page.goto(BASE + '/ops/clients', { waitUntil: 'networkidle' })
   await page.getByTestId('clients-add').click()
+  // D-646 서류 넣는 칸은 따로 받는 조각(한가할 때 미리 받음) — 보일 때까지 기다린다
+  await page.getByTestId('new-client-docs').waitFor({ timeout: 10000 }).catch(() => {})
   check(`D-187 등록 창 맨 위에 '서류만 넣어도 칸이 채워집니다' ${tag}`, (await page.getByTestId('new-client-docs').count()) === 1 && (await page.getByTestId('new-client-docs').innerText()).includes('서류만 넣어도 칸이 채워집니다'))
   await page.getByLabel('등록할 업체 서류 고르기').setInputFiles([BIZ, ROSTER, MEMO])
   await page.getByTestId('new-client-from-doc-companyName').waitFor({ timeout: 20000 })
