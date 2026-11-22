@@ -8,13 +8,14 @@
  * 화면을 그린 뒤 한가할 때 미리 받아 두어 Ctrl+K 를 바로 눌러도 기다리지 않게.
  */
 
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Search } from 'lucide-react'
 import { useBackToClose } from '../../lib/backToClose'
+import { lazyNow } from '../../lib/lazyNow'
 
-const loadSearchDialog = () => import('./SearchDialog')
-const SearchDialog = lazy(() => loadSearchDialog().then((m) => ({ default: m.SearchDialog })))
+// 받아 둔 뒤에는 누르는 즉시 그린다(Suspense 의 0.3초 대기 없이)
+const { Component: SearchDialog, preload: loadSearchDialog } = lazyNow(() => import('./SearchDialog').then((m) => m.SearchDialog))
 
 /** 창 속을 받는 동안 — 같은 자리 · 같은 이름의 틀(바깥을 누르면 닫힘) */
 function SearchLoading({ onClose }: { onClose: () => void }) {
@@ -119,11 +120,7 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
       )}
 
       {/* D-94: body 로 띄운다 — 머리줄 안에 있으면 머리줄 층(z) 에 갇혀 모듈 창(영업 고객 등록 등) 뒤에 깔렸다 */}
-      {open && (
-        <Suspense fallback={<SearchLoading onClose={close} />}>
-          <SearchDialog onClose={close} />
-        </Suspense>
-      )}
+      {open && <SearchDialog onClose={close} fallback={<SearchLoading onClose={close} />} />}
     </>
   )
 }

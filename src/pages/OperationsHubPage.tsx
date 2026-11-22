@@ -1,4 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazyNow } from '../lib/lazyNow'
 import { useMoneyWords } from '../components/ops/useMoneyWords'
 import { useSerialSave } from '../lib/useSerialSave'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -106,8 +107,8 @@ import { useClientSaveNews } from '../services/clientSaveNews'
 // D-481 서류 한꺼번에 올리기 창(글자 읽기 · 서류 분석 엔진)은 카드에서 누를 때 받는다 — 목록 첫 화면이 이것 때문에 무거웠다
 // D-646 첫 화면에 없는 것은 쓸 때 받는다 — 등록 창의 서류 넣는 칸(서류 분류 · 글자 읽기) · 머리 [AI 도우미] 단추
 const ServiceCatalogModal = lazy(() => import('../components/ops/ServiceCatalogModal').then((m) => ({ default: m.ServiceCatalogModal })))
-const loadNewClientDocDrop = () => import('../components/ops/NewClientDocDrop')
-const NewClientDocDrop = lazy(() => loadNewClientDocDrop().then((m) => ({ default: m.NewClientDocDrop })))
+// D-647 받아 둔 뒤에는 창을 여는 즉시 그린다(Suspense 의 0.3초 대기 없이 — lib/lazyNow)
+const { Component: NewClientDocDrop, preload: loadNewClientDocDrop } = lazyNow(() => import('../components/ops/NewClientDocDrop').then((m) => m.NewClientDocDrop))
 const AiAssist = lazy(() => import('../components/ai/AiAssist').then((m) => ({ default: m.AiAssist })))
 const BulkDocUploadSheet = lazy(() => import('../components/ops/BulkDocUploadSheet').then((m) => ({ default: m.BulkDocUploadSheet })))
 
@@ -167,10 +168,9 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
   // D-646 등록 창의 서류 넣는 칸은 첫 화면엔 받지 않지만, 목록을 그린 뒤 한가할 때 미리 받아 둔다 — 누르면 바로 보이게
   useEffect(() => {
     const go = () => void loadNewClientDocDrop().catch(() => undefined)
-    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void }
-    if (w.requestIdleCallback) {
-      const id = w.requestIdleCallback(go, { timeout: 4000 })
-      return () => w.cancelIdleCallback?.(id)
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(go, { timeout: 4000 })
+      return () => window.cancelIdleCallback(id)
     }
     const t = window.setTimeout(go, 1500)
     return () => window.clearTimeout(t)
@@ -1436,9 +1436,11 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
               {/* D-181: 고객 종류 — 대표만 고른다(팀장 화면은 늘 중소기업 고객) */}
               {!pilot && <ClientTypePicker value={newType} onChange={setNewType} />}
               {/* D-187: 서류만 넣어도 — 사업자등록증 · 크레탑 · 등기부등본을 읽어 아래 칸을 채운다 */}
-              <Suspense fallback={<p className="t-sub rounded-(--radius-control) border border-dashed border-slate-300 px-3 py-4 text-center text-slate-500" data-testid="new-client-docs-loading">서류 넣는 칸 불러오는 중…</p>}>
-                <NewClientDocDrop onChange={setDocsRead} preload={preDocs} />
-              </Suspense>
+              <NewClientDocDrop
+                onChange={setDocsRead}
+                preload={preDocs}
+                fallback={<p className="t-sub rounded-(--radius-control) border border-dashed border-slate-300 px-3 py-4 text-center text-slate-500" data-testid="new-client-docs-loading">서류 넣는 칸 불러오는 중…</p>}
+              />
               <label className="text-[0.9375rem] font-medium text-slate-700">
                 {!pilot && newType === 'consultant' ? '이름(회사명)' : '업체명'}
                 <input
