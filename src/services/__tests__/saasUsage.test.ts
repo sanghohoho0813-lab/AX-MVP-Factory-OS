@@ -977,6 +977,15 @@ async function run() {
     const blocked = hasSavedSignIn()
     g.localStorage = before
     check('K28 미리 받기 — 로그인 표가 없으면 안 받음 · 다른 저장 값만 있어도 안 받음 · sb-…-auth-token 이 있으면 받음 · 저장 공간이 막혀도 죽지 않음(안 받음)', none === false && other === false && signed === true && blocked === false, JSON.stringify({ none, other, signed, blocked }))
+    // D-649 모듈 대화창 틀(ChatFirst — 맞춤 추천 · 계산기 규칙까지 끌어옴)은 뼈대가 기다리지 않는다: 뼈대와 함께 기다리는 묶음(Promise.all)에 없고 · 화면이 다 뜬 뒤(preloadLater) 받는다
+    //   local 앱도 처음부터 같이 받지 않는다(정적 import 0 · 뜬 뒤 받기 한 번)
+    const waitBlock = chunks.slice(chunks.indexOf('Promise.all(['), chunks.indexOf('])', chunks.indexOf('Promise.all([')))
+    const local = src('src/app/LocalApp.tsx')
+    check(
+      'K28b D-649 뼈대는 대화창 틀을 기다리지 않음(함께 기다리는 조각 3개 · ChatFirst 0) · 뜬 뒤 받기(preloadLater) · local 앱도 정적 import 0 · 뜬 뒤 받기',
+      (waitBlock.match(/import\('/g) ?? []).length === 3 && !/ChatFirst/.test(waitBlock) && /preloadLater\(\(\) => void import\('\.\.\/components\/chat\/ChatFirst'\)/.test(chunks) && !staticImports(local).some((p) => /chat\/ChatFirst/.test(p)) && /warmChatFirstLater\(\)/.test(local),
+      JSON.stringify({ wait: (waitBlock.match(/import\('[^']+'/g) ?? []), local: staticImports(local) }),
+    )
   }
 
   /* K29 — D-591 여러 업체 등록: 이메일 · 주소 칸 */

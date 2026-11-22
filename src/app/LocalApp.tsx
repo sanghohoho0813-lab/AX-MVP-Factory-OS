@@ -8,10 +8,13 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom'
 import { AppShell } from '../components/layout/AppShell'
 import { appRouteChildren, legalRoutes, PublicGrantFinder, publicSurveyRoute, publicTestRoute } from './appRouteChildren'
 import { RouteErrorScreen } from '../components/layout/RouteErrorScreen'
+import { warmChatFirstLater } from './shellChunks'
 // 화면을 감싸는 틀은 화면 목록이 필요할 때 받게 돼 있다 — local 모드는 예전처럼 처음부터 같이 받는다
 import '../tools/shared/toolClientContext'
 import '../tools/shared/ModuleRoute'
-import '../components/chat/ChatFirst'
+
+// D-649 모듈 대화창 틀은 화면이 다 뜬 뒤에 받아 둔다(그 전에 모듈을 열면 그때 받는다 — app/shellChunks)
+warmChatFirstLater()
 
 // local 모드 라우터 — 기존 Stage 1~11 구조를 그대로 유지한다(로그인 없이 진입).
 const localRouter = createBrowserRouter([

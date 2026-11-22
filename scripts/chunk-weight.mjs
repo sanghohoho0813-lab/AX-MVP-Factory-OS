@@ -63,6 +63,23 @@ if (cloud) step('로그인 화면까지', /^SupabaseApp-/)
 else step('앱 틀(로컬 방식)', /^LocalApp-/)
 console.log(`${'  ↳ 여기까지'.padEnd(26)} 압축 ${total}KB${cloud ? ' (로그인 화면)' : ''}`)
 step('앱 뼈대(메뉴 · 머리줄)', /^AppShell-/)
+// D-649 뼈대가 함께 기다리는 조각 — 빌드된 뼈대 받기(app/shellChunks)의 Promise.all([...]) 안에 AppShell 과 같이 든 것.
+//   예전 판은 여기를 세지 않아 '앱 뼈대' 숫자가 실제로 기다리는 양보다 작게 나왔다(모듈 대화창 틀 · 그 아래 규칙들).
+function shellCompanions() {
+  for (const f of files) {
+    const s = src[f]
+    const at = s.search(/import\([`'"]\.\/AppShell-/)
+    if (at < 0) continue
+    const open = s.lastIndexOf('Promise.all([', at)
+    const close = s.indexOf(']).then(', at)
+    if (open < 0 || close < 0 || at - open > 400) continue
+    const names = [...s.slice(open, close).matchAll(/import\([`'"]\.\/([^`'"]+\.js)[`'"]\)/g)].map((m) => m[1]).filter((n) => !/^AppShell-/.test(n) && src[n] !== undefined)
+    return names
+  }
+  return []
+}
+const companions = shellCompanions()
+if (companions.length) step('뼈대와 함께 기다리는 틀', new RegExp(`^(${companions.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})$`))
 console.log(`${'  ↳ 여기까지'.padEnd(26)} 압축 ${total}KB (어느 화면이든 로그인 뒤 꼭 받는 양)\n`)
 const base = total
 for (const [label, re] of [
