@@ -10418,7 +10418,7 @@ D-647 을 휴대폰 흉내로 재다 찾은 것과 남은 작은 조각 둘. 동
 
 **미리 받기 전에 누르면** — 화면을 연 지 5초 안에 [새 업체 등록]을 누르면 서류 칸은 그때 받는다(같은 기계에서 약 1.0초 · 그동안 '서류 넣는 칸 불러오는 중…' 한 줄 · 업체명 등 나머지 칸은 바로). 그래서 [새 업체 등록](빈 목록의 등록 단추 둘 포함)에 손가락 · 마우스가 닿는 순간부터 받게 했다 — 마우스를 올렸다 누르면 PC 0.07초 · 휴대폰(누르기 시작 뒤 0.3초) 0.42초. 찾기 창 · 안내 카드는 조각이 작아 그때 받아도 PC 0.06초 안팎(qa:studio 'Ctrl+K 뒤 0.4초에 바로 적기' 녹색).
 
-**시험** — tsc · oxlint 오류 0 · build · test:all 녹색 · qa:guide · qa:homeask · qa:assist · qa:studio · qa:facts(고객 사실 창고 — 날짜 읽기 옮김) · qa:todos · qa:planner · qa:calendar · qa:hover · qa:chars · qa:firstscreen · qa:shell · qa:detail(530/0) 녹색 · 단추에 닿을 때 받기 더한 뒤 qa:bulkpaste · qa:detail 다시.
+**시험** — tsc · oxlint 오류 0 · build · test:all 녹색 · qa:guide · qa:homeask · qa:assist · qa:studio · qa:facts(고객 사실 창고 — 날짜 읽기 옮김) · qa:todos · qa:planner · qa:calendar · qa:hover · qa:chars · qa:firstscreen · qa:shell · qa:detail(530/0) 녹색 · 단추에 닿을 때 받기 더한 뒤 qa:bulkpaste · qa:detail(530/0) 다시 · qa:pilot(478/0) · qa:isolation(24/0) 녹색.
 
 ## D-649 (2026-11-22) 모듈 대화창 틀은 앱 뼈대가 기다리지 않게 · 받는 양 재는 자 바로잡기
 
@@ -10455,4 +10455,4 @@ D-648 을 운영처럼(HTTP/2) 재다가 찾은 것. 동작 · 화면은 그대�
 
 **바뀌는 것 하나** — 모듈 대화창이 첫 주소인 모듈(정책자금 · 고용지원금 · 연구소 · 창업감면 · 크레탑 · 홍보 글 · 홈페이지 · 지원사업 · 세금 계산기)을 앱을 연 지 몇 초 안에 처음 열면, 틀을 그때 받는다(예전엔 뼈대와 함께 이미 받아 두었다). 5초쯤 지나면 미리 받아 둔 것을 쓴다.
 
-**시험** — tsc · oxlint 오류 0 · build · test:all(K28b — 뼈대가 기다리는 조각 3개 · 대화창 틀 0 · 뜬 뒤 받기 · local 앱 정적 import 0) · 앱을 연 직후 모듈 첫 화면을 바로 열기(PC · 390 — 정책자금 · 고용지원금 · 창업감면 · 오류 0 · 사진 확인) · e2e 묶음은 아래에 이어 적는다.
+**시험** — tsc · oxlint 오류 0 · build · test:all(K28b — 뼈대가 기다리는 조각 3개 · 대화창 틀 0 · 뜬 뒤 받기 · local 앱 정적 import 0) · 앱을 연 직후 모듈 첫 화면을 바로 열기(PC · 390 — 정책자금 · 고용지원금 · 창업감면 · 오류 0 · 사진 확인) · qa:modchat · qa:link · qa:chat · qa:shell · qa:homeask · qa:modules · qa:scenarios · qa:wayfinding · qa:sideai · qa:keepui · qa:guide · qa:studio · qa:hover · qa:firstscreen 녹색(qa:chars 진행 중) · 로그인 방식으로 뼈대를 받는 길이 바뀌어 qa:pilot(478/0) · qa:session(14/0)도 녹색.
