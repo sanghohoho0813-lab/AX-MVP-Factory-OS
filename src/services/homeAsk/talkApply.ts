@@ -6,7 +6,7 @@
  * 이미 업체에 같은 값이면 처음부터 뺀다(talkFound) — 다시 기록하자고 하지 않게.
  */
 import type { ClientOpsRecord } from '../../types/clientOps'
-import { scenarioAnswer, withScenarioAnswer } from '../scenarioFit'
+import { scenarioAnswer, withScenarioAnswer } from '../scenarioAnswers'
 import { readFact, withFactValue } from '../customerFacts'
 import { withNextAction } from '../clientOpsNextAction'
 import { newFacts, newNumbers, talkAnswers, talkNext, talkNumbers, type TalkAnswer, type TalkNext, type TalkNumber } from './homeTalk'

@@ -9,7 +9,7 @@
  * 자동은 서버 기본 회사(보통 Gemini) 안에서만 고른다 — 물음에 쓰는 모델이 예전 기본(가장 싼 모델)과 같게.
  * 팀장 · 구독 고객 화면은 올려 쓰지 않는다(upgrade false · 서버가 준 role 이 pilot) — 늘 가장 싼 모델 그대로.
  */
-import { betterModel } from './actions'
+import { betterModel } from './modelUpgrade'
 import type { AssistStatus, ModelInfo, ProviderId, ProviderInfo } from './client'
 import { ASSIST_PRESETS } from './presets'
 

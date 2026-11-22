@@ -148,24 +148,8 @@ export function finderLink(origin: string, profile: CompanyProfile | null, from 
   return `${origin.replace(/\/$/, '')}${FINDER_PATH}${q ? `?${q}` : ''}`
 }
 
-export async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text)
-    return true
-  } catch {
-    try {
-      const ta = document.createElement('textarea')
-      ta.value = text
-      document.body.appendChild(ta)
-      ta.select()
-      const ok = document.execCommand?.('copy') ?? false
-      ta.remove()
-      return ok
-    } catch {
-      return false
-    }
-  }
-}
+// W7(D-644) 복사는 lib/copyText — 예전 이름으로도 부를 수 있게
+export { copyText } from '../../lib/copyText'
 
 export interface GrantAlert {
   notice: GrantNotice

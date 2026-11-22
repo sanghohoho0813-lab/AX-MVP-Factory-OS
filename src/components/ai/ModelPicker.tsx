@@ -5,11 +5,14 @@
  *   (물음은 가장 싼 모델 · 일을 시킬 때는 좋은 모델). 판 맨 위에서 자동 · [가장 싼 모델] · [좋은 모델] 을 한 번에 고르고, 바로 다음 질문부터 쓰인다.
  *   팀장 · 구독 고객처럼 올려 쓸 좋은 모델이 없는 계정은 예전 그대로 그 모델 이름만 보인다.
  */
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { ChevronDown, Cpu } from 'lucide-react'
 import { fetchAssistStatus, peekAssistStatus, type AssistStatus } from '../../services/aiAssist/client'
 import { CHOICE_EVENT, readChoice, saveChoice, type AiChoice } from '../../services/aiAssist/store'
-import { ModelRow, labelOf } from './AiAssist'
+import { labelOf } from './modelLabel'
+
+// W7(D-644) 펼친 설정(ModelRow)은 펼칠 때 받는다 — 단추는 머리줄 · 대화 판(앱 뼈대)에 늘 있어 AI 도우미 판 전체를 첫 화면 전에 받았다
+const ModelRow = lazy(() => import('./AiAssist').then((m) => ({ default: m.ModelRow })))
 import { useCustomerAudience } from '../../config/customerAudience'
 import { autoPlanFor, showsAuto, useModelPickShown } from '../../lib/modelPickPref'
 
@@ -101,7 +104,9 @@ export function ModelPicker({ className = '', tone = 'light', popover = false, t
       </button>
       {open && (
         <div className={`rounded-(--radius-control) bg-white text-slate-900 shadow-(--shadow-card) ${popover ? 'absolute right-0 z-40 mt-2 w-[min(26rem,calc(100vw-2rem))]' : ''}`} data-testid="model-pick-panel">
-          <ModelRow status={status} effective={effective} choice={choice} open setOpen={(v) => setOpen(v)} setChoice={(c) => setChoice(c)} loadStatus={load} />
+          <Suspense fallback={<p className="t-sub px-3 py-2.5 text-slate-500" data-testid="model-pick-loading">불러오는 중…</p>}>
+            <ModelRow status={status} effective={effective} choice={choice} open setOpen={(v) => setOpen(v)} setChoice={(c) => setChoice(c)} loadStatus={load} />
+          </Suspense>
         </div>
       )}
     </div>

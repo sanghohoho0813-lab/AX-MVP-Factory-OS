@@ -1,5 +1,4 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { AiAssist } from '../components/ai/AiAssist'
 import { clientBundle, clientsBundle, todayBundle, todayLabel } from '../services/aiAssist/builders'
 import { HomeAsk } from '../components/home/HomeAsk'
 import { homeSuggestions, mergeBundles, nearNames, openedBy, planChips, planSection, ruleAnswer, type HomeIntent, type PickLite, type PlanChip } from '../services/homeAsk/homeAsk'
@@ -80,7 +79,7 @@ import {
   daySummaryText,
 } from '../services/dailyBriefService'
 import { agendaWhen, buildAgenda, contentAgenda, type AgendaItem } from '../services/upcomingAgenda'
-import { listIdeas, type ContentIdea } from '../services/marketing/radarStore'
+import type { ContentIdea } from '../services/marketing/radarStore'
 import { localDateOf, nowDate, todayLocalDate } from '../lib/appClock'
 import { krwTile } from '../lib/format'
 import { getDataModeConfig } from '../data/dataMode'
@@ -104,6 +103,9 @@ import { useClientSaveNews } from '../services/clientSaveNews'
 
 /** D-508 업체 약속 글이 미팅 · 상담이면 말하기 대본을 바로 */
 const MEETING_WORDS = /미팅|상담|방문|제안|만남|브리핑|설명회|회의/
+
+/** D-644 AI 도우미 칸은 아래쪽 — 첫 화면을 그리는 데 그 묶음을 기다리지 않는다 */
+const AiAssist = lazy(() => import('../components/ai/AiAssist').then((m) => ({ default: m.AiAssist })))
 
 /** D-360 오늘 올릴 것(마케팅) — 마케팅 코드는 첫 화면 묶음에 넣지 않는다 */
 const TodayPosts = lazy(() => import('./marketing/radar/TodayPosts'))
@@ -374,7 +376,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       return
     }
     let alive = true
-    listIdeas(workspaceId)
+    // D-644 마케팅 기록 읽는 묶음은 첫 화면을 그린 뒤에 받는다(읽는 것은 그대로)
+    import('../services/marketing/radarStore')
+      .then((m) => m.listIdeas(workspaceId))
       .then((list) => alive && setIdeas(list))
       .catch(() => alive && setIdeas([]))
     return () => {
@@ -1026,7 +1030,11 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           {loading || (!reco.ready && active.length > 0) ? <TodayPicksPlaceholder /> : <TodayPicks clients={clients} reco={reco} phone={phone} />}
         </ArrangeItem>
         <ArrangeItem id="assist" label="AI 도우미" hint="오늘 제일 중요한 것 · 직접 묻기">
-          {!loading && clients.length > 0 && <AiAssist page="today" title="오늘 할 일" presets={['today.top3', 'today.deadline', 'today.order', 'today.calls']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />}
+          {!loading && clients.length > 0 && (
+            <Suspense fallback={null}>
+              <AiAssist page="today" title="오늘 할 일" presets={['today.top3', 'today.deadline', 'today.order', 'today.calls']} build={assistBuild} onRecorded={() => void listJournal(workspaceId).then(setJournal).catch(() => undefined)} />
+            </Suspense>
+          )}
         </ArrangeItem>
         <ArrangeItem id="decisions" label="확인할 것" hint="자료에서 읽은 정보 — 맞다 · 아니다">
           {/* D-158: 확인할 것 — 프로그램이 준비한 것에 맞다 · 아니다만(없으면 칸 없음) */}

@@ -7,16 +7,14 @@
  *   ChatModeButton  경로 줄 오른쪽 [⋯] 안 [대화로 묻기] — 이 화면 대화창을 연다(PC 오른쪽 판 · 휴대폰 아래 판).
  */
 import { useEffect, type ReactNode } from 'react'
-import { MENU_ROW, useInPageTools } from '../layout/PageTools'
 import { useLocation } from 'react-router-dom'
-import { MessageCircle } from 'lucide-react'
 import { ModuleChat } from './ModuleChat'
 import { PageChat } from './PageChat'
 import { ToolClientFrame } from '../../tools/shared/toolClientContext'
 import { useEntitlements } from '../../lib/entitlementsStore'
 import { chatShown, type ChatFirstKey } from '../../services/workChat/chatFirst'
 import { useChatFirstPrefs } from '../../lib/useChatFirst'
-import { basePageChat, launchPageChat, openPageChat, usePageChat } from '../../lib/pageChat'
+import { openPageChat } from '../../lib/pageChat'
 
 export function ChatFirst({ k, children }: { k: ChatFirstKey; children: ReactNode }) {
   const loc = useLocation()
@@ -48,23 +46,5 @@ export function ChatFirst({ k, children }: { k: ChatFirstKey; children: ReactNod
   )
 }
 
-/** 이 화면에 대화창이 있고 닫혀 있을 때 — [⋯] 안 [대화로 묻기] */
-export function ChatModeButton() {
-  const inMenu = useInPageTools()
-  const pc = usePageChat()
-  const base = basePageChat(pc)
-  if (!base?.launcher) return null
-  if (pc.mode === 'none' ? pc.sheet : pc.dockShown) return null
-  return (
-    <button
-      type="button"
-      onClick={launchPageChat}
-      className={inMenu ? MENU_ROW : 'tap t-sub inline-flex h-9 shrink-0 items-center gap-1.5 rounded-(--radius-control) border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 hover:bg-slate-50'}
-      data-testid="chatfirst-open"
-      data-guide="fn-chat-mode"
-    >
-      <MessageCircle aria-hidden="true" className="size-4 text-slate-500" />
-      <span>대화로 묻기</span>
-    </button>
-  )
-}
+// W7(D-644) [대화로 묻기] 단추는 ChatModeButton.tsx — 앱 뼈대가 이 파일(모듈 대화창)을 끌어오지 않게. 예전 이름으로도 부를 수 있게 다시 내보낸다.
+export { ChatModeButton } from './ChatModeButton'

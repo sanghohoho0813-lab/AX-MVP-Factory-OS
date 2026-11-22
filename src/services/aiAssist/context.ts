@@ -63,8 +63,8 @@ const PHONE_MORE: readonly [RegExp, string][] = [
 ]
 
 /** 자유 글 — 주민번호 · 비밀번호 · 키 · 계좌 · 이메일 · 휴대폰 · 유선 전화를 가리고, 알려 준 사람 이름을 '(이름)' 으로 */
-/** D-638 대화 · 직접 묻기 물음 글자 수(서버 askLimit 과 같은 수) */
-export const ASK_MAX_CHAT = 2000
+// W7(D-644) 물음 글자 한도 · ref 정리는 limits.ts — 오른쪽 대화 판 · 모델 고르기가 이 큰 묶음을 끌어오지 않게(여기서 다시 내보냄)
+export { ASK_MAX_CHAT, normRef } from './limits'
 
 /** D-638 직접 적은 물음 속 사람 이름 → 별칭(영업자 A · 대표 B) — 화면 자료와 같은 별칭으로 보내고 답은 화면에서 되돌린다 */
 export function aliasText(s: string, aliases: Record<string, string> | undefined): string {
@@ -113,15 +113,6 @@ export function wonText(won: number | null | undefined): string {
 /* ref 붙이기                                                             */
 /* ------------------------------------------------------------------ */
 
-/**
- * D-241 모델이 돌려준 ref 를 자료의 ref 모양으로 — ' C3 ', '[c3]', '#c3', 'c-3' 도 c3.
- * 모양이 아니면 '' (없는 번호를 만들어 오면 이어 주지 않는다).
- */
-export function normRef(ref: unknown): string {
-  if (typeof ref !== 'string') return ''
-  const t = ref.trim().toLowerCase().replace(/^[[(#\s]+|[\])\s.,]+$/g, '').replace(/^([a-z]{1,3})[-_\s]+(\d)/, '$1$2')
-  return /^[a-z]{1,3}\d{1,4}$/.test(t) ? t : ''
-}
 
 export class RefBook {
   private n = new Map<string, number>()

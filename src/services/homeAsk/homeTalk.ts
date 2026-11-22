@@ -11,7 +11,7 @@
  *  - '~하면 · ~한다면 · ~할 경우 · 물음표' 는 사실이 아니라 가정 — 기록하자고 하지 않고, 그 가정으로 설계만 보여 준다.
  *  - 저장은 대표가 [기록] 을 누를 때만(최종 확인 한 번).
  */
-import type { QuestionKey } from '../scenarioFit'
+import type { QuestionKey } from '../scenarioAnswers'
 
 export type TalkMode = 'fact' | 'if'
 

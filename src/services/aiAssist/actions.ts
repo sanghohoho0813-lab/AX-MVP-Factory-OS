@@ -3,9 +3,8 @@
  * 대표: "열어보기를 누르면 진짜 뭔가 열리던지 뭔가 기록이 되든지 해야" — 답의 번호(ref)를 무엇으로 이어 줄지 · 할 일로 넣을 때의 글과 기한.
  */
 import { addDaysLocal } from '../clientOpsNextAction'
-import { normRef } from './context'
-import type { AssistAnswer, AssistItem, AssistStatus, ProviderId } from './client'
-import type { AiChoice } from './store'
+import { normRef } from './limits'
+import type { AssistAnswer, AssistItem } from './client'
 
 /** ref 머리 글자 → 이어 주는 곳 이름(단추 글) */
 const REF_LABEL: Record<string, string> = {
@@ -85,27 +84,8 @@ export function todoText(item: Pick<AssistItem, 'title' | 'detail'>): string {
   return text.slice(0, 200)
 }
 
-/**
- * D-241 같은 회사의 한 단계 위 모델(빠르게 → 보통 → 깊게). 키가 없거나 이미 가장 위면 null.
- * 대표: 싼 모델 답이 와닿지 않을 때 모델 설정을 열지 않고 한 번에 다시.
- */
-export function betterModel(status: AssistStatus | null, run: { provider: ProviderId; model: string }): (AiChoice & { label: string }) | null {
-  const p = status?.providers.find((x) => x.id === run.provider)
-  if (!p || !p.configured) return null
-  const now = p.models.find((m) => m.id === run.model)
-  const cur = now?.tier
-  if (!cur) {
-    // D-244 단계를 모르는 모델 — 가격표로 견주어 더 비싼 단계 모델 중 가장 싼 것. 가격도 모르면 단추 없음(더 약한 모델을 권하지 않게)
-    if (!now?.price) return null
-    const cost = (x: [number, number]) => x[0] + x[1]
-    const base = cost(now.price)
-    const up = p.models.filter((x) => x.tier && x.price && cost(x.price) > base).sort((a, b) => cost(a.price!) - cost(b.price!))[0]
-    return up ? { provider: p.id, model: up.id, label: up.label } : null
-  }
-  const want = cur === 'cheap' ? 'standard' : cur === 'standard' ? 'deep' : null
-  const m = want ? p.models.find((x) => x.tier === want) : undefined
-  return m ? { provider: p.id, model: m.id, label: m.label } : null
-}
+// W7(D-644) 한 단계 위 모델은 modelUpgrade.ts — 자동 모델 규칙(앱 뼈대)이 이 파일(할 일 · 업체 자료)을 끌어오지 않게
+export { betterModel } from './modelUpgrade'
 
 /**
  * D-244 이 ref 가 이미 있는 할 일(업무 일기 t#)을 가리키나 — 그런 줄에는 [할 일로 넣기] 를 내지 않는다(같은 할 일이 두 번).

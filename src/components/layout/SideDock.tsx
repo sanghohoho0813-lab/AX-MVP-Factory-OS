@@ -22,13 +22,13 @@ import { CHAT_TINT, autoOpenPageChat, basePageChat, closePageDock, pageChatView,
 import { SIDE_SITES, addressLabel, addressToUrl, openInSide, useSideAi } from '../../lib/sideAi'
 import { assistOn, useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { askDock, dockTurns, setDockTurns, syncDockChat, useDockChat } from '../../services/aiAssist/dockChat'
-import { copyText } from '../../services/grants/grantView'
+import { copyText } from '../../lib/copyText'
 import { useToast } from '../ui/toastContext'
 import { ModelPicker } from '../ai/ModelPicker'
 import { ChatTextSize } from '../chat/ChatTextSize'
 import { AiConfirm } from '../ai/AiConfirm'
 import { BotBubble, BotRow, ChatNotice, CutLine, MeBubble, TypingBubble } from '../chat/bubbles'
-import { ASK_MAX_CHAT } from '../../services/aiAssist/context'
+import { ASK_MAX_CHAT } from '../../services/aiAssist/limits'
 import { chatDayKey, chatDayLine, chatTime } from '../../lib/chatTime'
 
 const DOCK_DEFAULT_W = 420

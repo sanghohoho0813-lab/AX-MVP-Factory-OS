@@ -400,21 +400,9 @@ function OpenButton({ label, onClick, className = '' }: { label: string; onClick
 }
 
 /** 서버 목록이 아직 없으면 모델 이름을 읽기 좋게('gemini-3.1-flash-lite' → 'Gemini 3.1 Flash Lite') */
-export function prettyModel(id: string): string {
-  return id
-    .replace(/(\d)-(\d)/g, '$1.$2')
-    .split('-')
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
-    .join(' ')
-    .replace(/^Gpt/, 'GPT')
-    .replace(/Flash Lite$/, 'Flash-Lite')
-}
-
-export function labelOf(status: AssistStatus | null, c: AiChoice): string {
-  const p = status?.providers.find((x) => x.id === c.provider)
-  const m = p?.models.find((x) => x.id === c.model)
-  return m ? m.label : prettyModel(c.model)
-}
+// W7(D-644) 모델 이름은 modelLabel.ts — 모델 고르기 단추(앱 뼈대)가 이 큰 파일을 끌어오지 않게(여기서 다시 내보냄)
+import { labelOf, prettyModel } from './modelLabel'
+export { labelOf, prettyModel }
 
 
 /* ------------------------------------------------------------------ */
