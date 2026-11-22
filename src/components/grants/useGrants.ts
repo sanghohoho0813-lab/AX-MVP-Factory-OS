@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { brand } from '../../brand/brand.config'
 import { listLinks, publishUpdate } from '../../services/customerBridgeService'
 import { listNotices, listSent, recordSent, type SentChannel, type SentExtra, type SentRecord } from '../../services/grants/grantStore'
-import { digestExtra, digestHistory, digestMessage, sentIndexOf, type DigestHistoryLine, type DigestItem, type SentIndex } from '../../services/grants/grantDigest'
+import { digestExtra, digestHistory, digestMessage, digestSheet, sentIndexOf, type DigestHistoryLine, type DigestItem, type DigestSheet, type SentIndex } from '../../services/grants/grantDigest'
 import type { GrantMatch, GrantNotice } from '../../services/grants/grantMatch'
 import { noticeMessage, shareMessage } from '../../services/grants/grantText'
 import { profileLine } from '../../services/grants/grantProfile'
@@ -17,6 +17,7 @@ import type { PortalClientLink } from '../../types/bridge'
 import { useIsPilot } from '../../auth/osAccess'
 import { useCustomerAudience } from '../../config/customerAudience'
 import { useSenderLine } from '../layout/useCurrentUser'
+import { todayLocalDate } from '../../lib/appClock'
 
 /** D-563 외부 구독 고객 계정 — 지원사업 알림(전문 모듈 묶음)이 닫혀 있다. 공고를 주지 않으면 맞는 공고 수 · 칩 · 알림이 함께 사라진다 */
 const NO_NOTICES: GrantNotice[] = []
@@ -162,6 +163,15 @@ export function useGrantActions(o: {
     [digestText, remember, toast],
   )
 
+  /** D-645 대표님께 드리는 한 장 — 인쇄 창을 연 묶음을 보낸 기록에 '한 장' 으로 남긴다(문구 복사와 같은 기록 · 이름 · 의견) */
+  const recordSheet = useCallback(
+    async (client: GrantClient, items: readonly DigestItem[], note: string) => {
+      if (items.length === 0) return
+      await remember(client.record.id, items.map((it) => it.match.notice.id), 'sheet', digestExtra(items, note))
+    },
+    [remember],
+  )
+
   const copyLink = useCallback(
     async (client: GrantClient | null) => {
       if (pilot) return
@@ -202,7 +212,7 @@ export function useGrantActions(o: {
     [linkOf, workspaceId, remember, toast],
   )
 
-  return { copyNotice, copyAll, copyLink: pilot ? null : copyLink, toPortal, digestText, sendDigest }
+  return { copyNotice, copyAll, copyLink: pilot ? null : copyLink, toPortal, digestText, sendDigest, recordSheet }
 }
 
 /** D-623 업체 판에 넘기는 '골라서 보내기' 묶음 — 알린 기록 · 보낸 기록 줄 · 미리 보기 · 보내기 */
@@ -211,21 +221,26 @@ export interface DigestControl {
   history: DigestHistoryLine[]
   preview: (items: readonly DigestItem[], note: string) => string
   onSend: (items: readonly DigestItem[], note: string) => Promise<boolean>
+  /** D-645 대표님께 드리는 한 장 — 종이 모양 · 인쇄한 묶음 기록 */
+  sheet: (items: readonly DigestItem[], note: string) => DigestSheet
+  onSheet: (items: readonly DigestItem[], note: string) => Promise<void>
 }
 
 /** 보낸 기록을 한 번만 묶어 두고, 업체마다 판에 넘길 묶음을 만든다 */
-export function useGrantDigest(o: { sent: readonly SentRecord[]; notices: readonly GrantNotice[]; actions: Pick<ReturnType<typeof useGrantActions>, 'digestText' | 'sendDigest'> }): (client: GrantClient) => DigestControl {
+export function useGrantDigest(o: { sent: readonly SentRecord[]; notices: readonly GrantNotice[]; actions: Pick<ReturnType<typeof useGrantActions>, 'digestText' | 'sendDigest' | 'recordSheet'> }): (client: GrantClient) => DigestControl {
   const { sent, notices, actions } = o
   const index = useMemo(() => sentIndexOf(sent), [sent])
   const titles = useMemo(() => new Map(notices.map((n) => [n.id, n.title])), [notices])
-  const { digestText, sendDigest } = actions
+  const { digestText, sendDigest, recordSheet } = actions
   return useCallback(
     (client: GrantClient): DigestControl => ({
       index,
       history: digestHistory(sent, client.record.id, (id) => titles.get(id) ?? ''),
       preview: (items, note) => digestText(client, items, note),
       onSend: (items, note) => sendDigest(client, items, note),
+      sheet: (items, note) => digestSheet({ record: client.record, items, note, today: todayLocalDate() }),
+      onSheet: (items, note) => recordSheet(client, items, note),
     }),
-    [index, sent, titles, digestText, sendDigest],
+    [index, sent, titles, digestText, sendDigest, recordSheet],
   )
 }

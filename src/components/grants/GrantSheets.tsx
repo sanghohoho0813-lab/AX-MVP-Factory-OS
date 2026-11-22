@@ -239,7 +239,7 @@ export function ClientGrantPanel({
   const lastSent = sentIndex?.last.get(client.record.id) ?? ''
   const freshFit = cands.filter((c) => c.bucket === 'fresh' && c.match.verdict === 'fit').length
   if (digest && picking) {
-    return <GrantDigestStep companyName={client.record.companyName} cands={cands} lastSent={lastSent} preview={digest.preview} onSend={digest.onSend} onBack={() => setPicking(false)} />
+    return <GrantDigestStep companyName={client.record.companyName} cands={cands} lastSent={lastSent} preview={digest.preview} onSend={digest.onSend} sheet={digest.sheet} onSheet={digest.onSheet} onBack={() => setPicking(false)} />
   }
   return (
     <div className="flex flex-col gap-3" data-testid="client-grants">

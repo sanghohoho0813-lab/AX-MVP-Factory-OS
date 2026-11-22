@@ -208,9 +208,10 @@ export async function submitAlertRequest(r: AlertRequest): Promise<void> {
 /* 보낸 기록 (업체마다)                                                  */
 /* ------------------------------------------------------------------ */
 
-export type SentChannel = 'kakao' | 'portal' | 'link'
+/** D-645 sheet = 대표님께 드린 한 장(인쇄 · PDF) */
+export type SentChannel = 'kakao' | 'portal' | 'link' | 'sheet'
 
-export const SENT_CHANNEL_LABEL: Record<SentChannel, string> = { kakao: '카톡 문구', portal: '고객 화면', link: '찾기 링크' }
+export const SENT_CHANNEL_LABEL: Record<SentChannel, string> = { kakao: '카톡 문구', portal: '고객 화면', link: '찾기 링크', sheet: '한 장(인쇄 · PDF)' }
 
 export interface SentRecord {
   id: string
@@ -249,7 +250,7 @@ export async function listSent(workspaceId: string | null): Promise<SentRecord[]
       id: r.id,
       clientId: r.clientId,
       noticeIds: Array.isArray(r.data.noticeIds) ? (r.data.noticeIds as unknown[]).filter((x): x is string => typeof x === 'string') : [],
-      channel: (['kakao', 'portal', 'link'] as const).includes(r.data.channel as SentChannel) ? (r.data.channel as SentChannel) : 'kakao',
+      channel: (['kakao', 'portal', 'link', 'sheet'] as const).includes(r.data.channel as SentChannel) ? (r.data.channel as SentChannel) : 'kakao',
       at: typeof r.data.at === 'string' ? r.data.at : r.createdAt,
       ...(textMap(r.data.titles) ? { titles: textMap(r.data.titles) } : {}),
       ...(textMap(r.data.comments) ? { comments: textMap(r.data.comments) } : {}),

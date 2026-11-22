@@ -7,8 +7,10 @@
  * 규칙 계산(공고 조건 × 업체 정보)이다 — 선정 가능성이 아니고, 글을 지어내지 않는다(공고에 적힌 것 · 내가 적은 의견만).
  */
 import { localDateOf } from '../../lib/appClock'
+import type { ClientOpsRecord } from '../../types/clientOps'
 import { deadlineRank, verdictRank, type GrantMatch, type GrantNotice } from './grantMatch'
 import type { SentChannel, SentRecord } from './grantStore'
+import { applyDocViews, applyDocsFor } from './grantApply'
 
 /** 처음에 골라 두는 수 — 카톡 한 통에 읽기 좋은 길이 */
 export const DIGEST_DEFAULT = 5
@@ -171,6 +173,79 @@ export function digestMessage(o: { companyName: string; sender: string; items: r
   })
   lines.push('', '신청해 보고 싶은 공고가 있으면 번호만 알려 주세요. 서류 준비부터 도와드리겠습니다.', '※ 조건은 공고 글과 회사 정보를 맞춰 본 것이며, 선정 여부는 심사에서 정해집니다.')
   return lines.join('\n')
+}
+
+/* ------------------------------------------------------------------ */
+/* D-645 대표님께 드리는 한 장(인쇄 · PDF)                                  */
+/* ------------------------------------------------------------------ */
+
+export interface DigestSheetItem {
+  no: string
+  title: string
+  /** 소관 · 수행 기관(있는 것만) */
+  agency: string
+  deadline: string
+  amount: string
+  ok: string[]
+  unknown: string[]
+  comment: string
+  url: string
+  /** 낼 서류 — 서류함에 이미 있는 것 · 더 받을 것(신청서 · 사업계획서는 따로) */
+  docsHave: string[]
+  docsNeed: string[]
+  /** 신청서 · 사업계획서 — 같이 쓴다는 한 줄을 넣을지 */
+  writePlan: boolean
+}
+
+export interface DigestSheet {
+  /** 종이 머리 — '○○ 대표님께' */
+  to: string
+  title: string
+  /** 'YYYY년 M월 D일' */
+  date: string
+  note: string
+  items: DigestSheetItem[]
+  /** 맨 아래 — 다음 순서 · 조건 안내(문구와 같은 말) */
+  closing: string[]
+}
+
+const PLAN_DOC = /신청서|사업\s*계획서/
+const ymdKo = (ymd: string) => (/^\d{4}-\d{2}-\d{2}$/.test(ymd) ? `${ymd.slice(0, 4)}년 ${Number(ymd.slice(5, 7))}월 ${Number(ymd.slice(8, 10))}일` : '')
+
+/**
+ * 문구(digestMessage)와 같은 공고 · 같은 순서 · 같은 의견을 종이 한 장 모양으로. 낼 서류는 공고 글의 제출서류(없으면 흔히 내는 것)를
+ * 이 업체 서류함과 맞춰 '이미 있음 · 더 받을 것' 으로 나눈다(신청 준비 화면과 같은 함수 — applyDocViews).
+ * 고객에게 드리는 종이 — 수수료 · 내부 메모 · 판정 점수는 넣지 않는다.
+ */
+export function digestSheet(o: { record: ClientOpsRecord; items: readonly DigestItem[]; note?: string; today: string }): DigestSheet {
+  const name = o.record.companyName.trim()
+  const items = o.items.slice(0, DIGEST_LIMIT).map((it, i): DigestSheetItem => {
+    const n = it.match.notice
+    const views = applyDocViews(o.record, { docs: applyDocsFor(n), applyDueDate: n.applyEnd }, o.today)
+    const plain = views.filter((v) => !PLAN_DOC.test(v.label))
+    return {
+      no: CIRCLED[i] ?? `${i + 1}.`,
+      title: n.title,
+      agency: [n.agency, n.operator && n.operator !== n.agency ? n.operator : ''].filter(Boolean).join(' · '),
+      deadline: deadlineLine(it.match),
+      amount: n.amountText,
+      ok: it.match.reasons.filter((r) => r.state === 'ok' && r.key !== 'region').map((r) => r.text.split(' — ')[0]),
+      unknown: it.match.reasons.filter((r) => r.state === 'unknown').map((r) => r.label),
+      comment: oneLine(it.comment, DIGEST_COMMENT_MAX),
+      url: n.url,
+      docsHave: plain.filter((v) => v.state === 'ok' || v.state === 'manual_done').map((v) => v.label),
+      docsNeed: plain.filter((v) => v.state !== 'ok' && v.state !== 'manual_done').map((v) => (v.state === 'expired' || v.state === 'expires_before_due' ? `${v.label}(새로 발급)` : v.label)),
+      writePlan: views.length !== plain.length,
+    }
+  })
+  return {
+    to: name ? `${name} 대표님께` : '대표님께',
+    title: `맞는 지원사업 공고 ${items.length}건`,
+    date: ymdKo(o.today),
+    note: oneLine(o.note ?? '', DIGEST_NOTE_MAX),
+    items,
+    closing: ['신청해 보고 싶은 공고가 있으면 번호만 알려 주세요. 서류 준비부터 도와드리겠습니다.', '조건은 공고 글과 회사 정보를 맞춰 본 것이며, 선정 여부는 심사에서 정해집니다.'],
+  }
 }
 
 /** 보낸 기록에 같이 남길 것 — 그때의 공고 이름 · 의견 · 한마디 */

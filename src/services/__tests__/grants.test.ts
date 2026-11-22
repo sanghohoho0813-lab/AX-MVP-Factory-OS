@@ -58,7 +58,7 @@ import { buildClientReport } from '../clientReport'
 import { DECISION_BULK_KINDS, buildDecisions, paymentReminderMessage, undoDecision, weekdayOnOrAfter, withDecisionAnswer } from '../decisions'
 import { buildClientAlerts } from '../clientOpsAlerts'
 import { clip, grantBriefOf } from '../grants/grantBrief'
-import { DIGEST_LIMIT, defaultDigestPicks, digestCandidates, digestExtra, digestHistory, digestMessage, digestSummary, noticeDay, sentIndexOf, type DigestItem } from '../grants/grantDigest'
+import { DIGEST_LIMIT, defaultDigestPicks, digestCandidates, digestExtra, digestHistory, digestMessage, digestSheet, digestSummary, noticeDay, sentIndexOf, type DigestItem } from '../grants/grantDigest'
 import type { SentRecord } from '../grants/grantStore'
 import { isGrantBookmark } from '../../types/clientOps'
 import { DOC_FIELDS, docReadLine, readNoticeDoc } from '../grants/grantDoc'
@@ -1174,6 +1174,46 @@ https://www.bizinfo.go.kr/web/lay1/bbs/S1T122C128/AS/74/view.do?pblancId=PBLN_00
   const oldRec: SentRecord[] = [{ id: 'o', clientId: 'c1', noticeIds: ['gone', 'told'], channel: 'kakao', at: '2026-11-01T03:00:00Z' }]
   const h2 = digestHistory(oldRec, 'c1', (id) => (id === 'told' ? '지금 이름' : ''))
   check('D623-17 예전 기록(이름을 안 남긴 것): 지금 목록에 있으면 그 이름 · 없으면 빈 이름', h2[0].items.map((x) => x.title).join('|') === '|지금 이름', h2)
+}
+
+/* ---------------- D-645 대표님께 드릴 한 장 ---------------- */
+{
+  const T = '2026-11-17'
+  const p = prof({ ...BASE })
+  const mk = (id: string, over: Partial<GrantNotice>, rules: Partial<GrantRules> = { regions: ['경기'] }) => notice(rules, { id, title: `공고 ${id}`, ...over })
+  const withDocs = mk('d1', { applyEnd: '2026-11-30', agency: '경기도', operator: '경기도경제과학진흥원', amountText: '최대 3천만원', url: 'https://x.test/d1', documents: ['사업자등록증 사본', '국세 납세증명서', '4대보험 가입자 명부', '사업신청서'] })
+  const noDocs = mk('d2', { applyEnd: '2026-12-10', agency: '중소벤처기업부', operator: '중소벤처기업부' })
+  const checkOne = mk('d3', { applyEnd: '2026-11-25' }, { regions: ['경기'], minEmployees: 5 })
+  const rec = normalizeClientOps({
+    id: 'sh1', companyName: '한빛정밀', representativeName: '김대표',
+    customDocuments: [{ id: 'cd1', key: 'customdoc_tax', label: '납세증명서', validMonths: 1, sensitive: false }],
+    documents: {
+      businessRegistration: { received: true, issuedAt: '2024-01-02', fileName: 'a.pdf' },
+      customdoc_tax: { received: true, issuedAt: '2026-11-10', fileName: 'd.pdf' },
+    },
+  } as never)
+  const items: DigestItem[] = [
+    { match: matchGrant(withDocs, p, T), comment: '  견적서만 받으면\n바로 낼 수 있어요 ' },
+    { match: matchGrant(noDocs, p, T), comment: '' },
+    { match: matchGrant(checkOne, p, T), comment: '' },
+  ]
+  const sh = digestSheet({ record: rec, items, note: '  지난주 미팅에서 말씀드린 건입니다. ', today: T })
+  check('D645-1 머리: 업체 대표님께 · 건수 · 날짜 · 한마디(앞뒤 빈칸 뗌)', sh.to === '한빛정밀 대표님께' && sh.title === '맞는 지원사업 공고 3건' && sh.date === '2026년 11월 17일' && sh.note === '지난주 미팅에서 말씀드린 건입니다.', sh)
+  check('D645-2 순서 · 번호 = 고른 순서(문구와 같음)', sh.items.map((x) => `${x.no}${x.title}`).join('|') === '①공고 d1|②공고 d2|③공고 d3', sh.items.map((x) => x.title))
+  const a = sh.items[0]
+  check('D645-3 소관 · 수행 기관(다를 때만 둘) · 마감(날짜) · 지원 · 의견 한 줄 · 주소', a.agency === '경기도 · 경기도경제과학진흥원' && sh.items[1].agency === '중소벤처기업부' && /\(11월 30일\)/.test(a.deadline) && a.amount === '최대 3천만원' && a.comment === '견적서만 받으면 바로 낼 수 있어요' && a.url === 'https://x.test/d1', a)
+  check('D645-4 낼 서류 = 공고 제출서류 × 이 업체 서류함 — 있음(사업자등록증 · 납세증명서) · 더 준비(명부)', a.docsHave.join('|') === '사업자등록증 사본|국세 납세증명서' && a.docsNeed.join('|') === '4대보험 가입자 명부', a)
+  check('D645-5 사업신청서 · 사업계획서는 서류 줄이 아니라 "같이 씁니다" 한 줄', a.writePlan && ![...a.docsHave, ...a.docsNeed].some((l) => /신청서|계획서/.test(l)))
+  const b = sh.items[1]
+  check('D645-6 제출서류가 없는 공고: 흔히 내는 서류로 맞춰 봄 · 신청서 · 사업계획서 한 줄', b.docsHave.length + b.docsNeed.length === 6 && b.docsHave.includes('사업자등록증') && b.docsNeed.includes('중소기업 확인서') && b.writePlan, b)
+  check('D645-7 확인 필요 공고: 확인할 것(직원 수)', sh.items[2].unknown.includes('직원 수'), sh.items[2].unknown)
+  const expired = digestSheet({ record: rec, items: [items[0]], today: '2026-12-20' })
+  check('D645-8 마감 전에 만료되는 서류는 "더 준비 — 새로 발급"', expired.items[0].docsNeed.some((l) => l === '국세 납세증명서(새로 발급)'), expired.items[0])
+  const nameless = digestSheet({ record: normalizeClientOps({ id: 'x', companyName: '  ' } as never), items: Array.from({ length: 13 }, (_, i) => ({ match: matchGrant(mk(`k${i}`, { applyEnd: '2026-12-01' }), p, T), comment: '' })), today: T })
+  check('D645-9 회사 이름 없으면 "대표님께" · 한 장에 10건까지 · 한마디 없으면 빈 칸', nameless.to === '대표님께' && nameless.items.length === DIGEST_LIMIT && nameless.items[9].no === '⑩' && nameless.note === '')
+  const flat = JSON.stringify(sh)
+  check('D645-10 종이에 수수료 · 판정 점수 · AI 말 0 · 선정 약속 0', !/수수료|점수|AI|선정됩니다|보장|확실/.test(flat) && sh.closing.some((c) => c.includes('선정 여부는 심사에서 정해집니다')), sh.closing)
+  check('D645-11 같은 공고 · 같은 의견 → 문구(카톡)와 종이의 공고 이름 · 의견이 같음', items.every((it, i) => digestMessage({ companyName: '한빛정밀', sender: 's', items }).includes(`${sh.items[i].no} ${sh.items[i].title}`)) && digestMessage({ companyName: '한빛정밀', sender: 's', items }).includes(`· 제 의견: ${a.comment}`))
 }
 
 /* ---------------- D-639 공고 원문 파일 읽기 ---------------- */

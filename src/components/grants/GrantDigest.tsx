@@ -4,7 +4,7 @@
  * 고르는 순서 · 문구는 services/grants/grantDigest.ts(규칙). 여기는 그리기만 한다.
  */
 import { useMemo, useState } from 'react'
-import { ArrowLeft, Copy } from 'lucide-react'
+import { ArrowLeft, Copy, FileText } from 'lucide-react'
 import { Button } from '../ui/Button'
 import {
   DIGEST_COMMENT_MAX,
@@ -14,9 +14,11 @@ import {
   type DigestCandidate,
   type DigestHistoryLine,
   type DigestItem,
+  type DigestSheet,
 } from '../../services/grants/grantDigest'
 import { SENT_CHANNEL_LABEL } from '../../services/grants/grantStore'
 import { DeadlineText, VerdictBadge } from './GrantParts'
+import { GrantDigestSheetStep } from './GrantDigestSheet'
 
 const md = (ymd: string) => (ymd ? `${Number(ymd.slice(5, 7))}/${Number(ymd.slice(8, 10))}` : '')
 const FIRST = 8
@@ -28,6 +30,8 @@ export function GrantDigestStep({
   preview,
   onSend,
   onBack,
+  sheet,
+  onSheet,
 }: {
   companyName: string
   cands: DigestCandidate[]
@@ -36,6 +40,9 @@ export function GrantDigestStep({
   preview: (items: readonly DigestItem[], note: string) => string
   onSend: (items: readonly DigestItem[], note: string) => Promise<boolean>
   onBack: () => void
+  /** D-645 대표님께 드릴 한 장 — 없으면 단추를 그리지 않는다 */
+  sheet?: (items: readonly DigestItem[], note: string) => DigestSheet
+  onSheet?: (items: readonly DigestItem[], note: string) => Promise<void>
 }) {
   // 처음에 골라 둔 수 — 안내 글은 이 수로 말한다(넣고 빼도 '골라 뒀어요' 숫자가 흔들리지 않게)
   const initial = useMemo(() => defaultDigestPicks(cands), [cands])
@@ -45,6 +52,8 @@ export function GrantDigestStep({
   const [limit, setLimit] = useState(FIRST)
   const [showPreview, setShowPreview] = useState(false)
   const [busy, setBusy] = useState(false)
+  // D-645 같은 판 안의 다음 단계 — 고른 것 · 의견 · 한마디는 그대로 두고 종이 모양만 본다
+  const [paperStep, setPaperStep] = useState(false)
 
   const fresh = cands.filter((c) => c.bucket === 'fresh').length
   // 보내는 순서 = 목록 순서(새로 올라온 것 · 맞음 · 마감 급한 순) — 누른 순서가 아니다
@@ -61,6 +70,10 @@ export function GrantDigestStep({
     } finally {
       setBusy(false)
     }
+  }
+
+  if (paperStep && sheet && items.length > 0) {
+    return <GrantDigestSheetStep sheet={sheet(items, note)} onPrint={() => onSheet?.(items, note) ?? Promise.resolve()} onBack={() => setPaperStep(false)} />
   }
 
   return (
@@ -146,6 +159,11 @@ export function GrantDigestStep({
             <Button size="sm" variant="secondary" onClick={() => setShowPreview((v) => !v)} disabled={items.length === 0} aria-expanded={showPreview} data-testid="grant-digest-preview-toggle">
               {showPreview ? '미리 보기 접기' : '미리 보기'}
             </Button>
+            {sheet && (
+              <Button size="sm" variant="secondary" onClick={() => setPaperStep(true)} disabled={items.length === 0} data-testid="grant-digest-sheet" data-guide="fn-grant-digest-paper">
+                <FileText aria-hidden="true" className="size-4" /> 대표님께 드릴 한 장
+              </Button>
+            )}
             <span className="t-sub text-slate-600" data-testid="grant-digest-count">
               고른 공고 {items.length}건{full ? ` · 한 통에 ${DIGEST_LIMIT}건까지` : ''}
             </span>

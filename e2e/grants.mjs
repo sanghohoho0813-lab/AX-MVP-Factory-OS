@@ -966,6 +966,55 @@ https://www.bizinfo.go.kr/web/view.do?pblancId=PBLN_${days}`
   check('D-623 390: 보내기 단추 높이 40px 이상', !!box && box.height >= 40, box)
   if (SHOTS) await mp.screenshot({ path: `${SHOTS}/d623-digest-390.png` }).catch(() => {})
   check('D-623 390: 화면 오류 0', merr.length === 0, merr)
+  // D-645 대표님께 드릴 한 장 — 같은 판 안 다음 단계 · 공고마다 한 줄 · 종이 그대로 · 인쇄하면 보낸 기록에 '한 장' 한 번
+  if (hasBtn) {
+    await mp.getByTestId('grant-digest-note').fill('지난주 미팅에서 말씀드린 건입니다.')
+    await mp.getByTestId('grant-digest-sheet').click()
+    await mp.getByTestId('digest-sheet').waitFor()
+    const rows = await mp.getByTestId('digest-sheet-row').allInnerTexts()
+    check('D-645 390: 같은 창 안 다음 단계 · 고른 3건 · 공고마다 한 줄(마감 · 서류 n/m)', (await mp.getByTestId('grant-digest').count()) === 0 && (await mp.getByTestId('client-sheet').count()) === 1 && rows.length === 3 && rows.every((r) => /서류 \d+\/\d+/.test(r)) && /공고 3건/.test(await mp.getByTestId('digest-sheet-lead').innerText()), rows)
+    check('D-645 390: 처음엔 종이 접힘(공고 줄 · 단추만)', (await mp.getByTestId('digest-sheet-paper').count()) === 0)
+    await mp.getByTestId('digest-sheet-paper-toggle').click()
+    const paper = await mp.getByTestId('digest-sheet-paper').innerText()
+    check('D-645 390: 종이 — 업체 대표님께 · 건수 · 한마디 · 의견 · 신청 방법 · 선정 약속 0', /한솔테크\(주\) 대표님께/.test(paper) && paper.includes('맞는 지원사업 공고 3건') && paper.includes('지난주 미팅에서 말씀드린 건입니다.') && paper.includes('긴 의견도 한 줄로 들어가는지 봅니다') && paper.includes('신청 방법') && paper.includes('신청서 · 사업계획서는 저희가 같이 씁니다.') && paper.includes('선정 여부는 심사에서 정해집니다') && !/수수료/.test(paper) && !/AI(?!랩)/.test(paper), paper.slice(-400))
+    check('D-645 390: 종이 펼쳐도 가로 넘침 0', (await overflowX(mp)) <= 0, await overflowX(mp))
+    if (SHOTS) await mp.screenshot({ path: `${SHOTS}/d645-sheet-390.png`, fullPage: true }).catch(() => {})
+    // 인쇄 — 종이만 보이고(머리줄 · 단추 0) 공고 3건
+    await mp.emulateMedia({ media: 'print' })
+    const printed = await mp.evaluate(() => {
+      const solo = document.querySelector('body > .print-solo [data-testid="digest-sheet-doc"]')
+      const vis = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden'
+      return { solo: vis(solo), items: solo ? solo.querySelectorAll('[data-testid="digest-sheet-item"]').length : 0, step: vis(document.querySelector('[data-testid="digest-sheet"]')) }
+    })
+    await mp.emulateMedia({ media: 'screen' })
+    check('D-645 인쇄 모양: 종이만 · 공고 3건 · 화면 단추 안 보임', printed.solo && printed.items === 3 && !printed.step, printed)
+    await mp.evaluate(() => {
+      window.__printed = 0
+      window.print = () => {
+        window.__printed += 1
+      }
+    })
+    const sheetRows = () =>
+      mp.evaluate(() => {
+        const k = Object.keys(localStorage).find((x) => x.startsWith('axmvp.module.grants.sent'))
+        return JSON.parse(localStorage.getItem(k ?? '') ?? '[]').map((r) => r.data).filter((d) => d.channel === 'sheet')
+      })
+    await mp.getByTestId('digest-sheet-print').click()
+    await mp.getByTestId('digest-sheet-recorded').waitFor({ timeout: 4000 }).catch(() => {})
+    await mp.getByTestId('digest-sheet-print').click()
+    await mp.waitForTimeout(300)
+    const sr = await sheetRows()
+    check('D-645 [인쇄 · PDF로 저장] 두 번 → 인쇄 창 두 번 · 보낸 기록 "한 장" 은 한 번(공고 3 · 이름 · 의견 · 한마디)', (await mp.evaluate(() => window.__printed)) === 2 && sr.length === 1 && sr[0].noticeIds.length === 3 && Object.keys(sr[0].titles ?? {}).length === 3 && Object.keys(sr[0].comments ?? {}).length === 1 && sr[0].note === '지난주 미팅에서 말씀드린 건입니다.', sr)
+    await mp.getByTestId('digest-sheet-back').click()
+    await mp.getByTestId('grant-digest').waitFor()
+    check('D-645 [고르기로] → 고른 것 · 의견 · 한마디 그대로', (await mp.locator('[data-testid="grant-digest-row"][data-picked="1"]').count()) === 3 && (await mp.getByTestId('grant-digest-comment').first().inputValue()).startsWith('긴 의견도') && (await mp.getByTestId('grant-digest-note').inputValue()) === '지난주 미팅에서 말씀드린 건입니다.')
+    await mp.getByTestId('grant-digest-back').click()
+    await mp.getByTestId('client-grants').waitFor()
+    await mp.getByTestId('grant-sent-toggle').click().catch(() => {})
+    const hist = await mp.getByTestId('grant-sent-list').innerText().catch(() => '')
+    check('D-645 보낸 기록 줄: "한 장(인쇄 · PDF) · 공고 3건"', /한 장\(인쇄 · PDF\) · 공고 3건/.test(hist), hist)
+    check('D-645 390: 화면 오류 0', merr.length === 0, merr)
+  }
   await m.close()
 }
 
