@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { lazyNow } from '../lib/lazyNow'
+import { preloadLater } from '../lib/preloadLater'
 import { useMoneyWords } from '../components/ops/useMoneyWords'
 import { useSerialSave } from '../lib/useSerialSave'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -167,13 +168,8 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
   const [formOpen, setFormOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1')
   // D-646 등록 창의 서류 넣는 칸은 첫 화면엔 받지 않지만, 목록을 그린 뒤 한가할 때 미리 받아 둔다 — 누르면 바로 보이게
   useEffect(() => {
-    const go = () => void loadNewClientDocDrop().catch(() => undefined)
-    if (typeof window.requestIdleCallback === 'function') {
-      const id = window.requestIdleCallback(go, { timeout: 4000 })
-      return () => window.cancelIdleCallback(id)
-    }
-    const t = window.setTimeout(go, 1500)
-    return () => window.clearTimeout(t)
+    // D-648 화면이 다 뜬 뒤에(느린 휴대폰에서 목록 조각과 대역을 다투지 않게 — 그 전에 창을 열면 그때 받음)
+    return preloadLater(() => void loadNewClientDocDrop().catch(() => undefined))
   }, [])
   // D-498 오늘 대화창에서 [새 업체로 등록] — 거기서 읽은 서류가 등록 창에 미리 들어온다(한 번만 꺼냄)
   const [preDocs] = useState(() => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1' ? peekNewClientDocs() : []))

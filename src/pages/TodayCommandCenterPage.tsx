@@ -1,5 +1,4 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { clientBundle, clientsBundle, todayBundle, todayLabel } from '../services/aiAssist/builders'
 import { HomeAsk } from '../components/home/HomeAsk'
 import { homeSuggestions, mergeBundles, nearNames, openedBy, planChips, planSection, ruleAnswer, type HomeIntent, type PickLite, type PlanChip } from '../services/homeAsk/homeAsk'
 import { newFacts, newNumbers, talkAnswers, talkNext, talkNumbers, type TalkAnswer, type TalkNext, type TalkNumber } from '../services/homeAsk/homeTalk'
@@ -514,6 +513,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     } catch {
       charges = []
     }
+    // D-648 보낼 자료 만들기(builders)는 AI 도우미 · 대화창을 쓸 때 받는다
+    const { todayBundle } = await import('../services/aiAssist/builders')
     return todayBundle({ today, clients, overdueTodos, todayTodos, hardDue, appointments, agenda, agendaLate, money, weekIn, salesRisks: salesRiskList, recontacts: salesRecontactList, care: careList(clients, today), openEvents: pilot ? 0 : openEvents.length, agentPayable: pilot ? 0 : agentPayable, charges, journal })
   }, [workspaceId, today, clients, overdueTodos, todayTodos, hardDue, appointments, agenda, agendaLate, money, weekIn, salesRiskList, salesRecontactList, pilot, openEvents, agentPayable, journal])
 
@@ -540,7 +541,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const homePrepare = useCallback(
     async (question: string, ids: string[], intents: HomeIntent[], docs: readonly ChatDoc[] = []) => {
       const base = await assistBuild()
-      const { buildInsights, topPicks } = await import('../services/clientInsights')
+      const [{ buildInsights, topPicks }, { clientBundle, clientsBundle, todayLabel }] = await Promise.all([import('../services/clientInsights'), import('../services/aiAssist/builders')])
       let focus = ids.map((id) => clients.find((c) => c.id === id)).filter((c): c is ClientOpsRecord => !!c)
       /*
        * D-498 함께 올린 서류 — 어느 회사 서류인지(번호 · 이름) 찾고, 그 업체(없으면 빈 새 업체)에 서류를 얹어 임시 판정. 저장하지 않는다.

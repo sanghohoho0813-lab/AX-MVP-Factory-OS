@@ -13,6 +13,7 @@ import { createPortal } from 'react-dom'
 import { Search } from 'lucide-react'
 import { useBackToClose } from '../../lib/backToClose'
 import { lazyNow } from '../../lib/lazyNow'
+import { preloadLater } from '../../lib/preloadLater'
 
 // 받아 둔 뒤에는 누르는 즉시 그린다(Suspense 의 0.3초 대기 없이)
 const { Component: SearchDialog, preload: loadSearchDialog } = lazyNow(() => import('./SearchDialog').then((m) => m.SearchDialog))
@@ -41,16 +42,11 @@ export function GlobalSearch({ compact = false }: { compact?: boolean } = {}) {
   const close = useCallback(() => setOpen(false), [])
   useBackToClose(open, close)
 
-  // D-647 화면을 그린 뒤 한가할 때 창 속을 미리 받아 둔다(누르면 바로 · 못 받아도 누를 때 다시)
+  // D-647 화면을 그린 뒤 창 속을 미리 받아 둔다(누르면 바로 · 못 받아도 누를 때 다시)
   useEffect(() => {
     if (compact) return
-    const go = () => void loadSearchDialog().catch(() => {})
-    if (typeof window.requestIdleCallback === 'function') {
-      const id = window.requestIdleCallback(go, { timeout: 4000 })
-      return () => window.cancelIdleCallback(id)
-    }
-    const t = window.setTimeout(go, 1500)
-    return () => window.clearTimeout(t)
+    // D-648 화면이 다 뜬 뒤에(느린 휴대폰에서 화면 조각과 대역을 다투지 않게)
+    return preloadLater(() => void loadSearchDialog().catch(() => {}))
   }, [compact])
 
   // 전역 단축키

@@ -64,22 +64,9 @@ function pad2(n: number): string {
   return String(n).padStart(2, '0')
 }
 
-/** 'YYYY년 MM월 DD일' / 'YYYY-MM-DD' / 'YYYY.MM.DD' → YYYY-MM-DD */
-export function parseKoreanDate(input: string): string | undefined {
-  const s = input.trim()
-  let m = /(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/.exec(s)
-  if (!m) m = /(\d{4})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{1,2})/.exec(s)
-  if (!m) {
-    const d = digits(s)
-    if (d.length === 8) m = [s, d.slice(0, 4), d.slice(4, 6), d.slice(6, 8)] as unknown as RegExpExecArray
-  }
-  if (!m) return undefined
-  const y = Number(m[1])
-  const mo = Number(m[2])
-  const da = Number(m[3])
-  if (y < 1900 || y > 2200 || mo < 1 || mo > 12 || da < 1 || da > 31) return undefined
-  return `${y}-${pad2(mo)}-${pad2(da)}`
-}
+/** 'YYYY년 MM월 DD일' / 'YYYY-MM-DD' / 'YYYY.MM.DD' → YYYY-MM-DD — D-648 작은 파일(koreanDate)로 떼고 여기서 다시 내보냄 */
+export { parseKoreanDate } from './koreanDate'
+import { parseKoreanDate } from './koreanDate'
 
 /** 주민등록번호 앞 6자리 → 생년월일 (성별코드로 세기 판별) */
 export function birthFromRrnPrefix(prefix6: string, genderCode?: string): string | undefined {

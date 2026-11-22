@@ -16,7 +16,7 @@
 
 import type { ClientOpsRecord, FactCandidate, FactMeta, FactSource, FactStatus, ProfileGroupKey } from '../types/clientOps'
 import { withCustomField } from './clientOpsService'
-import { parseKoreanDate } from './koreanDocParser'
+import { parseKoreanDate } from './koreanDate'
 import { editDistance, jamoOf } from './jamo'
 
 /* ------------------------------------------------------------------ */

@@ -11,6 +11,7 @@ import { useCustomerAudience } from '../../config/customerAudience'
 import { usePilotMarketingScreens } from '../../config/pilotMarketing'
 import { isAdvancedVisible } from '../../lib/featureVisibility'
 import { useStoreVersion } from '../../lib/useStoreVersion'
+import { preloadLater } from '../../lib/preloadLater'
 import type { guideGroupsFor } from '../../content/guideGroups'
 import type { ScreenHit, searchScreens } from '../../content/screenSearch'
 
@@ -48,7 +49,7 @@ export function useLazyScreenSearch(want: boolean): { search: ScreenSearchFn | n
   const advanced = isAdvancedVisible()
   const [loaded, setLoaded] = useState<ScreenSearchMod | null>(mod)
 
-  // 적기 시작하면 바로, 아니면 화면을 그린 뒤 한가할 때
+  // 적기 시작하면 바로, 아니면 화면이 다 뜬 뒤에
   useEffect(() => {
     if (loaded) return
     let alive = true
@@ -64,12 +65,11 @@ export function useLazyScreenSearch(want: boolean): { search: ScreenSearchFn | n
         alive = false
       }
     }
-    const hasIdle = typeof window.requestIdleCallback === 'function'
-    const id = hasIdle ? window.requestIdleCallback(go, { timeout: 3000 }) : window.setTimeout(go, 1500)
+    // D-648 화면이 다 뜬 뒤에(느린 휴대폰에서 화면 조각과 대역을 다투지 않게)
+    const cancel = preloadLater(go)
     return () => {
       alive = false
-      if (hasIdle) window.cancelIdleCallback(id)
-      else window.clearTimeout(id)
+      cancel()
     }
   }, [want, loaded])
 

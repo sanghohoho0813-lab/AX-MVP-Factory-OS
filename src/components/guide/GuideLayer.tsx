@@ -20,6 +20,7 @@ import { MODULES } from '../../config/moduleRegistry'
 import { menuVideo } from '../../config/menuVideos'
 import { useCustomerAudience } from '../../config/customerAudience'
 import { guideHoverOn, useGuideHoverOn } from '../../lib/guideHoverPref'
+import { preloadLater } from '../../lib/preloadLater'
 
 interface Shown {
   key: string
@@ -76,9 +77,8 @@ export function GuideLayer() {
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return
     if (!window.matchMedia('(hover: hover)').matches) return
-    const preload = () => void loadGuideText().catch(() => {})
-    const hasIdle = typeof window.requestIdleCallback === 'function'
-    const idle = hasIdle ? window.requestIdleCallback(preload, { timeout: 3000 }) : window.setTimeout(preload, 1200)
+    // D-648 화면이 다 뜬 뒤에 받는다(그 전에 마우스를 올리면 그때 받음)
+    const cancelPreload = preloadLater(() => void loadGuideText().catch(() => {}))
     let timer = 0
     let current: Element | null = null
     // 누른 칸은 떠날 때까지 다시 띄우지 않는다(누른 뒤 화면이 바뀌어도 마우스는 그 자리에 있다)
@@ -185,8 +185,7 @@ export function GuideLayer() {
     window.addEventListener('blur', hide)
     return () => {
       window.clearTimeout(timer)
-      if (hasIdle) window.cancelIdleCallback(idle)
-      else window.clearTimeout(idle)
+      cancelPreload()
       document.removeEventListener('mouseover', over)
       document.removeEventListener('focusin', focusIn)
       document.removeEventListener('focusout', hide)
