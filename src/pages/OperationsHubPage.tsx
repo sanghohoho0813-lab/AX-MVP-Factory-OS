@@ -425,6 +425,8 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
     setNewType(pilot ? 'sme' : ctype)
     setFormOpen(true)
   }
+  // D-648 [새 업체 등록] 에 손가락 · 마우스가 닿는 순간부터 서류 칸을 받는다(미리 받기 전에 눌러도 덜 기다리게)
+  const warmForm = () => void loadNewClientDocDrop().catch(() => undefined)
 
   /*
    * D-114: 계약 고객 · 잠재고객 · 전체. 메뉴 옆 숫자는 계약 고객만 세고, 잠재고객은 여기 들어와서 본다.
@@ -725,7 +727,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 />
               </Suspense>
             )}
-            <Button variant="primary" onClick={openForm} data-testid="clients-add" data-guide="fn-clients-add">
+            <Button variant="primary" onClick={openForm} onPointerDown={warmForm} onPointerEnter={warmForm} onFocus={warmForm} data-testid="clients-add" data-guide="fn-clients-add">
               <CirclePlus aria-hidden="true" className="size-4" />
               <span className="hidden sm:inline">{!pilot && ctype === 'consultant' ? '새 컨설턴트 고객 등록' : '새 업체 등록'}</span>
               <span className="sm:hidden">등록</span>
@@ -1160,7 +1162,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                 <div data-testid="clients-empty-consultant" className="rounded-(--radius-panel) border border-slate-200 bg-white px-5 py-12 text-center">
                   <BriefcaseBusiness aria-hidden="true" className="mx-auto size-9 text-brand-400" />
                   <p className="mt-3 text-[1.2rem] font-bold text-slate-900">아직 컨설턴트 고객이 없습니다</p>
-                  <Button variant="primary" className="mt-4" onClick={openForm} data-testid="clients-empty-consultant-add">
+                  <Button variant="primary" className="mt-4" onClick={openForm} onPointerDown={warmForm} onPointerEnter={warmForm} onFocus={warmForm} data-testid="clients-empty-consultant-add">
                     <CirclePlus aria-hidden="true" className="size-4" />컨설턴트 고객 등록
                   </Button>
                   <p className="mx-auto mt-4 max-w-xl text-[1rem] break-keep text-slate-600">
@@ -1173,7 +1175,7 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                   <Building2 aria-hidden="true" className="mx-auto size-9 text-brand-400" />
                   <p className="mt-3 text-[1.2rem] font-bold text-slate-900">등록된 업체가 없습니다</p>
                   <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                    <Button variant="primary" onClick={openForm} data-testid="clients-empty-add">
+                    <Button variant="primary" onClick={openForm} onPointerDown={warmForm} onPointerEnter={warmForm} onFocus={warmForm} data-testid="clients-empty-add">
                       <CirclePlus aria-hidden="true" className="size-4" />첫 업체 등록
                     </Button>
                     {/* D-582 고객 목록이 엑셀에 있는 사람 — 한 곳씩 넣지 않게 */}
