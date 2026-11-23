@@ -208,7 +208,7 @@ export default function IntakeFormPage({ slug }: { slug: string }) {
             {error}
           </p>
         )}
-        <button type="submit" disabled={busy} className="tap min-h-13 rounded-(--radius-control) bg-brand-600 px-4 text-lg font-bold text-white hover:bg-brand-700 disabled:opacity-60" data-testid="intake-submit">
+        <button type="submit" disabled={busy} className="min-h-13 rounded-(--radius-control) bg-brand-600 px-4 text-lg font-bold text-white hover:bg-brand-700 disabled:opacity-60" data-testid="intake-submit">
           {busy ? '보내는 중…' : '상담 신청 보내기'}
         </button>
       </form>

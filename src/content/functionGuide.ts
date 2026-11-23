@@ -372,6 +372,14 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     effect: '대충 한꺼번에 올려도 칸과 회사 정보가 채워지고, 사람이 볼 것만 물어요.',
     next: '휴대폰으로 찍은 흐린 서류도 더 잘 읽게 해요.',
   },
+  'fn-docs-uplink': {
+    label: '링크로 받기',
+    menu: 'client-ops',
+    what: '업체 대표님께 링크 하나를 보내면, 대표님이 휴대폰으로 서류를 바로 올려요. 로그인 · 앱 설치는 없어요.',
+    why: '카톡으로 받은 파일을 내려받아 다시 올리는 일을 없애려고 있어요.',
+    effect: '올라온 서류가 이 서류함에 모이고, [넣기] 한 번이면 맞는 칸에 들어가 회사 정보까지 채워져요.',
+    next: '받은 서류를 칸에 저절로 넣는 것까지 넓혀요.',
+  },
   'fn-docs-request': {
     label: '서류 요청 문구',
     menu: 'client-ops',

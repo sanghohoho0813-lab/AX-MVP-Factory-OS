@@ -7,7 +7,7 @@ import { DatePickerHost } from './components/ui/DatePickerHost'
 import { DeviceStage } from './components/layout/DeviceView'
 import { isStageExcluded, useDeviceView } from './lib/deviceView'
 import { preloadShellIfSignedIn } from './app/shellChunks'
-import { slugFromPath } from './lib/askPath'
+import { slugFromPath, uploadSlugFromPath } from './lib/askPath'
 
 // supabase 모드 앱(및 Supabase SDK)은 지연 로딩해 local 모드 entry 번들에 포함되지 않게 한다.
 const SupabaseApp = lazy(() =>
@@ -20,10 +20,13 @@ const SupabaseApp = lazy(() =>
  */
 const IntakeFormPage = lazy(() => import('./pages/public/IntakeFormPage'))
 const askSlug = typeof window !== 'undefined' ? slugFromPath(window.location.pathname) : ''
+/** L-41 · D-652 서류 올리기 공개 화면(/up/<20자리>) — 업체 대표가 휴대폰으로 여는 화면. 같은 까닭으로 라우터 · 로그인 준비 밖에서 */
+const UploadFormPage = lazy(() => import('./pages/public/UploadFormPage'))
+const upSlug = typeof window !== 'undefined' ? uploadSlugFromPath(window.location.pathname) : ''
 
 // D-590 로그인해 둔 브라우저는 앱 뼈대를 기다리지 않게 — 첫 조각을 읽자마자 받기 시작한다(로그인 화면만 볼 사람은 받지 않는다)
 try {
-  if (getDataModeConfig().mode === 'supabase' && !askSlug) preloadShellIfSignedIn()
+  if (getDataModeConfig().mode === 'supabase' && !askSlug && !upSlug) preloadShellIfSignedIn()
 } catch {
   /* 설정을 못 읽으면 미리 받지 않는다 — 화면이 필요할 때 받는다 */
 }
@@ -50,7 +53,23 @@ function App() {
       </Suspense>
     )
   }
+  if (upSlug) {
+    return (
+      <Suspense fallback={<PublicSplash text="서류 올리기 화면을 여는 중…" />}>
+        <UploadFormPage slug={upSlug} />
+      </Suspense>
+    )
+  }
   return <MainApp />
+}
+
+/** 공개 화면을 받는 동안 — OS 이름 · 로고 없이 */
+function PublicSplash({ text }: { text: string }) {
+  return (
+    <div className="boot" role="status" data-testid="boot-splash">
+      <p className="boot-msg">{text}</p>
+    </div>
+  )
 }
 
 /** 상담 신청 화면을 받는 동안 — OS 이름 · 로고 없이 */

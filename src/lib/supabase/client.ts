@@ -45,6 +45,23 @@ export function getSupabaseClient(): SupabaseClient {
   return client
 }
 
+let anonClient: SupabaseClient | null = null
+
+/**
+ * L-41 · D-652 로그인 없는 공개 화면용 — 세션을 읽지도 남기지도 않는다(늘 로그인 안 한 사람으로).
+ * 컨설턴트가 자기 브라우저에서 업체 대표용 링크를 열어 봐도 컨설턴트 자격으로 올리지 않게.
+ */
+export function getAnonSupabaseClient(): SupabaseClient {
+  if (anonClient) return anonClient
+  const cfg = getDataModeConfig()
+  if (cfg.mode !== 'supabase') throw new Error('supabase 모드가 아닙니다.')
+  if (cfg.configError || !cfg.supabaseUrl || !cfg.supabaseAnonKey) throw new Error('Supabase 설정이 올바르지 않습니다.')
+  anonClient = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'axmvp-public-anon' },
+  })
+  return anonClient
+}
+
 /** 테스트·로그아웃 시 클라이언트 캐시 초기화 */
 export function resetSupabaseClient(): void {
   client = null

@@ -13,6 +13,10 @@
       "destination": "/ask.html"
     },
     {
+      "source": "/up/:slug",
+      "destination": "/up.html"
+    },
+    {
       "source": "/((?!assets/|favicon\\.svg|api/).*)",
       "destination": "/index.html"
     }

@@ -10,6 +10,10 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { nextToasts } from '../../components/ui/toastContext'
 import { NEXT_TIME_OPTIONS, joinNextTime, splitNextTime } from '../clientOpsNextAction'
+import { OTHER_UPLOAD_LABEL, UPLOAD_ACCEPT, isUploadMissing, parseUploadState, uploadErrorText, uploadFileProblem, uploadRequestText, uploadSlugFromPath, uploadUrl } from '../uploadLink'
+import { UPLOAD_LINK_FOLDER, placementForUpload, withUploadedFile } from '../uploadLinkAccept'
+import { slugFromPath } from '../../lib/askPath'
+import { isStageExcluded } from '../../lib/deviceView'
 import { join } from 'node:path'
 import handler, { AFTER_AI_MS, MARKETING_PAGES, __resetAiAssistState, aiBudget } from '../../../api/ai-assist.js'
 import { ASSISTS, assistSystem } from '../../../api/_ai/assists.js'
@@ -714,7 +718,7 @@ async function run() {
     fnMissing.length === 0 && fnThin.length === 0 && fnNoMenu.length === 0 && fnBadBasic.length === 0 && usedFn.size >= 50 && functionGuidesOf('sales').length === 5 &&
       !functionGuidesOf('client-ops', { pilot: true }).some((x) => ['fn-client-portal', 'fn-client-consulting', 'fn-client-ai'].includes(x.key)) &&
       !functionGuidesOf('client-ops', { pilot: true, basic: true }).some((x) => x.key === 'fn-client-funding') &&
-      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 19 && functionGuidesOf('client-ops', { pilot: true }).every((x) => !x.key.startsWith('fn-talk-')) && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 4 && functionGuidesOf('mk-threads').length === 5 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 4 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
+      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 20 && functionGuidesOf('client-ops', { pilot: true }).every((x) => !x.key.startsWith('fn-talk-')) && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 4 && functionGuidesOf('mk-threads').length === 5 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 4 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
     `missing=${fnMissing.join()} thin=${fnThin.join()} nomenu=${fnNoMenu.join()} basic=${fnBadBasic.join()} used=${usedFn.size}`,
   )
   const bf = basicFlow(CLIENT_FLOW)
@@ -1026,6 +1030,79 @@ async function run() {
     )
   }
 
+  /* K52 — D-652 서류 올리기 링크: 주소 · 상태 읽기 · 카톡 문구 · 파일 거르기 · 칸에 넣기(덮지 않음 · 폴더) */
+  {
+    const src = (f: string) => readFileSync(join(process.cwd(), f), 'utf8')
+    const slug = '0123456789abcdef0123'
+    check(
+      'K52 D-652 주소 — /up/<20자리>만 · 대문자는 소문자 · 상담 신청(/ask 12자리)과 섞이지 않음 · 보기 무대 밖',
+      uploadSlugFromPath(`/up/${slug.toUpperCase()}`) === slug && uploadSlugFromPath(`/up/${slug}/`) === slug && uploadSlugFromPath('/up/short') === '' && uploadSlugFromPath(`/up/${slug}/x`) === '' &&
+        uploadSlugFromPath('/ask/0a1b2c3d4e5f') === '' && slugFromPath(`/up/${slug}`) === '' && uploadUrl(slug, 'https://os.example.com/') === `https://os.example.com/up/${slug}` && isStageExcluded(`/up/${slug}`),
+    )
+    const st = parseUploadState({
+      role: 'writer',
+      link: { slug, title: '(주)한빛정밀', note: '', docs: [{ key: 'bizReg', label: '사업자등록증' }, { key: 'bad key', label: 'x' }, { key: 'bizReg', label: '겹침' }], expiresAt: '2026-12-07T00:00:00Z', expired: false, uploaded: 2 },
+      files: [{ id: 'f1', docKey: 'bizReg', docLabel: '사업자등록증', fileName: '사업자.pdf', fileSize: 1000, storagePath: 'w/c/upload-link/l/f1.pdf', uploadedAt: '2026-11-23T01:00:00Z' }, { id: 'f2' }],
+      accepted: 1,
+      closed: 0,
+    })
+    check(
+      'K52 D-652 상태 읽기 — writer 만 · 받을 서류는 바른 키 · 겹침 없이 · 경로 없는 파일 줄은 버림 · 모르는 모양은 none · 12자리 주소는 링크 아님',
+      st.role === 'writer' && st.link?.docs.length === 1 && st.files.length === 1 && st.files[0].fileName === '사업자.pdf' && st.accepted === 1 &&
+        parseUploadState({ role: 'owner' }).role === 'none' && parseUploadState(null).role === 'none' &&
+        (parseUploadState({ role: 'writer', link: { slug: '0a1b2c3d4e5f' }, files: [] }) as { link: unknown }).link === null,
+      st,
+    )
+    const msg = uploadRequestText({ contactName: '김한빛', link: { slug, docs: [{ key: 'bizReg', label: '사업자등록증' }, { key: 'fin', label: '재무제표' }], expiresAt: '2026-12-07T00:00:00Z' }, origin: 'https://os.example.com' })
+    check(
+      'K52 D-652 카톡 문구 — 대표님 이름 · 로그인 없음 · 사진도 됨 · 서류 번호 목록 · 주소 · 기한(한국 날짜) · OS 이름 0',
+      msg.startsWith('안녕하세요, 김한빛 대표님.') && /로그인 · 앱 설치 없음/.test(msg) && /1\. 사업자등록증\n2\. 재무제표/.test(msg) && msg.includes(`https://os.example.com/up/${slug}`) && /12월 7일까지 열려 있어요/.test(msg) &&
+        !/MIRAE|미래AI랩/.test(msg) && uploadRequestText({ link: { slug, docs: [], expiresAt: '' } }).startsWith('안녕하세요, 대표님.'),
+      msg,
+    )
+    check(
+      'K52 D-652 파일 거르기(서버와 같은 규칙) — 사진 · PDF · 한글 · 엑셀 됨 · 실행 파일 · 형식 없음 · 0바이트 · 20MB 넘음 막힘 · 휴대폰 사진 찍기 열림',
+      uploadFileProblem({ name: 'a.PDF', size: 10 }) === '' && uploadFileProblem({ name: '사진.heic', size: 10 }) === '' && uploadFileProblem({ name: 'b.hwp', size: 10 }) === '' && uploadFileProblem({ name: 'c.xlsx', size: 20 * 1024 * 1024 }) === '' &&
+        /형식/.test(uploadFileProblem({ name: 'v.exe', size: 10 })) && /형식/.test(uploadFileProblem({ name: 'noext', size: 10 })) && /빈 파일/.test(uploadFileProblem({ name: 'a.pdf', size: 0 })) &&
+        /너무 커요/.test(uploadFileProblem({ name: 'a.pdf', size: 20 * 1024 * 1024 + 1 })) && UPLOAD_ACCEPT.startsWith('image/*,application/pdf,') && OTHER_UPLOAD_LABEL === '그 밖의 서류',
+    )
+    check(
+      'K52 D-652 오류 말 · 0031 전(함수 없음 · 권한 없음)은 링크 칸을 안 그림',
+      /10분쯤 뒤/.test(uploadErrorText({ message: 'too many requests' })) && /형식/.test(uploadErrorText({ message: 'file type not allowed' })) && /인터넷/.test(uploadErrorText(new Error('Failed to fetch'))) &&
+        isUploadMissing({ code: 'PGRST202' }) && isUploadMissing({ code: '42501' }) && isUploadMissing({ message: 'Could not find the function public.upload_link_state' }) && !isUploadMissing({ code: '22023' }) && !isUploadMissing(null),
+    )
+    // 칸에 넣기 — 업체 대표가 고른 칸 · 이미 파일이 있으면 '(2)' 칸(덮지 않음) · 그 밖의 서류는 이름으로 · 폴더 '고객이 올린 서류'
+    const base = normalizeClientOps({ id: 'c52', workspaceId: 'w', companyName: '(주)한빛정밀', createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z' })
+    const f1 = { id: 'f1', docKey: 'businessRegistration', docLabel: '사업자등록증', fileName: '사업자.pdf', fileSize: 1000, contentType: 'application/pdf', storagePath: 'w/c52/upload-link/l/f1.pdf', uploadedAt: '' }
+    const p1 = placementForUpload(base, f1, { text: '' })
+    const r1 = withUploadedFile(base, f1, p1)
+    const f2 = { ...f1, id: 'f2', fileName: '사업자2.pdf', storagePath: 'w/c52/upload-link/l/f2.pdf' }
+    const r2 = withUploadedFile(r1.record, f2, placementForUpload(r1.record, f2, { text: '' }))
+    const f3 = { ...f1, id: 'f3', docKey: '', docLabel: '', fileName: '중소기업확인서.pdf', storagePath: 'w/c52/upload-link/l/f3.pdf' }
+    const p3 = placementForUpload(r2.record, f3, { text: '' })
+    const f4 = { ...f3, id: 'f4', fileName: 'IMG_0001.jpg' }
+    const p4 = placementForUpload(r2.record, f4, { text: '' }, 'businessRegistration')
+    const d1 = r1.record.documents[r1.key]
+    check(
+      "K52 D-652 칸에 넣기 — 고른 칸(받음 · 경로 · 폴더 '고객이 올린 서류') · 같은 칸 두 번째는 '(2)' 칸(덮지 않음) · 그 밖의 서류는 이름으로 칸 · 직접 고른 칸이 먼저",
+      p1.kind === 'existing' && p1.sure && r1.key === 'businessRegistration' && d1?.received === true && d1.storagePath === f1.storagePath && d1.folderPath === UPLOAD_LINK_FOLDER &&
+        r2.key !== 'businessRegistration' && /\(2\)$/.test(r2.label) && r2.record.documents.businessRegistration?.storagePath === f1.storagePath &&
+        p3.label.includes('중소기업') && p4.kind === 'existing' && (p4 as { key: string }).key === 'businessRegistration' && p4.reason === '직접 고른 칸',
+      { r1: r1.key, r2: [r2.key, r2.label], p3, p4 },
+    )
+    // 화면 · 서버 · 빌드가 같은 약속을 지키는지(글자로)
+    const sheet = src('src/components/ops/UploadLinkSheet.tsx')
+    const page = src('src/pages/public/UploadFormPage.tsx')
+    const svc = src('src/services/uploadLink.ts')
+    const vite = src('vite.config.ts')
+    const vercel = src('vercel.json')
+    const sql = src('supabase/migrations/20261123000031_upload_links.sql')
+    check(
+      'K52 D-652 약속 — 공개 화면은 세션 없는 연결 · 넣기는 받은 뒤 저장 실패면 되돌림 · 되돌리기 알림 · up.html(OS 이름 0) · /up/* 길 · 서버 경로는 서버가 정함 · 덮어쓰기 0(upsert false)',
+      /getAnonSupabaseClient\(\)\.rpc\('public_upload_form'/.test(svc) && /upsert: false/.test(svc) && /decideUploadedFile\(f\.id, 'uploaded'\)/.test(sheet) && /label: '되돌리기'/.test(sheet) &&
+        /makeUpHtml/.test(vite) && /'up\.html'/.test(vite) && /"source": "\/up\/:slug"/.test(vercel) && /v_path := l\.workspace_id::text/.test(sql) && !/OS|MIRAE|미래AI랩/.test(page.replace(/OS 로고 · 이름 없음/g, '')),
+    )
+  }
   /* K51 — D-651 판매 관점 진단 P1: 휴대폰 영업 보드 · 고객 카드 · 업체 순서 안내 · 미팅 메모 한 번에 · 약속 시각 · 오늘 할 일 · 1차 미팅 분야 */
   {
     const src = (f: string) => readFileSync(join(process.cwd(), f), 'utf8')

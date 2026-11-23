@@ -6,3 +6,9 @@ export function slugFromPath(pathname: string): string {
   const m = /^\/ask\/([0-9A-Za-z]{12})\/?$/.exec(pathname)
   return m ? m[1].toLowerCase() : ''
 }
+
+/** L-41 · D-652 서류 올리기 공개 화면 주소(/up/<20자리>) 알아보기 — 같은 까닭으로 이 작은 파일에 */
+export function uploadSlugFromPath(pathname: string): string {
+  const m = /^\/up\/([0-9A-Za-z]{20})\/?$/.exec(pathname)
+  return m ? m[1].toLowerCase() : ''
+}

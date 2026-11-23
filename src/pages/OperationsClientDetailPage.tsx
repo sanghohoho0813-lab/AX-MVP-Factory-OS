@@ -37,7 +37,7 @@ import {
   FileText,
   Sparkles,
 } from 'lucide-react'
-import { FileArchive, FlaskConical, FolderOpen, HardDrive, ListTree } from 'lucide-react'
+import { FileArchive, FlaskConical, FolderOpen, HardDrive, Link2, ListTree } from 'lucide-react'
 import { DocOriginalsSheet } from '../components/ops/DocOriginalsSheet'
 import { originalItems } from '../services/docOriginals'
 import { withoutProvisional } from '../services/marketingTrial'
@@ -111,6 +111,7 @@ import type {
   ServiceStatus,
 } from '../types/clientOps'
 import { Button } from '../components/ui/Button'
+import { UploadLinkBar, UploadLinkSheet, useUploadLink } from '../components/ops/UploadLinkSheet'
 import { NotFoundState } from '../components/ui/NotFoundState'
 import { Modal } from '../components/ui/Modal'
 import { Panel } from '../components/ui/Panel'
@@ -301,6 +302,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [moreOpen, setMoreOpen] = useState(false)
   // D-549 SAFE-5 서류 원본 묶음(ZIP) 판
   const [originalsOpen, setOriginalsOpen] = useState(false)
+  /* L-41 · D-652 서류 올리기 링크 — 업체 대표가 휴대폰으로 올린 서류(0031 전 · 로컬 모드면 아무것도 안 그림) */
+  const [uplView, setUplView] = useState<null | 'make' | 'ready' | 'inbox'>(null)
+  const upl = useUploadLink(workspaceId, clientId, canUploadFiles())
   // D-154: 성과 보고서 한 장
   // D-155: 오늘 '안부 챙길 계약 고객' 의 [성과 보고서] 는 ?report=1 로 들어와 바로 연다
   const [reportOpen, setReportOpen] = useState(() => searchParams.get('report') === '1')
@@ -1494,6 +1498,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               <FileUp aria-hidden="true" className="size-3.5" />
               <span className="sr-only">서류 올리기</span>
             </Button>
+            {/* L-41 · D-652 업체 대표가 휴대폰으로 올리는 링크 — 짧게(이름은 마우스 · 화면 읽기로) */}
+            {upl.state && (
+              <Button variant="secondary" size="sm" data-testid="docs-upload-link" data-guide="fn-docs-uplink" title="업체 대표가 휴대폰으로 올리는 링크" onClick={() => setUplView(upl.state?.link ? 'ready' : 'make')}>
+                <Link2 aria-hidden="true" className="size-3.5" />
+                <span>링크로 받기</span>
+              </Button>
+            )}
             {/* D-146: 예전 판별로 엉뚱한 칸에 들어간 파일을 제목으로 다시 가른다 */}
             {allDocumentMetas(record).some((m) => m.needsFile && record.documents[m.key]?.fileName) && (
               <Button variant="secondary" size="sm" data-testid="doc-resort" onClick={() => setResortOpen(true)}>
@@ -1557,6 +1568,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             }
           }}
         />
+
+        {/* L-41 · D-652 고객이 올린 서류 n개 · 열린 링크 — 한 줄(없으면 안 그림) */}
+        {upl.state && <UploadLinkBar state={upl.state} today={today} onOpen={(v) => setUplView(v)} />}
 
         {/* D-631 손볼 것 한 줄 · 보기 방식을 한 줄에(왼쪽 · 오른쪽) — 받음 줄 · 칩 · 보기 방식이 한 칸씩 세 줄로 쌓여 있었다. 좁으면 보기 방식이 아랫줄로 */}
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -2105,6 +2119,19 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {originalsOpen && <DocOriginalsSheet record={record} today={today} onClose={() => setOriginalsOpen(false)} />}
 
+      {uplView && upl.state && workspaceId && (
+        <UploadLinkSheet
+          record={record}
+          workspaceId={workspaceId}
+          today={today}
+          state={upl.state}
+          initialView={uplView}
+          onClose={() => setUplView(null)}
+          onCommit={commit}
+          current={current}
+        />
+      )}
+
       {moreOpen && (
         <BottomSheet title="이 업체에서 할 수 있는 것" onClose={() => setMoreOpen(false)}>
           <div className="flex flex-col gap-4">
@@ -2142,6 +2169,21 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 <Send aria-hidden="true" className="size-4" />
                 서류 요청 문구
               </Button>
+              {/* L-41 · D-652 업체 대표가 휴대폰으로 바로 올리는 링크 */}
+              {upl.state && (
+                <Button
+                  variant="secondary"
+                  className="w-full justify-start"
+                  data-testid="more-upload-link"
+                  onClick={() => {
+                    setMoreOpen(false)
+                    setUplView(upl.state?.files.length ? 'inbox' : upl.state?.link ? 'ready' : 'make')
+                  }}
+                >
+                  <Link2 aria-hidden="true" className="size-4" />
+                  서류 올리기 링크 보내기{upl.state.files.length ? ` · 받은 서류 ${upl.state.files.length}` : ''}
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 className="w-full justify-start"

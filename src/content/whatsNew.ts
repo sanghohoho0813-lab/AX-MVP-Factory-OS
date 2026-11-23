@@ -25,6 +25,14 @@ export const WHATS_NEW_MAX = 10
 
 export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
   {
+    id: 'upload-link',
+    date: '2026-11-23',
+    title: '업체 대표님이 휴대폰으로 서류를 바로 올리는 링크',
+    how: '업체 서류함에서 [링크로 받기] → 받을 서류를 고르고 카톡 문구를 복사해 보내세요. 올라온 서류는 [넣기] 한 번이면 칸에 들어가요.',
+    path: '/ops/clients',
+    cta: '고객 관리 열기',
+  },
+  {
     id: 'home-chat-big',
     date: '2026-11-19',
     title: '오늘 맨 위 대화창이 크게 — 한 번 쓰면 원하는 일로',
@@ -87,15 +95,6 @@ export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
     how: "유튜브는 이번 주 뜨는 주제가 번호 붙은 목록으로 바뀌었고, 하나를 누르면 제목 · 대본이 한 판 안에 나와요. 내 콘텐츠 · 지금 뜨는 영상도 칸마다 떨어져 있던 상자가 한 판 안의 줄로 바뀌었어요.",
     path: '/marketing?view=plan',
     cta: '유튜브 열기',
-    marketing: true,
-  },
-  {
-    id: 'sns-calm',
-    date: '2026-11-12',
-    title: '스레드 · 릴스 쓰는 화면이 한 판으로 깔끔해졌어요',
-    how: "1번 칸에서 '우리 분야 주제'(정관 · 가지급금 · 정책자금 같은 상담 주제)를 하나 누르고 [AI로 완성 글 쓰기] 를 누르면 돼요. 이번 주 키워드 · 직접 고르기는 접어 뒀어요.",
-    path: '/marketing/threads',
-    cta: '스레드 열기',
     marketing: true,
   },
 ]
