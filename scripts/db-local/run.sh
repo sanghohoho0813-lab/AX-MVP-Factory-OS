@@ -37,6 +37,13 @@ a=$(c30); psqlq < supabase/manual/rollback_0030.sql > /dev/null 2>&1; b=$(c30); 
 if echo "$a" | grep -q '0 확인|0|읽기 전용 거래|on|on' && echo "$a" | grep -q '5/5|들어감' && echo "$b" | grep -q '꺼짐(되돌림)' && echo "$c" | grep -q '5/5|들어감'; then out="$out
 PASS  점검 SQL(0030): 읽기 전용 on · '들어감'(5/5) → 되돌리기 → '꺼짐(되돌림)' → 다시 실행 → '들어감'"; else out="$out
 FAIL  점검 SQL(0030): [$a] [$b] [$c]"; fi
+# D-652 0031 점검(check_applied_0031.sql) — 전부 넣은 DB: 읽기 전용 on · 먼저 3줄 · '들어감'(7/7) → 되돌리기 → '꺼짐(되돌림)' → 0031 다시 → '들어감' · 확인 SQL 1~5 '좋음'
+c31() { su postgres -c "psql -At -F '|' -d $DB -c \"\$(cat supabase/manual/check_applied_0031.sql)\"" 2>&1 | tr '\n' ' '; }
+a=$(c31); psqlq < supabase/manual/rollback_0031.sql > /dev/null 2>&1; b=$(c31); psqlq < supabase/migrations/20261123000031_upload_links.sql > /dev/null 2>&1; c=$(c31)
+v31=$(su postgres -c "psql -At -F '|' -d $DB -c \"\$(cat supabase/manual/verify_after_0031.sql)\"" 2>&1 | grep -cE '^[1-5]\|.*\|좋음$')
+if echo "$a" | grep -q '0 확인|0|읽기 전용 거래|on|on' && [ "$(echo "$a" | grep -o '|들어감' | wc -l)" = "4" ] && echo "$a" | grep -q '7/7|들어감' && echo "$b" | grep -q '꺼짐(되돌림)' && echo "$c" | grep -q '7/7|들어감' && [ "$v31" = "5" ]; then out="$out
+PASS  점검 SQL(0031): 읽기 전용 on · 먼저 3줄 · '들어감'(7/7) → 되돌리기 → '꺼짐(되돌림)' → 다시 실행 → '들어감' · 확인 SQL 1~5 '좋음'"; else out="$out
+FAIL  점검 SQL(0031): [$a] [$b] [$c] 확인 $v31/5"; fi
 echo "$out"
 pass=$(echo "$out" | grep -c '^PASS'); bad=$(echo "$out" | grep -cE '^FAIL|ERROR')
 echo "통과 $pass · 실패 $bad"

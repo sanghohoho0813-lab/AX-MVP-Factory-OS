@@ -24,6 +24,8 @@ create or replace function storage.foldername(name text) returns text[] language
 grant usage on schema auth, storage, extensions, public to anon, authenticated, service_role;
 grant select on auth.users to authenticated;
 grant all on storage.objects to authenticated;
+-- Supabase 기본값과 같게: 로그인 안 한 사람(anon)도 storage.objects 에 넣는 권한은 있고, 막는 것은 RLS 정책이다(0031 올리기 링크 시험)
+grant insert on storage.objects to anon;
 -- Supabase 기본값과 같게: public 의 새 표 · 순번 · 함수는 anon · authenticated 에게 권한이 열리고, 막는 것은 RLS 다(D-162 e2e · 시험이 운영과 같은 조건에서 돈다)
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;

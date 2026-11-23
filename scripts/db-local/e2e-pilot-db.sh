@@ -14,7 +14,7 @@ psqlq() { su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB"; }
 su postgres -c "dropdb --if-exists $DB; createdb $DB"
 psqlq < $DIR/supabase-shim.sql > /dev/null
 for f in supabase/migrations/*.sql; do
-  case "$f" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_intake_links.sql|*_self_signup.sql|*_signup_approval.sql) continue ;; esac
+  case "$f" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_intake_links.sql|*_self_signup.sql|*_signup_approval.sql|*_upload_links.sql) continue ;; esac
   psqlq < "$f" > /dev/null
 done
 
@@ -76,6 +76,9 @@ psqlq < supabase/migrations/20261115000028_self_signup.sql > /dev/null
 
 # 0029 — D-635 가입 신청 → 대표가 앱에서 승인 · 거절(0028 뒤 — 0028 은 꺼 둔 채)
 psqlq < supabase/migrations/20261118000029_signup_approval.sql > /dev/null
+
+# 0031 — L-41 · D-652 서류 올리기 링크(0017 · 0019 · 0026 뒤)
+psqlq < supabase/migrations/20261123000031_upload_links.sql > /dev/null
 
 # PostgREST 가 붙을 역할(로컬 시험용 비밀번호)
 psqlq > /dev/null <<'SQL'
