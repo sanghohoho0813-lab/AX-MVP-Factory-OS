@@ -10495,4 +10495,4 @@ D-648 을 운영처럼(HTTP/2) 재다가 찾은 것. 동작 · 화면은 그대�
 6. **오늘 '오늘 할 일 n건'** — 누르면 같은 화면 아래 할 일 칸으로 내려간다(꾸미기로 그 칸을 숨겼으면 업무 일기로). [모두 보기] 는 그대로.
 7. **1차 미팅 '오늘 꺼낼 항목 고르기'** — 칩 26개를 한 번에 펼치던 것을 분야 7개 단추만(고른 개수 · 펼침 화살표) → 누른 분야의 항목만 펼침(한 번에 하나). 고른 항목 설명 · 업체 기록(sales.picks)은 그대로.
 
-**시험** — test:saasusage K51(시각 떼기/붙이기 · 휴대폰 보드 · 카드 테두리 · 순서 안내 · 메모 한 번 · 오늘 · 분야) · qa:talk T13-2/2b/4(따로 누르지 않아도 기록 · 알림 한 장 + 되돌리기 · 되돌리면 업체만 그 전 · 업무 일기 글 그대로) · qa:sales(분야 7개만 → '승계·리스크' → '가업승계'). TESTS_LINE
+**시험** — test:saasusage K51(시각 떼기/붙이기 · 휴대폰 보드 · 카드 테두리 · 순서 안내 · 메모 한 번 · 오늘 · 분야) · qa:talk T13-2/2b/4(따로 누르지 않아도 기록 · 알림 한 장 + 되돌리기 · 되돌리면 업체만 그 전 · 업무 일기 글 그대로) · qa:sales(분야 7개만 → '승계·리스크' → '가업승계'). 돌린 결과: tsc · oxlint · build 녹색 · test:all 녹색(134초 · saas-usage 133/0) · qa:pilot 481/0(고객 계정 390 영업 보드 포함) · qa:sales 203/0(처음 묶음에서 1건 '미팅 준비 390 차수 세 칸' 이 기계가 바쁠 때 빨강 — 따로 열면 세 칸 정상 · 혼자 다시 돌려 녹색) · qa:journey · talk · board · todos · easy · flow · real · many · detail · wayfinding · homeask · taps · chars · hover · phone · firstscreen · contract · planner · uxhome · simple · steady · squeeze · keepui · e2e:mobile 모두 녹색.
