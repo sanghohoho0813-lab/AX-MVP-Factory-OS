@@ -10,7 +10,10 @@ import { CalendarClock, Pencil } from 'lucide-react'
 import { Button } from '../ui/Button'
 import {
   NEXT_QUICK_DAYS,
+  NEXT_TIME_OPTIONS,
   addDaysLocal,
+  joinNextTime,
+  splitNextTime,
   friendlyDate,
   nextSuggestions,
   relativeDay,
@@ -37,13 +40,17 @@ export function NextStepEditor({
   hideLabel?: boolean
 }) {
   const [open, setOpen] = useState(false)
-  const [text, setText] = useState(record.nextAction)
+  // D-651 '몇 시에' — 글 뒤의 ' · 오후 2시' 를 떼어 칸에 넣고, 저장할 때 다시 붙인다(저장 모양 그대로)
+  const [text, setText] = useState(() => splitNextTime(record.nextAction).base)
+  const [time, setTime] = useState(() => splitNextTime(record.nextAction).time)
   const [date, setDate] = useState(record.nextActionDueDate)
   const [move, setMove] = useState(true)
   const [busy, setBusy] = useState(false)
 
   const start = () => {
-    setText(record.nextAction)
+    const parts = splitNextTime(record.nextAction)
+    setText(parts.base)
+    setTime(parts.time)
     setDate(record.nextActionDueDate)
     setMove(true)
     setOpen(true)
@@ -128,7 +135,21 @@ export function NextStepEditor({
           )
         })}
       </div>
-      {date && <p className="t-sub text-slate-600">→ {friendlyDate(date)} · {relativeDay(date, today)}</p>}
+      {/* D-651 몇 시에 — 미팅 메모가 '오후 2시' 까지 알아듣는데 손으로 적을 칸이 없었다(고르지 않아도 된다) */}
+      <label className="block text-[0.9375rem] font-medium text-slate-700">
+        몇 시에 <span className="font-normal text-slate-500">(안 골라도 돼요)</span>
+        <select value={time} onChange={(e) => setTime(e.target.value)} aria-label="시각" data-testid="next-step-time" className={inputClass}>
+          <option value="">시각 안 정함</option>
+          {/* 예전에 적은 시각이 목록에 없으면(예: 오후 2시 10분) 그대로 남긴다 */}
+          {time && !NEXT_TIME_OPTIONS.includes(time) && <option value={time}>{time}</option>}
+          {NEXT_TIME_OPTIONS.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+      </label>
+      {date && <p className="t-sub text-slate-600">→ {friendlyDate(date)}{time ? ` ${time}` : ''} · {relativeDay(date, today)}</p>}
       {firstMeeting && (
         <label className="t-sub flex items-center gap-2 text-slate-700">
           <input type="checkbox" checked={move} onChange={(e) => setMove(e.target.checked)} className="size-5 shrink-0 accent-brand-600" />
@@ -138,7 +159,7 @@ export function NextStepEditor({
         </label>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="primary" onClick={() => void save(text, date)} disabled={busy} data-testid="next-step-save">
+        <Button variant="primary" onClick={() => void save(joinNextTime(text, time), date)} disabled={busy} data-testid="next-step-save">
           {busy ? '저장 중…' : '저장'}
         </Button>
         <Button variant="secondary" onClick={() => setOpen(false)} disabled={busy}>

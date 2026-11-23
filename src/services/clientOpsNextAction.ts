@@ -93,3 +93,35 @@ export function withNextAction(
 export function suggestsFirstMeeting(record: ClientOpsRecord, text: string, date: string): boolean {
   return salesStageOf(record) === 'lead' && /1차\s*미팅/.test(text) && /^\d{4}-\d{2}-\d{2}$/.test(date)
 }
+
+/**
+ * D-651 다음 약속 '몇 시에' — 시각은 따로 칸을 두지 않고(저장 모양 그대로) 약속 글 뒤에 ' · 오후 2시' 로 붙인다.
+ * 미팅 메모 · 대화창이 읽어 넣는 모양(homeTalk talkNext — '2차 미팅 · 오후 2시')과 같다.
+ */
+export const NEXT_TIME_OPTIONS: string[] = (() => {
+  const out: string[] = []
+  for (let h = 8; h <= 19; h++) {
+    const word = h < 12 ? '오전' : h === 12 ? '낮' : '오후'
+    const hh = h > 12 ? h - 12 : h
+    out.push(`${word} ${hh}시`, `${word} ${hh}시 반`)
+  }
+  return out
+})()
+
+const TIME_SUFFIX = /\s*·\s*((?:오전|오후|아침|저녁|낮)\s*)?(\d{1,2})\s*시(?:\s*(반|\d{1,2}\s*분))?\s*$/
+
+/** '2차 미팅 · 오후 2시' → { base: '2차 미팅', time: '오후 2시' } · 시각이 없으면 time '' */
+export function splitNextTime(text: string): { base: string; time: string } {
+  const m = TIME_SUFFIX.exec(text)
+  if (!m) return { base: text, time: '' }
+  const time = `${m[1] ? `${m[1].trim()} ` : ''}${m[2]}시${m[3] ? ` ${m[3].replace(/\s/g, '')}` : ''}`
+  return { base: text.slice(0, m.index).trimEnd(), time }
+}
+
+/** 약속 글 + 시각 → 저장할 글(시각이 없으면 글 그대로 · 글이 없으면 시각만) */
+export function joinNextTime(base: string, time: string): string {
+  const b = base.trim()
+  const t = time.trim()
+  if (!t) return b
+  return b ? `${b} · ${t}` : t
+}

@@ -243,6 +243,9 @@ const clientsBadge = async (page) => ((await page.locator('aside [data-nav-badge
   check('미팅 준비(D-167): 1차는 포인트만 — 질문 · 요청할 자료(오프닝 멘트 없음)', ((await page.getByTestId('meeting-rounds').getByRole('button', { name: '1차 미팅' }).getAttribute('aria-pressed')) === 'true') && !((await page.getByTestId('meeting-plan').innerText()) ?? '').includes('오프닝') && /질문 \d+개/.test(main1) && main1.includes('요청할 자료') && main1.includes('미팅정밀'))
   // D-167: 크레탑 없이 항목만 바로 고르기 — 고르면 업체 기록에 남는다
   await page.getByTestId('prep-mode').getByRole('radio', { name: '항목만 바로 고르기' }).click()
+  // D-651 분야 7개만 보이고 누른 분야만 펼친다 — '승계·리스크' 를 눌러 '가업승계'
+  check('미팅 준비(D-651): 처음엔 분야 7개 단추만 · 항목 칩 0', (await page.getByTestId('direct-pick-cat').count()) === 7 && (await page.getByTestId('direct-pick-items').count()) === 0)
+  await page.locator('[data-testid="direct-pick-cat"][data-cat="승계·리스크"]').click()
   await page.getByTestId('direct-pick').getByRole('button', { name: '가업승계', exact: true }).click()
   await page.waitForTimeout(500)
   const picked = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients')).find((c) => c.id === 'cli_meet').sales.picks)

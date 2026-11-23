@@ -161,6 +161,7 @@ export function NextActionBar({
   tone = 'indigo',
   testId = 'next-action',
   attrs,
+  compact = false,
 }: {
   label?: string
   title: ReactNode
@@ -173,13 +174,16 @@ export function NextActionBar({
   tone?: FeatureTone
   testId?: string
   attrs?: Record<string, string>
+  /** D-651 휴대폰에서도 한 줄(단추는 오른쪽 · 설명은 두 줄까지) — 아래 목록의 첫 칸이 첫 화면 안에 들게 */
+  compact?: boolean
 }) {
   const t = toneClass(tone)
   return (
     <section
-      className="relative flex flex-col gap-3 overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3.5 shadow-(--shadow-card) max-sm:-order-1 sm:flex-row sm:items-center sm:gap-4 sm:px-5"
+      className={`relative flex overflow-hidden rounded-(--radius-panel) border border-slate-200 bg-white px-4 shadow-(--shadow-card) max-sm:-order-1 sm:flex-row sm:items-center sm:gap-4 sm:px-5 ${compact ? 'flex-row items-center gap-3 py-2.5 sm:py-3.5' : 'flex-col gap-3 py-3.5'}`}
       data-testid={testId}
       data-frame="next"
+      data-compact={compact ? '' : undefined}
       {...attrs}
     >
       <span aria-hidden="true" className={`relative hidden size-11 shrink-0 items-center justify-center rounded-xl sm:flex ${t.tile}`}>
@@ -188,10 +192,10 @@ export function NextActionBar({
       <div className="relative min-w-0 flex-1">
         <p className="t-meta font-semibold text-slate-500">{label}</p>
         <div className="t-card break-keep text-slate-900">{title}</div>
-        {detail && <div className="t-sub break-keep text-slate-600">{detail}</div>}
+        {detail && <div className={`t-sub break-keep text-slate-600 ${compact ? 'max-sm:line-clamp-2' : ''}`}>{detail}</div>}
         {extra}
       </div>
-      {action && <div className="relative flex shrink-0 flex-wrap gap-2 *:w-full sm:*:w-auto">{action}</div>}
+      {action && <div className={`relative flex shrink-0 flex-wrap gap-2 ${compact ? '' : '*:w-full sm:*:w-auto'}`}>{action}</div>}
     </section>
   )
 }

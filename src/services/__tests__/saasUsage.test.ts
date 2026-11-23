@@ -9,6 +9,7 @@
  */
 import { readFileSync, readdirSync } from 'node:fs'
 import { nextToasts } from '../../components/ui/toastContext'
+import { NEXT_TIME_OPTIONS, joinNextTime, splitNextTime } from '../clientOpsNextAction'
 import { join } from 'node:path'
 import handler, { AFTER_AI_MS, MARKETING_PAGES, __resetAiAssistState, aiBudget } from '../../../api/ai-assist.js'
 import { ASSISTS, assistSystem } from '../../../api/_ai/assists.js'
@@ -1022,6 +1023,62 @@ async function run() {
       "K50 D-650 미팅 준비 'AI로 미팅 질문 다듬기 · 준비 중' 단추 0 · 스레드 글 칸 틀 이름에 기호 0 · '본인 댓글' 칸 이름만 · 완성 글 쓰기 두 번째 누름 '이 주제로 쓰기'",
       !/AiSoonButton/.test(prep) && !/미팅 질문 다듬기/.test(prep.replace(/\/\/.*$/gm, '')) && /\{t\.name\}/.test(tplName) && !/\{t\.key\} \{t\.name\}/.test(tplName) &&
         /<span className="t-sub font-semibold text-slate-700">본인 댓글<\/span>/.test(thr) && /<AiConfirm confirmLabel="이 주제로 쓰기">/.test(qs),
+    )
+  }
+
+  /* K51 — D-651 판매 관점 진단 P1: 휴대폰 영업 보드 · 고객 카드 · 업체 순서 안내 · 미팅 메모 한 번에 · 약속 시각 · 오늘 할 일 · 1차 미팅 분야 */
+  {
+    const src = (f: string) => readFileSync(join(process.cwd(), f), 'utf8')
+    // ① 다음 약속 시각 — 글 뒤 ' · 오후 2시' 를 떼고 붙인다(미팅 메모가 읽어 넣는 모양과 같다)
+    const a = splitNextTime('2차 미팅 · 오후 2시')
+    const b = splitNextTime('자료 받기')
+    const c = splitNextTime('미팅 · 오전 10시 반')
+    check(
+      'K51 D-651 다음 약속 시각 — 떼기(2차 미팅 / 오후 2시 · 시각 없으면 그대로 · 반) · 붙이기(글+시각 · 시각만 · 시각 없으면 글 그대로) · 고르는 칸 오전 8시~오후 7시 반',
+      a.base === '2차 미팅' && a.time === '오후 2시' && b.base === '자료 받기' && b.time === '' && c.base === '미팅' && c.time === '오전 10시 반' &&
+        joinNextTime('2차 미팅', '오후 2시') === '2차 미팅 · 오후 2시' && joinNextTime('', '오후 3시') === '오후 3시' && joinNextTime('견적 회신 ', '') === '견적 회신' &&
+        splitNextTime(joinNextTime('1차 미팅', '낮 12시 반')).time === '낮 12시 반' && NEXT_TIME_OPTIONS[0] === '오전 8시' && NEXT_TIME_OPTIONS.at(-1) === '오후 7시 반' && NEXT_TIME_OPTIONS.length === 24,
+      JSON.stringify({ a, b, c }),
+    )
+    // ② 휴대폰 영업 보드 — 단계 고르개 한 줄(옆으로 밀기) · 지금 챙길 영업 한 줄(compact) · 판 제목 휴대폰 0 · 두 단추 한 줄
+    const board = src('src/pages/sales/SalesBoardPage.tsx')
+    const frame = src('src/components/ui/pageFrame.tsx')
+    check(
+      'K51 D-651 휴대폰 영업 보드 — 단계 고르개 ScrollHintRow 한 줄 · 고른 칸 화면 안으로(activeKey) · 지금 챙길 영업 compact · 판 제목 휴대폰 없음 · 단추 max-sm:px-3',
+      /<ScrollHintRow[^>]*activeKey=\{picked\}/.test(board) && /data-testid="sales-stage-picker" className="flex w-max/.test(board) && /compact\n/.test(board) &&
+        /title=\{phone \? undefined : '영업 보드'\}/.test(board) && (board.match(/max-sm:px-3/g) ?? []).length >= 2 && /compact\?: boolean/.test(frame) && /max-sm:line-clamp-2/.test(frame),
+    )
+    // ③ 고객 카드 — 색 테두리는 '오늘 처리할 곳'(빨강)만 · 펼치면 다음 할 일이 이름 줄 바로 아래 / 오늘 약속(dLeft 0)도 빨강
+    const card = src('src/components/ops/ClientBoardCard.tsx')
+    const hub = src('src/pages/OperationsHubPage.tsx')
+    const openPart = card.slice(card.indexOf('{open && ('))
+    check(
+      "K51 D-651 고객 카드 — 곧 · 이상 없음 테두리 회색 · 빨강만 남김 · 펼치면 '다음 할 일' 이 회사 요약 · 추천 띠보다 먼저 · 오늘 약속도 빨강(dLeft <= 0)",
+      /warning: 'border-slate-200 bg-white'/.test(card) && /success: 'border-slate-200 bg-white'/.test(card) && /danger: `\$\{EDGE_BOX\.danger\} bg-white`/.test(card) &&
+        openPart.indexOf('record.nextAction ||') > 0 && openPart.indexOf('record.nextAction ||') < openPart.indexOf('data-testid="card-reco"') && openPart.indexOf('record.nextAction ||') < openPart.indexOf('strongMeta.map') &&
+        /dLeft !== null && dLeft <= 0\) \|\| overduePayments > 0\) return 'danger'/.test(hub),
+    )
+    // ④ 업체 상세 순서 안내 — 접힌 한 줄은 숫자 대신 '일 순서 안내' · 펼치면 'n개 화면 중 k번째'(진행도로 읽히지 않게) · 다른 화면은 예전 그대로
+    const sg = src('src/components/ui/StepGuide.tsx')
+    check(
+      "K51 D-651 업체 상세 '2 / 6단계' → 접힌 줄 '일 순서 안내' · 펼치면 'n개 화면 중 k번째' · 모듈 화면(labelInTabs 아님)은 'k / n단계' 그대로",
+      /min \? '일 순서 안내' : `\$\{n\}개 화면 중 \$\{index \+ 1\}번째`/.test(sg) && /\{index \+ 1\} \/ \{n\}단계/.test(sg),
+    )
+    // ⑤ 미팅 메모 [기록] 한 번 — 업무 일기 + 업체(autoTalk) · 알림 한 장에 되돌리기 · 실패하면 [기록] 다시
+    const qc = src('src/components/journal/QuickCapture.tsx')
+    const talk = src('src/components/ops/ClientTalkSheet.tsx')
+    check(
+      'K51 D-651 미팅 메모 — [기록] 한 번에 업무 일기 + 이 업체(autoTalk) · 알림 "업무 일기에 적고 …에도 기록했어요" + [되돌리기](그 전 기록으로) · 읽을 것 없을 때만 "업무 일기에 적었어요"',
+      /autoTalk = false/.test(qc) && /else if \(autoTalk\)/.test(qc) && /talkTestId="talk-memo-talk"\n\s+autoTalk/.test(talk) && /업무 일기에 적고 \$\{record\.companyName\}에도 기록했어요/.test(talk) &&
+        /label: '되돌리기'/.test(talk) && /\.onCommit\(before\)/.test(talk) && /if \(!hasTalk\(talkFound\(input\.content, record, todayLocalDate\(\)\)\)\) showToast\('업무 일기에 적었어요'\)/.test(talk),
+    )
+    // ⑥ 오늘 '할 일 n건' 누르면 같은 화면 할 일 칸으로 · ⑦ 1차 미팅 항목 — 분야 7개 단추 · 누른 분야만 펼침
+    const today = src('src/pages/TodayCommandCenterPage.tsx')
+    const pick = src('src/components/sales/DirectPickPanel.tsx')
+    check(
+      "K51 D-651 오늘 '오늘 할 일 n건' 단추 → 할 일 칸(today-todo-card)으로 · 없으면 업무 일기 / 1차 미팅 '오늘 꺼낼 항목' — 분야 단추(aria-expanded) · 펼친 분야 하나(openCat)",
+      /data-testid="today-todo-jump"/.test(today) && /getElementById\('today-todo-card'\)/.test(today) && /navigate\('\/journal'\)/.test(today) &&
+        /data-testid="direct-pick-cat"/.test(pick) && /useState<string \| null>\(null\)/.test(pick) && /s\.cat === openCat/.test(pick) && !/CONSULTING_CATEGORIES\.map\(\(cat\) => \(\n\s+<fieldset/.test(pick),
     )
   }
 

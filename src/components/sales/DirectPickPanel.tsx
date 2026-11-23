@@ -5,7 +5,8 @@
  * 그래서 컨설팅 항목 26 가운데 고르기만 하면 — 고른 항목마다 왜 · 물어볼 것 · 받을 자료를 한 장으로 보여 주고,
  * 업체 기록(sales.picks)에 남겨 2 · 3차 준비('이어서 물을 것')가 그대로 이어서 쓴다. 규칙 목록이다 — 외부 호출 없음.
  */
-import { Check } from 'lucide-react'
+import { useState } from 'react'
+import { Check, ChevronDown } from 'lucide-react'
 import { CONSULTING_CATEGORIES, CONSULTING_STRATEGIES } from '../../tools/cretop/mini/analysisCore.js'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { withSalesInfo } from '../../services/salesPipeline'
@@ -21,6 +22,8 @@ export function DirectPickPanel({ record, onSave }: { record: ClientOpsRecord; o
     void onSave(withSalesInfo(record, { picks: next }), picks.includes(name) ? `${quoted(name, '을/를')} 뺐습니다.` : `${quoted(name, '을/를')} 이번 미팅 항목에 넣었습니다.`)
   }
   const chosen = picks.map((n) => CONSULTING_STRATEGIES.find((s) => s.name === n)).filter((s): s is (typeof CONSULTING_STRATEGIES)[number] => !!s)
+  // D-651 26개 칩을 한 번에 펼치지 않는다 — 분야 7개만 보이고, 누른 분야의 항목만 펼친다(한 번에 하나)
+  const [openCat, setOpenCat] = useState<string | null>(null)
   return (
     <section aria-label="제안 항목 바로 고르기" data-testid="direct-pick" className="flex flex-col gap-3 rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -29,30 +32,49 @@ export function DirectPickPanel({ record, onSave }: { record: ClientOpsRecord; o
         </HintTip>
         <span className="t-sub text-slate-500" data-testid="direct-pick-count">{picks.length}개 골랐음 · 컨설팅 항목 {CONSULTING_STRATEGIES.length}개</span>
       </div>
-      <div className="flex flex-col gap-2.5">
-        {CONSULTING_CATEGORIES.map((cat) => (
-          <fieldset key={cat}>
-            <legend className="t-meta font-semibold text-slate-500">{cat}</legend>
-            <div className="mt-1 flex flex-wrap gap-1.5">
-              {CONSULTING_STRATEGIES.filter((s) => s.cat === cat).map((s) => {
-                const on = picks.includes(s.name)
-                return (
-                  <button
-                    key={s.name}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => toggle(s.name)}
-                    className={`tap t-sub inline-flex items-center gap-1 rounded-full border px-3 py-1 font-medium ${on ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
-                  >
-                    {on && <Check aria-hidden="true" className="size-3.5" />}
-                    {s.name}
-                  </button>
-                )
-              })}
-            </div>
-          </fieldset>
-        ))}
+      <div role="group" aria-label="분야 고르기" data-testid="direct-pick-cats" className="flex flex-wrap gap-1.5">
+        {CONSULTING_CATEGORIES.map((cat) => {
+          const on = openCat === cat
+          const n = CONSULTING_STRATEGIES.filter((s) => s.cat === cat && picks.includes(s.name)).length
+          return (
+            <button
+              key={cat}
+              type="button"
+              aria-expanded={on}
+              data-testid="direct-pick-cat"
+              data-cat={cat}
+              onClick={() => setOpenCat(on ? null : cat)}
+              className={`tap t-sub inline-flex items-center gap-1 rounded-(--radius-control) border px-3 py-1.5 font-semibold ${on ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+            >
+              {cat}
+              {n > 0 && <span className={`tabular-nums ${on ? 'text-white' : 'text-brand-700'}`}>· {n}</span>}
+              <ChevronDown aria-hidden="true" className={`size-4 transition-transform ${on ? 'rotate-180' : ''}`} />
+            </button>
+          )
+        })}
       </div>
+      {openCat && (
+        <fieldset data-testid="direct-pick-items" className="rounded-(--radius-control) border border-slate-200 bg-white p-3">
+          <legend className="sr-only">{openCat}</legend>
+          <div className="flex flex-wrap gap-1.5">
+            {CONSULTING_STRATEGIES.filter((s) => s.cat === openCat).map((s) => {
+              const on = picks.includes(s.name)
+              return (
+                <button
+                  key={s.name}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggle(s.name)}
+                  className={`tap t-sub inline-flex items-center gap-1 rounded-full border px-3 py-1 font-medium ${on ? 'border-brand-500 bg-brand-50 text-brand-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                >
+                  {on && <Check aria-hidden="true" className="size-3.5" />}
+                  {s.name}
+                </button>
+              )
+            })}
+          </div>
+        </fieldset>
+      )}
       {chosen.length > 0 && (
         <ol className="grid gap-2 lg:grid-cols-2" data-testid="direct-pick-points">
           {chosen.map((s, i) => (

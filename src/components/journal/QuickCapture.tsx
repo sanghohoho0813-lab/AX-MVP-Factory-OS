@@ -23,6 +23,7 @@ export function QuickCapture({
   autoFocus = false,
   onTalkRecord,
   talkTestId = 'capture-talk',
+  autoTalk = false,
 }: {
   clients: ClientOpsRecord[]
   defaultClientId?: string | null
@@ -36,6 +37,11 @@ export function QuickCapture({
    */
   onTalkRecord?: (clientId: string, found: TalkFound) => Promise<boolean>
   talkTestId?: string
+  /**
+   * D-651 미팅 메모처럼 '이 업체 일' 이 분명한 곳 — [기록] 한 번이면 읽은 사정 · 숫자 · 다음 약속도 바로 그 업체에 넣는다
+   * (카드는 '기록했어요' 로 남고 · 되돌리기는 onTalkRecord 쪽 알림). 실패하면 예전처럼 [업체에 기록] 단추가 남는다.
+   */
+  autoTalk?: boolean
 }) {
   const [told, setTold] = useState<{ clientId: string; company: string; found: TalkFound; saved: boolean } | null>(null)
   const [talkBusy, setTalkBusy] = useState(false)
@@ -76,9 +82,17 @@ export function QuickCapture({
       if (ok === false) return
       // D-506 업체를 골랐으면 그 메모에서 업체 사정 · 숫자 · 다음 약속(이미 같은 값이면 안 보임)
       const rec = onTalkRecord && clientId ? clients.find((c) => c.id === clientId) : undefined
-      if (rec) {
+      if (rec && onTalkRecord) {
         const found = talkFound(text, rec, todayLocalDate())
-        setTold(hasTalk(found) ? { clientId: rec.id, company: rec.companyName, found, saved: false } : null)
+        if (!hasTalk(found)) setTold(null)
+        else if (autoTalk) {
+          const base = { clientId: rec.id, company: rec.companyName, found }
+          setTold({ ...base, saved: false })
+          setTalkBusy(true)
+          const saved = await onTalkRecord(rec.id, found).catch(() => false)
+          setTalkBusy(false)
+          setTold({ ...base, saved })
+        } else setTold({ clientId: rec.id, company: rec.companyName, found, saved: false })
       } else setTold(null)
       clearContent()
       setDueDate('')

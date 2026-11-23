@@ -768,11 +768,25 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 sm:px-6" data-testid="today-hero-line">
           <h1 className="t-page flex min-w-0 flex-wrap items-baseline gap-x-3 break-keep text-slate-900">
             {/* D-482 읽는 동안은 짧게(한 줄) — 긴 '불러오는 중' 문구가 휴대폰에서 두 줄이었다가 '오늘 할 일 n건' 한 줄로 줄며 아래가 통째로 밀렸다 */}
-            {loading
-              ? '오늘 할 일'
-              : todoCount > 0
-                ? `오늘 할 일 ${todoCount}건`
-                : '오늘 할 일을 적어 보세요'}
+            {loading ? (
+              '오늘 할 일'
+            ) : todoCount > 0 ? (
+              // D-651 'n건' 을 누르면 바로 그 목록으로(같은 화면 아래 할 일 칸) — 꾸미기로 그 칸을 숨겼으면 업무 일기로
+              <button
+                type="button"
+                data-testid="today-todo-jump"
+                onClick={() => {
+                  const card = document.getElementById('today-todo-card')
+                  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  else navigate('/journal')
+                }}
+                className="tap text-left hover:text-brand-700 hover:underline"
+              >
+                오늘 할 일 {todoCount}건
+              </button>
+            ) : (
+              '오늘 할 일을 적어 보세요'
+            )}
             <Link to="/journal" className="tap t-sub inline-flex items-center font-medium text-brand-700 hover:underline">
               모두 보기
             </Link>

@@ -23,7 +23,7 @@ import { josa } from '../../lib/josa'
 import { TermText } from '../ui/TermText'
 import { QuickCapture } from '../journal/QuickCapture'
 import { createJournalEntry } from '../../services/journalService'
-import { applyTalk } from '../../services/homeAsk/talkApply'
+import { applyTalk, hasTalk, talkFound } from '../../services/homeAsk/talkApply'
 import { nowIso, todayLocalDate } from '../../lib/appClock'
 import { buildDiagnosis, meetingFollowUp } from '../../services/clientDiagnosis'
 import { useSenderLine } from '../layout/useCurrentUser'
@@ -273,7 +273,7 @@ function MemoView({ record, insights, asks, memo }: { record: ClientOpsRecord; i
   return (
     <div className="flex flex-col gap-3" data-testid="talk-memo">
       <p className="t-sub break-keep text-slate-700">
-        대표님 답을 들리는 대로 적으세요 — 업무 일기에 남고, 직원 수 · 매출 · 채용 계획 · 다음 약속은 <b className="font-semibold text-slate-900">[이 업체에 기록]</b> 한 번이면 판정에 바로 들어가요.
+        대표님 답을 들리는 대로 적으세요 — <b className="font-semibold text-slate-900">[기록]</b> 한 번이면 업무 일기에 남고, 직원 수 · 매출 · 채용 계획 · 다음 약속은 이 업체에도 바로 들어가요(되돌리기 있음).
       </p>
       {asks.length > 0 && (
         <details className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2" data-testid="talk-memo-asks">
@@ -299,7 +299,8 @@ function MemoView({ record, insights, asks, memo }: { record: ClientOpsRecord; i
         onCreate={async (input) => {
           try {
             await createJournalEntry(memo.workspaceId, memo.userId, { ...input, clientId: record.id })
-            showToast('업무 일기에 적었어요')
+            // D-651 읽을 것이 있으면 업체 기록까지 한 번에 — 알림은 그쪽 한 장(되돌리기 달린)으로
+            if (!hasTalk(talkFound(input.content, record, todayLocalDate()))) showToast('업무 일기에 적었어요')
             return true
           } catch (cause) {
             showToast(cause instanceof Error ? `${cause.message} — 적은 글은 그대로 있어요.` : '저장하지 못했어요. 적은 글은 그대로 있어요.')
@@ -307,9 +308,21 @@ function MemoView({ record, insights, asks, memo }: { record: ClientOpsRecord; i
           }
         }}
         talkTestId="talk-memo-talk"
+        autoTalk
         onTalkRecord={async (_id, found) => {
+          // D-651 [기록] 한 번 — 업무 일기 + 이 업체(사정 · 숫자 · 다음 약속). 잘못 읽었으면 되돌리기(업무 일기 글은 그대로)
+          const before = record
           const ok = await memo.onCommit(applyTalk(record, found, nowIso())).catch(() => false)
-          if (ok) showToast(`${record.companyName}에 기록했어요 — 판정 · 미팅 순서를 다시 맞췄어요`)
+          if (ok)
+            showToast(`업무 일기에 적고 ${record.companyName}에도 기록했어요 — 판정 · 미팅 순서를 다시 맞췄어요`, {
+              label: '되돌리기',
+              onClick: () =>
+                void memo
+                  .onCommit(before)
+                  .catch(() => false)
+                  .then((back) => showToast(back ? `${record.companyName} 기록을 되돌렸어요 — 업무 일기 글은 그대로예요` : '되돌리지 못했어요 — 업체 화면에서 고쳐 주세요')),
+            })
+          else showToast('업무 일기에는 적었어요 — 업체 기록은 못 했어요. 아래 [기록] 을 다시 눌러 주세요')
           return ok
         }}
       />

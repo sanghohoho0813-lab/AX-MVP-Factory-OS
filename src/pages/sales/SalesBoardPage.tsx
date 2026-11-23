@@ -34,6 +34,7 @@ import { salesActionPath, salesRecontacts, salesRisks } from '../../services/sal
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { SalesTabs } from '../../components/sales/SalesTabs'
+import { ScrollHintRow } from '../../components/ui/ScrollHintRow'
 import { LINK_BUTTON } from '../../components/sales/salesStyle'
 import { createClient, listClients, saveClient } from '../../services/clientOpsService'
 import { contractCloseDraft, withContractClose, type ContractCloseDraft } from '../../services/salesContract'
@@ -535,12 +536,13 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
             {assistShown && records.length > 0 && <AiAssist variant="button" page="sales" title="영업 관리" presets={['sales.brief', 'sales.push', 'sales.stuck', 'sales.money']} build={assistBuild} />}
             {/* D-119: 크레탑 보고서 한 번으로 등록 · 기본 정보 · 1차 미팅 전략까지 — D-617 외부 구독 고객에게는 없음(크레탑은 고객에게 닫힌 전문 모듈) */}
             {!customer && (
-              <Link to="/sales/new" data-testid="board-cretop-intake" className={LINK_BUTTON.primary}>
+              <Link to="/sales/new" data-testid="board-cretop-intake" className={`${LINK_BUTTON.primary} max-sm:px-3`}>
                 <ScanSearch aria-hidden="true" className="size-4" />
                 크레탑으로 등록
               </Link>
             )}
-            <Button variant={customer ? 'primary' : 'secondary'} onClick={() => setFormOpen(true)} data-guide="fn-sales-add">
+            {/* D-651 휴대폰 — 두 단추가 한 줄에(1px 모자라 두 줄이 돼 머리가 52px 길었다) */}
+            <Button variant={customer ? 'primary' : 'secondary'} className="max-sm:px-3" onClick={() => setFormOpen(true)} data-guide="fn-sales-add">
               <CirclePlus aria-hidden="true" className="size-4" />
               새 잠재고객
             </Button>
@@ -571,6 +573,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
                 </Link>
               }
               testId="sales-next"
+              compact
             />
           ) : flow.here ? (
             <NextActionBar
@@ -578,7 +581,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
               icon={Route}
               label={`${flow.flow.name} · ${flow.index + 1} / ${flow.flow.steps.length}단계`}
               title={flow.here.label}
-              detail={flow.here.why}
+              // D-651 휴대폰 — 순서 안내의 설명 줄은 뺀다(제목 · 다음 단추만). 급한 곳이 있을 때의 까닭 줄은 그대로
               action={
                 flow.next ? (
                   <Link to={flow.next.key} className={LINK_BUTTON.primary} data-testid="sales-next-go">
@@ -587,6 +590,7 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
                 ) : undefined
               }
               testId="sales-next"
+              compact
             />
           ) : null}
 
@@ -701,7 +705,8 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
         </ArrangeItem>
         <ArrangeItem id="board" label="영업 보드" hint="단계별 칸반 · 찾기">
         <WorkPanel
-          title="영업 보드"
+          // D-651 휴대폰은 판 제목 줄을 뺀다 — 바로 위 탭이 '영업 보드' 를 말하고, 칸마다 숫자는 아래 고르개에
+          title={phone ? undefined : '영업 보드'}
           count={liveCount}
           testId="sales-board-panel"
           toolbar={
@@ -747,30 +752,31 @@ function BoardContent({ workspaceId }: { workspaceId: string | null }) {
 
             {/* 좁은 화면 — 칸을 골라 한 칸씩 (옆으로 밀지 않는다) */}
             <div className="flex flex-col gap-3 xl:hidden">
-              <div role="group" aria-label="영업 단계 고르기" data-testid="sales-stage-picker" className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-1.5">
-                {SALES_STAGE_ORDER.map((s) => {
-                  const on = picked === s
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => setPicked(s)}
-                      className={`tap flex flex-col items-start gap-0.5 rounded-(--radius-control) border px-2.5 py-2 text-left ${
-                        on ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <span className="t-meta flex w-full min-w-0 items-start gap-1.5 font-semibold">
-                        <span aria-hidden="true" className={`mt-[0.4em] size-2 shrink-0 rounded-full ${on ? 'bg-white' : stageColor(s).dot}`} style={on ? undefined : stageColor(s).style} />
-                        {/* 좁으면 두 줄로 — '1차 미팅 예정' · '1차 미팅 완료' 가 둘 다 '1차 미팅 …' 으로 잘리면 구별이 안 된다 */}
-                        <span className="min-w-0 break-keep leading-tight">{SALES_STAGE_LABEL[s]}</span>
-                      </span>
-                      <span className={`t-body font-bold tabular-nums ${on ? 'text-white' : 'text-slate-900'}`}>{groups[s].length}</span>
-                    </button>
-                  )
-                })}
-              </div>
-              <p className="t-sub break-keep text-slate-500">{SALES_STAGE_LABEL[picked]} — {SALES_STAGE_HINT[picked]}</p>
+              {/* D-651 단계 칸 8개는 한 줄로(옆으로 밀기 · 고른 칸은 화면 안으로) — 3줄 236px 가 첫 카드를 화면 밖으로 밀었다 */}
+              <ScrollHintRow fade="from-white via-white/90" activeKey={picked}>
+                <div role="group" aria-label="영업 단계 고르기" data-testid="sales-stage-picker" className="flex w-max gap-1.5 pr-10">
+                  {SALES_STAGE_ORDER.map((s) => {
+                    const on = picked === s
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setPicked(s)}
+                        className={`tap flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 whitespace-nowrap ${
+                          on ? 'border-brand-500 bg-brand-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${on ? 'bg-white' : stageColor(s).dot}`} style={on ? undefined : stageColor(s).style} />
+                        <span className="t-sub font-semibold">{SALES_STAGE_LABEL[s]}</span>
+                        <span className={`t-sub font-bold tabular-nums ${on ? 'text-white' : groups[s].length > 0 ? 'text-slate-900' : 'text-slate-400'}`}>{groups[s].length}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </ScrollHintRow>
+              {/* D-651 휴대폰은 칸에 업체가 있으면 설명 줄을 읽는 기계에만(빈 칸이면 보인다) */}
+              <p className={`t-sub break-keep text-slate-500 ${groups[picked].length > 0 ? 'max-sm:sr-only' : ''}`}>{SALES_STAGE_LABEL[picked]} — {SALES_STAGE_HINT[picked]}</p>
               {groups[picked].length === 0 ? (
                 <p className="t-sub rounded-(--radius-panel) border border-dashed border-slate-200 bg-white px-3 py-8 text-center text-slate-400">이 단계에 있는 업체가 없습니다</p>
               ) : (

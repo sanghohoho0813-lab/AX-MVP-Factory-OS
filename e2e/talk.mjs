@@ -253,11 +253,13 @@ const memoKeys = memoShown ? await memoTalk.locator('[data-key]').evaluateAll((e
 const journalAfter = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').filter((e) => e.clientId === 'cli_hansol').length)
 check('T13-1 [기록] → 업무 일기에 이 업체로 한 줄 · 읽은 것 카드(설비 계획 · 직원 23명 · 다음 약속)', journalAfter === journalBefore + 1 && memoShown && memoKeys.includes('facility') && memoKeys.includes('employeeCount') && (await memoTalk.getByTestId('home-ask-talk-next').count()) === 1, { journalBefore, journalAfter, memoKeys })
 if (memoShown) {
-  await memoTalk.getByTestId('home-ask-talk-save').click()
-  await page.locator('[data-testid="talk-memo-talk"][data-saved="1"]').waitFor({ timeout: 8000 }).catch(() => {})
+  // D-651 [기록] 한 번 — 업무 일기 + 이 업체까지(따로 [이 업체에 기록] 을 누르지 않는다) · 알림 한 장에 [되돌리기]
+  const autoSaved = await page.locator('[data-testid="talk-memo-talk"][data-saved="1"]').waitFor({ timeout: 8000 }).then(() => true).catch(() => false)
   await page.waitForTimeout(400)
   const hr = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_hansol') ?? {})
-  check('T13-2 [이 업체에 기록] → 설비 답 · 직원 수 · 다음 할 일(2차 미팅) · 창은 그대로 열림', hr.decided?.['scn.facility']?.a === 'yes' && hr.employeeCount === '23명' && /미팅/.test(hr.nextAction ?? '') && !!hr.nextActionDueDate && (await page.getByTestId('talk-sheet').count()) === 1, { d: hr.decided?.['scn.facility'], e: hr.employeeCount, n: hr.nextAction })
+  check('T13-2 [기록] 한 번 → (따로 누르지 않아도) 설비 답 · 직원 수 · 다음 할 일(2차 미팅) · 창은 그대로 열림', autoSaved && hr.decided?.['scn.facility']?.a === 'yes' && hr.employeeCount === '23명' && /미팅/.test(hr.nextAction ?? '') && !!hr.nextActionDueDate && (await page.getByTestId('talk-sheet').count()) === 1, { autoSaved, d: hr.decided?.['scn.facility'], e: hr.employeeCount, n: hr.nextAction })
+  const toasts = await page.getByRole('status').allInnerTexts().catch(() => [])
+  check('T13-2b 알림 한 장 — "업무 일기에 적고 …에도 기록했어요" + [되돌리기] · "업무 일기에 적었어요" 따로 0', toasts.some((t) => /업무 일기에 적고 .+에도 기록했어요/.test(t) && t.includes('되돌리기')) && !toasts.some((t) => /^업무 일기에 적었어요/.test(t.trim())), toasts)
   // 미팅이 끝나면 — 정리 문자(방금 기록한 다음 약속이 바로 · 업무 일기 메모 글은 고객 문자에 안 들어감)
   const fuBox = page.getByTestId('talk-followup')
   await fuBox.locator('summary').click()
@@ -270,6 +272,13 @@ if (memoShown) {
     fuText.startsWith('대표님, 오늘 시간 내 주셔서 감사합니다.') && fuText.includes('■ 오늘 말씀드린 것') && /- 다음 만남: \d{1,2}월 \d{1,2}일\([일월화수목금토]\) · .*미팅/.test(fuText) && !fuText.includes('대표님 말씀') && fuClip.trim() === fuText.trim(),
     fuText.slice(0, 400),
   )
+  // D-651 [되돌리기] → 업체 기록만 그 전으로(직원 수 · 설비 답) · 업무 일기 글은 그대로
+  const undoBtn = page.getByRole('button', { name: '되돌리기' }).last()
+  if (await undoBtn.isVisible().catch(() => false)) await undoBtn.click()
+  await page.waitForTimeout(700)
+  const back = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_hansol') ?? {})
+  const journalKept = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').filter((e) => e.clientId === 'cli_hansol').length)
+  check('T13-4 [되돌리기] → 업체 기록은 그 전(직원 수 23명 · 설비 답 아님) · 업무 일기 글은 그대로', back.employeeCount !== '23명' && back.decided?.['scn.facility']?.a !== 'yes' && journalKept === journalAfter, { e: back.employeeCount, d: back.decided?.['scn.facility'], journalKept, journalAfter })
 }
 await page.keyboard.press('Escape')
 

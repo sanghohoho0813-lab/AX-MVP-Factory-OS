@@ -163,9 +163,20 @@ export function StepGuide({
               {/* D-627 접힌 한 줄은 '몇 번째 · 지금 단계' 만(순서 이름은 펼치면 · 마우스를 올리면) */}
               {!min && <span>{flow.name}</span>}
               {!min && <span aria-hidden="true">·</span>}
-              <span className="tabular-nums" data-testid="step-count">
-                {index + 1} / {n}단계
-              </span>
+              {/*
+                D-651 업체 상세(labelInTabs)의 접힌 한 줄은 숫자 대신 '일 순서 안내' — '2 / 6단계' 가 업체 진행도처럼 읽혔다
+                (계약을 마친 업체도 개요 탭이면 2/6). 업체가 어디까지 왔는지는 이름 옆 계약 단계 알약이 말한다.
+                펼치면 '몇 번째 화면' 으로 — 화면 순서라는 것이 글로 보이게.
+              */}
+              {labelInTabs ? (
+                <span className="tabular-nums" data-testid="step-count">
+                  {min ? '일 순서 안내' : `${n}개 화면 중 ${index + 1}번째`}
+                </span>
+              ) : (
+                <span className="tabular-nums" data-testid="step-count">
+                  {index + 1} / {n}단계
+                </span>
+              )}
               {min && <span className={labelInTabs ? 'sr-only' : 'font-bold text-slate-900'}>· {here.label}</span>}
             </p>
             <button

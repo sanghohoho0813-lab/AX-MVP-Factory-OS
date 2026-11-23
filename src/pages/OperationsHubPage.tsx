@@ -149,7 +149,8 @@ const SEVERITY_TABS: { key: AlertSeverity | 'all'; label: string }[] = [
  * 나눈다. 목록의 정렬 순서와 색이 같은 방향을 보게 되어 위에서부터 색이 옅어진다.
  */
 function clientTone(dLeft: number | null, overduePayments: number, critical: number, warning: number): Tone {
-  if ((dLeft !== null && dLeft < 0) || overduePayments > 0) return 'danger'
+  // D-651 빨간 테두리 = 오늘 처리할 곳 — 다음 약속이 오늘이거나 지났거나 받을 돈 예정일이 지났을 때(오늘 약속도 빨강)
+  if ((dLeft !== null && dLeft <= 0) || overduePayments > 0) return 'danger'
   if (dLeft !== null && dLeft <= DUE_SOON_DAYS) return 'warning'
   if (critical > 0 || warning > 0) return 'neutral'
   return 'success'

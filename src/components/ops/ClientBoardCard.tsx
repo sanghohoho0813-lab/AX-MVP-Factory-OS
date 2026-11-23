@@ -127,10 +127,14 @@ function ServiceChip({ chip, onClick }: { chip: ChipState; onClick: () => void }
  * D-483 카드 테두리 — 네 변을 같은 색으로(왼쪽 3px 선만 긋던 것 · 대표 지시: 한쪽만 칠하기 금지).
  * 늦음 · 곧 마감은 진하게, 이상 없음은 옅은 초록 — 급한 카드가 먼저 눈에 들어오게.
  */
+/*
+ * D-651 색 테두리는 '오늘 처리할 곳'(빨강) 하나만 — 곧 마감(주황) · 이상 없음(초록)까지 테두리를 칠하니
+ * 다섯 장이 모두 색이라 정작 오늘 손댈 한 장이 안 보였다. 곧 · 이상 없음은 회색 테두리, 뜻은 상태 알약이 말한다.
+ */
 const CARD_FILL: Record<Tone, string> = {
   danger: `${EDGE_BOX.danger} bg-white`,
-  warning: `${EDGE_BOX.warning} bg-white`,
-  success: 'border-success-200 ring-1 ring-inset ring-success-200 bg-white',
+  warning: 'border-slate-200 bg-white',
+  success: 'border-slate-200 bg-white',
   neutral: 'border-slate-200 bg-white',
   brand: `${EDGE_BOX.brand} bg-white`,
 }
@@ -249,7 +253,7 @@ export function ClientBoardCard({
         if ((window.getSelection?.()?.toString() ?? '') !== '') return
         onOpen()
       }}
-      className={`ax-lift relative cursor-pointer overflow-hidden rounded-(--radius-panel) border transition-colors ${tone === 'neutral' || tone === 'success' ? 'hover:border-brand-300' : ''} ${CARD_FILL[tone]}`}
+      className={`ax-lift relative cursor-pointer overflow-hidden rounded-(--radius-panel) border transition-colors ${tone !== 'danger' && tone !== 'brand' ? 'hover:border-brand-300' : ''} ${CARD_FILL[tone]}`}
     >
 
       <div className="flex flex-col gap-2 p-3.5 sm:p-4">
@@ -317,6 +321,18 @@ export function ClientBoardCard({
         {/* D-627 아래는 펼쳤을 때만(PC · 휴대폰 같음) */}
         {open && (
         <>
+
+        {/* 다음 할 일 — D-651 펼치면 이름 줄 바로 아래(이름 · 상태 · 다음 할 일 · 전화가 먼저, 회사 요약 · 업무 조각은 그 아래) */}
+        <p className="t-sub break-keep text-slate-700">
+          {record.nextAction || <span className="text-slate-400">다음 약속이 없습니다</span>}
+          {record.nextActionDueDate && (
+            <span className={dLeft !== null && dLeft < 0 ? 'font-semibold text-danger-700' : 'text-slate-500'}>
+              {' · '}
+              {record.nextActionDueDate}
+              {dLeft !== null && ` ${dueText(dLeft)}`}
+            </span>
+          )}
+        </p>
 
         {/* 검색 근거 — 회사명이 아니라 다른 칸이 맞았으면 어느 칸인지 밝힌다 (D-80) */}
         {hit && (
@@ -415,18 +431,6 @@ export function ClientBoardCard({
             ))}
           </p>
         )}
-
-        {/* 다음 할 일 */}
-        <p className="t-sub break-keep text-slate-700">
-          {record.nextAction || <span className="text-slate-400">다음 약속이 없습니다</span>}
-          {record.nextActionDueDate && (
-            <span className={dLeft !== null && dLeft < 0 ? 'font-semibold text-danger-700' : 'text-slate-500'}>
-              {' · '}
-              {record.nextActionDueDate}
-              {dLeft !== null && ` ${dueText(dLeft)}`}
-            </span>
-          )}
-        </p>
 
         <div className="contents" data-testid="card-more-2">
         {/*
