@@ -14,6 +14,7 @@ import { addDaysLocal } from '../../services/clientOpsNextAction'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
 import { HelpHeading } from '../ui/fold'
+import { useCustomerAudience } from '../../config/customerAudience'
 
 const chip = (on: boolean) =>
   `tap t-body inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 py-2 font-semibold whitespace-nowrap ${
@@ -99,12 +100,13 @@ function WhenPicker({ value, onChange, today, testId }: { value: When; onChange:
   )
 }
 
-function AmountChips({ options, value, onChange, testId, extra }: { options: { label: string; amount: number }[]; value: number | null; onChange: (n: number) => void; testId: string; extra?: string }) {
+function AmountChips({ options, value, onChange, testId, extra, inputOnly = false }: { options: { label: string; amount: number }[]; value: number | null; onChange: (n: number) => void; testId: string; extra?: string; inputOnly?: boolean }) {
   const [typing, setTyping] = useState(false)
   const inOptions = value !== null && options.some((o) => o.amount === value)
   return (
     <div className="flex flex-col gap-2" data-testid={testId}>
-      <div className="flex flex-wrap gap-2">
+      {/* D-650 inputOnly — 고를 금액 없이 금액 칸만(고객 계정의 계약금액: 대표 상품 금액을 보이지 않는다) */}
+      {!inputOnly && <div className="flex flex-wrap gap-2">
         {options.map((o) => (
           <button key={o.label} type="button" aria-pressed={!typing && value === o.amount} className={chip(!typing && value === o.amount)} onClick={() => { setTyping(false); onChange(o.amount) }}>
             {!typing && value === o.amount && <Check aria-hidden="true" className="size-4" />}
@@ -114,8 +116,8 @@ function AmountChips({ options, value, onChange, testId, extra }: { options: { l
         <button type="button" aria-pressed={typing || (value !== null && !inOptions && value > 0)} className={chip(typing || (value !== null && !inOptions && value > 0))} onClick={() => setTyping(true)}>
           직접 입력
         </button>
-      </div>
-      {(typing || (value !== null && !inOptions && value > 0)) && (
+      </div>}
+      {(inputOnly || typing || (value !== null && !inOptions && value > 0)) && (
         <label className="flex items-center gap-2">
           <input
             autoFocus
@@ -162,6 +164,8 @@ export function ContractPlanSheet({
   const [agentName, setAgentName] = useState(record.sales?.referrer ?? '')
   const [agentRate, setAgentRate] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
+  // D-650 고객 계정 — 대표님 상품(AX) 금액 · 영업자 수수료(영업자 정산 화면이 닫혀 있다 · D-562)를 보이지 않는다
+  const customer = useCustomerAudience()
 
   const splitDefault = (p: number): PlanLine[] => {
     const third = Math.round(p / 3 / 10_000) * 10_000
@@ -233,11 +237,12 @@ export function ContractPlanSheet({
             </p>
           ) : (
             <>
-              <p className="t-sub text-slate-500">AX 계약 자주 쓰는 금액 · 다른 계약은 직접 입력</p>
+              <p className="t-sub text-slate-500">{customer ? '계약금액을 적어 주세요' : 'AX 계약 자주 쓰는 금액 · 다른 계약은 직접 입력'}</p>
               <AmountChips
                 testId="plan-total"
                 extra="계약금액"
-                options={AX_QUICK_AMOUNTS.map((a) => ({ label: money(a), amount: a }))}
+                inputOnly={customer}
+                options={customer ? [] : AX_QUICK_AMOUNTS.map((a) => ({ label: money(a), amount: a }))}
                 value={total}
                 onChange={(n) => {
                   setTotal(n)
@@ -361,8 +366,8 @@ export function ContractPlanSheet({
               </section>
             )}
 
-            {/* 영업자 — 있을 때만 */}
-            <section className="flex flex-col gap-2">
+            {/* 영업자 — 있을 때만 · D-650 고객 계정엔 없음 */}
+            {!customer && <section className="flex flex-col gap-2">
               <button type="button" aria-expanded={agentOpen} onClick={() => setAgentOpen((v) => !v)} className="tap t-sub self-start font-medium text-slate-600 underline">
                 {agentOpen ? '영업자 수수료 없음으로' : '영업자 수수료가 있나요?'}
               </button>
@@ -376,7 +381,7 @@ export function ContractPlanSheet({
                   ))}
                 </div>
               )}
-            </section>
+            </section>}
           </>
         )}
       </div>

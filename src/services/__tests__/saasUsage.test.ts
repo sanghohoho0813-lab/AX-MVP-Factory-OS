@@ -8,6 +8,7 @@
  *  3) 메뉴 스위치 — 서버가 연 계정만 레이더 · 스레드 · 릴스/틱톡 주소가 열리고, 홍보 글 · 홈페이지 · 다른 대표 화면은 그대로 닫힘.
  */
 import { readFileSync, readdirSync } from 'node:fs'
+import { nextToasts } from '../../components/ui/toastContext'
 import { join } from 'node:path'
 import handler, { AFTER_AI_MS, MARKETING_PAGES, __resetAiAssistState, aiBudget } from '../../../api/ai-assist.js'
 import { ASSISTS, assistSystem } from '../../../api/_ai/assists.js'
@@ -985,6 +986,42 @@ async function run() {
       'K28b D-649 뼈대는 대화창 틀을 기다리지 않음(함께 기다리는 조각 3개 · ChatFirst 0) · 뜬 뒤 받기(preloadLater) · local 앱도 정적 import 0 · 뜬 뒤 받기',
       (waitBlock.match(/import\('/g) ?? []).length === 3 && !/ChatFirst/.test(waitBlock) && /preloadLater\(\(\) => void import\('\.\.\/components\/chat\/ChatFirst'\)/.test(chunks) && !staticImports(local).some((p) => /chat\/ChatFirst/.test(p)) && /warmChatFirstLater\(\)/.test(local),
       JSON.stringify({ wait: (waitBlock.match(/import\('[^']+'/g) ?? []), local: staticImports(local) }),
+    )
+  }
+
+  /* K50 — D-650 판매 관점 진단 P0: 고객 계정에 새는 대표 글 · 꺼진 AI 자리 단추 · 알림 쌓임 · 내부 말 */
+  {
+    const src = (f: string) => readFileSync(join(process.cwd(), f), 'utf8')
+    // ① 같은 이름의 단추('되돌리기')가 달린 알림은 마지막 한 장만 · 단추 없는 알림 · 다른 단추 알림은 그대로 · 셋까지
+    const undo = (id: number) => ({ id, message: `단계 ${id}`, action: { label: '되돌리기', onClick: () => {} } })
+    let st = nextToasts([], undo(1))
+    st = nextToasts(st, undo(2))
+    st = nextToasts(st, undo(3))
+    const plain = nextToasts(st, { id: 4, message: '저장했어요' })
+    const other = nextToasts(plain, { id: 5, message: '등록', action: { label: '보기', onClick: () => {} } })
+    const many = [6, 7, 8, 9].reduce((acc, id) => nextToasts(acc, { id, message: `알림 ${id}` }), other)
+    check(
+      'K50 D-650 알림 — 되돌리기 셋을 연달아 띄우면 마지막 한 장(3) · 단추 없는 알림은 남김 · 다른 이름 단추(보기)는 따로 · 한 번에 셋까지',
+      st.length === 1 && st[0].id === 3 && plain.map((t) => t.id).join() === '3,4' && other.map((t) => t.id).join() === '3,4,5' && many.length === 3 && many.at(-1)?.id === 9,
+      JSON.stringify({ st: st.map((t) => t.id), plain: plain.map((t) => t.id), other: other.map((t) => t.id), many: many.map((t) => t.id) }),
+    )
+    // ② 고객 계정 — 수금 '한 번에 적기' 의 AX 금액 · 영업자 수수료, 계약 완료 창의 영업자 · 수수료는 고객에게 숨김(대표 · 내부 팀장은 그대로)
+    const plan = src('src/components/ops/ContractPlanSheet.tsx')
+    const close = src('src/components/sales/ContractCloseSheet.tsx')
+    check(
+      'K50 D-650 고객 계정 — 수금 창: AX 금액 고르기 대신 금액 칸만(inputOnly) · 영업자 수수료 칸 숨김 / 계약 완료 창: 영업자 · 수수료 칸 숨김 · 저장에도 영업자 0',
+      /useCustomerAudience\(\)/.test(plan) && /inputOnly=\{customer\}/.test(plan) && /options=\{customer \? \[\] : AX_QUICK_AMOUNTS/.test(plan) && /\{!customer && <section/.test(plan) &&
+        /useCustomerAudience\(\)/.test(close) && /\{!customer && <div[^>]*contract-close-agent/.test(close) && /onSubmit\(customer \? \{ \.\.\.d, agentName: '', agentRatePct: null \} : d\)/.test(close),
+    )
+    // ③ 미팅 준비 머리의 '준비 중' 자리 단추 0 · ④ 스레드 글 칸 이름에 틀 기호(U 등) 0 · 본인 댓글 칸 이름 짧게 · 글 쓰는 AI 단추의 두 번째 글은 '이 주제로 쓰기'
+    const prep = src('src/pages/sales/MeetingPrepPage.tsx')
+    const thr = src('src/pages/marketing/ThreadsPage.tsx')
+    const qs = src('src/pages/marketing/QuickStart.tsx')
+    const tplName = thr.slice(thr.indexOf('function TplName('), thr.indexOf('function TplNames('))
+    check(
+      "K50 D-650 미팅 준비 'AI로 미팅 질문 다듬기 · 준비 중' 단추 0 · 스레드 글 칸 틀 이름에 기호 0 · '본인 댓글' 칸 이름만 · 완성 글 쓰기 두 번째 누름 '이 주제로 쓰기'",
+      !/AiSoonButton/.test(prep) && !/미팅 질문 다듬기/.test(prep.replace(/\/\/.*$/gm, '')) && /\{t\.name\}/.test(tplName) && !/\{t\.key\} \{t\.name\}/.test(tplName) &&
+        /<span className="t-sub font-semibold text-slate-700">본인 댓글<\/span>/.test(thr) && /<AiConfirm confirmLabel="이 주제로 쓰기">/.test(qs),
     )
   }
 

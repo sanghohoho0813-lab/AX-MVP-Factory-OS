@@ -1,11 +1,11 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react'
 import { Info, X } from 'lucide-react'
-import { ToastContext, type ToastAction } from './toastContext'
+import { ToastContext, nextToasts, type ToastAction, type ToastEntry } from './toastContext'
 
-interface ToastEntry {
-  id: number
-  message: string
-  action?: ToastAction
+/** D-650 휴대폰에서 창(시트)이 열려 있으면 알림은 위쪽에 — 아래에 띄우면 창의 방금 나온 결과 · 저장 단추를 덮었다 */
+function dialogOpen(): boolean {
+  if (typeof document === 'undefined') return false
+  return [...document.querySelectorAll('[role="dialog"]')].some((el) => el.getClientRects().length > 0)
 }
 
 /**
@@ -19,6 +19,7 @@ function durationOf(message: string, action?: ToastAction): number {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastEntry[]>([])
+  const [overDialog, setOverDialog] = useState(false)
   const nextId = useRef(0)
 
   const dismiss = useCallback((id: number) => {
@@ -28,8 +29,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const showToast = useCallback(
     (message: string, action?: ToastAction) => {
       const id = nextId.current++
-      // 한 번에 셋까지 — 쌓이면 화면을 덮는다
-      setToasts((prev) => [...prev.slice(-2), { id, message, action }])
+      setOverDialog(dialogOpen())
+      setToasts((prev) => nextToasts(prev, { id, message, action }))
       window.setTimeout(() => dismiss(id), durationOf(message, action))
     },
     [dismiss],
@@ -38,11 +39,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      {/* 휴대폰에서는 하단 메뉴 위에 뜬다(예전엔 메뉴를 덮었다). 글 부분은 눌러도 아래로 지나간다 — 단추만 받는다 */}
+      {/* 휴대폰에서는 하단 메뉴 위에 뜬다(예전엔 메뉴를 덮었다). 글 부분은 눌러도 아래로 지나간다 — 단추만 받는다.
+          D-650 휴대폰에서 창이 열려 있을 때 뜬 알림은 위쪽에(창 아래쪽의 결과 · 저장 단추를 덮지 않게). PC 는 그대로 오른쪽 아래 */}
       <div
         aria-live="polite"
         data-testid="toast-stack"
-        className="no-print pointer-events-none fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] z-50 flex flex-col items-center gap-2 sm:inset-x-auto sm:right-6 sm:items-end lg:right-[calc(var(--dock-float,0px)+var(--side-reserve,0px)+1.5rem)] lg:bottom-6"
+        data-place={overDialog ? 'top' : 'bottom'}
+        className={`no-print pointer-events-none fixed inset-x-3 z-50 flex flex-col items-center gap-2 sm:inset-x-auto sm:top-auto sm:right-6 sm:bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:items-end lg:right-[calc(var(--dock-float,0px)+var(--side-reserve,0px)+1.5rem)] lg:bottom-6 ${overDialog ? 'top-[calc(0.5rem+env(safe-area-inset-top,0px))]' : 'bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))]'}`}
       >
         {toasts.map((toast) => (
           <div

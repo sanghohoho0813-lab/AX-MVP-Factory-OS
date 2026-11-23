@@ -142,15 +142,15 @@ function templateTip(t: ThreadTemplate): string {
   return `${t.key} ${t.name}\n${e.plain}\n\n예시\n${e.sample}`
 }
 
-/** 글 속 틀 이름 — 색 밑줄 · 마우스를 올리면 뜻 · 예시 */
+/** 글 속 틀 이름 — 색 밑줄 · 마우스를 올리면 뜻 · 예시. D-650 글 칸 이름에는 틀 기호(A~W) 없이 이름만 — '글 — U 밥줄 공개' 의 U 는 처음 보는 사람이 읽을 수 없다 */
 function TplName({ k }: { k: ThreadTemplateKey }) {
   const t = templateOf(k)
   if (!t) return <>{k}</>
   const tone = TONES[toneOfTemplate(t)]
   return (
-    <HoverTip tip={<TipBody title={`${t.key} ${t.name}`} body={TEMPLATE_EASY[t.key].plain} example={TEMPLATE_EASY[t.key].sample} />} testId="thr-tpltip">
+    <HoverTip tip={<TipBody title={t.name} body={TEMPLATE_EASY[t.key].plain} example={TEMPLATE_EASY[t.key].sample} />} testId="thr-tpltip">
       <span className={`cursor-help rounded-md px-1.5 py-0.5 font-semibold underline decoration-dotted underline-offset-2 ${tone.soft} ${tone.ink}`} data-testid="thr-tplname" data-key={t.key}>
-        {t.key} {t.name}
+        {t.name}
       </span>
     </HoverTip>
   )
@@ -887,8 +887,9 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, weekRef, brie
               <textarea value={draft.body} onChange={(e) => set({ body: e.target.value })} rows={13} placeholder={'첫 줄 15~25자\n둘째 줄 = 왜 너 얘기인지\n\n한 줄에 한 생각\n\n끝 = 대답하기 쉬운 것 하나'} className="t-body w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 leading-relaxed" data-testid="thr-body" />
             </label>
             <label className="flex flex-col gap-1">
-              <HintTip tip="내 글에 내가 다는 첫 댓글이에요. 본문에서는 팔지 않고, 자료 · 링크 안내는 여기에만 적어요. 조회가 1,000을 넘으면 달아요." label="본인 댓글" tight>
-                <span className="t-sub font-semibold text-slate-700">본인 댓글 (조회 1,000 넘으면 · 진단 · 자료 안내는 여기만)</span>
+              {/* D-650 칸 이름은 짧게 — 언제 · 무엇을 적는지는 ⓘ(조회 1,000 넘으면 · 진단 · 자료 안내는 여기만) */}
+              <HintTip tip="내 글에 내가 다는 첫 댓글이에요. 본문에서는 팔지 않고, 진단 · 자료 · 링크 안내는 여기에만 적어요. 조회가 1,000을 넘으면 달아요." label="본인 댓글" tight>
+                <span className="t-sub font-semibold text-slate-700">본인 댓글</span>
               </HintTip>
               <input value={draft.selfComment} onChange={(e) => set({ selfComment: e.target.value })} placeholder={isMarketingCustomer() ? '예: 자세한 정리는 프로필 링크에서' : '예: 3분 진단은 프로필 링크에서'} className="t-body min-h-11 w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3" data-testid="thr-comment" />
             </label>

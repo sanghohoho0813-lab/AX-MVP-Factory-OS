@@ -173,7 +173,8 @@ export function QuickStart({
         <div className={`flex flex-col gap-2 ${row}`}>
           <div className="flex flex-wrap items-center gap-2">
             {ai.ok && (
-              <AiConfirm><Button variant="primary" onClick={ai.onRun} disabled={ai.busy || !has} className="w-full sm:w-auto" data-testid={`${testPrefix}-qs-ai`} data-guide={testPrefix === 'sht' ? 'fn-mk-script' : 'fn-mk-write'}>
+              /* D-650 글을 쓰는 단추라 두 번째 누름 글은 '이 주제로 쓰기'(기본 '이대로 질문하기' 는 묻는 단추용 — 글을 쓰는데 '질문' 이라 헷갈렸다) */
+              <AiConfirm confirmLabel="이 주제로 쓰기"><Button variant="primary" onClick={ai.onRun} disabled={ai.busy || !has} className="w-full sm:w-auto" data-testid={`${testPrefix}-qs-ai`} data-guide={testPrefix === 'sht' ? 'fn-mk-script' : 'fn-mk-write'}>
                 <Sparkles aria-hidden="true" className="size-4" /> {ai.busy ? 'AI가 쓰는 중…' : ai.label}
               </Button></AiConfirm>
             )}

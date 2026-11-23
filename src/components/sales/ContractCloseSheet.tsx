@@ -14,6 +14,7 @@ import { addDaysLocal } from '../../services/clientOpsNextAction'
 import type { ContractCloseDraft } from '../../services/salesContract'
 import { BUILTIN_SERVICES, SERVICES, builtinServicesHidden } from '../../content/clientOpsCatalog'
 import { CONTRACT_KIND_LABEL, CONTRACT_KIND_ORDER, type ClientOpsRecord } from '../../types/clientOps'
+import { useCustomerAudience } from '../../config/customerAudience'
 
 const inputCls = 'mt-1 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2.5 text-[1rem] text-slate-900 focus:border-brand-500 focus:outline-none'
 const chip = (on: boolean) =>
@@ -36,8 +37,10 @@ export function ContractCloseSheet({
   onStageOnly?: () => Promise<boolean>
   onClose: () => void
 }) {
-  const [d, setD] = useState<ContractCloseDraft>(initial)
-  const [rateText, setRateText] = useState(() => (initial.agentRatePct === null ? '' : String(initial.agentRatePct)))
+  // D-650 고객 계정 — 영업자 · 수수료 칸을 보이지 않고 저장에도 넣지 않는다(영업자 정산 화면이 고객에게 닫혀 있다 · D-562)
+  const customer = useCustomerAudience()
+  const [d, setD] = useState<ContractCloseDraft>(() => (customer ? { ...initial, agentName: '', agentRatePct: null } : initial))
+  const [rateText, setRateText] = useState(() => (customer || initial.agentRatePct === null ? '' : String(initial.agentRatePct)))
   const [busy, setBusy] = useState(false)
   const total = d.lines.reduce((s, l) => s + (l.amount ?? 0), 0)
   const wantsIns = d.kind === 'insurance' || d.kind === 'mixed'
@@ -69,7 +72,7 @@ export function ContractCloseSheet({
               단계만 옮기기
             </Button>
           )}
-          <Button variant="primary" onClick={() => void run(() => onSubmit(d))} disabled={busy} data-testid="contract-close-save">
+          <Button variant="primary" onClick={() => void run(() => onSubmit(customer ? { ...d, agentName: '', agentRatePct: null } : d))} disabled={busy} data-testid="contract-close-save">
             {busy ? '저장 중…' : '계약 완료로 저장'}
           </Button>
         </div>
@@ -77,7 +80,7 @@ export function ContractCloseSheet({
     >
       <div data-testid="contract-close" className="flex flex-col gap-4">
         <p className="t-sub break-keep text-slate-600">
-          아는 것으로 채워 두었습니다. 확인하고 저장하면 계약 정보 · 수금 항목 · 영업자 수수료 · 업무 시작까지 한 번에 들어갑니다.
+          아는 것으로 채워 두었습니다. 확인하고 저장하면 계약 정보 · 수금 항목{customer ? '' : ' · 영업자 수수료'} · 업무 시작까지 한 번에 들어갑니다.
         </p>
 
         <div className="grid grid-cols-2 gap-3">
@@ -142,7 +145,7 @@ export function ContractCloseSheet({
           </div>
         </fieldset>
 
-        <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-3">
+        {!customer && <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-3" data-testid="contract-close-agent">
           <label className="t-sub font-medium text-slate-700">
             영업자(소개한 사람)
             <input value={d.agentName} onChange={(e) => setD({ ...d, agentName: e.target.value })} placeholder="없으면 비워 두세요" className={inputCls} />
@@ -163,8 +166,8 @@ export function ContractCloseSheet({
               className={`${inputCls} text-right`}
             />
           </label>
-        </div>
-        {agentTotal > 0 && d.agentName.trim() !== '' && (
+        </div>}
+        {!customer && agentTotal > 0 && d.agentName.trim() !== '' && (
           <p className="t-meta -mt-2 text-slate-500">
             {d.agentName} 몫 {formatKrw(agentTotal)} — 고객이 입금하면 영업자 정산의 '지금 줄 돈' 으로 갑니다.
           </p>

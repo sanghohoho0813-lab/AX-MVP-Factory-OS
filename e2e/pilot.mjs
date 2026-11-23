@@ -1876,6 +1876,33 @@ try {
     await pk.waitForTimeout(1000)
     const docsK = await deadEnds(pk)
     check('고객(D-563) 서류 탭: "이 서류를 쓰는 도구" 줄 없음 · 닫힌 주소 링크 0 · 서류 칸은 그대로', (await pk.locator('[data-testid^="doc-tools-"]').count()) === 0 && docsK.links.length === 0 && ((await pk.locator('main').innerText().catch(() => '')) ?? '').includes('사업자등록증'), JSON.stringify(docsK))
+    // D-650 고객 계정 — 수금 '한 번에 적기' 창에 대표님 상품(AX) 금액 · 영업자 수수료 0 / 계약 완료 창에 영업자 · 수수료 0(영업자 정산 화면이 닫혀 있다 · D-562)
+    {
+      await go(pk, `/ops/clients/${kc}?tab=fees`)
+      await pk.waitForTimeout(900)
+      await pk.getByTestId('plan-open').first().click()
+      await pk.waitForTimeout(500)
+      const planK = pk.getByTestId('contract-plan')
+      const planT = (await planK.innerText().catch(() => '')) ?? ''
+      const chipK = await planK.getByTestId('plan-total').getByRole('button').count()
+      const inK = await planK.getByTestId('plan-total').locator('input').count()
+      await shot(pk, 'customer-15-plan-sheet')
+      check("고객 수금(D-650): '한 번에 적기' 창 — 'AX 계약' 금액 0 · 금액 고르기 단추 0 · 금액 칸 바로 · '영업자 수수료가 있나요?' 0", !/AX/.test(planT) && chipK === 0 && inK === 1 && !planT.includes('영업자'), { chipK, inK, t: planT.replace(/\n+/g, '|').slice(0, 160) })
+      await pk.keyboard.press('Escape')
+      await pk.waitForTimeout(400)
+      await go(pk, '/sales/board')
+      await pk.waitForTimeout(900)
+      const stK = pk.locator('select[aria-label="고객시범상사(주) 영업 단계"]:visible').first()
+      await stK.selectOption({ label: '계약 완료' })
+      await pk.waitForTimeout(700)
+      const closeK = pk.getByTestId('contract-close')
+      const closeT = (await closeK.innerText().catch(() => '')) ?? ''
+      await shot(pk, 'customer-16-contract-close')
+      check('고객 계약 완료(D-650): 창은 뜸 · 영업자 · 수수료 칸 0 · 영업자 정산 · 수수료 말 0', (await closeK.count()) === 1 && (await pk.getByTestId('contract-close-agent').count()) === 0 && !closeT.includes('영업자') && !closeT.includes('수수료'), closeT.replace(/\n+/g, '|').slice(0, 200))
+      await pk.getByRole('dialog').getByRole('button', { name: '취소', exact: true }).click()
+      await pk.waitForTimeout(500)
+      check('고객 계약 완료(D-650): [취소] → 단계 그대로(잠재)', sql(`select payload->'sales'->>'stage' from public.operations_clients where id = '${kc}'`) !== 'contracted', sql(`select payload->'sales'->>'stage' from public.operations_clients where id = '${kc}'`))
+    }
     const leftK = []
     for (const u of ['/', '/ops/decide', '/ops/clients', '/ops/calendar', '/sales/board', '/money', '/settings', `/ops/clients/${kc}?tab=work`, `/ops/clients/${kc}?tab=journal`]) {
       await go(pk, u)

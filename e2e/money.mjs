@@ -221,11 +221,15 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   check('지난달로: 제목 · 이번 달로 단추', (await page.getByTestId('money-month-label').innerText()) !== `${TODAY.slice(0, 4)}년 ${Number(TODAY.slice(5, 7))}월` && (await page.getByRole('button', { name: '이번 달로' }).count()) === 1)
 
   // 다른 화면의 AI 자리
-  for (const [path, label] of [['/journal', 'AI로 돌아보기'], ['/tools/policy-funding', 'AI로 사업계획서 초안'], ['/sales/meeting', 'AI로 미팅 질문 다듬기'], ['/sales/proposal', 'AI로 제안서 문장 다듬기']]) {
+  for (const [path, label] of [['/journal', 'AI로 돌아보기'], ['/tools/policy-funding', 'AI로 사업계획서 초안'], ['/sales/proposal', 'AI로 제안서 문장 다듬기']]) {
     await page.goto(BASE + path, { waitUntil: 'networkidle' })
     await page.waitForTimeout(400)
     check(`AI 자리: ${path} '${label}'`, (await page.getByTestId('ai-soon').filter({ hasText: label }).count()) >= 1)
   }
+  // D-650 미팅 준비 머리의 '준비 중' 자리 단추는 뺐다(맨 위 보라 단추가 알림만 띄웠다)
+  await page.goto(BASE + '/sales/meeting', { waitUntil: 'networkidle' })
+  await page.waitForTimeout(400)
+  check("D-650 미팅 준비: 'AI로 미팅 질문 다듬기 · 준비 중' 단추 0", (await page.getByTestId('ai-soon').count()) === 0)
   check('AI 단추를 눌러도 밖으로 나간 요청 0', outside.length === 0, outside)
   check('1440: 오류 0', errors.length === 0, errors)
   await ctx.close()
