@@ -10526,4 +10526,5 @@ D-648 을 운영처럼(HTTP/2) 재다가 찾은 것. 동작 · 화면은 그대�
 **시험** — `scripts/db-local/test-0031-upload-links.sql` 94(공개 · 팀장 · 가입자 · 외부 고객 · 허락 없는 대표 · 공격 · 한도 · 기한 · 승인 끊김 · 업체 지움 · 30분 · 받은 파일 정하기 · 새 주소 · 닫기) ·
 run.sh 0031 묶음(점검 SQL 없음 → 들어감 → 되돌리기 → 꺼짐 → 다시 → 들어감 · 확인 SQL 1~5 좋음) · test:saasusage K52(7 — 문구 OS 이름 0 · 서류 목록 다듬기 · 파일 문제 · 칸 정하기) ·
 `npm run qa:uplink`(새 · 클라우드 흉내 29 — U1~U7 · P1~P9 · I1~I7 · L1~L4 · M1).
+돌린 결과: tsc · oxlint · build 녹색 · test:all 녹색 · qa:uplink 29/0 · qa:db 883/0 · qa:pilot 481/0 · qa:isolation 24/0 · qa:detail 530/0 · qa:chars 147/0(43화면 한도 안) · qa:hover 113/0 · qa:guide 71/0 · qa:wording 6/0 · qa:files 38/0 · qa:folder 19/0 · qa:originals 20/0. 처음 돌렸을 때 빨강 둘은 시험 쪽이었다 — 공개 화면 단추가 휴대폰에서 44px(전역 `.tap` 이 52px 를 덮음 → 앱 고침) · 브라우저 가로채기가 묶음(multipart) 안 파일 바이트를 넘겨주지 않음(시험을 '파일 칸 · 종류 · 덮어쓰기 아님' 으로 바꾸고 크기는 예약 값으로).
 **못 한 것 · 모르는 것** — 운영 보관함(Supabase Storage)이 로그인 안 한 사람의 넣기를 이 정책대로 받는지는 로컬 흉내(같은 정책 · 같은 함수)로만 확인했다. 실제 휴대폰 · 카톡 안 브라우저에서 사진 찍기 창이 뜨는지는 못 봤다(파일 고르기 `accept` 는 사진 · PDF 를 포함).
