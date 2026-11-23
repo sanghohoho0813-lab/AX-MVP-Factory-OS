@@ -462,7 +462,8 @@ await page.getByTestId('thr-tab-write').click()
 await openChoose(page)
 await page.getByTestId('thr-write').waitFor()
 await page.getByTestId('thr-goal-reply').click()
-check('R1d 쓰기 칸 — 이번 주 잘 터진 형식(참고) 한 줄 · P 틀에 "이번 주 잘 됨"', /P 자료 나눔 조건/.test(await page.getByTestId('thr-week-hint').innerText()) && /이번 주 잘 됨/.test(await page.getByTestId('thr-tpl-P').innerText()) && !/이번 주 잘 됨/.test(await page.getByTestId('thr-tpl-A').innerText()))
+// D-650 틀 이름은 기호(P) 없이 이름만 — '자료 나눔 조건'
+check('R1d 쓰기 칸 — 이번 주 잘 터진 형식(참고) 한 줄(틀 기호 없이 이름만) · P 틀에 "이번 주 잘 됨"', /자료 나눔 조건/.test(await page.getByTestId('thr-week-hint').innerText()) && !/P 자료 나눔 조건/.test(await page.getByTestId('thr-week-hint').innerText()) && /이번 주 잘 됨/.test(await page.getByTestId('thr-tpl-P').innerText()) && !/이번 주 잘 됨/.test(await page.getByTestId('thr-tpl-A').innerText()))
 const before2 = llm.length
 { const l289 = page.getByTestId('thr-qs-ai'); await l289.click(); await l289.page().waitForTimeout(450); await l289.click() } // D-289 AI 단추 두 번
 await page.getByTestId('thr-ai-drafts').waitFor({ timeout: 20000 })

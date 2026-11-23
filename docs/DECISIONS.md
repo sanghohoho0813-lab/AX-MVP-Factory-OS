@@ -10475,4 +10475,4 @@ D-648 을 운영처럼(HTTP/2) 재다가 찾은 것. 동작 · 화면은 그대�
 
 **잰 것**(로컬 · 대표 화면) — 영업 단계 세 번 바꾼 뒤 알림 3장 → 1장 · 미팅 준비 '준비 중' 단추 1 → 0 · 휴대폰 미팅 메모 [기록] 뒤 알림이 [업체에 기록] 단추를 덮음 → 안 덮음(알림 y 8 · 단추 y 523).
 
-**시험** — test:saasusage K50(알림 규칙 · 고객 계정 숨김 · 미팅 준비 단추 0 · 말 고침) · qa:money(미팅 준비 '준비 중' 단추 0으로 바꿈) · qa:pilot 고객 계정 D-650 두 줄(수금 창 AX 0 · 금액 고르기 단추 0 · 금액 칸 바로 · 영업자 0 / 계약 완료 창 영업자 · 수수료 0 · [취소] 하면 단계 그대로) · TESTS_LINE
+**시험** — test:saasusage K50(알림 규칙 · 고객 계정 숨김 · 미팅 준비 단추 0 · 말 고침) · qa:money(미팅 준비 '준비 중' 단추 0으로 바꿈) · qa:pilot 고객 계정 D-650 두 줄(수금 창 AX 0 · 금액 고르기 단추 0 · 금액 칸 바로 · 영업자 0 / 계약 완료 창 영업자 · 수수료 0 · [취소] 하면 단계 그대로) · qa:threads R1d(틀 이름이 기호 없이 '자료 나눔 조건' 으로 보이는지로 바꿈). 돌린 결과: tsc · oxlint · build 녹색 · test:all 녹색(103초) · qa:pilot 481/0 · qa:threads 107/0 · qa:sales · qa:journey · qa:talk · qa:shorts · qa:mkquick · qa:hooks · qa:money · qa:contract · qa:senior · qa:chars · qa:hover · qa:phone · qa:wording 모두 녹색.
