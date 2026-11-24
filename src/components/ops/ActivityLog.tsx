@@ -9,6 +9,7 @@ import {
   History,
   Landmark,
   ListChecks,
+  Send,
   TrendingUp,
   UserPen,
  Wrench } from 'lucide-react'
@@ -37,6 +38,7 @@ const KIND_ICON: Record<ActivityKind, LucideIcon> = {
   tool: Wrench,
   sales: TrendingUp,
   care: HeartHandshake,
+  notice: Send,
 }
 
 /** 종류별 색 — 화면 테마와 분리된 고정 분류색을 쓴다 */
@@ -55,6 +57,7 @@ const KIND_CLASS: Record<ActivityKind, string> = {
   tool: 'bg-slate-100 text-slate-600',
   sales: 'bg-brand-50 text-brand-700',
   care: 'bg-brand-50 text-brand-700',
+  notice: 'bg-brand-50 text-brand-700',
 }
 
 const PAGE = 12

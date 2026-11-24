@@ -16,6 +16,7 @@ import { useMoneyWords } from '../components/ops/useMoneyWords'
 import { useIsPhone } from '../lib/useIsPhone'
 import { TodayCharges } from '../components/money/TodayCharges'
 import { TodayCare } from '../components/ops/TodayCare'
+import { TodayNotices } from '../components/ops/TodayNotices'
 import { TodayDecisions } from '../components/ops/DecisionList'
 import { useGrantData } from '../components/grants/useGrants'
 import { useClientReco } from '../components/ops/useClientReco'
@@ -791,6 +792,10 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
               모두 보기
             </Link>
           </h1>
+          {/* D-653 오늘 고객에게 보낼 안내(약속 전날 · 서류 3일째 · 받을 돈) — 있을 때만 단추 하나 → 판 */}
+          {!loading && (
+            <TodayNotices clients={clients} today={today} workspaceId={workspaceId} onSaved={(r) => setClients((cs) => cs.map((c) => (c.id === r.id ? r : c)))} />
+          )}
           <p className="t-sub hidden font-medium text-slate-500 sm:block">
             <time dateTime={now.toISOString()}>{timeText}</time> · {greeting(now.getHours())}
           </p>

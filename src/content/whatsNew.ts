@@ -25,6 +25,14 @@ export const WHATS_NEW_MAX = 10
 
 export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
   {
+    id: 'today-notices',
+    date: '2026-11-24',
+    title: "오늘 화면에 '보낼 안내' — 고객에게 보낼 연락을 앱이 골라 문구까지",
+    how: "내일 약속 · 3일째 안 온 서류 · 입금 예정일이 있으면 오늘 맨 위에 '보낼 안내 n건' 이 떠요. 누르고 [문구 복사] → 카톡에 붙여 보낸 뒤 [보냈어요].",
+    path: '/',
+    cta: '오늘 열기',
+  },
+  {
     id: 'upload-link',
     date: '2026-11-23',
     title: '업체 대표님이 휴대폰으로 서류를 바로 올리는 링크',
@@ -84,15 +92,6 @@ export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
     date: '2026-11-15',
     title: "유튜브 '이번 주 뜨는 주제' 하나로 합쳤어요 — 누르면 제목 · 표지 글까지",
     how: '주제에 마우스를 올리면 근거 숫자(여러 채널이 다룬 수 · 평소보다 잘된 영상 수)가 뜨고, 누르면 왜 지금 · 제목 · 표지 글 · 찍는 법이 펼쳐져요(휴대폰은 누르기). [이 주제로 글 · 대본 만들기] 를 누르면 글이 나와요.',
-    path: '/marketing?view=plan',
-    cta: '유튜브 열기',
-    marketing: true,
-  },
-  {
-    id: 'youtube-calm',
-    date: '2026-11-12',
-    title: '유튜브 · 내 콘텐츠 · 지금 뜨는 영상 화면도 한 판으로 깔끔해졌어요',
-    how: "유튜브는 이번 주 뜨는 주제가 번호 붙은 목록으로 바뀌었고, 하나를 누르면 제목 · 대본이 한 판 안에 나와요. 내 콘텐츠 · 지금 뜨는 영상도 칸마다 떨어져 있던 상자가 한 판 안의 줄로 바뀌었어요.",
     path: '/marketing?view=plan',
     cta: '유튜브 열기',
     marketing: true,

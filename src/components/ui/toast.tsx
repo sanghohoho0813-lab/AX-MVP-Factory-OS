@@ -40,12 +40,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {/* 휴대폰에서는 하단 메뉴 위에 뜬다(예전엔 메뉴를 덮었다). 글 부분은 눌러도 아래로 지나간다 — 단추만 받는다.
-          D-650 휴대폰에서 창이 열려 있을 때 뜬 알림은 위쪽에(창 아래쪽의 결과 · 저장 단추를 덮지 않게). PC 는 그대로 오른쪽 아래 */}
+          D-650 휴대폰에서 창이 열려 있을 때 뜬 알림은 위쪽에(창 아래쪽의 결과 · 저장 단추를 덮지 않게). PC 는 그대로 오른쪽 아래
+          D-653 쌓임은 창(z-50) 위 · 큰 달력 · 처음 안내(z-70) 아래 — body 로 옮겨 그린 창이 열려 있어도 [되돌리기] 가 눌린다 */}
       <div
         aria-live="polite"
         data-testid="toast-stack"
         data-place={overDialog ? 'top' : 'bottom'}
-        className={`no-print pointer-events-none fixed inset-x-3 z-50 flex flex-col items-center gap-2 sm:inset-x-auto sm:top-auto sm:right-6 sm:bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:items-end lg:right-[calc(var(--dock-float,0px)+var(--side-reserve,0px)+1.5rem)] lg:bottom-6 ${overDialog ? 'top-[calc(0.5rem+env(safe-area-inset-top,0px))]' : 'bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))]'}`}
+        className={`no-print pointer-events-none fixed inset-x-3 z-[60] flex flex-col items-center gap-2 sm:inset-x-auto sm:top-auto sm:right-6 sm:bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:items-end lg:right-[calc(var(--dock-float,0px)+var(--side-reserve,0px)+1.5rem)] lg:bottom-6 ${overDialog ? 'top-[calc(0.5rem+env(safe-area-inset-top,0px))]' : 'bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))]'}`}
       >
         {toasts.map((toast) => (
           <div

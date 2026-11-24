@@ -246,6 +246,14 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     effect: '사업자등록증 한 장만 올려도 그 회사 기준으로 답이 나와요.',
     next: '한 번에 올릴 수 있는 서류 수를 늘려요.',
   },
+  'fn-today-notices': {
+    label: '보낼 안내',
+    menu: 'today',
+    what: '내일 약속 · 3일째 안 온 서류 · 입금 예정일이 다가온 돈을 골라, 고객에게 보낼 문구까지 만들어 둬요.',
+    why: '아침마다 누구에게 무슨 연락을 해야 하는지 기억에 기대지 않으려고 있어요.',
+    effect: '[문구 복사] 로 카톡 · 문자에 붙여 보내고 [보냈어요] 를 누르면 업체 기록에 남고 목록에서 빠져요.',
+    next: '알림톡을 연결하면 같은 목록을 앱이 직접 보내요.',
+  },
   'fn-today-wrap': {
     label: '오늘 정리하기',
     menu: 'today',

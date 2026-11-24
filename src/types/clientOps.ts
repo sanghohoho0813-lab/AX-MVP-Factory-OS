@@ -491,6 +491,7 @@ export type ActivityKind =
   | 'tool' // 도구함 결과를 붙임 (창업감면 판정 · 크레탑 분석 · 정책자금 진단 …)
   | 'sales' // 영업 단계 변경 · 영업 정보 수정 (D-114)
   | 'care' // 계약 고객 안부 연락 (D-155)
+  | 'notice' // 고객에게 보낸 안내 — 약속 · 서류 · 받을 돈 (D-653)
 
 /**
  * 도구함 결과 한 건 (D-88).
@@ -887,6 +888,11 @@ export interface ClientOpsRecord {
   diagnosisGiven?: DiagnosisGiven[]
   /** D-512 고객에게 보낸 서류 요청(무엇을 · 언제) — 서류가 들어오면 그 줄이 저절로 받음 */
   docRequests?: DocRequest[]
+  /**
+   * D-653 고객에게 보낸 안내(약속 안내 'meet:날짜' · 받을 돈 'fee:항목id' → 보낸 날 YYYY-MM-DD) — 오늘 '보낼 안내' 에서 다시 띄우지 않게.
+   * 서류 독촉은 여기 말고 그 요청의 resentAt. payload 에 함께 저장된다(DB 변경 없음).
+   */
+  notices?: Record<string, string>
   /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */
   archivedAt: string | null
   createdAt: string

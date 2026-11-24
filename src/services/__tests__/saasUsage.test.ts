@@ -12,6 +12,7 @@ import { nextToasts } from '../../components/ui/toastContext'
 import { NEXT_TIME_OPTIONS, joinNextTime, splitNextTime } from '../clientOpsNextAction'
 import { OTHER_UPLOAD_LABEL, UPLOAD_ACCEPT, isUploadMissing, parseUploadState, uploadErrorText, uploadFileProblem, uploadRequestText, uploadSlugFromPath, uploadUrl } from '../uploadLink'
 import { UPLOAD_LINK_FOLDER, placementForUpload, withUploadedFile } from '../uploadLinkAccept'
+import { FEE_QUIET_DAYS, normalizeNotices, noticeWho, outboundNotices, withNoticeSent, wonShortText } from '../outbound'
 import { slugFromPath } from '../../lib/askPath'
 import { isStageExcluded } from '../../lib/deviceView'
 import { join } from 'node:path'
@@ -718,7 +719,7 @@ async function run() {
     fnMissing.length === 0 && fnThin.length === 0 && fnNoMenu.length === 0 && fnBadBasic.length === 0 && usedFn.size >= 50 && functionGuidesOf('sales').length === 5 &&
       !functionGuidesOf('client-ops', { pilot: true }).some((x) => ['fn-client-portal', 'fn-client-consulting', 'fn-client-ai'].includes(x.key)) &&
       !functionGuidesOf('client-ops', { pilot: true, basic: true }).some((x) => x.key === 'fn-client-funding') &&
-      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 20 && functionGuidesOf('client-ops', { pilot: true }).every((x) => !x.key.startsWith('fn-talk-')) && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 4 && functionGuidesOf('mk-threads').length === 5 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 4 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
+      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 20 && functionGuidesOf('client-ops', { pilot: true }).every((x) => !x.key.startsWith('fn-talk-')) && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 5 /* D-653 보낼 안내 */ && functionGuidesOf('mk-threads').length === 5 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 4 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
     `missing=${fnMissing.join()} thin=${fnThin.join()} nomenu=${fnNoMenu.join()} basic=${fnBadBasic.join()} used=${usedFn.size}`,
   )
   const bf = basicFlow(CLIENT_FLOW)
@@ -1030,6 +1031,100 @@ async function run() {
     )
   }
 
+  /* K53 — D-653 오늘 고객에게 보낼 안내: 내일 약속 · 서류 3일째 · 받을 돈(조건 대기 빼고) · 보냈어요 · 되돌리기 */
+  {
+    const src = (f: string) => readFileSync(join(process.cwd(), f), 'utf8')
+    const today = '2026-11-24'
+    const fee = (id: string, over: Record<string, unknown>) => ({
+      id, serviceKey: null, kind: 'success', label: '착수금', amount: 3_300_000, agentFee: 500_000, agentName: '박영업', agentPaidAt: null, dueDate: '', receivedAt: null, note: '', ...over,
+    })
+    const rec = normalizeClientOps({
+      id: 'c53', workspaceId: 'w', companyName: '(주)한빛정밀', representativeName: '김한빛', contactPhone: '010-1234-5678',
+      nextAction: '2차 미팅 · 오후 2시', nextActionDueDate: '2026-11-25',
+      fees: [
+        fee('over', { dueDate: '2026-11-20' }),
+        fee('today', { dueDate: today, amount: null, label: '잔금' }),
+        fee('soon', { dueDate: '2026-11-26', label: '중도금', amount: 150_000_000 }),
+        fee('far', { dueDate: '2026-11-30' }),
+        fee('wait', { dueDate: '2026-11-20', conditionKind: 'funding_executed', label: '성공보수' }),
+        fee('recv', { dueDate: '2026-11-20', receivedAt: '2026-11-21' }),
+        fee('stale', { dueDate: '2026-07-01' }),
+      ],
+      docRequests: [
+        { id: 'r1', sentAt: '2026-11-20', sentAtIso: '2026-11-20T01:00:00Z', title: '서류 요청', items: [{ label: '대표님 생년월일', where: '' }, { label: '주주 구성 메모', where: '' }] },
+        { id: 'r2', sentAt: '2026-11-23', sentAtIso: '2026-11-23T01:00:00Z', title: '서류 요청', items: [{ label: '임대차 메모', where: '' }] },
+      ],
+      createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z',
+    } as never)
+    const archived = { ...rec, id: 'c53b', archivedAt: '2026-11-01T00:00:00Z' }
+    const list = outboundNotices([rec, archived], today)
+    const kinds = list.map((n) => `${n.kind}:${n.mark.type === 'notice' ? n.mark.id : n.mark.reqId}`)
+    check(
+      'K53 D-653 고르기 · 순서 — 내일 약속 → 지난 돈 → 서류 4일째 → 오늘 돈 → 곧(2일 안) 돈 · 조건 대기 · 받은 돈 · 먼 날 · 90일 넘은 · 1일째 요청 · 보관 업체는 없음',
+      kinds.join('|') === 'meet:meet:2026-11-25|fee:fee:over|docs:r1|fee:fee:today|fee:fee:soon',
+      kinds,
+    )
+    const meet = list[0]
+    const over = list[1]
+    const docs = list[2]
+    check(
+      "K53 D-653 문구 — '김한빛 대표님' · 내일 날짜 · 시각 · 약속 이름 · 지난 돈 금액(330만원) · 예정일 · 서류 남은 것만 · 1억 5,000만원 · 영업자 이름 · 수수료 0",
+      meet.title === '내일 2차 미팅 · 오후 2시' && meet.text.startsWith('안녕하세요, 김한빛 대표님.') && meet.text.includes('내일 11월 25일(수) 오후 2시 2차 미팅 일정 확인차') &&
+        over.title === '착수금 330만원 · 예정일 4일 지남' && over.text.includes('11월 20일(금) 입금 예정이었던 착수금 330만원 건이') &&
+        docs.title === '서류 2가지 · 4일째 안 옴' && docs.text.includes('1. 대표님 생년월일') && docs.text.includes('2. 주주 구성 메모') &&
+        list[4].title === '중도금 1억 5,000만원 · 2일 뒤 입금 예정' && list[3].title === '잔금 · 오늘 입금 예정' &&
+        list.every((n) => !n.text.includes('박영업') && !n.text.includes('50만원') && n.phone === '010-1234-5678'),
+      list.map((n) => [n.title, n.text]),
+    )
+    const signed = outboundNotices([rec], today, '홍길동 팀장')[0]
+    check(
+      "K53 D-653 보내는 사람 · 부르는 말 — 서명 한 줄 · 대표 이름 없으면 담당자님 · 둘 다 없으면 '대표님' · 숫자 읽기",
+      signed.text.startsWith('안녕하세요, 김한빛 대표님. 홍길동 팀장입니다.') && noticeWho({ representativeName: '', contactName: '이과장' }) === '이과장님' && noticeWho({ representativeName: '', contactName: '' }) === '대표님' &&
+        wonShortText(3_300_000) === '330만원' && wonShortText(200_000_000) === '2억원' && wonShortText(12_345) === '12,345원',
+    )
+    const internal = { ...rec, nextAction: '견적서 보내기', fees: [], docRequests: [] }
+    const later = { ...rec, nextActionDueDate: '2026-11-27', fees: [], docRequests: [] }
+    const todayMeet = { ...rec, nextActionDueDate: today, fees: [], docRequests: [] }
+    check(
+      "K53 D-653 약속 — 내부 할 일('견적서 보내기')은 안내 안 함 · 3일 뒤 약속은 아직 · 오늘 약속은 '오늘' 로 맨 위",
+      outboundNotices([internal], today).length === 0 && outboundNotices([later], today).length === 0 && outboundNotices([todayMeet], today)[0]?.title === '오늘 2차 미팅 · 오후 2시' && outboundNotices([todayMeet], today)[0]?.rank === 0,
+    )
+    // 보냈어요 → 목록에서 빠짐 · 기록 한 줄 · 되돌리기
+    const s1 = withNoticeSent(rec, meet, today, '2026-11-24T01:00:00Z')
+    const s2 = withNoticeSent(s1.record, over, today, '2026-11-24T01:01:00Z')
+    const s3 = withNoticeSent(s2.record, docs, today, '2026-11-24T01:02:00Z')
+    const after = outboundNotices([s3.record], today).map((n) => n.kind)
+    const undone = s1.undo(s3.record)
+    check(
+      'K53 D-653 보냈어요 — 약속 · 돈은 notices · 서류는 그 요청의 다시 부탁한 날 · 활동 기록 한 줄씩 · 셋 다 목록에서 빠짐 · 약속만 되돌리면 약속만 다시',
+      s3.record.notices?.['meet:2026-11-25'] === today && s3.record.notices?.['fee:over'] === today && s3.record.docRequests?.find((r) => r.id === 'r1')?.resentAt === today &&
+        s3.record.activity.slice(0, 3).every((a) => a.kind === 'notice' && a.text.startsWith('고객에게 안내 보냄 — ')) && after.join(',') === 'fee,fee' &&
+        !undone.notices?.['meet:2026-11-25'] && undone.notices?.['fee:over'] === today && outboundNotices([undone], today)[0]?.kind === 'meet' &&
+        undone.activity.filter((a) => a.kind === 'notice').length === 2 && s3.undo(s3.record).docRequests?.find((r) => r.id === 'r1')?.resentAt === undefined,
+      { notices: s3.record.notices, after, undone: undone.notices },
+    )
+    const week = `2026-12-0${1 + (FEE_QUIET_DAYS - 7)}`
+    check(
+      "K53 D-653 지난 돈은 보낸 뒤 7일 조용 → 그래도 안 들어왔으면 다시 · 서류는 다시 부탁한 날부터 3일 뒤 다시",
+      outboundNotices([s3.record], '2026-11-30').every((n) => n.mark.type !== 'notice' || n.mark.id !== 'fee:over') &&
+        outboundNotices([s3.record], week).some((n) => n.mark.type === 'notice' && n.mark.id === 'fee:over') &&
+        !outboundNotices([s3.record], '2026-11-26').some((n) => n.mark.type === 'resend' && n.mark.reqId === 'r1') &&
+        outboundNotices([s3.record], '2026-11-26').some((n) => n.mark.type === 'resend' && n.mark.reqId === 'r2') &&
+        outboundNotices([s3.record], '2026-11-27').some((n) => n.mark.type === 'resend' && n.mark.reqId === 'r1'),
+    )
+    const norm = normalizeNotices({ 'meet:2026-11-25': '2026-11-24', 'fee:abc': '2026-11-20', bad: '2026-11-20', 'fee:x': 'yesterday', 'meet:': '2026-11-01' })
+    const round = normalizeClientOps(JSON.parse(JSON.stringify(s3.record)))
+    check(
+      "K53 D-653 저장 모양 — 'meet:' · 'fee:' 열쇠 · 날짜만 남김 · 다시 읽어도 그대로(DB 변경 0 · payload) · 없으면 칸 없음",
+      JSON.stringify(norm) === JSON.stringify({ notices: { 'meet:2026-11-25': '2026-11-24', 'fee:abc': '2026-11-20' } }) && round.notices?.['fee:over'] === today &&
+        normalizeClientOps({ id: 'x', companyName: 'x' } as never).notices === undefined && JSON.stringify(normalizeNotices([])) === '{}',
+    )
+    const outSrc = src('src/services/outbound.ts')
+    check(
+      'K53 D-653 약속 — 규칙 글(AI 부름 0) · 밖으로 보내는 길 0(fetch · 알림 함수 없음) · 수수료 칸을 문구에 쓰지 않음',
+      !/callAssist|ai-assist|fetch\(|sendKakao|alimtalk/i.test(outSrc) && !/agentFee|agentName/.test(outSrc),
+    )
+  }
   /* K52 — D-652 서류 올리기 링크: 주소 · 상태 읽기 · 카톡 문구 · 파일 거르기 · 칸에 넣기(덮지 않음 · 폴더) */
   {
     const src = (f: string) => readFileSync(join(process.cwd(), f), 'utf8')

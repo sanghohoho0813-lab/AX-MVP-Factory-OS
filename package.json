@@ -85,6 +85,7 @@
     "qa:files": "node e2e/files-cloud.mjs",
     "qa:originals": "node e2e/docoriginals-cloud.mjs",
     "qa:uplink": "node e2e/uplink-cloud.mjs",
+    "qa:outbound": "node e2e/outbound.mjs",
     "qa:taxplan": "node e2e/taxplan.mjs",
     "qa:ventureplan": "node e2e/ventureplan.mjs",
     "qa:pvmenu": "node e2e/pvmenu.mjs",
