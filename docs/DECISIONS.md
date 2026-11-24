@@ -10575,3 +10575,5 @@ run.sh 0031 묶음(점검 SQL 없음 → 들어감 → 되돌리기 → 꺼짐 �
 
 **시험** — test:aiassist RA1~RA7(Gemini 에 소리 inlineData · 결과에 소리 0 · 팀장 403 · 목록 빠짐 · 잘못된 소리 400 · 크기 400/413 · m4a → mp4 · 정리는 글만) · test:saasusage K54(8 — 받아 적은 줄 · 시각 · 정리 → 메모 · 순서 · 겹침 · 메모를 D-505 규칙이 읽음) · K20 업체 기능 안내 21 ·
 `npm run qa:record`(새 · R1~R11 — 크롬 시험용 가짜 마이크 · 진짜 서버 함수 + 가짜 Gemini · 조각 2.5초).
+결과 — tsc · oxlint · build · test:all 녹색 · qa:record 14/0 · qa:assist 120/0 · qa:talk 35/0 · qa:guide 71/0 · qa:wording 6/0 · qa:db 녹색(DB 변경 0) · qa:pilot 481/0.
+확인하지 못한 것: 진짜 Gemini 가 휴대폰 녹음 형식(크롬 webm · 아이폰 사파리 mp4)을 받아 적는지 · 실제 휴대폰에서 화면이 꺼지거나 다른 앱으로 갔을 때 녹음이 멈추는지(시험은 가짜 공급자 · 가짜 마이크) · 1시간 미팅의 실제 AI 사용료.
