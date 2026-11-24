@@ -40,7 +40,7 @@ export function mkPathSteps(i: PathInput): PathStep[] {
   return [
     { key: 'channel', title: '내 채널 알려 주기', why: '누가 쓰는 글인지 정해져야 읽는 사람이 믿어요. 이름 · 분야만 적어도 글이 내 것으로 나와요.', action: '이름 · 분야 적기', href: '/settings', done: i.channel },
     // D-655 첫날 걷기 — 예전 글 '하나만 누르면 돼요' 와 달리 이 단계는 [콘텐츠에 담기](ideas > 0)로 끝난다. 누르기만 하고 돌아오면 2/5 그대로라 헷갈렸다
-    { key: 'topic', title: '이번 주 주제 하나 고르기', why: '사람들이 지금 찾는 주제로 써야 처음 보는 사람이 들어와요. 하나 누르고 [콘텐츠에 담기] 하면 돼요.', action: '이번 주 주제 보기', href: '/marketing/youtube?view=plan', done: i.ideas > 0 || i.written > 0 },
+    { key: 'topic', title: '이번 주 주제 하나 고르기', why: '지금 찾는 주제로 써야 처음 보는 사람이 들어와요. 하나 골라 [콘텐츠에 담기] 하면 돼요.', action: '이번 주 주제 보기', href: '/marketing/youtube?view=plan', done: i.ideas > 0 || i.written > 0 },
     { key: 'write', title: '짧은 글 한 편 쓰기', why: '잘 쓴 한 편보다 꾸준한 열 편이 고객을 데려와요. 초안은 프로그램이 써 주니 고치기만 하면 돼요.', action: '짧은 글 쓰러 가기', href: '/marketing/threads', done: i.written > 0 },
     { key: 'post', title: '올리고 [올렸어요] 누르기', why: '올려야 반응을 알 수 있어요. 올린 날을 남겨 두면 어떤 글이 잘됐는지 나중에 보여 드려요.', action: '써 둔 글 보기', href: '/marketing/threads', done: i.posted > 0 },
     { key: 'ending', title: '글 끝에 연락 받는 길 넣기', why: '글을 본 사람이 연락할 길이 없으면 고객이 되지 않아요. 한 번 적어 두면 글 끝에 저절로 붙어요.', action: '끝인사 적기', href: '/settings?brand=more', done: i.ending },
