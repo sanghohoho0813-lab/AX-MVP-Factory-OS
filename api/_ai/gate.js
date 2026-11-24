@@ -132,38 +132,41 @@ export function __resetGateState() {
 
 /* ---------------- 요청 읽기 ---------------- */
 
-export async function readBody(req) {
+/** 보통 요청의 크기 한도 — D-654 녹음 단추처럼 더 큰 요청을 받는 곳은 max 를 따로 주고, 단추를 안 뒤에 다시 잰다(size) */
+export const BODY_MAX = MAX_BODY
+
+export async function readBody(req, max = MAX_BODY) {
   if (req.body !== undefined && req.body !== null) {
     if (typeof req.body === 'string') {
-      if (req.body.length > MAX_BODY) return { tooLarge: true }
+      if (req.body.length > max) return { tooLarge: true, size: req.body.length }
       try {
-        return { value: JSON.parse(req.body) }
+        return { value: JSON.parse(req.body), size: req.body.length }
       } catch {
-        return { value: null }
+        return { value: null, size: req.body.length }
       }
     }
     if (typeof req.body === 'object') {
       const size = JSON.stringify(req.body).length
-      return size > MAX_BODY ? { tooLarge: true } : { value: req.body }
+      return size > max ? { tooLarge: true, size } : { value: req.body, size }
     }
   }
-  if (typeof req.on !== 'function') return { value: null }
+  if (typeof req.on !== 'function') return { value: null, size: 0 }
   return new Promise((resolve) => {
     let size = 0
     const chunks = []
     req.on('data', (c) => {
       size += c.length
-      if (size <= MAX_BODY) chunks.push(c)
+      if (size <= max) chunks.push(c)
     })
     req.on('end', () => {
-      if (size > MAX_BODY) return resolve({ tooLarge: true })
+      if (size > max) return resolve({ tooLarge: true, size })
       try {
-        resolve({ value: JSON.parse(Buffer.concat(chunks).toString('utf8')) })
+        resolve({ value: JSON.parse(Buffer.concat(chunks).toString('utf8')), size })
       } catch {
-        resolve({ value: null })
+        resolve({ value: null, size })
       }
     })
-    req.on('error', () => resolve({ value: null }))
+    req.on('error', () => resolve({ value: null, size }))
   })
 }
 

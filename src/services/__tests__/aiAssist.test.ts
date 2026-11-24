@@ -359,6 +359,63 @@ async function serverTests() {
     check('V8 받아 적기 지시문 — [영상 받아 적기] 있음 · 마케팅 성공 공식 · 꼭 지킬 것 없음 · 들린 숫자는 그대로 / 우리 버전 지시문엔 [성공 공식 요약] 그대로',
       tSys.includes('[영상 받아 적기]') && !tSys.includes('[성공 공식') && !tSys.includes('[꼭 지킬 것') && !tSys.includes(RADAR_RULES[0]) && tSys.includes('들린 그대로') && aSys.includes('[성공 공식 요약') && !aSys.includes('[영상 받아 적기]'))
   }
+  // D-654 미팅 녹음 받아 적기 · 정리 — 대표만 · Gemini 만 · 소리는 글 앞에 바로(inlineData) · 녹음 단추만 큰 요청
+  setEnv()
+  {
+    const RCTX = { title: '미팅 녹음', today: '2026-11-24', sections: [{ name: '업체', rows: [{ 업체: '(주)한솔정밀', 조각: '1번째 · 2:00 부터' }] }] }
+    // 2분 조각 크기(24kbps ≈ 360KB)의 가짜 소리 — base64
+    const bytes = new Uint8Array(360_000).map((_, i) => (i * 31) % 251)
+    let bin = ''
+    for (const b of bytes) bin += String.fromCharCode(b)
+    const data = btoa(bin)
+    const audio = { mime: 'audio/webm;codecs=opus', data, index: 1, start: 120 }
+    const r = await post({ requestId: rid(), assistId: 'meeting.transcribe', page: 'client', choice: { provider: 'anthropic', model: 'claude-sonnet-5-5' }, context: RCTX, audio })
+    const call = calls.find((c) => c.url.includes(':generateContent'))
+    const parts = ((call?.body.contents as { parts: Record<string, unknown>[] }[] | undefined)?.[0]?.parts ?? []) as Record<string, { mimeType?: string; data?: string }>[]
+    const text = String((parts[1] as unknown as { text?: string })?.text ?? '')
+    const sys = String(((call?.body.systemInstruction as { parts?: { text?: string }[] } | undefined)?.parts ?? [])[0]?.text ?? '')
+    check('RA1 녹음 받아 적기 — Claude 를 골라 둬도 Gemini · 소리는 글 앞에 inlineData(audio/webm · 보낸 그대로) · 글에 [녹음] 2번째 조각 · 2:00 · 지시문 [녹음 받아 적기]',
+      r.statusCode === 200 && (r.body.run as { provider: string }).provider === 'gemini' && !!call && calls.every((c) => !c.url.includes('/messages')) && parts[0]?.inlineData?.mimeType === 'audio/webm' && parts[0]?.inlineData?.data === data && text.includes('[녹음]') && text.includes('2번째 조각') && text.includes('2:00') && sys.includes('[녹음 받아 적기]') && sys.includes('들린 그대로'),
+      { status: r.statusCode, mime: parts[0]?.inlineData?.mimeType, text: text.slice(-160) })
+    check('RA2 답(보관 · 화면으로 가는 run)에 소리 원본이 없다 — 받아 적은 글만', !JSON.stringify(r.body).includes(data.slice(0, 200)))
+    calls = []
+    const pl = await Promise.all([
+      post({ requestId: rid(), assistId: 'meeting.transcribe', page: 'client', context: RCTX, audio }, PILOT),
+      post({ requestId: rid(), assistId: 'meeting.summary', page: 'client', context: RCTX }, PILOT),
+    ])
+    const st = await get('/api/ai-assist?status=1', PILOT)
+    const stIds = ((st.body.assists ?? []) as { id: string }[]).map((a) => a.id)
+    const ownSt = await get('/api/ai-assist?status=1')
+    check('RA3 팀장 등급(내부 팀장 · 고객 · 대표가 팀장 화면으로 볼 때)은 녹음 · 정리 둘 다 403 · 공급자 안 부름 · 팀장 상태 목록에 없음 · 대표 목록엔 있음',
+      pl.every((x) => x.statusCode === 403) && calls.length === 0 && !stIds.includes('meeting.transcribe') && !stIds.includes('meeting.summary') && ((ownSt.body.assists ?? []) as { id: string }[]).some((a) => a.id === 'meeting.transcribe'),
+      { pl: pl.map((x) => x.statusCode), stIds: stIds.filter((x) => x.startsWith('meeting')) })
+    calls = []
+    const big = btoa(String.fromCharCode(...new Uint8Array(30_000)))
+    const bad = await Promise.all([
+      post({ requestId: rid(), assistId: 'meeting.transcribe', page: 'client', context: RCTX }),
+      post({ requestId: rid(), assistId: 'meeting.transcribe', page: 'client', context: RCTX, audio: { ...audio, mime: 'video/mp4' } }),
+      post({ requestId: rid(), assistId: 'meeting.transcribe', page: 'client', context: RCTX, audio: { ...audio, mime: 'text/html' } }),
+      post({ requestId: rid(), assistId: 'meeting.transcribe', page: 'client', context: RCTX, audio: { ...audio, data: 'not base64 !!' } }),
+      post({ requestId: rid(), assistId: 'meeting.transcribe', page: 'client', context: RCTX, audio: { ...audio, data: btoa('tiny') } }),
+      post({ requestId: rid(), assistId: 'meeting.transcribe', page: 'client', context: RCTX, audio: { ...audio, index: -1 } }),
+      post({ requestId: rid(), assistId: 'meeting.transcribe', page: 'client', context: RCTX, audio: { ...audio, start: 1.5 } }),
+    ])
+    check('RA4 소리가 틀리면 400 · 공급자 안 부름(없음 · 영상 형식 · 글 형식 · base64 아님 · 1KB 아래 · 순번 음수 · 시각 소수)', bad.every((b) => b.statusCode === 400) && calls.length === 0, bad.map((b) => b.statusCode))
+    // 크기 — 녹음 조각 1.5MB 넘으면 400 · 녹음 단추가 아닌데 256KB 넘으면 413(예전 한도 그대로) · 녹음 단추라도 요청 전체 2.3MB 넘으면 413
+    const over = btoa(String.fromCharCode(...new Uint8Array(1_000))) + 'A'.repeat(2_000_000 - (2_000_000 % 4))
+    const tooBig = await post({ requestId: rid(), assistId: 'meeting.transcribe', page: 'client', context: RCTX, audio: { ...audio, data: over } })
+    const fat = await post({ requestId: rid(), assistId: 'today.top3', page: 'today', context: { ...CTX, pad: 'x'.repeat(300_000) } })
+    const huge = await post({ requestId: rid(), assistId: 'meeting.transcribe', page: 'client', context: RCTX, audio: { ...audio, data: 'A'.repeat(2_400_000) } })
+    check('RA5 크기 — 녹음 조각 1.5MB 넘음 400 · 다른 단추 300KB 요청 413(예전 한도) · 녹음 요청 2.4MB 413 · 공급자 안 부름', tooBig.statusCode === 400 && fat.statusCode === 413 && huge.statusCode === 413 && calls.length === 0, { tooBig: tooBig.statusCode, fat: fat.statusCode, huge: huge.statusCode, big: big.length })
+    const m4a = await post({ requestId: rid(), assistId: 'meeting.transcribe', page: 'client', context: RCTX, audio: { ...audio, mime: 'audio/x-m4a' } })
+    const m4aMime = ((calls.filter((c) => c.url.includes(':generateContent')).pop()?.body.contents as { parts: { inlineData?: { mimeType?: string } }[] }[] | undefined)?.[0]?.parts ?? [])[0]?.inlineData?.mimeType
+    check('RA6 휴대폰 녹음 파일(m4a)은 audio/mp4 로 맞춰 보냄', m4a.statusCode === 200 && m4aMime === 'audio/mp4', { s: m4a.statusCode, m4aMime })
+    calls = []
+    const sm = await post({ requestId: rid(), assistId: 'meeting.summary', page: 'client', context: { ...RCTX, sections: [{ name: '받아 적은 글', rows: [{ 시각: '0:12', 말: '직원은 지금 18명이고 작년 매출이 52억 정도 됩니다' }] }] } })
+    const smCall = calls.find((c) => c.url.includes(':generateContent'))
+    const smParts = ((smCall?.body.contents as { parts: unknown[] }[] | undefined)?.[0]?.parts ?? []).length
+    check('RA7 녹음 정리 — 소리 없이 글만(조각 1) · 대표 200 · 지시문에 사정 · 숫자 · 약속 · 할 일 · 확인할 것', sm.statusCode === 200 && smParts === 1 && ASSISTS['meeting.summary'].instruction.join(' ').includes('"확인할 것"'), { s: sm.statusCode, smParts })
+  }
   setEnv()
   {
     const id = rid()

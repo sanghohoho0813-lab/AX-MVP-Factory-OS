@@ -13,13 +13,15 @@
  *   내부 팀장(audience internal)은 세 회사 · 회사마다 가장 싼 모델 하나(tier cheap)만. 다른 모델을 보내도 서버가 가장 싼 모델로 바꿔 부른다.
  *   외부 구독 고객 · 누구인지 모를 때는 예전 그대로 Gemini 만(개인정보처리방침 초안의 국외 이전 회사가 Google 하나 — 늘리려면 방침부터).
  * D-260 영상 단추(radar.transcript) — { video: { id, start, end } } 만 받아 서버가 YouTube 주소를 만들고 Gemini 에 영상 그대로 붙인다(구간 15분까지).
+ * D-654 녹음 단추(meeting.transcribe · 대표만) — { audio: { mime, data(base64), index, start } } 녹음 조각 하나를 Gemini 에 바로 붙인다.
+ *   이 단추만 큰 요청(AUDIO_BODY_MAX)을 받는다 — 다른 단추는 예전 한도(256KB) 그대로. 녹음은 서버 어디에도 남기지 않는다(받아 적은 글만 답으로).
  */
-import { ASSISTS, ASSIST_OUTPUT_SCHEMA, ASSIST_RULES, FREEDOM_RULES, PACKS, RADAR_RULES, SAFE_AX_OWNER, SAFE_RULES, SHORTS_RULES, THREADS_RULES, VIDEO_RULES, assistOf, assistSystem, buildAssistPrompt, topicPacks } from './_ai/assists.js'
+import { ASSISTS, ASSIST_OUTPUT_SCHEMA, ASSIST_RULES, AUDIO_RULES, FREEDOM_RULES, PACKS, RADAR_RULES, SAFE_AX_OWNER, SAFE_RULES, SHORTS_RULES, THREADS_RULES, VIDEO_RULES, assistOf, assistSystem, buildAssistPrompt, topicPacks } from './_ai/assists.js'
 import { CONFIDENTIAL_RULES, guardOutput, scrubBrand, scrubBrandDeep, secretIndex } from './_ai/guard.js'
 import { IDEA_JUDGE, PATENT_JUDGE, VENTURE_JUDGE } from './_ai/judge.js'
 import { ProviderError, extractJson, scrubDeep, scrubText, validate } from './_ai/core.js'
 import { SKILL_MAX } from './_ai/judge.js'
-import { __resetGateState, assistLimits, fail, rateCheck, readBody, send, whoCan } from './_ai/gate.js'
+import { BODY_MAX, __resetGateState, assistLimits, fail, rateCheck, readBody, send, whoCan } from './_ai/gate.js'
 import { cleanBrand } from './_ai/brand.js'
 import { customerLabel, customerOutput, stripOwnerContext } from './_ai/customerMarketing.js'
 import { __resetUsageState, legacyAudience, myAccess, releaseUsage, reserveUsage, settleUsage, usageReady, usageUnits } from './_ai/usage.js'
@@ -83,6 +85,33 @@ export const VIDEO_SEGMENT_MAX = 900
  * D-260 영상 단추 — 화면이 보낸 영상 번호 · 구간만 받는다. 주소는 서버가 YouTube 주소로만 만든다(다른 주소 · 파일은 못 보냄).
  * 틀리면 null(부른 쪽이 400).
  */
+/** D-654 녹음 조각 한 개의 크기(풀어 놓은 바이트) — 화면은 2분씩(24kbps ≈ 360KB) 끊어 보낸다 */
+export const AUDIO_MAX_BYTES = 1_500_000
+/** 녹음 단추가 받는 요청 한도(base64 는 4/3 배 + 자료 글) — Vercel 함수 한도(4.5MB)보다 넉넉히 아래 */
+export const AUDIO_BODY_MAX = 2_300_000
+/** 받는 소리 형식(브라우저 녹음 · 휴대폰 녹음 파일) — 뒤의 ';codecs=…' 는 떼고 본다 */
+export const AUDIO_MIMES = new Set(['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/aac', 'audio/flac', 'audio/x-m4a'])
+const B64_RE = /^[A-Za-z0-9+/]+={0,2}$/
+
+/**
+ * D-654 녹음 조각 — 형식 · 크기 · 순번 · 시작 시각(초)이 맞아야. 틀리면 null(부른 쪽이 400).
+ * x-m4a 는 mp4 로 맞춘다(같은 그릇). 너무 작은 조각(1KB 아래)은 소리가 아니다.
+ */
+export function cleanAudio(a) {
+  if (!a || typeof a !== 'object') return null
+  const raw = typeof a.mime === 'string' ? a.mime.split(';')[0].trim().toLowerCase() : ''
+  if (!AUDIO_MIMES.has(raw)) return null
+  const mime = raw === 'audio/x-m4a' ? 'audio/mp4' : raw === 'audio/x-wav' ? 'audio/wav' : raw === 'audio/mp3' ? 'audio/mpeg' : raw
+  const data = typeof a.data === 'string' ? a.data : ''
+  if (!data || data.length % 4 !== 0 || !B64_RE.test(data)) return null
+  const bytes = (data.length / 4) * 3 - (data.endsWith('==') ? 2 : data.endsWith('=') ? 1 : 0)
+  if (bytes < 1000 || bytes > AUDIO_MAX_BYTES) return null
+  const index = Number(a.index ?? 0)
+  const start = Number(a.start ?? 0)
+  if (!Number.isInteger(index) || index < 0 || index > 200 || !Number.isInteger(start) || start < 0 || start > 6 * 3600) return null
+  return { mime, data, index, start, bytes }
+}
+
 export function cleanVideo(v) {
   if (!v || typeof v !== 'object') return null
   const id = typeof v.id === 'string' ? v.id : ''
@@ -149,6 +178,7 @@ const secrets = () =>
     ...THREADS_RULES,
     ...SHORTS_RULES,
     ...VIDEO_RULES,
+    ...AUDIO_RULES,
     ...VENTURE_JUDGE,
     ...PATENT_JUDGE,
     ...IDEA_JUDGE.patent,
@@ -166,7 +196,7 @@ class UsageError extends Error {
   }
 }
 
-async function runOnce(assist, choice, body, role, video = null, deadline = Date.now() + maxDurationMs() - AFTER_AI_MS) {
+async function runOnce(assist, choice, body, role, video = null, deadline = Date.now() + maxDurationMs() - AFTER_AI_MS, audio = null) {
   const key = providerKey(choice.provider)
   const base = providerBase(choice.provider)
   // D-264 화면 자료 · 물음 · 대표 기준에서도 쓰지 않는 이름 · 출처 이름을 지우고 보낸다
@@ -187,10 +217,14 @@ async function runOnce(assist, choice, body, role, video = null, deadline = Date
   const built = buildAssistPrompt(customerMk ? { ...assist, label: customerLabel(assist.label, brand) } : assist, context, ask)
   const { sent } = built
   // D-260 영상 단추 — 맨 앞에 붙인 영상의 어느 구간인지(시각은 영상 처음부터)
-  const user = video ? `${built.user}\n[영상] 맨 앞에 붙인 YouTube 영상\n[구간] ${clock(video.start)} ~ ${clock(video.end)} — 이 구간만(시각은 영상 처음부터 센 것)` : built.user
+  const user = video
+    ? `${built.user}\n[영상] 맨 앞에 붙인 YouTube 영상\n[구간] ${clock(video.start)} ~ ${clock(video.end)} — 이 구간만(시각은 영상 처음부터 센 것)`
+    : audio
+      ? `${built.user}\n[녹음] 맨 앞에 붙인 소리 — 이 미팅 녹음의 ${audio.index + 1}번째 조각(녹음 처음부터 ${clock(audio.start)} 에 시작 · 항목 시각은 이 조각 처음부터 센 것)`
+      : built.user
   const started = Date.now()
   // '생각' 토큰까지 세는 공급자가 있어 글 몫의 두 배를 상한으로
-  const call = { provider: choice.provider, key, base, model: choice.model, system, user, maxOut: assist.maxOut * 2, ...(video ? { video } : {}) }
+  const call = { provider: choice.provider, key, base, model: choice.model, system, user, maxOut: assist.maxOut * 2, ...(video ? { video } : {}), ...(audio ? { audio: { mime: audio.mime, data: audio.data } } : {}) }
   // D-638 부를 때마다 남은 시간만큼만 기다린다 · 다시 부를 시간이 6초도 안 남았으면 다시 부르지 않는다(시간 초과로 끝 — 센 것은 돌려준다)
   const timed = () => ({ ...call, timeoutMs: aiBudget(deadline) })
   const roomForRetry = () => deadline - Date.now() >= 6000
@@ -271,7 +305,8 @@ export default async function handler(req, res) {
     const meterable = !!acc && acc.state === 'ok' && acc.configured && usageReady()
     const legacyInternal = !!acc && acc.state === 'missing' && (await legacyAudience(bearerOf(req))) === 'internal'
     const marketing = who.role !== 'pilot' || legacyInternal || (meterable && acc.marketing && (acc.kind === 'internal' || acc.active))
-    const assists = Object.values(ASSISTS).filter((a) => who.role !== 'pilot' || !pilotBlocked(a.page, marketing))
+    // D-654 대표만 쓰는 단추(미팅 녹음)는 팀장 등급 목록에 없다
+    const assists = Object.values(ASSISTS).filter((a) => who.role !== 'pilot' || (!pilotBlocked(a.page, marketing) && !a.ownerOnly))
     const usage = acc && acc.state === 'ok' && acc.configured ? { used: acc.used, limit: acc.limit, month: acc.month, kind: acc.kind, plan: acc.plan, active: acc.active } : null
     return send(res, 200, { ok: true, role: who.role, ...(who.role === 'pilot' ? { cheapOnly: internal } : {}), ...catalog, ...(probe ? { probe } : {}), limits: assistLimits(), marketing, usage, assists: assists.map((a) => ({ id: a.id, page: a.page, version: a.version })) })
   }
@@ -304,16 +339,23 @@ export default async function handler(req, res) {
   if (!who.ok) return fail(res, who.status, who.code, who.missing ? { missing: who.missing } : {})
   const pilot = who.role === 'pilot'
 
-  const { value: body, tooLarge } = await readBody(req)
+  // D-654 녹음 단추만 큰 요청을 받는다 — 어느 단추인지는 읽은 뒤에 알므로 큰 한도로 읽고, 녹음 단추가 아니면 예전 한도로 다시 잰다
+  const { value: body, tooLarge, size } = await readBody(req, AUDIO_BODY_MAX)
   if (tooLarge) return fail(res, 413, 'too_large')
   if (!body || typeof body !== 'object') return fail(res, 400, 'bad_request')
   const assist = assistOf(body.assistId)
   if (!assist || body.page !== assist.page || typeof body.requestId !== 'string' || !ID_RE.test(body.requestId)) return fail(res, 400, 'bad_request')
+  if (!assist.audio && (size ?? 0) > BODY_MAX) return fail(res, 413, 'too_large')
 
   if (pilot && CUSTOMER_ALWAYS_BLOCKED.has(assist.page)) return fail(res, 403, 'forbidden')
+  // D-654 대표만 쓰는 단추(미팅 녹음 받아 적기 · 정리) — 팀장 · 고객 · 대표가 팀장 화면으로 볼 때도 막는다
+  if (pilot && assist.ownerOnly) return fail(res, 403, 'forbidden')
   // D-260 영상 단추는 영상 번호 · 구간이 맞아야
   const video = assist.video ? cleanVideo(body.video) : null
   if (assist.video && !video) return fail(res, 400, 'bad_request')
+  // D-654 녹음 단추는 소리 조각이 맞아야(형식 · 크기 · 순번)
+  const audio = assist.audio ? cleanAudio(body.audio) : null
+  if (assist.audio && !audio) return fail(res, 400, 'bad_request')
 
   // 고른 것이 없으면 기본(Gemini 가장 싼 모델) · 공급자만 골랐으면 그 공급자의 가장 싼 모델
   // D-614 팀장 등급 — 내부 팀장인지 먼저 본다(쓸 수 있는 회사 · 모델이 다르다). 이 답은 아래 장부 예약에도 그대로 쓴다
@@ -325,8 +367,10 @@ export default async function handler(req, res) {
   // 내부 팀장의 기본은 늘 Gemini 가장 싼 모델(서버 기본 회사를 Claude 로 바꿔 둬도) — 상태 화면의 기본(pilotCatalog)과 같게
   const def = pilot && (internal || !pilotProviders(internal).has(defaultChoice().provider)) ? { provider: 'gemini', model: tierModel('gemini', 'cheap') } : defaultChoice()
   // D-260 영상을 직접 보는 것은 Gemini 만 된다 — 다른 회사를 골라 둬도 이 단추는 Gemini(고른 Gemini 모델이 있으면 그것)
-  const provider = assist.video ? 'gemini' : sent ? sent.provider : def.provider
-  const picked = assist.video
+  // D-654 녹음을 직접 듣는 것도 Gemini 만(개인정보처리방침 초안의 국외 이전 회사도 Google 하나)
+  const gemOnly = assist.video || assist.audio
+  const provider = gemOnly ? 'gemini' : sent ? sent.provider : def.provider
+  const picked = gemOnly
     ? (sent && sent.provider === 'gemini' && sent.model) || (def.provider === 'gemini' ? def.model : tierModel('gemini', 'cheap'))
     : (sent && sent.model) || (provider === def.provider ? def.model : tierModel(provider, 'cheap'))
   // D-614 내부 팀장은 회사마다 가장 싼 모델 하나 — 더 비싼 모델을 보내도 가장 싼 모델로 부른다
@@ -412,7 +456,7 @@ export default async function handler(req, res) {
     }
     let run
     try {
-      run = await runOnce(assist, choice, body, who.role, video, deadline)
+      run = await runOnce(assist, choice, body, who.role, video, deadline, audio)
     } catch (e) {
       // AI 가 실패하면 센 것을 돌려준다 — 같은 요청 번호로 다시 해도 한 번만 센다
       if (charged) await releaseUsage(token, body.requestId)

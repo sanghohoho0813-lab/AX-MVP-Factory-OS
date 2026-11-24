@@ -319,6 +319,14 @@ export interface AssistVideo {
   end: number
 }
 
+/** D-654 미팅 녹음 조각(대표만) — base64 · 몇 번째 조각 · 녹음 처음부터 몇 초에 시작 */
+export interface AssistAudio {
+  mime: string
+  data: string
+  index: number
+  start: number
+}
+
 /* ------------------------------------------------------------------ */
 /* D-638 한 번 누르면 끝까지 — 끊겨도 같은 요청 번호로 답을 다시 받는다       */
 /* ------------------------------------------------------------------ */
@@ -445,12 +453,12 @@ async function recoverRun(first: AssistError, body: PostBody, signal?: AbortSign
   throw last
 }
 
-export async function callAssist(req: { requestId: string; assistId: string; page: AssistPage; choice: { provider: ProviderId; model: string } | null; context: AssistContext; ask?: string; video?: AssistVideo; skill?: string; signal?: AbortSignal }): Promise<AssistRun> {
+export async function callAssist(req: { requestId: string; assistId: string; page: AssistPage; choice: { provider: ProviderId; model: string } | null; context: AssistContext; ask?: string; video?: AssistVideo; audio?: AssistAudio; skill?: string; signal?: AbortSignal }): Promise<AssistRun> {
   const brand = brandForRequest()
   // D-629 자동이면 이 요청의 물음 · 단추로 모델을 정한다(직접 고른 모델은 그대로)
   const { choice, auto } = await resolveAssistChoice(req)
   // SAAS-1 이 작업공간의 브랜드 · AI 설정(있으면) — 서버는 대표가 아닌 계정에만 쓴다
-  const body: PostBody = { requestId: req.requestId, assistId: req.assistId, page: req.page, choice, context: req.context, ask: req.ask ?? '', ...(req.video ? { video: req.video } : {}), ...(req.skill ? { skill: req.skill } : {}), ...(brand ? { brand } : {}) }
+  const body: PostBody = { requestId: req.requestId, assistId: req.assistId, page: req.page, choice, context: req.context, ask: req.ask ?? '', ...(req.video ? { video: req.video } : {}), ...(req.audio ? { audio: req.audio } : {}), ...(req.skill ? { skill: req.skill } : {}), ...(brand ? { brand } : {}) }
   let run: AssistRun
   try {
     run = await postAssist(body, req.signal)

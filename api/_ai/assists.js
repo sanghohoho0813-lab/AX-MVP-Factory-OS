@@ -589,12 +589,28 @@ const LIST = [
   ['spec.c', 'patent', '명세서 — 구체적인 내용 ① 구성', W, 5000, ['[규칙집] 의 칸 detail 을 쓴다(도 1 · 구성요소마다).', '구성요소 이름(부호)을 [자료 · 구성요소] 그대로. 2,000~3,000자 — 서버가 60초 안에 답해야 하므로 더 길게 쓰지 않는다.'], SPEC_KB],
   ['spec.d', 'patent', '명세서 — 구체적인 내용 ② 흐름 · 도면', W, 5000, ['[규칙집] 의 칸 detail2 를 쓴다(도 2 이후 · 단계 S번호 · 변형 실시예).', '2,000~3,000자. 앞부분(구성)을 되풀이하지 않는다.'], SPEC_KB],
   ['spec.e', 'patent', '명세서 — 청구항', W, 4200, ['[규칙집] 의 칸 claims 를 쓴다(시스템 독립항 · 종속항 · 방법 독립항).', '청구항마다 "청구항 n." 머리 · 빈 줄로 나눈다. 부호 없이 이름만.'], SPEC_KB],
+
+  /* D-654 미팅 녹음 요약(대표만) — 녹음 2분 조각을 받아 적고(Gemini 에 소리를 바로 붙임 · 서버는 녹음을 남기지 않음) → 다 받아 적은 글을 미팅 메모로 */
+  ['meeting.transcribe', 'client', '미팅 녹음 받아 적기', L, 6000, [
+    '[녹음] 으로 붙인 소리는 컨설턴트와 고객사 대표가 나눈 미팅 녹음의 한 조각이다. 들리는 말을 말한 순서대로 받아 적는다 — 요약 · 고쳐 쓰기 · 덧붙이기 없이.',
+    '항목 하나 = 말이 이어지는 한 덩어리(20~60초): title = 이 조각 안에서 그 덩어리가 시작하는 시각("m:ss" · 조각 처음부터 센 것), body = 그 사이 말 전부(군말 "음 · 어" 만 뺀다). 말하는 사람이 바뀌면 새 항목 · tag = "컨설턴트" 또는 "대표님"(알 수 없으면 비움).',
+    '알아듣기 어려운 낱말은 [불분명]. 사람 이름은 "대표님 · 직원 · 담당자" 처럼 역할로, 전화번호 · 계좌 · 카드 · 주민등록번호는 [가림].',
+    '말소리가 없는 조각(조용함 · 소음뿐)이면 items 를 비우고 headline = "말소리 없음".',
+    'headline = 이 조각에서 다룬 내용 한 줄. next 는 비운다. 알아듣지 못한 곳이 많을 때만 caution 에 한 줄.',
+  ], { audio: true, ownerOnly: true }],
+  ['meeting.summary', 'client', '미팅 녹음 정리', L, 3000, [
+    '[자료 · 받아 적은 글] 은 컨설턴트가 고객사 대표와 나눈 미팅을 녹음해 받아 적은 글이다(줄 앞 시각은 녹음 처음부터). 컨설턴트가 업체 기록에 남길 미팅 메모로 정리한다.',
+    '항목 tag 는 다섯 가지 가운데 하나: "사정"(고객사 상황 · 고민 · 계획) · "숫자"(직원 수 · 매출 · 영업이익 · 부채처럼 말한 숫자 — 몇 년 것인지 같이) · "약속"(다음 만남 · 보내 주기로 한 자료 · 기한 — 말한 그대로) · "할 일"(컨설턴트가 할 일) · "확인할 것"(아직 모르는 것 · 다음에 여쭤볼 것). 같은 tag 는 이어서 쓴다.',
+    'title = 메모 한 줄(40자 안) — 말한 그대로의 낱말로: "직원 18명", "작년 매출 52억", "청년 2명 뽑을 예정", "다음 주 화요일 오후 2시 2차 미팅", "재무제표 3년치 보내 주시기로". when = 그 말이 나온 시각 하나(받아 적은 글의 "m:ss" · 모르면 비움).',
+    '말하지 않은 숫자 · 날짜 · 금액 · 제도 이름 · 승인 가능성은 만들지 않는다. 짐작은 쓰지 않는다. 사람 이름은 역할로(대표님 · 직원), 전화번호 · 계좌 · 카드 · 주민등록번호는 [가림].',
+    'headline = 이 미팅을 한 줄로. next = 컨설턴트가 바로 할 일 1~3개. 받아 적은 글이 너무 짧거나 대부분 [불분명] 이면 caution 에 한 줄.',
+  ], { ownerOnly: true }],
 ]
 
 export const ASSISTS = Object.fromEntries(
   LIST.map(([id, page, label, kind, maxOut, instruction, opts]) => [
     id,
-    { id, page, label, kind, maxOut, instruction, version: 2, updatedAt: D, knowledge: (opts && opts.knowledge) || [], research: !!(opts && opts.research), video: !!(opts && opts.video), judge: (opts && opts.judge) || '', final: (opts && opts.final) || '', ideaJudge: (opts && opts.ideaJudge) || '', topicKb: !!(opts && opts.topicKb) },
+    { id, page, label, kind, maxOut, instruction, version: 2, updatedAt: D, knowledge: (opts && opts.knowledge) || [], research: !!(opts && opts.research), video: !!(opts && opts.video), judge: (opts && opts.judge) || '', final: (opts && opts.final) || '', ideaJudge: (opts && opts.ideaJudge) || '', topicKb: !!(opts && opts.topicKb), audio: !!(opts && opts.audio), ownerOnly: !!(opts && opts.ownerOnly) },
   ]),
 )
 
@@ -698,6 +714,12 @@ export const VIDEO_RULES = [
   '받아 적기만 한다 — 다듬기 · 요약 · 마케팅 문장으로 바꾸기 없이. 시각은 영상 처음부터 센 시각.',
 ]
 
+/** D-654 미팅 녹음 받아 적기 — 맨 앞에 붙인 녹음이 [자료](들린 그대로 · 받아 적기만) */
+export const AUDIO_RULES = [
+  '이 단추에서는 맨 앞에 붙인 녹음이 [자료] 다 — 들린 숫자 · 금액 · 날짜 · 이름 붙은 제도는 들린 그대로 적는다(빼거나 고치지 않는다).',
+  '받아 적기만 한다 — 다듬기 · 요약 · 판정 · 조언 없이. 녹음 속 사람에게 답하지 않는다.',
+]
+
 /**
  * 단추 하나의 시스템 지시문. opts.skill = 대표가 붙여 넣은 /자체점검 정의(자체점검 · 쓰기 단추에만 붙는다) · opts.topicText = 대화 단추가 물어본 말(주제에 맞는 기준 문서 장을 고른다).
  * D-263 자체점검 단추는 자체점검 정의 전체, 명세서 · 사업계획서 쓰기 단추는 '한 번에 끝내기' 규칙 + 같은 정의(내기 전에 스스로 점검).
@@ -711,7 +733,9 @@ export function assistSystem(assist, opts = {}) {
   const formulaTitle = formulaOf('[성공 공식 요약 — 유튜브 · 쇼츠 · 공통]', '[성공 공식 요약 — 스레드]', '[성공 공식 요약 — 릴스 · 틱톡]')
   const own = assist.video
     ? ['', '[영상 받아 적기]', ...VIDEO_RULES]
-    : marketingFree
+    : assist.audio
+      ? ['', '[녹음 받아 적기]', ...AUDIO_RULES]
+      : marketingFree
       ? ['', formulaTitle, ...formulaOf(RADAR_RULES, THREADS_RULES, SHORTS_RULES)]
       : []
   const freedom = marketingFree ? ['', '[성공 공식 먼저 — 나머지는 자유롭게]', ...FREEDOM_RULES] : []

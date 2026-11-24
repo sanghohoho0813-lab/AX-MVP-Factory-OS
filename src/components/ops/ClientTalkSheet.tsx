@@ -27,6 +27,9 @@ import { applyTalk, hasTalk, talkFound } from '../../services/homeAsk/talkApply'
 import { nowIso, todayLocalDate } from '../../lib/appClock'
 import { buildDiagnosis, meetingFollowUp } from '../../services/clientDiagnosis'
 import { useSenderLine } from '../layout/useCurrentUser'
+import { MeetingRecorder } from './MeetingRecorder'
+import { canRecordHere } from '../../services/meetingRecord'
+import { useAiAssistAccess } from '../../auth/ownerAiAccess'
 
 /** 미팅 메모를 저장할 곳 — 없으면 [미팅 메모] 탭도 없다 */
 export interface TalkMemoTarget {
@@ -264,6 +267,9 @@ function AskFinder({ insights }: { insights: readonly Insight[] }) {
 function MemoView({ record, insights, asks, memo }: { record: ClientOpsRecord; insights: readonly Insight[]; asks: readonly string[]; memo: TalkMemoTarget }) {
   const { showToast } = useToast()
   const sender = useSenderLine()
+  // D-654 미팅 녹음 요약 — 대표 계정 · 녹음되는 브라우저에서만(팀장 · 고객 화면에는 단추 없음 · 서버도 막음)
+  const canRecord = useAiAssistAccess() === 'owner' && canRecordHere()
+  const [inject, setInject] = useState<{ id: number; text: string } | null>(null)
   // 미팅이 끝나면 대표님께 — 진단서와 같은 판정 · 받을 자료(고객 말) + 다음 만남(방금 기록한 약속도 바로)
   const followUp = useMemo(() => {
     const today = todayLocalDate()
@@ -291,7 +297,9 @@ function MemoView({ record, insights, asks, memo }: { record: ClientOpsRecord; i
       <p className="t-meta break-keep text-slate-600" data-testid="talk-memo-example">
         이렇게 적으면 알아들어요 — 「직원 18명, 작년 매출 52억, 청년 2명 뽑을 예정, 다음 주 화요일 오후 2시 2차 미팅」
       </p>
+      {canRecord && <MeetingRecorder company={record.companyName} onMemo={(text) => setInject({ id: Date.now(), text })} />}
       <QuickCapture
+        inject={inject}
         clients={[record]}
         defaultClientId={record.id}
         // PC 는 바로 적게 — 휴대폰은 자판이 올라와 위 안내를 가리므로 누를 때

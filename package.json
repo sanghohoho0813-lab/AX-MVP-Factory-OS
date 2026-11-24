@@ -95,6 +95,7 @@
     "qa:mkpack": "node e2e/mkpack.mjs",
     "qa:diag": "node e2e/diag.mjs",
     "qa:talk": "node e2e/talk.mjs",
+    "qa:record": "node e2e/recorder.mjs",
     "qa:uxpick": "node e2e/uxpick.mjs",
     "qa:chars": "node e2e/chars.mjs",
     "qa:firstscreen": "node e2e/firstscreen.mjs",

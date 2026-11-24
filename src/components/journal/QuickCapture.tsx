@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Send } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import type { JournalEntryType } from '../../types/bridge'
@@ -24,6 +24,7 @@ export function QuickCapture({
   onTalkRecord,
   talkTestId = 'capture-talk',
   autoTalk = false,
+  inject = null,
 }: {
   clients: ClientOpsRecord[]
   defaultClientId?: string | null
@@ -42,6 +43,8 @@ export function QuickCapture({
    * (카드는 '기록했어요' 로 남고 · 되돌리기는 onTalkRecord 쪽 알림). 실패하면 예전처럼 [업체에 기록] 단추가 남는다.
    */
   autoTalk?: boolean
+  /** D-654 바깥(미팅 녹음 정리)에서 이 칸에 글을 덧붙인다 — id 가 바뀔 때마다 한 번, 적던 글은 덮지 않고 아래에 */
+  inject?: { id: number; text: string } | null
 }) {
   const [told, setTold] = useState<{ clientId: string; company: string; found: TalkFound; saved: boolean } | null>(null)
   const [talkBusy, setTalkBusy] = useState(false)
@@ -54,6 +57,16 @@ export function QuickCapture({
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
   const textRef = useRef<HTMLTextAreaElement>(null)
+  const injectedRef = useRef(0)
+  useEffect(() => {
+    if (!inject || inject.id === injectedRef.current || !inject.text.trim()) return
+    injectedRef.current = inject.id
+    setContent(content.trim() ? `${content.trimEnd()}\n\n${inject.text}` : inject.text)
+    setOpen(true)
+    // 휴대폰에서는 메모 칸이 화면 아래에 있다 — 넣은 글이 보이게 가장 적게 내린다(이미 보이면 그대로)
+    // (지우는 정리 함수는 두지 않는다 — 글을 넣자마자 content 가 바뀌어 정리가 먼저 돌면 내려가지 않는다)
+    window.setTimeout(() => textRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }), 80)
+  }, [inject, content, setContent])
   // D-122: 저장 중에 Ctrl+Enter 를 또 눌러도 한 번만 — 단추는 막혀도 단축키는 막히지 않았다
   const busyRef = useRef(false)
 

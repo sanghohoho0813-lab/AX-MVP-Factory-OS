@@ -13,6 +13,8 @@ import { NEXT_TIME_OPTIONS, joinNextTime, splitNextTime } from '../clientOpsNext
 import { OTHER_UPLOAD_LABEL, UPLOAD_ACCEPT, isUploadMissing, parseUploadState, uploadErrorText, uploadFileProblem, uploadRequestText, uploadSlugFromPath, uploadUrl } from '../uploadLink'
 import { UPLOAD_LINK_FOLDER, placementForUpload, withUploadedFile } from '../uploadLinkAccept'
 import { FEE_QUIET_DAYS, normalizeNotices, noticeWho, outboundNotices, withNoticeSent, wonShortText } from '../outbound'
+import { LINE_MAX, REC_CHUNK_SEC, clockOf, heardLinesOf, heardText, memoFromSummary, pickRecordMime, secOf, summaryContext, transcribeContext } from '../meetingRecord'
+import { hasTalk, talkFound } from '../homeAsk/talkApply'
 import { slugFromPath } from '../../lib/askPath'
 import { isStageExcluded } from '../../lib/deviceView'
 import { join } from 'node:path'
@@ -719,7 +721,7 @@ async function run() {
     fnMissing.length === 0 && fnThin.length === 0 && fnNoMenu.length === 0 && fnBadBasic.length === 0 && usedFn.size >= 50 && functionGuidesOf('sales').length === 5 &&
       !functionGuidesOf('client-ops', { pilot: true }).some((x) => ['fn-client-portal', 'fn-client-consulting', 'fn-client-ai'].includes(x.key)) &&
       !functionGuidesOf('client-ops', { pilot: true, basic: true }).some((x) => x.key === 'fn-client-funding') &&
-      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 20 && functionGuidesOf('client-ops', { pilot: true }).every((x) => !x.key.startsWith('fn-talk-')) && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 5 /* D-653 보낼 안내 */ && functionGuidesOf('mk-threads').length === 5 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 4 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
+      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 21 /* D-654 녹음해서 적기 */ && functionGuidesOf('client-ops', { pilot: true }).every((x) => !x.key.startsWith('fn-talk-')) && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 5 /* D-653 보낼 안내 */ && functionGuidesOf('mk-threads').length === 5 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 4 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
     `missing=${fnMissing.join()} thin=${fnThin.join()} nomenu=${fnNoMenu.join()} basic=${fnBadBasic.join()} used=${usedFn.size}`,
   )
   const bf = basicFlow(CLIENT_FLOW)
@@ -1029,6 +1031,76 @@ async function run() {
       !/AiSoonButton/.test(prep) && !/미팅 질문 다듬기/.test(prep.replace(/\/\/.*$/gm, '')) && /\{t\.name\}/.test(tplName) && !/\{t\.key\} \{t\.name\}/.test(tplName) &&
         /<span className="t-sub font-semibold text-slate-700">본인 댓글<\/span>/.test(thr) && /<AiConfirm confirmLabel="이 주제로 쓰기">/.test(qs),
     )
+  }
+
+  /* K54 — D-654 미팅 녹음 요약: 녹음 형식 고르기 · 조각 시각 · 받아 적은 줄 · 정리 → 메모(규칙이 알아듣는 모양) */
+  {
+    const order = pickRecordMime((m) => m === 'audio/mp4' || m === 'audio/webm')
+    const chrome = pickRecordMime((m) => m.startsWith('audio/webm'))
+    const none = pickRecordMime(() => false)
+    const thrown = pickRecordMime(() => {
+      throw new Error('x')
+    })
+    check('K54 D-654 녹음 형식 — 크롬 webm/opus 먼저 · 아이폰은 mp4 · 못 하는 브라우저 null(물어보다 터져도)', chrome === 'audio/webm;codecs=opus' && order === 'audio/mp4' && none === null && thrown === null, { chrome, order })
+    check('K54 D-654 시각 — 125초 = 2:05 · 1시간 넘으면 h:mm:ss · "1:02:03" → 3723초 · 이상한 글 null', clockOf(125) === '2:05' && clockOf(3723) === '1:02:03' && secOf('1:02:03') === 3723 && secOf('0:45') === 45 && secOf('abc') === null)
+    // 두 번째 조각(2:00 부터) — 조각 안 시각에 조각 시작을 더한다 · 녹음 처음부터 센 시각(2:30 · 조각 길이보다 큼)은 그대로
+    const lines = heardLinesOf(
+      {
+        headline: '고용 계획',
+        items: [
+          { title: '0:05', tag: '대표님', body: '직원은 지금 18명이고  작년 매출이 52억 정도 됩니다' },
+          { title: '0:40', tag: '컨설턴트', body: '청년 채용 계획이 있으세요?' },
+          { title: '?', body: '' },
+          { title: '4:30', tag: '대표님', body: '청년 2명 뽑을 예정이에요' },
+        ],
+      },
+      REC_CHUNK_SEC,
+    )
+    check(
+      'K54 D-654 받아 적은 줄 — 조각 시작 + 조각 안 시각(2:05 · 2:40) · 녹음 처음부터 센 시각은 그대로(4:30) · 빈 줄 버림 · 말한 사람 · 띄어쓰기 하나로',
+      lines.length === 3 && lines[0].at === 125 && lines[0].who === '대표님' && lines[0].text === '직원은 지금 18명이고 작년 매출이 52억 정도 됩니다' && lines[1].at === 160 && lines[1].who === '컨설턴트' && lines[2].at === 270,
+      lines,
+    )
+    check('K54 D-654 받아 적은 글 복사 — "[2:05] 대표님: …" 한 줄씩', heardText(lines).split('\n')[0] === '[2:05] 대표님: 직원은 지금 18명이고 작년 매출이 52억 정도 됩니다')
+    const long = [{ at: 0, who: '', text: '가'.repeat(LINE_MAX * 2 + 10) }]
+    const ctx = summaryContext('(주)한빛정밀', long, '2026-11-24')
+    const tctx = transcribeContext('(주)한빛정밀', 1, 120, '2026-11-24')
+    check(
+      'K54 D-654 정리에 보내는 자료 — 긴 말은 280자 줄로 나눔(서버 300자 자르기 밑) · 업체 이름만 · 받아 적기 자료는 업체 · 몇 번째 조각만',
+      ctx.sections[1].rows.length === 3 && ctx.sections[1].rows.every((r) => String(r.말).length <= LINE_MAX) && JSON.stringify(ctx.sections[0].rows) === '[{"업체":"(주)한빛정밀"}]' && JSON.stringify(tctx.sections[0].rows) === '[{"업체":"(주)한빛정밀","조각":"2번째 · 2:00 부터"}]',
+    )
+    const memo = memoFromSummary(
+      {
+        headline: '청년 채용 · 정책자금 상담',
+        items: [
+          { title: '다음 주 화요일 오후 2시 2차 미팅', tag: '약속' },
+          { title: '청년 2명 뽑을 예정', tag: '사정' },
+          { title: '직원 18명', tag: '숫자' },
+          { title: '작년 매출 52억', tag: '숫자' },
+          { title: '재무제표 3년치 받기', tag: '할 일' },
+          { title: '대표님 생년월일', tag: '확인할 것' },
+          { title: '   ', tag: '사정' },
+        ],
+        next: ['재무제표 3년치 받기', '정책자금 서류 목록 보내기'],
+        caution: '중간에 잘 안 들린 곳이 있음',
+      },
+      '32분 녹음',
+    )
+    const ml = memo.split('\n')
+    check(
+      'K54 D-654 메모 글 — 머리 [녹음 정리 · 32분 녹음] · 숫자 → 사정 → 약속 → 할 일 → 확인할 것 순서 · 빈 줄 버림 · 다음 할 일 겹치면 한 번 · 확인 한 줄',
+      ml[0] === '[녹음 정리 · 32분 녹음] 청년 채용 · 정책자금 상담' && ml[1] === '· 직원 18명' && ml[2] === '· 작년 매출 52억' && ml[3] === '· 청년 2명 뽑을 예정' && ml[4] === '· 다음 주 화요일 오후 2시 2차 미팅' && ml[5] === '· 할 일: 재무제표 3년치 받기' && ml[6] === '· 확인할 것: 대표님 생년월일' && ml[7] === '· 할 일: 정책자금 서류 목록 보내기' && ml[8] === '(확인: 중간에 잘 안 들린 곳이 있음)' && ml.length === 9,
+      ml,
+    )
+    // 핵심 — 정리된 메모를 지금 있는 규칙(업무 일기 · 미팅 메모 [기록] — D-505 · D-651)이 그대로 알아듣는다
+    const plain = normalizeClientOps({ id: 'c54', workspaceId: 'w', companyName: '(주)한빛정밀', createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z' } as never)
+    const found = talkFound(memo, plain, '2026-11-24')
+    check(
+      'K54 D-654 정리된 메모 → [기록] 규칙이 그대로 읽음 — 직원 수 · 매출(숫자) · 청년 채용(사정) · 다음 주 화요일 오후 2시 2차 미팅(다음 약속)',
+      hasTalk(found) && found.numbers.length >= 2 && found.answers.length >= 1 && !!found.next && found.next.date === '2026-12-01' && /2차 미팅/.test(found.next.text),
+      { numbers: found.numbers.map((n) => `${n.key}=${n.value}`), answers: found.answers.map((a) => a.key), next: found.next },
+    )
+    check('K54 D-654 답이 없으면 메모도 없음', memoFromSummary(null, '1분 녹음') === '')
   }
 
   /* K53 — D-653 오늘 고객에게 보낼 안내: 내일 약속 · 서류 3일째 · 받을 돈(조건 대기 빼고) · 보냈어요 · 되돌리기 */

@@ -138,6 +138,9 @@ export const ASSIST_PRESETS: readonly AssistPreset[] = [
   // D-252 기업인증 타자 없이 — 준비 화면의 [AI로 나눠 넣기] · [AI로 말할 답 쓰기] 가 부른다(띠 · 판 단추에는 없음)
   { id: 'cert.reply', page: 'cert', label: '기업인증 — 대표님 답장 질문마다 나누기', kind: 'list', hint: '카톡 답장 통째로 → 질문마다' },
   { id: 'cert.say', page: 'cert', label: '기업인증 — 실사 예상 질문 말할 답 쓰기', kind: 'write', hint: '확인된 사실 · 대표 답만으로' },
+  // D-654 미팅 메모 탭의 [녹음해서 적기] 가 부른다(대표만 · 띠 · 판 단추에는 없음)
+  { id: 'meeting.transcribe', page: 'client', label: '미팅 녹음 받아 적기', kind: 'list', hint: '미팅 메모 탭에서만 — 녹음을 2분씩 들려주고 받아 적기' },
+  { id: 'meeting.summary', page: 'client', label: '미팅 녹음 정리', kind: 'list', hint: '받아 적은 글 → 사정 · 숫자 · 약속 · 할 일 메모' },
 ]
 
 const MARKETING_PAGES: readonly AssistPage[] = ['radar', 'content', 'threads', 'shorts']

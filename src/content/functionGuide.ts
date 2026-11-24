@@ -740,6 +740,15 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     basicHidden: true,
   },
   // D-626 기획 대화(대표만 — 업체의 AI 전략실 안) — 이어서 묻기 · 리서치 · 자체점검 · 기획서 판 · 개발 프롬프트
+  'fn-meeting-record': {
+    label: '녹음해서 적기',
+    menu: 'client-ops',
+    what: '미팅을 휴대폰으로 녹음하면 AI 가 2분마다 받아 적고, 멈추면 사정 · 숫자 · 약속 · 할 일로 정리해 아래 메모 칸에 넣어 줘요.',
+    why: '미팅 중에 받아 적느라 대표님 말을 놓치거나, 끝나고 기억으로 다시 쓰느라 시간이 들어서요.',
+    effect: '정리된 메모를 읽고 [기록] 한 번이면 업무 일기와 업체 기록(직원 수 · 매출 · 다음 약속)까지 들어가요. 녹음 파일은 남지 않아요.',
+    next: '말한 사람을 더 정확히 나누고, 휴대폰 녹음 파일을 올려도 정리되게 해요.',
+    onlyOwner: true,
+  },
   'fn-talk-open': {
     label: '기획 대화',
     menu: 'client-ops',
