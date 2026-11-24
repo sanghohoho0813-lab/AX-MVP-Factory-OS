@@ -37,6 +37,12 @@ export interface OutboundNotice {
 
 /** 약속 글이 대표님을 뵙는 일일 때만(내부 할 일 '서류 독촉 전화' · '견적서 쓰기' 는 안내하지 않는다) */
 export const MEET_NOTICE_WORDS = /미팅|상담|방문|제안|만남|브리핑|설명회|회의|뵙|면담|실사/
+/**
+ * 만남 말이 있어도 컨설턴트가 혼자 할 일이면 안내하지 않는다(D-655 첫날 걷기에서 찾음) —
+ * 상담 신청 링크로 들어온 잠재고객의 '상담 신청 — 연락드리기' 가 약속으로 잡혀 '… 연락드리기 일정 확인차 연락드립니다' 가 나왔다.
+ * '제안서 보내기' · '미팅 준비' · '방문 일정 잡기' · '상담 신청(들어온 것)' 도 같은 까닭.
+ */
+export const MEET_NOTICE_SKIP = /연락\s*드리기|연락하기|전화\s*(?:드리기|하기)|회신|답장|보내기|보내\s*드리기|준비|작성|쓰기|정리|독촉|잡기|상담\s*신청/
 
 /** 서류 요청을 보낸(다시 보낸) 뒤 며칠이 지나면 다시 부탁할까 */
 export const DOCS_NUDGE_DAYS = 3
@@ -97,7 +103,7 @@ function meetNotice(record: ClientOpsRecord, today: string, sender: string): Out
   const tomorrow = addDaysLocal(today, 1)
   if (date !== today && date !== tomorrow) return null
   const text = (record.nextAction ?? '').trim()
-  if (!text || !MEET_NOTICE_WORDS.test(text)) return null
+  if (!text || !MEET_NOTICE_WORDS.test(text) || MEET_NOTICE_SKIP.test(text)) return null
   const id = `meet:${date}`
   if (record.notices?.[id]) return null
   const { base, time } = splitNextTime(text)

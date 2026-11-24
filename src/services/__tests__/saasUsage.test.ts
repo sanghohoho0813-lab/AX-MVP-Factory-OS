@@ -1161,6 +1161,14 @@ async function run() {
       "K53 D-653 약속 — 내부 할 일('견적서 보내기')은 안내 안 함 · 3일 뒤 약속은 아직 · 오늘 약속은 '오늘' 로 맨 위",
       outboundNotices([internal], today).length === 0 && outboundNotices([later], today).length === 0 && outboundNotices([todayMeet], today)[0]?.title === '오늘 2차 미팅 · 오후 2시' && outboundNotices([todayMeet], today)[0]?.rank === 0,
     )
+    // D-655 첫날 걷기 — 만남 말이 있어도 컨설턴트 혼자 할 일은 안내 안 함(상담 신청 링크로 들어온 잠재고객 '상담 신청 — 연락드리기')
+    const own = ['상담 신청 — 연락드리기', '제안서 보내기', '미팅 준비', '방문 일정 잡기', '상담 전화 드리기', '실사 자료 정리'].map((t) => ({ ...rec, nextAction: t, nextActionDueDate: today, fees: [], docRequests: [] }))
+    const keep = ['2차 미팅', '방문 상담 · 오후 3시', '제안 브리핑', '현장 실사'].map((t) => ({ ...rec, nextAction: t, nextActionDueDate: today, fees: [], docRequests: [] }))
+    check(
+      "K53b D-655 약속 — '연락드리기 · 보내기 · 준비 · 잡기 · 전화 드리기 · 정리 · 상담 신청' 은 안내 안 함 · '2차 미팅 · 방문 상담 · 제안 브리핑 · 현장 실사' 는 그대로",
+      own.every((r) => outboundNotices([r], today).length === 0) && keep.every((r) => outboundNotices([r], today).length === 1),
+      own.filter((r) => outboundNotices([r], today).length).map((r) => r.nextAction),
+    )
     // 보냈어요 → 목록에서 빠짐 · 기록 한 줄 · 되돌리기
     const s1 = withNoticeSent(rec, meet, today, '2026-11-24T01:00:00Z')
     const s2 = withNoticeSent(s1.record, over, today, '2026-11-24T01:01:00Z')

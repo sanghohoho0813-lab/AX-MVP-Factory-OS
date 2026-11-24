@@ -118,6 +118,8 @@ for (const [w, mob] of [[1440, false], [390, true]]) {
   await page.getByRole('button', { name: /등록/ }).first().click()
   const nameBox = page.getByLabel('업체명')
   await nameBox.fill('한솔테크(주)')
+  // 세 갈래를 함께 돌리면 한 박자 늦게 그려질 때가 있다(D-655 전체 점검) — 바로 세지 않고 잠깐 기다린다
+  await page.getByTestId('new-client-dupe').waitFor({ timeout: 3000 }).catch(() => {})
   check(`새 업체: 같은 업체가 있으면 알린다 ${tag}`, (await page.getByTestId('new-client-dupe').count()) === 1)
   await nameBox.fill(`새잠재상사${w}`)
   check(`새 업체: 기본은 잠재고객 ${tag}`, (await page.locator('form').getByRole('button', { name: /^잠재고객/ }).getAttribute('aria-pressed')) === 'true')
