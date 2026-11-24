@@ -10552,4 +10552,4 @@ run.sh 0031 묶음(점검 SQL 없음 → 들어감 → 되돌리기 → 꺼짐 �
 
 **시험** — test:saasusage K53(8 — 고르는 규칙 · 순서 · 문구 · 내부 할 일 · 조건 대기 · 7일 · 되돌리기 · 받은 값 다듬기) · K20 오늘 기능 안내 4 → 5 · `npm run qa:outbound`(새 · O1~O12).
 결과(휴대폰 칩으로 옮긴 뒤 다시) — tsc · oxlint · build · test:all 녹색 · qa:outbound 12/0 · qa:firstscreen 87/0 · taps 6 · chars 147 · easy 84 · simple 88 · hover 113 · guide 71 · homeask 94 · steady 76 · diag 39 · plan 89 · talk 35 · keepui 10(모두 실패 0) ·
-처음 묶음에서 docreq · flow 녹색 · qa:db 녹색(DB 변경 0) · qa:pilot(아래 줄).
+처음 묶음에서 docreq · flow 녹색 · qa:db 녹색(DB 변경 0) · qa:pilot 481/0.
