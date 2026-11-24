@@ -31,12 +31,15 @@ export function TodayNotices({
   today,
   workspaceId,
   onSaved,
+  chip = false,
 }: {
   clients: ClientOpsRecord[]
   today: string
   /** 누르기 직전에 이 작업실 기록을 새로 읽는다(D-212 — 아침에 열어 둔 화면으로 덮지 않게) */
   workspaceId: string | null
   onSaved: (record: ClientOpsRecord) => void
+  /** 휴대폰 — 숫자 한 줄(가로로 넘기는 칩 줄) 맨 앞 칩 모양으로(머리 줄에 줄을 하나 더 쓰지 않게 · qa:firstscreen) */
+  chip?: boolean
 }) {
   const sender = useSenderLine()
   const items = useMemo(() => outboundNotices(clients, today, sender), [clients, today, sender])
@@ -44,19 +47,34 @@ export function TodayNotices({
   if (!items.length && !open) return null
   return (
     <>
-      {items.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="tap t-sub inline-flex shrink-0 items-center gap-1.5 font-semibold text-brand-700 hover:underline"
-          data-testid="today-notices-open"
-          data-count={items.length}
-          data-guide="fn-today-notices"
-        >
-          <Send aria-hidden="true" className="size-4" />
-          보낼 안내 {items.length}건
-        </button>
-      )}
+      {items.length > 0 &&
+        (chip ? (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label={`보낼 안내 ${items.length}건 — 문구를 복사해 고객에게 보내요`}
+            className="tap inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-left hover:border-slate-300 hover:bg-slate-50"
+            data-testid="today-notices-open"
+            data-count={items.length}
+            data-guide="fn-today-notices"
+          >
+            <Send aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
+            <span className="t-sub break-keep whitespace-nowrap text-slate-600">보낼 안내</span>
+            <strong className="t-body font-bold whitespace-nowrap text-brand-700 tabular-nums">{items.length}건</strong>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="tap t-sub inline-flex shrink-0 items-center gap-1.5 font-semibold text-brand-700 hover:underline"
+            data-testid="today-notices-open"
+            data-count={items.length}
+            data-guide="fn-today-notices"
+          >
+            <Send aria-hidden="true" className="size-4" />
+            보낼 안내 {items.length}건
+          </button>
+        ))}
       {/* 판은 body 로 — 오늘 머리 띠(HeroFrame) 안에 그리면 아래 대화창 칸이 판 위로 올라온다(쌓임 순서) */}
       {open &&
         createPortal(

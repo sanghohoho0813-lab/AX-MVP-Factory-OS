@@ -14,6 +14,7 @@ import { listSubscriptions } from '../services/finance/financeStore'
 import { upcomingCharges } from '../services/finance/financeCore'
 import { useMoneyWords } from '../components/ops/useMoneyWords'
 import { useIsPhone } from '../lib/useIsPhone'
+import { usePageLayout, visibilityOf } from '../lib/pageLayout'
 import { TodayCharges } from '../components/money/TodayCharges'
 import { TodayCare } from '../components/ops/TodayCare'
 import { TodayNotices } from '../components/ops/TodayNotices'
@@ -322,6 +323,10 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   )
   // D-166: 휴대폰에서는 목록을 짧게(3건 · 4건) — '더 보기' 로 펼친다. PC 는 그대로
   const phone = useIsPhone()
+  // D-653 휴대폰에서 '보낼 안내' 는 숫자 한 줄 맨 앞 칩으로 — 그 줄을 꾸미기로 숨겼으면 머리 줄에 그대로
+  const todayLayout = usePageLayout('today')
+  const noticesInKpis = phone && visibilityOf(todayLayout, 'kpis') === 'show'
+  const onNoticeSaved = useCallback((r: ClientOpsRecord) => setClients((cs) => cs.map((c) => (c.id === r.id ? r : c))), [])
   const [showAllAppts, setShowAllAppts] = useState(false)
   const [journal, setJournal] = useState<JournalEntry[]>([])
   // D-486 미룬 할 일 흔적 — 줄에 '11/1에서 미룸'
@@ -791,11 +796,11 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             <Link to="/journal" className="tap t-sub inline-flex items-center font-medium text-brand-700 hover:underline">
               모두 보기
             </Link>
+            {/* D-653 오늘 고객에게 보낼 안내(약속 전날 · 서류 3일째 · 받을 돈) — 있을 때만 단추 하나 → 판.
+                PC 는 '모두 보기' 옆. 휴대폰은 숫자 한 줄 맨 앞 칩(여기 두면 줄이 하나 늘어 할 일 목록이 첫 화면 아래로 밀린다 — qa:firstscreen) ·
+                숫자 한 줄을 꾸미기로 숨겼으면 여기 그대로 */}
+            {!loading && !noticesInKpis && <TodayNotices clients={clients} today={today} workspaceId={workspaceId} onSaved={onNoticeSaved} />}
           </h1>
-          {/* D-653 오늘 고객에게 보낼 안내(약속 전날 · 서류 3일째 · 받을 돈) — 있을 때만 단추 하나 → 판 */}
-          {!loading && (
-            <TodayNotices clients={clients} today={today} workspaceId={workspaceId} onSaved={(r) => setClients((cs) => cs.map((c) => (c.id === r.id ? r : c)))} />
-          )}
           <p className="t-sub hidden font-medium text-slate-500 sm:block">
             <time dateTime={now.toISOString()}>{timeText}</time> · {greeting(now.getHours())}
           </p>
@@ -880,6 +885,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                       pilot={pilot}
                       phone={phone}
                       onFollow={() => (!pilot && openEvents.length > 0 ? navigate('/ops/inbox') : appointments.length > 0 ? scrollTo('today-appointments') : navigate('/ops/calendar'))}
+                      lead={!loading && noticesInKpis ? <TodayNotices chip clients={clients} today={today} workspaceId={workspaceId} onSaved={onNoticeSaved} /> : null}
                     />
                   )}
         </ArrangeItem>

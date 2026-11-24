@@ -9,7 +9,7 @@
  * D-541(2026-11-05 대표 지시): '오늘 처리할 업무' 칩은 뺐다 — 제목 '오늘 할 일 n건' 과 같은 숫자가 두 번 보였다.
  *   밀린 것 · 놓치면 끝나는 기한은 바로 아래 할 일 목록이 빨간 글자로 말한다(D-541 로 목록이 숫자 줄 바로 아래).
  */
-import { useContext, useEffect, useState } from 'react'
+import { useContext, useEffect, useState, type ReactNode } from 'react'
 import { CalendarClock, CheckCheck, MessagesSquare, Sparkles, Users } from 'lucide-react'
 import { SummaryChip, type SummaryChipProps as ChipProps } from '../ui/SummaryChip'
 import { ScrollHintRow } from '../ui/ScrollHintRow'
@@ -27,6 +27,8 @@ interface Props {
   onFollow: () => void
   /** D-482 업체 · 할 일을 읽는 동안 — 칸 자리를 미리 잡아(숫자 대신 '–') 다 읽은 뒤 아래 칸이 밀려 내려가지 않게 */
   loading?: boolean
+  /** D-653 휴대폰 — 줄 맨 앞에 붙일 칩(보낼 안내). 없으면 그대로 */
+  lead?: ReactNode
 }
 
 interface RecentAi {
@@ -70,7 +72,7 @@ function useRecentAiRuns(enabled: boolean): RecentAi | null {
   return state
 }
 
-export function TodayKpis({ clients, decisions, follow, pilot, phone, onFollow, loading = false }: Props) {
+export function TodayKpis({ clients, decisions, follow, pilot, phone, onFollow, loading = false, lead = null }: Props) {
   // 읽는 중에는 숫자 · 설명 대신 자리만(지어낸 0 을 잠깐이라도 보이지 않게)
   const val = (text: string) => (loading ? '–' : text)
   const tip = (text: string) => (loading ? '불러오는 중…' : text)
@@ -123,6 +125,7 @@ export function TodayKpis({ clients, decisions, follow, pilot, phone, onFollow, 
     return (
       <section aria-label="오늘 숫자" data-testid="today-kpis">
         <ScrollHintRow fade="from-white via-white/90" innerClassName="flex gap-2 pb-1">
+          {lead}
           {row}
         </ScrollHintRow>
       </section>
