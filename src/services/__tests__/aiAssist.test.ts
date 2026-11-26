@@ -28,7 +28,7 @@ import { AI_BRIEF_KEYS, DEFAULT_BRIEF, SCRIPT_MAX, aiPlanInput, ideaFromOpportun
 import { prepareFeed } from '../marketing/ytBench'
 import { radarPlan, radarVideos } from '../marketing/ytRadar'
 import { sampleFeed } from '../marketing/ytSample'
-import { agentsBundle, calendarBundle, clientsBundle, inboxBundle, maskStaff, salesBundle } from '../aiAssist/builders'
+import { agentsBundle, calendarBundle, clientsBundle, inboxBundle, maskStaff, salesBundle, todayBundle } from '../aiAssist/builders'
 import { moduleBundle } from '../aiAssist/moduleBuilders'
 import { radarBundle } from '../aiAssist/marketingBuilders'
 import { accountEpoch, allowedProviders, autoUpgradeAllowed, contextHash, historyOf, isCheapOnly, lastAutoPick, markDone, noteAutoPick, noteCheapModels, pushHistory, readChoice, readMode, saveChoice, setAllowedProviders, setCheapOnly } from '../aiAssist/store'
@@ -1097,6 +1097,24 @@ function askTests() {
   const recent = b.context.sections.find((x) => x.name.startsWith('최근 30일 기록'))
   const txt = JSON.stringify(recent)
   check('Q5 최근 30일 기록 — 새것부터 · 종류 이름 · 사람 이름 · 전화번호는 가림', (recent?.rows.length ?? 0) === 6 && (recent?.rows[0] as Record<string, unknown>).날짜 === '2026-10-22' && txt.includes('통화') && !txt.includes('010-1111-2222') && !txt.includes('홍길동'), txt.slice(0, 300))
+}
+
+/* D-670 오늘 자료 — 머리 줄 [보낼 안내] · [받은 서류] 와 같은 목록이 AI 에 가는 자료에도(문구 · 전화 · 사람 이름은 안 감) */
+{
+  const c = normalizeClientOps({ id: 'c_n', companyName: '나라정밀', representativeName: '김나라', contactName: '박과장', contactPhone: '010-9999-8888', createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z' } as never)
+  const base = { today: '2026-11-24', clients: [c], overdueTodos: [], todayTodos: [], hardDue: [], appointments: [], agenda: [], agendaLate: [], money: { overdue: { items: [], count: 0, total: 0 } }, weekIn: { count: 0, total: 0 }, salesRisks: [], recontacts: [], care: [], openEvents: 0, agentPayable: 0 }
+  const plain = todayBundle(base as never)
+  const withBoth = todayBundle({ ...base, notices: [{ clientId: 'c_n', clientName: '나라정밀', kind: '받았다고 알리기', title: '서류 1가지 받음 · 남은 1가지 김나라 010-9999-8888' }], uploads: [{ clientId: 'c_n', clientName: '나라정밀', count: 2 }] } as never)
+  const nSec = withBoth.context.sections.find((x) => x.name.startsWith('오늘 고객에게 보낼 안내'))
+  const uSec = withBoth.context.sections.find((x) => x.name.startsWith('고객이 올린 서류'))
+  const nRow = nSec?.rows[0] as Record<string, unknown> | undefined
+  const uRow = uSec?.rows[0] as Record<string, unknown> | undefined
+  check(
+    'Q6 D-670 오늘 자료 — 보낼 안내(업체 · 종류 · 한 줄) · 고객이 올린 서류(업체 · 수) 구역 · 그 업체로 가는 이동 표 · 사람 이름 · 전화는 가림 · 둘 다 없으면 구역도 없음',
+    nRow?.업체 === '나라정밀' && nRow?.종류 === '받았다고 알리기' && /서류 1가지 받음/.test(String(nRow?.내용)) && !/김나라|010-9999/.test(JSON.stringify(nSec)) && typeof nRow?.ref === 'string' &&
+      uRow?.업체 === '나라정밀' && uRow?.서류수 === 2 && !plain.context.sections.some((x) => x.name.startsWith('오늘 고객에게 보낼 안내') || x.name.startsWith('고객이 올린 서류')),
+    { nSec, uSec },
+  )
 }
 
 

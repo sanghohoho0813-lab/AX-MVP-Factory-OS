@@ -112,6 +112,10 @@ export interface TodayInput {
   charges?: { name: string; date: string; amount: string }[]
   /** D-288 기록 전체(직접 질문 재료 — 이번 달 업체별 기록 수 · 최근 30일) */
   journal?: readonly JournalEntry[]
+  /** D-670 오늘 고객에게 보낼 안내(오늘 [보낼 안내] 판과 같은 목록) — 종류 · 한 줄만. 문구 · 연락처는 보내지 않는다 */
+  notices?: readonly { clientId: string; clientName: string; kind: string; title: string }[]
+  /** D-670 고객이 올리기 링크로 올렸는데 아직 서류함 칸에 안 넣은 서류 */
+  uploads?: readonly { clientId: string; clientName: string; count: number }[]
 }
 
 export function todayBundle(i: TodayInput): AssistBundle {
@@ -143,6 +147,19 @@ export function todayBundle(i: TodayInput): AssistBundle {
           name: '업체 약속(지난 것 · 오늘 · 내일)',
           rows: i.appointments.slice(0, 30).map((e) => ({ ref: clientRef(e.clientId), 업체: e.clientName, 약속: safeText(e.title, namesOf(byId, e.clientId), 140), 날짜: e.date, 남은날: e.daysLeft })),
         },
+        // D-670 오늘 화면 머리 줄의 두 단추와 같은 목록 — '오늘 무엇부터' 를 물으면 연락할 곳 · 넣을 서류도 같이 답하게
+        ...(i.uploads?.length
+          ? [{ name: '고객이 올린 서류(아직 서류함 칸에 안 넣음 — 오늘 [받은 서류] 에서 넣기)', rows: i.uploads.slice(0, 20).map((u) => ({ ref: clientRef(u.clientId), 업체: u.clientName, 서류수: u.count })), total: i.uploads.length }]
+          : []),
+        ...(i.notices?.length
+          ? [
+              {
+                name: '오늘 고객에게 보낼 안내(문구는 오늘 [보낼 안내] 에 만들어져 있음)',
+                rows: i.notices.slice(0, 20).map((n) => ({ ref: clientRef(n.clientId), 업체: n.clientName, 종류: n.kind, 내용: safeText(n.title, namesOf(byId, n.clientId), 120) })),
+                total: i.notices.length,
+              },
+            ]
+          : []),
         {
           name: '다가오는 마감 · 약속(14일)',
           rows: i.agenda.slice(0, 40).map((a) => ({ ref: clientRef(a.clientId, a.href), 날짜: a.date, 남은날: a.daysLeft, 종류: a.kindLabel, 업체: a.clientName, 일: safeText(maskStaff(a.title), namesOf(byId, a.clientId), 140) })),

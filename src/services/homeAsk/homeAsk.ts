@@ -324,7 +324,15 @@ export interface RuleInput {
   intents: readonly HomeIntent[]
   /** 물어본 업체마다 판정 좋은 순(먼저 제안할 것과 같은 순서) */
   focus: readonly { id: string; name: string; picks: readonly PickLite[]; missingDocs: readonly string[] }[]
-  today: { overdue: number; todos: readonly string[]; hardDue: readonly string[]; appointments: readonly string[] }
+  today: {
+    overdue: number
+    todos: readonly string[]
+    hardDue: readonly string[]
+    appointments: readonly string[]
+    /** D-670 오늘 고객에게 보낼 안내('업체 — 종류 · 한 줄') · 고객이 올렸는데 아직 안 넣은 서류('업체 — n개') */
+    notices?: readonly string[]
+    uploads?: readonly string[]
+  }
   /** 질문에 업체 같은 말이 있었는데 못 찾았으면 비슷한 이름(최대 3) */
   nearNames: readonly string[]
   /** D-563 전문 모듈이 없는 계정(외부 구독 고객) — 모듈 판정 · 진단서를 약속하는 말을 쓰지 않는다 */
@@ -370,13 +378,19 @@ export function ruleAnswer(i: RuleInput): RuleAnswer {
   const items: AssistItem[] = []
   for (const t of i.today.appointments.slice(0, 3)) items.push({ title: t, tag: '약속' })
   for (const t of i.today.hardDue.slice(0, 3)) items.push({ title: t, tag: '기한' })
+  // D-670 오늘 머리 줄의 [받은 서류] · [보낼 안내] 와 같은 목록 — 대화로 물어도 같은 답
+  const uploads = i.today.uploads ?? []
+  const notices = i.today.notices ?? []
+  for (const t of uploads.slice(0, 2)) items.push({ title: t, tag: '받은 서류' })
+  for (const t of notices.slice(0, 3)) items.push({ title: t, tag: '연락' })
   for (const t of i.today.todos.slice(0, 3)) items.push({ title: t, tag: '할 일' })
   const head = i.nearNames.length
     ? `등록된 업체에서 그 이름을 찾지 못했어요 — 혹시 ${i.nearNames.join(' · ')} 인가요?`
     : items.length
       ? `오늘 챙길 것 ${items.length}가지${i.today.overdue > 0 ? ` · 밀린 할 일 ${i.today.overdue}건` : ''}`
       : '오늘은 급한 일이 없어요. 업체 이름과 함께 물어보면 그 업체 판정 · 서류로 정리해요.'
-  return { headline: head, items, next: i.nearNames.length ? ['[+] 에서 업체를 고르고 다시 물어보기'] : ['업체 이름을 넣어 물어보기(예: ○○ 미팅 준비)'], links }
+  const hub = [uploads.length ? '오늘 맨 위 [받은 서류] 에서 칸에 넣기' : '', notices.length ? '오늘 맨 위 [보낼 안내] 에서 문구 복사 → 보내고 [보냈어요]' : ''].filter(Boolean)
+  return { headline: head, items, next: i.nearNames.length ? ['[+] 에서 업체를 고르고 다시 물어보기'] : [...hub, '업체 이름을 넣어 물어보기(예: ○○ 미팅 준비)'], links }
 }
 
 /** 못 찾은 이름과 비슷한 업체 — 두 글자 이상 겹치는 이름(최대 3) */

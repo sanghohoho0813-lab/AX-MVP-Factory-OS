@@ -110,6 +110,18 @@ const r2 = ruleAnswer({ question: '다음에너지 미팅', intents: ['meeting']
 check('규칙 답: 못 찾은 이름 → 비슷한 업체를 되물음', /혹시 다움에너지/.test(r2.headline), r2.headline)
 const r3 = ruleAnswer({ question: '오늘 뭐부터', intents: ['today'], focus: [], today: { overdue: 2, todos: ['한솔 전화'], hardDue: ['선한식품 · 신청 마감'], appointments: ['다움에너지 — 2차 미팅 (오늘)'] }, nearNames: [] })
 check('규칙 답: 업체가 없으면 약속 · 기한 · 할 일 · 밀린 할 일 수', r3.items.length === 3 && r3.items[0].tag === '약속' && /밀린 할 일 2건/.test(r3.headline), r3)
+// D-670 오늘 머리 줄 [받은 서류] · [보낼 안내] 와 같은 목록을 대화로 물어도 같이 답한다
+const r3b = ruleAnswer({
+  question: '오늘 뭐부터', intents: ['today'], focus: [],
+  today: { overdue: 0, todos: ['한솔 전화'], hardDue: [], appointments: ['다움에너지 — 2차 미팅 (오늘)'], notices: ['홍길동 — 첫 인사 · 새 상담 신청 · 오늘 들어옴', '다움에너지 — 약속 안내 · 내일 2차 미팅', '선한식품 — 받았다고 알리기 · 서류 1가지 받음 · 남은 1가지', '넷째 — 입금 안내 · 잔금'], uploads: ['선한식품 — 올린 서류 2개'] },
+  nearNames: [],
+})
+check(
+  "규칙 답(D-670): 약속 → 받은 서류 → 연락(세 줄까지) → 할 일 순서 · 다음에 할 것에 '오늘 맨 위 [받은 서류] · [보낼 안내]' · 없으면 예전 그대로",
+  r3b.items.map((x) => x.tag).join(',') === '약속,받은 서류,연락,연락,연락,할 일' && r3b.items[1].title === '선한식품 — 올린 서류 2개' && /첫 인사/.test(r3b.items[2].title) && /챙길 것 6가지/.test(r3b.headline) &&
+    /\[받은 서류\]/.test(r3b.next?.[0] ?? '') && /\[보낼 안내\]/.test(r3b.next?.[1] ?? '') && r3.next?.length === 1 && !/보낼 안내/.test(r3.next?.[0] ?? ''),
+  r3b,
+)
 
 // 6. 쓰면서 배우기
 let fb = EMPTY_FEEDBACK

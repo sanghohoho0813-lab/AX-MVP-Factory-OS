@@ -10,7 +10,7 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { Check, Copy, Send } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
-import { outboundNotices, withNoticeSent, type OutboundNotice } from '../../services/outbound'
+import { NOTICE_KIND_WORD, outboundNotices, withNoticeSent, type OutboundNotice } from '../../services/outbound'
 import { listClients, saveClient } from '../../services/clientOpsService'
 import { listJournal, updateJournalEntry } from '../../services/journalService'
 import { copyText } from '../consulting/studioParts'
@@ -21,13 +21,7 @@ import { useSenderLine } from '../layout/useCurrentUser'
 
 const SHOW = 5
 
-const KIND_WORD: Record<OutboundNotice['kind'], string> = {
-  hello: '첫 인사',
-  meet: '약속 안내',
-  docs: '서류 다시 부탁',
-  got: '받았다고 알리기',
-  fee: '입금 안내',
-}
+const KIND_WORD = NOTICE_KIND_WORD
 
 export function TodayNotices({
   clients,

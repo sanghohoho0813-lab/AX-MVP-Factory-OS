@@ -21,6 +21,15 @@ import { withActivity } from './clientOpsActivity'
 
 export type NoticeKind = 'hello' | 'meet' | 'docs' | 'got' | 'fee'
 
+/** 종류를 사람 말로 — 보낼 안내 판의 작은 머리 글 · 오늘 대화창 답의 꼬리표(D-670) */
+export const NOTICE_KIND_WORD: Record<NoticeKind, string> = {
+  hello: '첫 인사',
+  meet: '약속 안내',
+  docs: '서류 다시 부탁',
+  got: '받았다고 알리기',
+  fee: '입금 안내',
+}
+
 export interface OutboundNotice {
   /** 목록 안에서 하나뿐인 열쇠 */
   key: string

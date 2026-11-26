@@ -19,7 +19,8 @@ import { TodayCharges } from '../components/money/TodayCharges'
 import { TodayCare } from '../components/ops/TodayCare'
 import { TodayNotices } from '../components/ops/TodayNotices'
 import { TodayUploads } from '../components/ops/TodayUploads'
-import { useUploadInbox } from '../components/ops/useUploadInbox'
+import { uploadInboxRows, useUploadInbox } from '../components/ops/useUploadInbox'
+import { NOTICE_KIND_WORD, outboundNotices } from '../services/outbound'
 import { TodayDecisions } from '../components/ops/DecisionList'
 import { useGrantData } from '../components/grants/useGrants'
 import { useClientReco } from '../components/ops/useClientReco'
@@ -330,6 +331,9 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const noticesInKpis = phone && visibilityOf(todayLayout, 'kpis') === 'show'
   /** D-657 고객이 올리고 아직 칸에 안 넣은 서류(업체 id → 개수) — 0031 전 · 로컬 모드는 빈 표 */
   const uploadInbox = useUploadInbox(workspaceId)
+  // D-670 머리 줄 [보낼 안내] · [받은 서류] 와 같은 목록을 AI 도우미 · 대화창도 안다("오늘 뭐부터?" 답에 같이) — 문구 · 연락처는 싣지 않는다
+  const noticeRows = useMemo(() => outboundNotices(clients, today).map((n) => ({ clientId: n.clientId, clientName: n.companyName, kind: NOTICE_KIND_WORD[n.kind], title: n.title })), [clients, today])
+  const uploadRows = useMemo(() => uploadInboxRows(clients, uploadInbox).map((u) => ({ clientId: u.clientId, clientName: u.companyName, count: u.waiting })), [clients, uploadInbox])
   const onNoticeSaved = useCallback((r: ClientOpsRecord) => setClients((cs) => cs.map((c) => (c.id === r.id ? r : c))), [])
   const [showAllAppts, setShowAllAppts] = useState(false)
   const [journal, setJournal] = useState<JournalEntry[]>([])
@@ -525,8 +529,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
     }
     // D-648 보낼 자료 만들기(builders)는 AI 도우미 · 대화창을 쓸 때 받는다
     const { todayBundle } = await import('../services/aiAssist/builders')
-    return todayBundle({ today, clients, overdueTodos, todayTodos, hardDue, appointments, agenda, agendaLate, money, weekIn, salesRisks: salesRiskList, recontacts: salesRecontactList, care: careList(clients, today), openEvents: pilot ? 0 : openEvents.length, agentPayable: pilot ? 0 : agentPayable, charges, journal })
-  }, [workspaceId, today, clients, overdueTodos, todayTodos, hardDue, appointments, agenda, agendaLate, money, weekIn, salesRiskList, salesRecontactList, pilot, openEvents, agentPayable, journal])
+    return todayBundle({ today, clients, overdueTodos, todayTodos, hardDue, appointments, agenda, agendaLate, money, weekIn, salesRisks: salesRiskList, recontacts: salesRecontactList, care: careList(clients, today), openEvents: pilot ? 0 : openEvents.length, agentPayable: pilot ? 0 : agentPayable, charges, journal, notices: noticeRows, uploads: uploadRows })
+  }, [workspaceId, today, clients, overdueTodos, todayTodos, hardDue, appointments, agenda, agendaLate, money, weekIn, salesRiskList, salesRecontactList, pilot, openEvents, agentPayable, journal, noticeRows, uploadRows])
 
   const clientNameOf = (id: string) => clientNames.get(id)
 
@@ -663,6 +667,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
           overdue: overdueTodos.length,
           todos: todayTodos.slice(0, 3).map((t) => t.content.slice(0, 60)),
           hardDue: hardDue.slice(0, 3).map((h) => `${h.clientName ? `${h.clientName} · ` : ''}${h.title}`),
+          notices: noticeRows.slice(0, 3).map((n) => `${n.clientName} — ${n.kind} · ${n.title}`),
+          uploads: uploadRows.slice(0, 2).map((u) => `${u.clientName} — 올린 서류 ${u.count}개`),
           appointments: appointments.filter((e) => (e.daysLeft ?? 9) >= 0).slice(0, 3).map((e) => `${e.clientName} — ${e.title}${e.daysLeft === 0 ? ' (오늘)' : e.daysLeft === 1 ? ' (내일)' : ''}`),
         },
         nearNames: focus.length === 0 && companyish ? nearNames(question, active) : [],
@@ -676,7 +682,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
       }
       return { bundle, rule, plans, ...(planRec && (talkFacts.length || talkNums.length || talkNx) ? { talk: { clientId: planRec.id, company: planRec.companyName, answers: talkFacts, numbers: talkNums, changes: talkChanges, ...(talkNx ? { next: talkNx } : {}) } } : {}), ...(docs.length ? { docCompany } : {}) }
     },
-    [assistBuild, clients, active, today, grantNotices, usable, reco, overdueTodos, todayTodos, hardDue, appointments],
+    [assistBuild, clients, active, today, grantNotices, usable, reco, overdueTodos, todayTodos, hardDue, appointments, noticeRows, uploadRows],
   )
 
   /** D-502 대화창에서 읽은 업체 사정을 업체에 기록 — 저장 직전에 새로 읽어(다른 창 · 팀장이 고친 것을 덮지 않게 · D-212) 답만 더한다 */
