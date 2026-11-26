@@ -166,6 +166,8 @@ export interface ItemView {
   keys: DocumentKey[]
   /** 서류함 칸이 받은 줄로 만들었다(사람 체크가 아니라) */
   byDoc: boolean
+  /** 받은 날이 확실하다 — 파일이 올라온 날이거나 사람이 [받았어요] 한 날(칸만 체크한 것은 고친 날이 섞여 확실하지 않다 · D-666) */
+  sure: boolean
 }
 
 export function itemView(record: Pick<ClientOpsRecord, 'customDocuments' | 'documents'>, req: DocRequest, item: DocRequestItem): ItemView {
@@ -177,10 +179,10 @@ export function itemView(record: Pick<ClientOpsRecord, 'customDocuments' | 'docu
   })
   if (hit) {
     const at = stampOf(record.documents[hit]).slice(0, 10)
-    return { item, got: true, gotAt: at || req.sentAt, keys, byDoc: true }
+    return { item, got: true, gotAt: at || req.sentAt, keys, byDoc: true, sure: Boolean(record.documents[hit]?.uploadedAt) }
   }
-  if (item.doneAt) return { item, got: true, gotAt: item.doneAt, keys, byDoc: false }
-  return { item, got: false, gotAt: '', keys, byDoc: false }
+  if (item.doneAt) return { item, got: true, gotAt: item.doneAt, keys, byDoc: false, sure: true }
+  return { item, got: false, gotAt: '', keys, byDoc: false, sure: false }
 }
 
 export interface RequestProgress {

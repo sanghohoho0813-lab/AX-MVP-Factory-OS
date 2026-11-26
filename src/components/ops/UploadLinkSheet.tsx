@@ -15,7 +15,7 @@ import { useToast } from '../ui/toastContext'
 import { copyText } from '../../lib/copyText'
 import { allDocumentMetas } from '../../services/clientOpsDocuments'
 import { collectMissingDocuments } from '../../services/clientOpsMessages'
-import { pendingDocKeys } from '../../services/docRequests'
+import { pendingDocKeys, requestLinesOf, requestProgress, sameOpenRequest } from '../../services/docRequests'
 import { documentFileUrl } from '../../services/clientOpsService'
 import {
   UPLOAD_CHANGED,
@@ -147,7 +147,7 @@ export function UploadLinkSheet({
           />
         )}
         {view === 'ready' && state.link && (
-          <ReadyView record={record} workspaceId={workspaceId} state={state} onEdit={() => setView('make')} onInbox={() => setView('inbox')} onLink={onLink} onSent={onSent} />
+          <ReadyView record={record} workspaceId={workspaceId} today={today} state={state} onEdit={() => setView('make')} onInbox={() => setView('inbox')} onLink={onLink} onSent={onSent} />
         )}
         {view === 'ready' && !state.link && <MakeView record={record} workspaceId={workspaceId} today={today} state={state} onDone={() => setView('ready')} onLink={onLink} />}
         {view === 'inbox' && (
@@ -267,6 +267,7 @@ function MakeView({
 function ReadyView({
   record,
   workspaceId,
+  today,
   state,
   onEdit,
   onInbox,
@@ -275,6 +276,7 @@ function ReadyView({
 }: {
   record: ClientOpsRecord
   workspaceId: string
+  today: string
   state: Writer
   onEdit: () => void
   onInbox: () => void
@@ -291,6 +293,12 @@ function ReadyView({
   const message = uploadRequestText({ contactName: record.contactName, link })
   /** 받을 서류를 골라 둔 링크만 '요청한 서류' 로 잇는다(그 밖의 서류만 받는 링크는 셀 줄이 없다) */
   const canMark = Boolean(onSent && link.docs.length && !link.expired)
+  /** D-665 이 문구로 이미 부탁해 둔 열린 요청 — 판을 다시 열어도(다음 날 · 다른 기기) 처음처럼 보이지 않게 */
+  const asked = useMemo(() => {
+    if (!canMark) return null
+    const req = sameOpenRequest(record, requestLinesOf(message).map((l) => l.label))
+    return req ? requestProgress(record, req, today) : null
+  }, [canMark, record, message, today])
 
   const copy = async (what: 'msg' | 'url') => {
     const ok = await copyText(what === 'msg' ? message : url)
@@ -341,17 +349,23 @@ function ReadyView({
         {canMark && (
           <Button variant={copied && !sent.done ? 'primary' : 'secondary'} disabled={sent.busy || !!sent.done} onClick={() => void markSent()} data-testid="upload-link-sent">
             {sent.done ? <Check aria-hidden="true" className="size-4" /> : null}
-            {sent.busy ? '적는 중…' : sent.done ? '보낸 것으로 적음' : '보냈어요'}
+            {sent.busy ? '적는 중…' : sent.done ? '보낸 것으로 적음' : asked ? '다시 보냈어요' : '보냈어요'}
           </Button>
         )}
         <button type="button" onClick={() => void copy('url')} className="tap t-sub min-h-10 font-semibold text-brand-700 hover:underline" data-testid="upload-link-copy-url">
           주소만 복사
         </button>
       </div>
-      {sent.done && (
+      {sent.done ? (
         <p role="status" className="t-sub break-keep text-success-700" data-testid="upload-link-sent-done">
           {sent.done}
         </p>
+      ) : (
+        asked && (
+          <p className={`t-sub break-keep ${!asked.done && asked.waitingDays >= 3 ? 'font-semibold text-danger-700' : 'text-slate-700'}`} data-testid="upload-link-asked" data-days={asked.waitingDays}>
+            {asked.done ? '부탁한 서류를 다 받았어요' : `${asked.waitingDays === 0 ? '오늘 부탁함' : `부탁한 지 ${asked.waitingDays}일째`} · 받은 ${asked.got}/${asked.total}`}
+          </p>
+        )
       )}
       <p className="t-sub text-slate-600" data-testid="upload-link-meta">
         {link.expired ? '기한이 지났어요 — [받을 서류 고치기] 로 다시 열어요' : `${koDate(link.expiresAt)}까지 · 받은 ${link.uploaded}개`} · 서류 {link.docs.length}가지

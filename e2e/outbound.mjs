@@ -212,40 +212,113 @@ await ctx.close()
   const leadRec = (await stored(p4)).find((c) => c.id === 'c_lead')
   check("N2 [보냈어요] → 'hello:날짜' 로 남고 목록에서 빠짐 · 할 일('상담 신청 — 연락드리기')은 그대로(통화는 사람이 끝낸다)", leadRec?.notices?.['hello:2026-11-24'] === '2026-11-24' && leadRec.nextAction === '상담 신청 — 연락드리기' && (await sheet4.getByTestId('notice-row').count()) === 2, leadRec?.notices)
   await p4.keyboard.press('Escape')
-  // 업체 화면 — 오늘과 같은 알약이 머리에(개요 탭에서도 무엇이 걸려 있는지)
+  // 업체 화면 — D-667 알약 하나('일 순서 안내' 줄 자리 · 글자 수 그대로). 여럿이면 '지금 할 것 n' → 목록 판
   await p4.goto(BASE + '/ops/clients/c_docs?tab=overview', { waitUntil: 'networkidle' })
   const now = p4.getByTestId('client-now')
   await now.waitFor({ timeout: 8000 }).catch(() => {})
-  const nowText = (await now.innerText().catch(() => '')).replace(/\s+/g, ' ')
-  check("N3 D-660 업체 머리 '지금 할 것' — 보낼 안내 1건 · 서류 요청 4일째 0/2(3일 넘어 빨간 글자)", /보낼 안내\s*1건/.test(nowText) && /서류 요청 4일째\s*0\/2/.test(nowText) && /text-danger-700/.test((await now.getByTestId('now-docreq').locator('strong').getAttribute('class')) ?? ''), nowText)
+  const nowText = (await now.innerText().catch(() => '')).replace(/\s+/g, ' ').trim()
+  const guideText = (await p4.getByTestId('step-guide').innerText().catch(() => '')).replace(/\s+/g, ' ')
+  check(
+    "N3 D-660 · D-667 업체 '지금 할 것' — 알약 하나 '지금 할 것 2'(3일 넘은 요청이 있어 빨간 글자) · '일 순서 안내' 줄 자리에(그 글은 화면 읽기 전용으로)",
+    nowText === '지금 할 것 2' && (await now.getAttribute('data-kind')) === 'many' && /text-danger-700/.test((await now.locator('span').first().getAttribute('class')) ?? '') &&
+      (await p4.getByTestId('step-guide').getByTestId('client-now').count()) === 1 && /sr-only/.test((await p4.getByTestId('step-count').getAttribute('class')) ?? ''),
+    `${nowText} | ${guideText}`,
+  )
   if (SHOTS) await p4.screenshot({ path: join(SHOTS, 'client-now-pc.png') })
-  await now.getByTestId('now-docreq').click()
+  await now.click()
+  const nowSheet = p4.getByTestId('client-now-sheet')
+  await nowSheet.waitFor({ timeout: 5000 }).catch(() => {})
+  const sheetText = (await nowSheet.innerText().catch(() => '')).replace(/\s+/g, ' ')
+  check("N3b 누르면 판 — 보낼 안내 1건 [문구 보기] · 서류 요청 4일째 0/2 [서류함에서 보기]", /보낼 안내 1건 문구 보기/.test(sheetText) && /서류 요청 4일째 0\/2 서류함에서 보기/.test(sheetText), sheetText)
+  if (SHOTS) { await p4.waitForTimeout(600); await p4.screenshot({ path: join(SHOTS, 'client-now-sheet-pc.png') }) }
+  await nowSheet.getByTestId('now-docreq').click()
   await p4.waitForTimeout(500)
-  check('N4 [서류 요청 …] → 서류 탭 · 그 탭에서는 서류 알약을 겹쳐 그리지 않음(요청한 서류 판이 같은 줄) · 보낼 안내 알약은 그대로', new URL(p4.url()).searchParams.get('tab') === 'docs' && (await p4.getByTestId('now-docreq').count()) === 0 && (await p4.getByTestId('doc-req-row').count()) === 1 && (await p4.getByTestId('client-now').getByTestId('today-notices-open').count()) === 1)
-  await p4.getByTestId('client-now').getByTestId('today-notices-open').click()
+  const pill4 = p4.getByTestId('client-now')
+  check(
+    "N4 [서류 요청 …] → 서류 탭 · 그 탭에서는 서류 두 가지를 세지 않음(요청한 서류 판이 같은 줄) → 알약은 '보낼 안내 1' 하나",
+    new URL(p4.url()).searchParams.get('tab') === 'docs' && (await p4.getByTestId('client-now-sheet').count()) === 0 && (await p4.getByTestId('doc-req-row').count()) === 1 &&
+      (await pill4.innerText().catch(() => '')).replace(/\s+/g, ' ').trim() === '보낼 안내 1' && (await pill4.getAttribute('data-kind')) === 'notices',
+    await pill4.innerText().catch(() => ''),
+  )
+  // 하나뿐이면 누르자마자 그 판(목록 판을 거치지 않음)
+  await pill4.click()
   const s5 = p4.getByTestId('notice-sheet')
   await s5.waitFor()
   const rows5 = await s5.getByTestId('notice-row').count()
   await s5.getByTestId('notice-sent').first().click()
   await p4.waitForTimeout(800)
+  const emptyLine = await s5.getByTestId('notice-empty').count()
   await p4.keyboard.press('Escape')
   await p4.waitForTimeout(300)
   const docsRec = (await stored(p4)).find((c) => c.id === 'c_docs')
-  check('N5 업체 화면에서 연 판 — 이 업체 것만 1줄 · [보냈어요] → 다시 부탁한 날이 서류함 요청에 · 보낼 안내 알약 사라짐(화면이 새 기록으로)', rows5 === 1 && docsRec?.docRequests?.[0]?.resentAt === '2026-11-24' && (await p4.getByTestId('today-notices-open').count()) === 0 && /오늘 다시|다시 보냄|오늘/.test(await p4.getByTestId('doc-req-row').innerText()), { rows5, req: docsRec?.docRequests?.[0], row: await p4.getByTestId('doc-req-row').innerText().catch(() => '') })
+  check(
+    "N5 하나뿐인 알약 → 바로 문구 판(이 업체 것만 1줄) · [보냈어요] → 다시 부탁한 날이 서류함 요청에 · 판은 '다 보냈어요' 로 남고 · 알약은 사라지고 그 자리는 다시 '일 순서 안내'",
+    rows5 === 1 && emptyLine === 1 && docsRec?.docRequests?.[0]?.resentAt === '2026-11-24' && (await p4.getByTestId('client-now').count()) === 0 && !/sr-only/.test((await p4.getByTestId('step-count').getAttribute('class')) ?? '') &&
+      /일 순서 안내/.test(await p4.getByTestId('step-count').innerText()) && /오늘 다시|다시 보냄|오늘/.test(await p4.getByTestId('doc-req-row').innerText()),
+    { rows5, emptyLine, req: docsRec?.docRequests?.[0], row: await p4.getByTestId('doc-req-row').innerText().catch(() => '') },
+  )
   await p4.goto(BASE + '/ops/clients/c_meet', { waitUntil: 'networkidle' })
   await p4.waitForTimeout(600)
-  check("N6 다른 업체(내일 미팅) — '보낼 안내 1건' 만 · 걸린 것이 없는 업체는 줄 자체가 없음", /보낼 안내\s*1건/.test((await p4.getByTestId('client-now').innerText().catch(() => '')).replace(/\s+/g, ' ')) && (await p4.getByTestId('now-docreq').count()) === 0)
+  check("N6 다른 업체(내일 미팅) — '보낼 안내 1' 알약 하나", (await p4.getByTestId('client-now').innerText().catch(() => '')).replace(/\s+/g, ' ').trim() === '보낼 안내 1' && (await p4.getByTestId('client-now').getAttribute('data-kind')) === 'notices')
   await p4.goto(BASE + '/ops/clients/c_lead', { waitUntil: 'networkidle' })
   await p4.waitForTimeout(600)
-  check('N7 첫 인사를 보낸 잠재고객 — 줄 없음', (await p4.getByTestId('client-now').count()) === 0)
+  check("N7 첫 인사를 보낸 잠재고객 — 알약 없음 · 그 자리는 '일 순서 안내'", (await p4.getByTestId('client-now').count()) === 0 && /일 순서 안내/.test(await p4.getByTestId('step-count').innerText().catch(() => '')))
   // 390 — 줄이 옆으로 넘치지 않음
   await p4.setViewportSize({ width: 390, height: 844 })
   await p4.goto(BASE + '/ops/clients/c_meet?tab=overview', { waitUntil: 'networkidle' })
   await p4.waitForTimeout(600)
   const over4 = await p4.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-  check('N8 390 — 업체 머리 줄 옆 넘침 0 · 알약 높이 36px 이상', over4 <= 0 && ((await p4.getByTestId('client-now').getByTestId('today-notices-open').boundingBox())?.height ?? 0) >= 36, String(over4))
+  check('N8 390 — 옆 넘침 0 · 알약 높이 36px 이상', over4 <= 0 && ((await p4.getByTestId('client-now').boundingBox())?.height ?? 0) >= 36, String(over4))
   if (SHOTS) await p4.screenshot({ path: join(SHOTS, 'client-now-390.png') })
   await c4.close()
+}
+
+// ---------------------------------------------------------------- D-666 서류 받았다고 알리기(받은 것 · 남은 것 한 줄 — 사흘째 독촉과 겹치지 않음)
+{
+  const slug = 'abcdefghij0123456789'
+  const got = base('c_got', '(주)서류도착', {
+    representativeName: '정도착',
+    uploadHint: { slug, until: '2026-12-08' },
+    docRequests: [{ id: 'r5', sentAt: '2026-11-20', sentAtIso: '2026-11-20T01:00:00.000Z', title: '서류 요청', items: [{ label: '대표님 생년월일', where: '', doneAt: '2026-11-24' }, { label: '주주 구성 메모', where: '' }] }],
+  })
+  const { ctx: c5, page: p5 } = await open({ width: 390, height: 844 }, [got])
+  const chip = p5.getByTestId('today-notices-open')
+  await chip.waitFor({ timeout: 10_000 })
+  await chip.click()
+  const sheet = p5.getByTestId('notice-sheet')
+  await sheet.waitFor()
+  const rows = sheet.getByTestId('notice-row')
+  const row = rows.first()
+  await row.getByTestId('notice-peek').click()
+  const text = await row.getByTestId('notice-text').innerText()
+  check(
+    "N9 D-666 부탁한 서류 하나가 들어온 날 — 한 줄만('받았다고 알리기' · 4일째 독촉 줄은 따로 안 뜸) · '서류 1가지 받음 · 남은 1가지'",
+    (await rows.count()) === 1 && (await row.getAttribute('data-kind')) === 'got' && /받았다고 알리기/.test(await row.innerText()) && /서류 1가지 받음 · 남은 1가지/.test(await row.getByTestId('notice-title').innerText()),
+    await row.innerText(),
+  )
+  check(
+    'N10 문구 — 잘 받았습니다 · 받은 서류 · 아직 남은 서류 · 올리기 주소(끝인사 앞) · 수수료 · OS 이름 0',
+    text.startsWith('안녕하세요, 정도착 대표님.') && /보내 주신 서류 잘 받았습니다/.test(text) && /받은 서류\n1\. 대표님 생년월일/.test(text) && /아직 남은 서류\n1\. 주주 구성 메모/.test(text) &&
+      text.includes(`/up/${slug}`) && text.indexOf(`/up/${slug}`) < text.indexOf('편하실 때 보내 주세요') && !/MIRAE|수수료/.test(text),
+    text,
+  )
+  const over5 = await p5.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  check('N11 390 — 문구를 펼친 판 옆 넘침 0', over5 <= 0, String(over5))
+  if (SHOTS) { await p5.waitForTimeout(700); await p5.screenshot({ path: join(SHOTS, 'outbound-got-390.png') }) }
+  await row.getByTestId('notice-sent').click()
+  await p5.waitForTimeout(800)
+  const rec5 = (await stored(p5)).find((c) => c.id === 'c_got')
+  check(
+    "N12 [보냈어요] → 'got:요청:받은 수' 로 남고 · 남은 것을 같이 부탁했으니 그 요청의 다시 부탁한 날도 오늘 · 목록에서 빠짐",
+    rec5?.notices?.['got:r5:1'] === '2026-11-24' && rec5.docRequests?.[0]?.resentAt === '2026-11-24' && (await sheet.getByTestId('notice-row').count()) === 0,
+    JSON.stringify({ n: rec5?.notices, r: rec5?.docRequests?.[0]?.resentAt }),
+  )
+  await p5.keyboard.press('Escape')
+  await p5.goto(BASE + '/ops/clients/c_got?tab=overview', { waitUntil: 'networkidle' })
+  await p5.waitForTimeout(600)
+  const now5 = (await p5.getByTestId('client-now').innerText().catch(() => '')).replace(/\s+/g, ' ')
+  check("N13 업체 화면 — 보낼 안내는 없고 알약 하나 '서류 요청함'(기다린 날을 오늘부터 다시 셈 · 1/2 는 누르면 서류함에)", now5.trim() === '서류 요청함' && (await p5.getByTestId('client-now').getAttribute('data-kind')) === 'docreq', now5)
+  await c5.close()
 }
 
 check('O12 JS 오류 0', errs.length === 0, errs)

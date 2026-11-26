@@ -6,6 +6,7 @@
  *   - 서류 독촉   보낸 서류 요청에 아직 안 온 것이 있고 3일이 지났으면 → 남은 것만 다시 부탁(D-512 다시 요청과 같은 글)
  *   - 받을 돈     받기로 한 날이 2일 안 · 오늘 · 지났으면(조건 대기는 빼고 — D-140 수금 상태 그대로) → 입금 안내
  *   - 첫 인사     상담 신청 링크로 들어온 잠재고객에게 아직 연락 전이면(D-658) → '상담 신청 감사합니다 · 통화 편한 시간'
+ *   - 받았어요    부탁한 서류가 들어왔으면(이틀 안 · D-666) → '잘 받았습니다 · 받은 서류 · 아직 남은 서류(+ 올리기 주소)'
  * 보내는 것은 사람이다 — 앱은 문구만 만든다(외부 발송 · 비용 0). [보냈어요] 를 누르면 업체 기록에 남고 목록에서 빠진다.
  *   약속 · 받을 돈은 `notices`(무엇을 · 언제 보냈나) · 서류는 그 요청의 '다시 부탁한 날'(withRequestResent — 서류함과 같은 기록).
  * 나중에 알림톡을 열면 같은 목록 · 같은 문구가 자동 발송으로 바뀐다(템플릿이 이 글).
@@ -14,10 +15,11 @@
 import type { ClientOpsRecord } from '../types/clientOps'
 import { addDaysLocal, friendlyDate, splitNextTime } from './clientOpsNextAction'
 import { openRequests, requestProgress, resendText, withRequestResent } from './docRequests'
+import { uploadHintLines } from './uploadHint'
 import { feeStateOf, fundingFactsOf } from './feeStatus'
 import { withActivity } from './clientOpsActivity'
 
-export type NoticeKind = 'hello' | 'meet' | 'docs' | 'fee'
+export type NoticeKind = 'hello' | 'meet' | 'docs' | 'got' | 'fee'
 
 export interface OutboundNotice {
   /** 목록 안에서 하나뿐인 열쇠 */
@@ -30,8 +32,8 @@ export interface OutboundNotice {
   /** 붙여 보낼 글 */
   text: string
   phone: string
-  /** 보냈다는 기록을 어디에 — notices 열쇠 또는 서류 요청 id */
-  mark: { type: 'notice'; id: string } | { type: 'resend'; reqId: string }
+  /** 보냈다는 기록을 어디에 — notices 열쇠(+ 남은 서류를 같이 부탁했으면 그 요청의 '다시 부탁한 날' 도) 또는 서류 요청 id */
+  mark: { type: 'notice'; id: string; resendReqId?: string } | { type: 'resend'; reqId: string }
   /** 작을수록 위 */
   rank: number
 }
@@ -54,6 +56,8 @@ export const HELLO_NEXT_ACTION = '상담 신청 — 연락드리기'
 /** 신청한 지 이만큼 지나도록 연락 전이면 '첫 인사' 는 더 띄우지 않는다(할 일 목록에는 그대로 남는다) */
 export const HELLO_KEEP_DAYS = 14
 export const DOCS_NUDGE_DAYS = 3
+/** D-666 서류를 받은 지 이만큼 지나면 '받았어요' 안내는 더 띄우지 않는다(늦은 인사는 어색하다) */
+export const GOT_KEEP_DAYS = 2
 /** 받을 돈 — 예정일 며칠 전부터 미리 안내할까 */
 export const FEE_AHEAD_DAYS = 2
 /** 받을 돈 — 안내를 보낸 뒤 며칠 동안은 다시 띄우지 않나 */
@@ -165,9 +169,64 @@ function meetNotice(record: ClientOpsRecord, today: string, sender: string): Out
   }
 }
 
-function docsNotices(record: ClientOpsRecord, today: string, sender: string): OutboundNotice[] {
+/**
+ * D-666 부탁한 서류가 들어왔다 → '잘 받았습니다' 안내. 고객이 올리기 링크 · 카톡으로 보낸 뒤 받았는지 몰라 다시 묻지 않게.
+ * 받은 날이 확실한 줄(파일이 올라온 날 · 사람이 [받았어요] 한 날)이 이틀 안에 있을 때만 — 열쇠는 '요청 · 받은 수' 라서
+ * 하나 더 들어오면 한 번 더 뜨고, 같은 수에서는 한 번만. 남은 서류가 있으면 같은 글에 다시 부탁(+ 열린 올리기 주소)이 들어 있다.
+ */
+function gotNotices(record: ClientOpsRecord, today: string, sender: string): OutboundNotice[] {
+  const out: OutboundNotice[] = []
+  for (const req of record.docRequests ?? []) {
+    // 다 받고 [요청 끝내기] 를 먼저 눌렀어도 이틀은 본다
+    if (req.closedAt && (!DAY.test(req.closedAt) || daysBetween(req.closedAt, today) > GOT_KEEP_DAYS)) continue
+    const p = requestProgress(record, req, today)
+    const fresh = p.items.filter((x) => {
+      if (!x.got || !x.sure || !DAY.test(x.gotAt) || x.gotAt < req.sentAt) return false
+      const ago = daysBetween(x.gotAt, today)
+      return ago >= -1 && ago <= GOT_KEEP_DAYS
+    })
+    if (!fresh.length) continue
+    const id = `got:${req.id}:${p.got}`
+    if (record.notices?.[id]) continue
+    const gotLines = p.items.filter((x) => x.got).map((x, i) => `${i + 1}. ${x.item.label}`)
+    const left = p.pending.map((v, i) => [`${i + 1}. ${v.item.label}`, v.item.where ? `   - ${v.item.where}` : ''].filter(Boolean).join('\n'))
+    const text = left.length
+      ? [
+          greet(record, sender),
+          '보내 주신 서류 잘 받았습니다.',
+          '',
+          '받은 서류',
+          ...gotLines,
+          '',
+          '아직 남은 서류',
+          ...left,
+          ...uploadHintLines(record, today),
+          '',
+          '편하실 때 보내 주세요. 감사합니다.',
+        ]
+      : [greet(record, sender), '부탁드린 서류를 모두 잘 받았습니다.', '', '받은 서류', ...gotLines, '', '검토한 뒤 다시 연락드리겠습니다. 감사합니다.']
+    out.push({
+      key: `${record.id}|${id}`,
+      kind: 'got',
+      clientId: record.id,
+      companyName: record.companyName || '(이름 없음)',
+      title: left.length ? `서류 ${p.got}가지 받음 · 남은 ${left.length}가지` : `부탁한 서류 ${p.total}가지 다 받음`,
+      text: text.join('\n'),
+      phone: record.contactPhone ?? '',
+      // 남은 것을 같은 글로 다시 부탁했으니 기다린 날도 오늘부터 다시 센다(사흘 뒤 독촉과 겹치지 않게)
+      mark: { type: 'notice', id, ...(left.length && !req.closedAt ? { resendReqId: req.id } : {}) },
+      // 서류 독촉(3) 다음 · 오늘 받을 돈(4) 앞
+      rank: 3.5,
+    })
+  }
+  return out
+}
+
+function docsNotices(record: ClientOpsRecord, today: string, sender: string, skip: ReadonlySet<string>): OutboundNotice[] {
   const out: OutboundNotice[] = []
   for (const req of openRequests(record)) {
+    // D-666 '받았어요' 안내가 남은 서류를 같이 부탁한다 — 같은 요청을 두 줄로 띄우지 않는다
+    if (skip.has(req.id)) continue
     const p = requestProgress(record, req, today)
     if (!p.pending.length || p.waitingDays < DOCS_NUDGE_DAYS) continue
     const body = resendText(record, req, today)
@@ -249,7 +308,9 @@ export function outboundNotices(clients: readonly ClientOpsRecord[], today: stri
     if (hello) out.push(hello)
     const meet = meetNotice(c, today, sender)
     if (meet) out.push(meet)
-    out.push(...docsNotices(c, today, sender), ...feeNotices(c, today, sender))
+    const got = gotNotices(c, today, sender)
+    const gotReqs = new Set(got.map((g) => (g.mark.type === 'notice' ? g.mark.resendReqId ?? '' : '')).filter(Boolean))
+    out.push(...got, ...docsNotices(c, today, sender, gotReqs), ...feeNotices(c, today, sender))
   }
   return out.sort((a, b) => a.rank - b.rank || a.companyName.localeCompare(b.companyName, 'ko'))
 }
@@ -275,11 +336,28 @@ export function withNoticeSent(
 ): { record: ClientOpsRecord; undo: (latest: ClientOpsRecord) => ClientOpsRecord } {
   let next: ClientOpsRecord
   let revert: (r: ClientOpsRecord) => ClientOpsRecord
+  /** 그 요청의 '다시 부탁한 날' 을 오늘로 — 되돌릴 때는 그 전 값으로 */
+  const resend = (base: ClientOpsRecord, reqId: string): { next: ClientOpsRecord; revert: (r: ClientOpsRecord) => ClientOpsRecord } => {
+    const prev = (base.docRequests ?? []).find((q) => q.id === reqId)?.resentAt
+    return {
+      next: withRequestResent(base, reqId, today),
+      revert: (r) => ({
+        ...r,
+        docRequests: (r.docRequests ?? []).map((q) => {
+          if (q.id !== reqId) return q
+          if (prev) return { ...q, resentAt: prev }
+          const { resentAt: _drop, ...rest } = q
+          void _drop
+          return rest
+        }),
+      }),
+    }
+  }
   if (notice.mark.type === 'notice') {
     const id = notice.mark.id
     const prev = record.notices?.[id]
     next = { ...record, notices: { ...pruneNotices(record.notices, today), [id]: today } }
-    revert = (r) => {
+    const dropNotice = (r: ClientOpsRecord): ClientOpsRecord => {
       const ns = { ...(r.notices ?? {}) }
       if (prev) ns[id] = prev
       else delete ns[id]
@@ -287,20 +365,17 @@ export function withNoticeSent(
       void _drop
       return Object.keys(ns).length ? { ...rest, notices: ns } : rest
     }
+    revert = dropNotice
+    // D-666 '받았어요' 글에 남은 서류를 같이 부탁했다 — 그 요청의 기다린 날도 오늘부터
+    if (notice.mark.resendReqId) {
+      const again = resend(next, notice.mark.resendReqId)
+      next = again.next
+      revert = (r) => again.revert(dropNotice(r))
+    }
   } else {
-    const reqId = notice.mark.reqId
-    const prev = (record.docRequests ?? []).find((q) => q.id === reqId)?.resentAt
-    next = withRequestResent(record, reqId, today)
-    revert = (r) => ({
-      ...r,
-      docRequests: (r.docRequests ?? []).map((q) => {
-        if (q.id !== reqId) return q
-        if (prev) return { ...q, resentAt: prev }
-        const { resentAt: _drop, ...rest } = q
-        void _drop
-        return rest
-      }),
-    })
+    const again = resend(record, notice.mark.reqId)
+    next = again.next
+    revert = again.revert
   }
   next = withActivity(next, 'notice', `고객에게 안내 보냄 — ${notice.title}`, null, at)
   const entryId = next.activity[0]?.id
@@ -313,12 +388,12 @@ export function withNoticeSent(
   }
 }
 
-/** 저장된 값 다듬기(clientOpsService.normalizeClientOps) — 'meet:' · 'fee:' · 'hello:' 열쇠 · 날짜만 */
+/** 저장된 값 다듬기(clientOpsService.normalizeClientOps) — 'meet:' · 'fee:' · 'hello:' · 'got:' 열쇠 · 날짜만 */
 export function normalizeNotices(value: unknown): { notices?: Record<string, string> } {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const out: Record<string, string> = {}
   for (const [k, v] of Object.entries(value as Record<string, unknown>).slice(-300)) {
-    if (!/^(meet|fee|hello):[^\s]{1,120}$/.test(k) || typeof v !== 'string' || !DAY.test(v)) continue
+    if (!/^(meet|fee|hello|got):[^\s]{1,120}$/.test(k) || typeof v !== 'string' || !DAY.test(v)) continue
     out[k] = v
   }
   return Object.keys(out).length ? { notices: out } : {}

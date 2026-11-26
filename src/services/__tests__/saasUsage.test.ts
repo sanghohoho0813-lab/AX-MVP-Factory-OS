@@ -1292,6 +1292,57 @@ async function run() {
         !/^import /m.test(hintSrc) && /uploadHint: '서류 올리기 링크'/.test(src('src/services/clientMerge.ts')),
       )
     }
+    // D-666 서류 받았다고 알리기 — 부탁한 서류가 들어오면 '받은 것 · 남은 것' 한 줄(사흘째 독촉과 한 줄로) · 다 받으면 '모두 받았습니다'
+    {
+      const bare = { ...rec, nextAction: '', nextActionDueDate: null, fees: [], docRequests: rec.docRequests!.filter((r) => r.id === 'r1') } as typeof rec
+      const mark = (labels: string[], at: string) => ({ ...bare, docRequests: bare.docRequests!.map((r) => ({ ...r, items: r.items.map((i) => (labels.includes(i.label) ? { ...i, doneAt: at } : i)) })) }) as typeof rec
+      const one = mark(['대표님 생년월일'], today)
+      const list1 = outboundNotices([one], today, '홍길동 팀장')
+      const got = list1[0]
+      const slug = 'abcdefghij0123456789'
+      const withLink = outboundNotices([withUploadHint(one, { slug, expiresAt: '2026-12-08T03:00:00Z' })], today)[0]
+      check(
+        "K58 D-666 받았어요 — 하나 들어오면 '서류 1가지 받음 · 남은 1가지' 한 줄만(4일째 독촉 줄은 안 뜸) · 받은 서류 · 아직 남은 서류 · 보내는 사람 · 열린 링크 주소는 끝인사 앞",
+        list1.length === 1 && got.kind === 'got' && got.title === '서류 1가지 받음 · 남은 1가지' && got.text.startsWith('안녕하세요, 김한빛 대표님. 홍길동 팀장입니다.\n보내 주신 서류 잘 받았습니다.') &&
+          got.text.includes('받은 서류\n1. 대표님 생년월일') && got.text.includes('아직 남은 서류\n1. 주주 구성 메모') && !got.text.includes('/up/') && got.mark.type === 'notice' && got.mark.id === 'got:r1:1' && got.mark.resendReqId === 'r1' &&
+          withLink.text.includes(`/up/${slug}`) && withLink.text.indexOf(`/up/${slug}`) < withLink.text.indexOf('편하실 때 보내 주세요') && withLink.text.indexOf('아직 남은 서류') < withLink.text.indexOf(`/up/${slug}`),
+        list1.map((n) => [n.kind, n.title, n.text]),
+      )
+      const sent = withNoticeSent(one, got, today, '2026-11-24T03:00:00Z')
+      const r1sent = sent.record.docRequests!.find((r) => r.id === 'r1')
+      const back = sent.undo(sent.record)
+      check(
+        "K58 D-666 [보냈어요] — 보낸 기록 'got:r1:1' + 그 요청의 다시 부탁한 날도 오늘(남은 것을 같은 글로 부탁) → 목록 0 · 활동 기록 한 줄 · 되돌리면 둘 다 예전대로 · 저장 모양 'got:' 열쇠",
+        sent.record.notices?.['got:r1:1'] === today && r1sent?.resentAt === today && outboundNotices([sent.record], today).length === 0 && /고객에게 안내 보냄 — 서류 1가지 받음/.test(sent.record.activity[0]?.text ?? '') &&
+          back.notices?.['got:r1:1'] === undefined && back.docRequests!.find((r) => r.id === 'r1')?.resentAt === undefined && outboundNotices([back], today)[0]?.kind === 'got' &&
+          JSON.stringify(normalizeNotices({ 'got:r1:1': today })) === JSON.stringify({ notices: { 'got:r1:1': today } }),
+        sent.record.activity[0],
+      )
+      // 다음 날 하나 더 → 받은 수가 달라져 한 번 더 · 다 받았으면 '모두' · 다시 부탁은 없음
+      const both = { ...mark(['대표님 생년월일', '주주 구성 메모'], today), notices: { 'got:r1:1': today } } as typeof rec
+      const all = outboundNotices([both], today)[0]
+      const closedSoon = { ...both, docRequests: both.docRequests!.map((r) => ({ ...r, closedAt: today })) } as typeof rec
+      const closedOld = { ...both, docRequests: both.docRequests!.map((r) => ({ ...r, closedAt: '2026-11-20' })) } as typeof rec
+      check(
+        "K58 D-666 다 받음 — 하나 더 들어오면 새 줄('got:r1:2') · '부탁한 서류 2가지 다 받음' · '모두 잘 받았습니다' · 남은 서류 · 주소 · 다시 부탁 표시 없음 · 끝낸 요청도 이틀은 뜨고 오래 전에 끝낸 것은 안 뜸",
+        all?.kind === 'got' && all.title === '부탁한 서류 2가지 다 받음' && all.mark.type === 'notice' && all.mark.id === 'got:r1:2' && all.mark.resendReqId === undefined && /부탁드린 서류를 모두 잘 받았습니다/.test(all.text) &&
+          !/아직 남은 서류/.test(all.text) && !all.text.includes('/up/') && outboundNotices([closedSoon], today)[0]?.kind === 'got' && outboundNotices([closedOld], today).length === 0,
+        all,
+      )
+      // 받은 지 사흘 넘은 것 · 칸만 체크한 것(받은 날이 확실하지 않음)은 알리지 않는다 — 그때는 예전처럼 남은 것 독촉
+      const stale = outboundNotices([mark(['대표님 생년월일'], '2026-11-21')], today)
+      const slotReq = { id: 'r9', sentAt: '2026-11-23', sentAtIso: '2026-11-23T01:00:00Z', title: '서류 요청', items: [{ label: '최근 3개년 재무제표', where: '' }, { label: '주주 구성 메모', where: '' }] }
+      const slotBase = { ...bare, docRequests: [slotReq] } as typeof rec
+      const checked = { ...slotBase, documents: { ...slotBase.documents, financialStatements: { ...slotBase.documents.financialStatements, received: true, updatedAt: '2026-11-24T02:00:00Z' } } } as typeof rec
+      const uploaded = { ...slotBase, documents: { ...slotBase.documents, financialStatements: { ...slotBase.documents.financialStatements, received: true, fileName: 'fs.pdf', uploadedAt: '2026-11-24T02:00:00Z', updatedAt: '2026-11-24T02:00:00Z' } } } as typeof rec
+      const upNotice = outboundNotices([uploaded], today)
+      check(
+        "K58 D-666 조용히 — 사흘 전에 받은 것은 '받았어요' 없이 남은 것 독촉만 · 칸만 체크한 서류는 안 뜸 · 파일이 올라온 칸은 뜸('최근 3개년 재무제표' 받음 · 남은 1가지)",
+        stale.length === 1 && stale[0].kind === 'docs' && stale[0].title === '서류 1가지 · 4일째 안 옴' && outboundNotices([checked], today).length === 0 &&
+          upNotice.length === 1 && upNotice[0].kind === 'got' && upNotice[0].text.includes('받은 서류\n1. 최근 3개년 재무제표') && upNotice[0].text.includes('아직 남은 서류\n1. 주주 구성 메모'),
+        [stale.map((n) => n.title), upNotice.map((n) => n.text)],
+      )
+    }
     const outSrc = src('src/services/outbound.ts')
     check(
       'K53 D-653 약속 — 규칙 글(AI 부름 0) · 밖으로 보내는 길 0(fetch · 알림 함수 없음) · 수수료 칸을 문구에 쓰지 않음',

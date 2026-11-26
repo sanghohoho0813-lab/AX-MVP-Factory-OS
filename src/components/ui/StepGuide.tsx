@@ -7,7 +7,7 @@
  * 탭은 onGo(키), 모듈 화면은 hrefOf(키) 로 옮긴다. 순서 · 문장은 content/flowSteps.
  * 순서를 다 아는 사람은 [설명 접기] — 한 줄(몇 번째 · 이전/다음)만 남는다. 이 기기에 기억(D-185 '사용법 상자' 처럼 글이 늘 깔리지 않게).
  */
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Route } from 'lucide-react'
 import type { FlowPosition, FlowStep } from '../../content/flowSteps'
@@ -112,12 +112,18 @@ export function StepGuide({
   className = '',
   defaultMin = false,
   labelInTabs = false,
+  lead,
 }: GoProps & {
   pos: FlowPosition
   className?: string
   defaultMin?: boolean
   /** D-627 바로 위 탭 줄이 지금 단계 이름을 이미 보여 주면(업체 상세) 접힌 줄에서는 이름을 글로 다시 쓰지 않는다(화면 읽기 · 마우스에는 그대로) */
   labelInTabs?: boolean
+  /**
+   * D-667 접힌 한 줄의 '일 순서 안내' 글자 자리에 대신 설 것(업체 상세 '지금 할 것' 알약) — 글자 수 한도(D-627)를 늘리지 않고 보이게.
+   * 펼쳐 둔 사람에게는 머리 줄 위에 한 줄. 순서 밖 화면(이 틀을 안 그리는 탭)은 부르는 쪽이 따로 그린다.
+   */
+  lead?: ReactNode
 }) {
   const { flow, index, prev, next, here } = pos
   const [min, setMinState] = useState(() => readMin(defaultMin))
@@ -157,9 +163,10 @@ export function StepGuide({
     >
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1 basis-64">
+          {!min && lead && <div className="mb-2 flex">{lead}</div>}
           <div className="flex items-start gap-1">
             <p className="t-meta flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 font-bold text-brand-700" title={min && labelInTabs ? `${flow.name} · ${here.label}` : flow.name}>
-              <Route aria-hidden="true" className="size-4 shrink-0" />
+              {!(min && labelInTabs && lead) && <Route aria-hidden="true" className="size-4 shrink-0" />}
               {/* D-627 접힌 한 줄은 '몇 번째 · 지금 단계' 만(순서 이름은 펼치면 · 마우스를 올리면) */}
               {!min && <span>{flow.name}</span>}
               {!min && <span aria-hidden="true">·</span>}
@@ -168,7 +175,14 @@ export function StepGuide({
                 (계약을 마친 업체도 개요 탭이면 2/6). 업체가 어디까지 왔는지는 이름 옆 계약 단계 알약이 말한다.
                 펼치면 '몇 번째 화면' 으로 — 화면 순서라는 것이 글로 보이게.
               */}
-              {labelInTabs ? (
+              {labelInTabs && min && lead ? (
+                <>
+                  {lead}
+                  <span className="sr-only" data-testid="step-count">
+                    일 순서 안내
+                  </span>
+                </>
+              ) : labelInTabs ? (
                 <span className="tabular-nums" data-testid="step-count">
                   {min ? '일 순서 안내' : `${n}개 화면 중 ${index + 1}번째`}
                 </span>

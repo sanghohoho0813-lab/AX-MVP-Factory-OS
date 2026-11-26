@@ -289,6 +289,9 @@ await page.waitForTimeout(300)
 // 링크 판을 다시 열어 또 [보냈어요] — 같은 서류를 이미 부탁해 뒀으니 요청 · 할 일이 늘지 않고 '다시 보낸 날' 만
 await page.getByTestId('upload-link-bar').click()
 await sheet.waitFor()
+// D-665 다시 연 판은 이미 부탁한 것을 안다 — '오늘 부탁함 · 받은 0/2' · 단추는 [다시 보냈어요]
+const askedLine = await sheet.getByTestId('upload-link-asked').innerText().catch(() => '')
+check("J5b 링크 판을 다시 열면 '오늘 부탁함 · 받은 0/2' 한 줄 · 단추 말은 [다시 보냈어요](처음처럼 보이지 않는다)", /오늘 부탁함 · 받은 0\/2/.test(askedLine) && /다시 보냈어요/.test(await sheet.getByTestId('upload-link-sent').innerText()), askedLine)
 await sheet.getByTestId('upload-link-copy-msg').click()
 await sheet.getByTestId('upload-link-sent').click()
 await sheet.getByTestId('upload-link-sent-done').waitFor({ timeout: 5000 })
@@ -433,6 +436,24 @@ check('I7 [넣지 않기] → dismissed · 파일 지우기 0', files[1].status 
 // 더보기 · 링크 고치기 · 새 주소 · 닫기
 await page.keyboard.press('Escape')
 await page.waitForTimeout(300)
+// D-666 받았다고 알리기 — 넣은 서류가 부탁한 서류였으니 업체 머리에 '보낼 안내 1건'(받은 것 · 남은 것 · 같은 올리기 주소)
+{
+  const gotChip = page.getByTestId('client-now')
+  const gotCount = (await gotChip.getAttribute('data-kind').catch(() => '')) === 'notices' && /보낼 안내 1/.test(await gotChip.innerText().catch(() => '')) ? '1' : ''
+  await gotChip.click().catch(() => {})
+  const gotRow = page.getByTestId('notice-sheet').getByTestId('notice-row').first()
+  await gotRow.getByTestId('notice-peek').click().catch(() => {})
+  const gotText = await gotRow.getByTestId('notice-text').innerText().catch(() => '')
+  check(
+    "I8 D-666 넣고 나면 업체 알약 '보낼 안내 1'(서류 탭 — 하나뿐이라 누르면 바로 문구 판) → '받았다고 알리기 · 서류 1가지 받음 · 남은 1가지' · 받은 서류 사업자등록증 · 아직 남은 서류 재무제표 · 올리기 주소",
+    gotCount === '1' && (await gotRow.getAttribute('data-kind').catch(() => '')) === 'got' && /서류 1가지 받음 · 남은 1가지/.test(await gotRow.getByTestId('notice-title').innerText().catch(() => '')) &&
+      /받은 서류\n1\. 사업자등록증/.test(gotText) && /아직 남은 서류\n1\. [^\n]*재무제표/.test(gotText) && gotText.includes(linkUrl),
+    gotText,
+  )
+  if (SHOTS) { await page.waitForTimeout(700); await page.screenshot({ path: join(SHOTS, 'uplink-got-pc.png') }) }
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+}
 await page.getByTestId('client-more').click()
 await page.getByTestId('more-upload-link').click()
 await sheet.waitFor({ timeout: 5000 })

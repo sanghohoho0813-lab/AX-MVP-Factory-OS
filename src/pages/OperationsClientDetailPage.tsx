@@ -158,7 +158,8 @@ import { TodoComposer } from '../components/journal/TodoBoard'
 import { createJournalEntry, listJournal, updateJournalEntry } from '../services/journalService'
 import { pendingDocKeys, recordRequestSent, resendText, uploadDocsForRequest, withRequestResent } from '../services/docRequests'
 import { hintFromLink, openHint, sameHint, withUploadHint, withUploadLine } from '../services/uploadHint'
-import { ClientNowRow } from '../components/ops/ClientNowRow'
+import { ClientNowPill, ClientNowSheets } from '../components/ops/ClientNowRow'
+import { useClientNow, type NowKind } from '../components/ops/clientNow'
 import { saveUploadLink } from '../services/uploadLink'
 import { DocRequestPanel } from '../components/ops/DocRequestPanel'
 import { requestFollowUpText } from '../services/recoFollowUp'
@@ -374,6 +375,16 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const [deleting, setDeleting] = useState(false)
 
   const today = todayLocalDate()
+  /* D-660 · D-667 이 업체에서 지금 할 것 — 알약 하나(받은 서류 · 보낼 안내 · 서류 요청). 순서 안의 탭에서는 '일 순서 안내' 줄 자리에 선다 */
+  const nowItems = useClientNow(record, today, upl.state?.files.length ?? 0, tab === 'docs')
+  const [nowSheet, setNowSheet] = useState<'list' | 'notices' | null>(null)
+  const guideHostsNow = Boolean(flowPos.here) && flowPos.index >= 0
+  const runNow = (what: NowKind | 'list') => {
+    if (what === 'list' || what === 'notices') return setNowSheet(what)
+    setNowSheet(null)
+    if (what === 'uploads') setUplView('inbox')
+    else setTab('docs')
+  }
   const contractAge = contractAgeShort(record?.contract.signedAt ?? '', today)
 
   /**
@@ -863,21 +874,12 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           </div>
         </div>
 
-        {/* D-660 이 업체에서 지금 할 것 — 받은 서류 · 보낼 안내 · 서류 요청(있을 때만 한 줄 · 오늘 화면과 같은 알약) */}
-        <ClientNowRow
-          record={record}
-          today={today}
-          workspaceId={workspaceId}
-          uploads={upl.state?.files.length ?? 0}
-          onUploads={() => setUplView('inbox')}
-          onDocs={() => setTab('docs')}
-          onSaved={(saved) => {
-            latestRef.current = saved
-            setRecord(saved)
-            setSavedAt(Date.now())
-          }}
-          inDocs={tab === 'docs'}
-        />
+        {/* D-660 · D-667 이 업체에서 지금 할 것 — 알약 하나. 순서 안에 있는 탭은 아래 '일 순서 안내' 줄 자리에 서고(글자 수 그대로), 순서 밖 탭만 여기에 */}
+        {!guideHostsNow && nowItems.length > 0 && (
+          <div className="flex">
+            <ClientNowPill items={nowItems} onRun={runNow} />
+          </div>
+        )}
 
         {/* 주요 행동 — 한 화면에 강조 버튼은 하나만 둔다. D-126: 잠재고객은 서류보다 미팅이 먼저 · U4 휴대폰은 사이를 좁혀 세 단추가 한 줄에 */}
         <div className="flex flex-wrap items-center gap-2 max-sm:gap-1.5">
@@ -956,7 +958,21 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
 
       {/* D-235: 지금 몇 번째 단계 · 무엇을 위한 것인지 · 이전/다음(탭 순서는 그대로 — 처음 쓰는 사람이 따라갈 순서만) */}
       {/* U4(D-544) 처음엔 한 줄 — 설명은 [펼치기](한 번 고르면 기억) */}
-      <StepGuide pos={flowPos} onGo={(k) => setTab(k as DetailTab)} defaultMin labelInTabs />
+      <StepGuide pos={flowPos} onGo={(k) => setTab(k as DetailTab)} defaultMin labelInTabs lead={guideHostsNow && nowItems.length > 0 ? <ClientNowPill items={nowItems} onRun={runNow} /> : undefined} />
+      <ClientNowSheets
+        sheet={nowSheet}
+        items={nowItems}
+        record={record}
+        today={today}
+        workspaceId={workspaceId}
+        onRun={runNow}
+        onSaved={(saved) => {
+          latestRef.current = saved
+          setRecord(saved)
+          setSavedAt(Date.now())
+        }}
+        onClose={() => setNowSheet(null)}
+      />
 
       {tab === 'smart' && (
         <Suspense fallback={<p className="t-sub text-slate-500">맞춤 추천을 계산하는 중…</p>}>

@@ -1,5 +1,5 @@
 /**
- * D-653 오늘 — 고객에게 보낼 안내(약속 전날 · 서류 3일째 · 받을 돈 · D-658 새 상담 신청 첫 인사).
+ * D-653 오늘 — 고객에게 보낼 안내(약속 전날 · 서류 3일째 · 받을 돈 · D-658 새 상담 신청 첫 인사 · D-666 서류 받았다고 알리기).
  *
  * 오늘 머리 줄에 '보낼 안내 n건' 단추 하나(없으면 안 그림) → 누르면 아래에서 올라오는 판에 한 줄씩.
  * 줄마다 [카톡 문구 복사](D-661 — 올리기 링크 · 공고 알림과 같은 말) → 카톡 · 문자에 붙여 보내고 → [보냈어요] → 업체 기록에 남고 목록에서 빠진다(+ 되돌리기).
@@ -24,6 +24,7 @@ const KIND_WORD: Record<OutboundNotice['kind'], string> = {
   hello: '첫 인사',
   meet: '약속 안내',
   docs: '서류 다시 부탁',
+  got: '받았다고 알리기',
   fee: '입금 안내',
 }
 
@@ -84,6 +85,25 @@ export function TodayNotices({
         )}
     </>
   )
+}
+
+/** D-667 판만 — 업체 화면 '지금 할 것' 알약이 연다(이 업체 것만 · 오늘 화면과 같은 판 · 같은 [보냈어요]) */
+export function NoticesSheet({
+  clients,
+  today,
+  workspaceId,
+  onSaved,
+  onClose,
+}: {
+  clients: ClientOpsRecord[]
+  today: string
+  workspaceId: string | null
+  onSaved: (record: ClientOpsRecord) => void
+  onClose: () => void
+}) {
+  const sender = useSenderLine()
+  const items = useMemo(() => outboundNotices(clients, today, sender), [clients, today, sender])
+  return createPortal(<NoticeSheet items={items} today={today} workspaceId={workspaceId} clients={clients} onSaved={onSaved} onClose={onClose} />, document.body)
 }
 
 function NoticeSheet({
