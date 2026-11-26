@@ -321,6 +321,49 @@ await ctx.close()
   await c5.close()
 }
 
+// ---------------------------------------------------------------- D-668 다 받았다고 알리면 그 요청은 끝(요청 끝내기 + 3일 뒤 할 일 완료까지 한 번에)
+{
+  const done = base('c_done', '(주)다받음', {
+    representativeName: '한다받',
+    docRequests: [{ id: 'r7', sentAt: '2026-11-20', sentAtIso: '2026-11-20T01:00:00.000Z', title: '서류 요청', todoId: 'j_r7', items: [{ label: '대표님 생년월일', where: '', doneAt: '2026-11-23' }, { label: '주주 구성 메모', where: '', doneAt: '2026-11-24' }] }],
+  })
+  const { ctx: c6, page: p6 } = await open({ width: 1440, height: 900 }, [done])
+  await p6.evaluate(() => {
+    const now = '2026-11-20T01:00:00.000Z'
+    localStorage.setItem('axmvp.v1.ops_journal_entries', JSON.stringify([{ id: 'j_r7', workspaceId: null, ownerId: null, entryDate: '2026-11-20', entryType: 'follow_up', content: '자료 받았는지 확인 — 대표님 생년월일 외 1건', clientId: 'c_done', projectId: null, serviceKey: null, dueDate: '2026-11-23', pinned: false, completed: false, completedAt: null, createdAt: now, updatedAt: now }]))
+  })
+  await p6.reload({ waitUntil: 'networkidle' })
+  await p6.getByTestId('today-hero-line').waitFor()
+  const journal = () => p6.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') || '[]'))
+  await p6.getByTestId('today-notices-open').click()
+  const sheet6 = p6.getByTestId('notice-sheet')
+  await sheet6.waitFor()
+  const row6 = sheet6.getByTestId('notice-row').first()
+  await row6.getByTestId('notice-peek').click()
+  const text6 = await row6.getByTestId('notice-text').innerText()
+  check(
+    "N14 D-668 부탁한 서류를 다 받은 날 — '부탁한 서류 2가지 다 받음' · '모두 잘 받았습니다' · 남은 서류 줄 없음",
+    (await row6.getAttribute('data-kind')) === 'got' && /부탁한 서류 2가지 다 받음/.test(await row6.getByTestId('notice-title').innerText()) && /부탁드린 서류를 모두 잘 받았습니다/.test(text6) && !/아직 남은 서류/.test(text6),
+    text6,
+  )
+  await row6.getByTestId('notice-sent').click()
+  await p6.waitForTimeout(900)
+  const rec6 = (await stored(p6)).find((c) => c.id === 'c_done')
+  const j6 = (await journal()).find((e) => e.id === 'j_r7')
+  const toast6 = (await p6.getByRole('status').allInnerTexts()).join(' | ')
+  check(
+    "N15 [보냈어요] → 그 요청 끝낸 날 · 그 요청의 '받았는지 확인' 할 일 완료 · 알림 '서류 요청을 끝냈어요(할 일도 완료)'",
+    rec6?.docRequests?.[0]?.closedAt === '2026-11-24' && rec6.notices?.['got:r7:2'] === '2026-11-24' && j6?.completed === true && /서류 요청을 끝냈어요\(할 일도 완료\)/.test(toast6),
+    JSON.stringify({ closedAt: rec6?.docRequests?.[0]?.closedAt, completed: j6?.completed, toast6 }),
+  )
+  await p6.getByRole('button', { name: '되돌리기' }).last().click()
+  await p6.waitForTimeout(900)
+  const rec7 = (await stored(p6)).find((c) => c.id === 'c_done')
+  const j7 = (await journal()).find((e) => e.id === 'j_r7')
+  check('N16 [되돌리기] → 요청 다시 열림 · 할 일 다시 열림 · 보낼 안내에 다시', !rec7?.docRequests?.[0]?.closedAt && j7?.completed === false && (await sheet6.getByTestId('notice-row').count()) === 1, JSON.stringify({ closedAt: rec7?.docRequests?.[0]?.closedAt, completed: j7?.completed }))
+  await c6.close()
+}
+
 check('O12 JS 오류 0', errs.length === 0, errs)
 await browser.close()
 console.log(`\noutbound: ${pass} passed, ${fail} failed`)

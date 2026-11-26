@@ -1321,11 +1321,22 @@ async function run() {
       // 다음 날 하나 더 → 받은 수가 달라져 한 번 더 · 다 받았으면 '모두' · 다시 부탁은 없음
       const both = { ...mark(['대표님 생년월일', '주주 구성 메모'], today), notices: { 'got:r1:1': today } } as typeof rec
       const all = outboundNotices([both], today)[0]
+      const withTodo = { ...both, docRequests: both.docRequests!.map((r) => ({ ...r, todoId: 'todo9' })) } as typeof rec
+      const allTodo = outboundNotices([withTodo], today)[0]
+      const allSent = withNoticeSent(withTodo, allTodo, today, '2026-11-24T04:00:00Z')
+      const allBack = allSent.undo(allSent.record)
+      check(
+        "K58 D-668 다 받았다고 알리면 그 요청은 끝 — 표시(closeReqId · 그 요청의 할 일 id) · [보냈어요] → 요청 끝낸 날 · 목록 0 · 되돌리면 다시 열리고 다시 뜸 · 남은 것이 있을 때는 끝내지 않음",
+        allTodo.mark.type === 'notice' && allTodo.mark.closeReqId === 'r1' && allTodo.todoId === 'todo9' && allSent.record.docRequests!.find((r) => r.id === 'r1')?.closedAt === today && outboundNotices([allSent.record], today).length === 0 &&
+          allBack.docRequests!.find((r) => r.id === 'r1')?.closedAt === undefined && allBack.notices?.['got:r1:2'] === undefined && outboundNotices([allBack], today)[0]?.kind === 'got' &&
+          got.mark.type === 'notice' && got.mark.closeReqId === undefined && got.todoId === undefined && sent.record.docRequests!.find((r) => r.id === 'r1')?.closedAt === undefined,
+        allTodo,
+      )
       const closedSoon = { ...both, docRequests: both.docRequests!.map((r) => ({ ...r, closedAt: today })) } as typeof rec
       const closedOld = { ...both, docRequests: both.docRequests!.map((r) => ({ ...r, closedAt: '2026-11-20' })) } as typeof rec
       check(
         "K58 D-666 다 받음 — 하나 더 들어오면 새 줄('got:r1:2') · '부탁한 서류 2가지 다 받음' · '모두 잘 받았습니다' · 남은 서류 · 주소 · 다시 부탁 표시 없음 · 끝낸 요청도 이틀은 뜨고 오래 전에 끝낸 것은 안 뜸",
-        all?.kind === 'got' && all.title === '부탁한 서류 2가지 다 받음' && all.mark.type === 'notice' && all.mark.id === 'got:r1:2' && all.mark.resendReqId === undefined && /부탁드린 서류를 모두 잘 받았습니다/.test(all.text) &&
+        all?.kind === 'got' && all.title === '부탁한 서류 2가지 다 받음' && all.mark.type === 'notice' && all.mark.id === 'got:r1:2' && all.mark.resendReqId === undefined && all.mark.closeReqId === 'r1' && /부탁드린 서류를 모두 잘 받았습니다/.test(all.text) &&
           !/아직 남은 서류/.test(all.text) && !all.text.includes('/up/') && outboundNotices([closedSoon], today)[0]?.kind === 'got' && outboundNotices([closedOld], today).length === 0,
         all,
       )
@@ -1336,10 +1347,14 @@ async function run() {
       const checked = { ...slotBase, documents: { ...slotBase.documents, financialStatements: { ...slotBase.documents.financialStatements, received: true, updatedAt: '2026-11-24T02:00:00Z' } } } as typeof rec
       const uploaded = { ...slotBase, documents: { ...slotBase.documents, financialStatements: { ...slotBase.documents.financialStatements, received: true, fileName: 'fs.pdf', uploadedAt: '2026-11-24T02:00:00Z', updatedAt: '2026-11-24T02:00:00Z' } } } as typeof rec
       const upNotice = outboundNotices([uploaded], today)
+      // 한국 아침 8시에 올린 파일은 세계시로 전날 날짜 — 부탁한 날(한국 날짜)보다 앞처럼 보여도 받았다고 알린다
+      const morningReq = { ...slotReq, sentAt: today, sentAtIso: '2026-11-23T22:30:00Z' }
+      const morning = { ...uploaded, docRequests: [morningReq], documents: { ...uploaded.documents, financialStatements: { ...uploaded.documents.financialStatements, uploadedAt: '2026-11-23T23:00:00Z', updatedAt: '2026-11-23T23:00:00Z' } } } as typeof rec
       check(
         "K58 D-666 조용히 — 사흘 전에 받은 것은 '받았어요' 없이 남은 것 독촉만 · 칸만 체크한 서류는 안 뜸 · 파일이 올라온 칸은 뜸('최근 3개년 재무제표' 받음 · 남은 1가지)",
         stale.length === 1 && stale[0].kind === 'docs' && stale[0].title === '서류 1가지 · 4일째 안 옴' && outboundNotices([checked], today).length === 0 &&
-          upNotice.length === 1 && upNotice[0].kind === 'got' && upNotice[0].text.includes('받은 서류\n1. 최근 3개년 재무제표') && upNotice[0].text.includes('아직 남은 서류\n1. 주주 구성 메모'),
+          upNotice.length === 1 && upNotice[0].kind === 'got' && upNotice[0].text.includes('받은 서류\n1. 최근 3개년 재무제표') && upNotice[0].text.includes('아직 남은 서류\n1. 주주 구성 메모') &&
+          outboundNotices([morning], today)[0]?.kind === 'got',
         [stale.map((n) => n.title), upNotice.map((n) => n.text)],
       )
     }

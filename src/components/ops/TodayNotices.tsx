@@ -12,6 +12,7 @@ import { Check, Copy, Send } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
 import { outboundNotices, withNoticeSent, type OutboundNotice } from '../../services/outbound'
 import { listClients, saveClient } from '../../services/clientOpsService'
+import { listJournal, updateJournalEntry } from '../../services/journalService'
 import { copyText } from '../consulting/studioParts'
 import { useToast } from '../ui/toastContext'
 import { Button } from '../ui/Button'
@@ -131,6 +132,18 @@ function NoticeSheet({
   const fresh = async (id: string): Promise<ClientOpsRecord | null> =>
     (await listClients(workspaceId).catch(() => null))?.find((c) => c.id === id) ?? clients.find((c) => c.id === id) ?? null
 
+  /** 그 할 일을 끝냄 · 다시 엶 — 바뀌었으면 true(못 찾았거나 이미 그 상태 · 실패는 false) */
+  const setTodo = async (id: string, completed: boolean): Promise<boolean> => {
+    try {
+      const todo = (await listJournal(workspaceId)).find((e) => e.id === id)
+      if (!todo || todo.completed === completed) return false
+      await updateJournalEntry(todo, { completed })
+      return true
+    } catch {
+      return false
+    }
+  }
+
   const copy = async (n: OutboundNotice) => {
     const ok = await copyText(n.text)
     setCopied(ok ? n.key : null)
@@ -145,7 +158,9 @@ function NoticeSheet({
       if (!rec) throw new Error('업체를 찾지 못했어요')
       const { record, undo } = withNoticeSent(rec, n, today)
       onSaved(await saveClient(record))
-      showToast(`${n.companyName} — 보낸 것으로 적었어요`, {
+      // D-668 다 받았다고 알렸다 → 그 요청은 끝났으니(withNoticeSent) 그 요청으로 만든 '받았는지 확인' 할 일도 같이 끝낸다(못 끝내도 안내는 보낸 것)
+      const todoDone = n.todoId ? await setTodo(n.todoId, true) : false
+      showToast(`${n.companyName} — 보낸 것으로 적었어요${n.mark.type === 'notice' && n.mark.closeReqId ? ` · 서류 요청을 끝냈어요${todoDone ? '(할 일도 완료)' : ''}` : ''}`, {
         label: '되돌리기',
         onClick: () => {
           void (async () => {
@@ -153,6 +168,7 @@ function NoticeSheet({
               const now = await fresh(n.clientId)
               if (!now) throw new Error('missing')
               onSaved(await saveClient(undo(now)))
+              if (todoDone && n.todoId) await setTodo(n.todoId, false)
               showToast('되돌렸어요 — 보낼 안내에 다시 보여요')
             } catch {
               showToast('되돌리지 못했어요 — 다시 눌러 주세요')

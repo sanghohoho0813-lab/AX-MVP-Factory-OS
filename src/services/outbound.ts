@@ -14,7 +14,7 @@
  */
 import type { ClientOpsRecord } from '../types/clientOps'
 import { addDaysLocal, friendlyDate, splitNextTime } from './clientOpsNextAction'
-import { openRequests, requestProgress, resendText, withRequestResent } from './docRequests'
+import { openRequests, requestProgress, resendText, withRequestClosed, withRequestResent } from './docRequests'
 import { uploadHintLines } from './uploadHint'
 import { feeStateOf, fundingFactsOf } from './feeStatus'
 import { withActivity } from './clientOpsActivity'
@@ -32,8 +32,13 @@ export interface OutboundNotice {
   /** 붙여 보낼 글 */
   text: string
   phone: string
-  /** 보냈다는 기록을 어디에 — notices 열쇠(+ 남은 서류를 같이 부탁했으면 그 요청의 '다시 부탁한 날' 도) 또는 서류 요청 id */
-  mark: { type: 'notice'; id: string; resendReqId?: string } | { type: 'resend'; reqId: string }
+  /**
+   * 보냈다는 기록을 어디에 — notices 열쇠 또는 서류 요청 id.
+   * '받았어요' 는 같이: 남은 서류를 같은 글로 부탁했으면 그 요청의 '다시 부탁한 날' 도(resendReqId) · 다 받았으면 그 요청을 끝낸다(closeReqId · D-668).
+   */
+  mark: { type: 'notice'; id: string; resendReqId?: string; closeReqId?: string } | { type: 'resend'; reqId: string }
+  /** D-668 그 요청으로 만든 '받았는지 확인' 할 일 — 다 받았다고 알리면 화면이 같이 끝낸다(이 파일은 업무 일기를 건드리지 않는다) */
+  todoId?: string
   /** 작을수록 위 */
   rank: number
 }
@@ -180,8 +185,10 @@ function gotNotices(record: ClientOpsRecord, today: string, sender: string): Out
     // 다 받고 [요청 끝내기] 를 먼저 눌렀어도 이틀은 본다
     if (req.closedAt && (!DAY.test(req.closedAt) || daysBetween(req.closedAt, today) > GOT_KEEP_DAYS)) continue
     const p = requestProgress(record, req, today)
+    // 받은 날은 올린 시각의 날짜(세계시)라 한국 아침에 올린 것은 하루 앞 날짜로 적힌다 — 부탁한 날과 견주지 않고 '며칠 전' 으로만 본다
+    // (부탁하기 전에 이미 있던 칸은 itemView 가 부탁한 시각 뒤에 올라온 파일만 받음으로 센다)
     const fresh = p.items.filter((x) => {
-      if (!x.got || !x.sure || !DAY.test(x.gotAt) || x.gotAt < req.sentAt) return false
+      if (!x.got || !x.sure || !DAY.test(x.gotAt)) return false
       const ago = daysBetween(x.gotAt, today)
       return ago >= -1 && ago <= GOT_KEEP_DAYS
     })
@@ -213,8 +220,9 @@ function gotNotices(record: ClientOpsRecord, today: string, sender: string): Out
       title: left.length ? `서류 ${p.got}가지 받음 · 남은 ${left.length}가지` : `부탁한 서류 ${p.total}가지 다 받음`,
       text: text.join('\n'),
       phone: record.contactPhone ?? '',
-      // 남은 것을 같은 글로 다시 부탁했으니 기다린 날도 오늘부터 다시 센다(사흘 뒤 독촉과 겹치지 않게)
-      mark: { type: 'notice', id, ...(left.length && !req.closedAt ? { resendReqId: req.id } : {}) },
+      // 남은 것을 같은 글로 다시 부탁했으니 기다린 날도 오늘부터 다시 센다(사흘 뒤 독촉과 겹치지 않게) · 다 받았으면 그 요청은 여기서 끝(D-668)
+      mark: { type: 'notice', id, ...(req.closedAt ? {} : left.length ? { resendReqId: req.id } : { closeReqId: req.id }) },
+      ...(!left.length && !req.closedAt && req.todoId ? { todoId: req.todoId } : {}),
       // 서류 독촉(3) 다음 · 오늘 받을 돈(4) 앞
       rank: 3.5,
     })
@@ -371,6 +379,21 @@ export function withNoticeSent(
       const again = resend(next, notice.mark.resendReqId)
       next = again.next
       revert = (r) => again.revert(dropNotice(r))
+    }
+    // D-668 다 받았다고 알렸다 — 그 요청은 끝(서류함 [끝내기] 와 같은 기록). 되돌리면 다시 열린다
+    if (notice.mark.closeReqId) {
+      const reqId = notice.mark.closeReqId
+      next = withRequestClosed(next, reqId, today)
+      revert = (r) =>
+        dropNotice({
+          ...r,
+          docRequests: (r.docRequests ?? []).map((q) => {
+            if (q.id !== reqId) return q
+            const { closedAt: _drop, ...rest } = q
+            void _drop
+            return rest
+          }),
+        })
     }
   } else {
     const again = resend(record, notice.mark.reqId)
