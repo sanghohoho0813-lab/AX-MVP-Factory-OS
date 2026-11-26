@@ -194,6 +194,25 @@ await ctx.close()
   const { ctx: c4, page: p4 } = await open({ width: 1440, height: 900 }, [CLIENTS[0], CLIENTS[2], lead])
   const chip = p4.getByTestId('today-notices-open')
   await chip.waitFor({ timeout: 10_000 })
+  // D-673 새 상담 신청은 종에도 — '새 상담 신청 · 홍길동 · 첫 인사 보내기' → 오늘 보낼 안내 판이 바로(주소 값은 지워짐)
+  {
+    await p4.getByRole('button', { name: /챙길 것/ }).click()
+    const bellHello = p4.getByTestId('bell-hello')
+    await bellHello.waitFor({ timeout: 8000 }).catch(() => {})
+    const bellText = ((await bellHello.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+    await bellHello.click().catch(() => {})
+    const opened = p4.getByTestId('notice-sheet')
+    await opened.waitFor({ timeout: 5000 }).catch(() => {})
+    await p4.waitForTimeout(300)
+    check(
+      "N0 D-673 종에 '새 상담 신청 · 홍길동 · 첫 인사 보내기' → 누르면 오늘 보낼 안내 판이 열린 채(맨 위가 첫 인사) · 주소의 notices 값은 지워짐",
+      /새 상담 신청/.test(bellText) && /홍길동 · 첫 인사 보내기/.test(bellText) && (await opened.getByTestId('notice-row').first().getAttribute('data-kind').catch(() => '')) === 'hello' && !new URL(p4.url()).searchParams.has('notices'),
+      `${bellText} | ${p4.url()}`,
+    )
+    if (SHOTS) { await p4.waitForTimeout(600); await p4.screenshot({ path: join(SHOTS, 'bell-hello-pc.png') }) }
+    await p4.keyboard.press('Escape')
+    await p4.waitForTimeout(400)
+  }
   await chip.click()
   const sheet4 = p4.getByTestId('notice-sheet')
   await sheet4.waitFor()

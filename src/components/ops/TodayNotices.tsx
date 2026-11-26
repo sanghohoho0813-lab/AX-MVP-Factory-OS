@@ -5,7 +5,7 @@
  * 줄마다 [카톡 문구 복사](D-661 — 올리기 링크 · 공고 알림과 같은 말) → 카톡 · 문자에 붙여 보내고 → [보냈어요] → 업체 기록에 남고 목록에서 빠진다(+ 되돌리기).
  * 보내는 것은 사람이다(외부 발송 · 비용 0). 문구는 규칙 글(services/outbound) — AI 가 쓰지 않는다.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { Check, Copy, Send } from 'lucide-react'
@@ -30,6 +30,7 @@ export function TodayNotices({
   workspaceId,
   onSaved,
   chip = false,
+  openSignal = 0,
 }: {
   clients: ClientOpsRecord[]
   today: string
@@ -38,10 +39,15 @@ export function TodayNotices({
   onSaved: (record: ClientOpsRecord) => void
   /** 휴대폰 — 숫자 한 줄(가로로 넘기는 칩 줄) 맨 앞 칩 모양으로(머리 줄에 줄을 하나 더 쓰지 않게 · qa:firstscreen) */
   chip?: boolean
+  /** D-673 밖에서 판을 연다(종의 '첫 인사 보내기' → /?notices=1) — 값이 바뀔 때마다 한 번 */
+  openSignal?: number
 }) {
   const sender = useSenderLine()
   const items = useMemo(() => outboundNotices(clients, today, sender), [clients, today, sender])
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(openSignal > 0)
+  useEffect(() => {
+    if (openSignal > 0) setOpen(true)
+  }, [openSignal])
   if (!items.length && !open) return null
   return (
     <>

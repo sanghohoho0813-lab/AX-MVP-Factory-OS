@@ -31,7 +31,7 @@ import { hasWeekData, subscribeWeekRunLoaded } from '../services/marketing/weekR
 import { useAllDecisions } from '../components/ops/useAllDecisions'
 import { featureUsable, useEntitlements } from '../lib/entitlementsStore'
 import { isCustomerAudience, useCustomerAudience } from '../config/customerAudience'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowRight,
   Building2,
@@ -331,6 +331,22 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
   const noticesInKpis = phone && visibilityOf(todayLayout, 'kpis') === 'show'
   /** D-657 고객이 올리고 아직 칸에 안 넣은 서류(업체 id → 개수) — 0031 전 · 로컬 모드는 빈 표 */
   const uploadInbox = useUploadInbox(workspaceId)
+  // D-673 종의 '새 상담 신청 — 첫 인사 보내기' 는 /?notices=1 로 들어와 보낼 안내 판을 바로 연다(열고 나면 주소에서 뺀다 — 새로 고쳐도 또 열리지 않게)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [noticeSignal, setNoticeSignal] = useState(0)
+  const noticesParam = searchParams.get('notices') === '1'
+  useEffect(() => {
+    if (!noticesParam) return
+    setNoticeSignal((n) => n + 1)
+    setSearchParams(
+      (cur) => {
+        const next = new URLSearchParams(cur)
+        next.delete('notices')
+        return next
+      },
+      { replace: true },
+    )
+  }, [noticesParam, setSearchParams])
   // D-670 머리 줄 [보낼 안내] · [받은 서류] 와 같은 목록을 AI 도우미 · 대화창도 안다("오늘 뭐부터?" 답에 같이) — 문구 · 연락처는 싣지 않는다
   const noticeRows = useMemo(() => outboundNotices(clients, today).map((n) => ({ clientId: n.clientId, clientName: n.companyName, kind: NOTICE_KIND_WORD[n.kind], title: n.title })), [clients, today])
   const uploadRows = useMemo(() => uploadInboxRows(clients, uploadInbox).map((u) => ({ clientId: u.clientId, clientName: u.companyName, count: u.waiting })), [clients, uploadInbox])
@@ -809,7 +825,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             {/* D-653 오늘 고객에게 보낼 안내(약속 전날 · 서류 3일째 · 받을 돈) — 있을 때만 단추 하나 → 판.
                 PC 는 '모두 보기' 옆. 휴대폰은 숫자 한 줄 맨 앞 칩(여기 두면 줄이 하나 늘어 할 일 목록이 첫 화면 아래로 밀린다 — qa:firstscreen) ·
                 숫자 한 줄을 꾸미기로 숨겼으면 여기 그대로 */}
-            {!loading && !noticesInKpis && <TodayNotices clients={clients} today={today} workspaceId={workspaceId} onSaved={onNoticeSaved} />}
+            {!loading && !noticesInKpis && <TodayNotices clients={clients} today={today} workspaceId={workspaceId} onSaved={onNoticeSaved} openSignal={noticeSignal} />}
             {/* D-657 고객이 올린 서류(올리기 링크) — 보낼 안내 옆에 나란히. 있을 때만 */}
             {!loading && !noticesInKpis && <TodayUploads clients={clients} inbox={uploadInbox} />}
           </h1>
@@ -901,7 +917,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                         !loading && noticesInKpis ? (
                           <>
                             <TodayUploads chip clients={clients} inbox={uploadInbox} />
-                            <TodayNotices chip clients={clients} today={today} workspaceId={workspaceId} onSaved={onNoticeSaved} />
+                            <TodayNotices chip clients={clients} today={today} workspaceId={workspaceId} onSaved={onNoticeSaved} openSignal={noticeSignal} />
                           </>
                         ) : null
                       }

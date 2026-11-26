@@ -19,6 +19,7 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
   // D-162: Pilot 은 고객 플랫폼 상담신청을 쓰지 않는다 — 종에도 넣지 않는다
   const pilot = useIsPilot()
   const [alerts, setAlerts] = useState<OpsAlert[]>([])
+  const [hellos, setHellos] = useState<{ count: number; first: string }>({ count: 0, first: '' })
   /** 종 목록에 보일 상담신청 한 줄 (누구 · 종류) — 읽을 때 한 번 만든다 */
   const [events, setEvents] = useState<{ id: string; text: string }[]>([])
   // D-222 창으로 돌아오면 다시 센다(다른 기기 · 홈페이지에서 새로 들어온 상담신청) — 메뉴 숫자와 같게, 15초에 한 번까지
@@ -43,14 +44,21 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
     void (async () => {
       // D-112: 서비스는 종이 처음 셀 때 불러온다 — 첫 파일에서 뺀다
       try {
-        const [{ listClients }, { buildAllAlerts }] = await Promise.all([
+        const [{ listClients }, { buildAllAlerts }, { outboundNotices }] = await Promise.all([
           import('../../services/clientOpsService'),
           import('../../services/clientOpsAlerts'),
+          import('../../services/outbound'),
         ])
         const clients = await listClients(workspaceId)
         if (alive) setAlerts(buildAllAlerts(clients, todayLocalDate()))
+        // D-673 상담 신청 링크로 들어와 아직 첫 인사를 안 보낸 곳 — 오늘 [보낼 안내] 의 '첫 인사' 와 같은 목록
+        const hello = outboundNotices(clients, todayLocalDate()).filter((n) => n.kind === 'hello')
+        if (alive) setHellos({ count: hello.length, first: hello[0]?.companyName ?? '' })
       } catch {
-        if (alive) setAlerts([])
+        if (alive) {
+          setAlerts([])
+          setHellos({ count: 0, first: '' })
+        }
       }
       if (pilot) {
         if (alive) setEvents([])
@@ -126,7 +134,7 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
   const { entries: support, unread: supportUnread } = useSupportInbox()
   const supportNew = (support ?? []).filter((m) => !m.readAt)
   const supportText = [supportNew.some((m) => m.kind === 'question') ? `문의 ${supportNew.filter((m) => m.kind === 'question').length}건` : '', supportNew.some((m) => m.kind === 'error') ? `화면 오류 ${supportNew.filter((m) => m.kind === 'error').length}건` : ''].filter(Boolean).join(' · ')
-  const count = critical.length + events.length + feedbackUnread + supportUnread + signupCount + (uploads.files > 0 ? 1 : 0)
+  const count = critical.length + events.length + feedbackUnread + supportUnread + signupCount + (uploads.files > 0 ? 1 : 0) + (hellos.count > 0 ? 1 : 0)
 
   return (
     <div ref={containerRef} className="relative">
@@ -157,6 +165,16 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
                   <Link to="/settings?tab=workspace&focus=signup" onClick={() => setOpen(false)} data-testid="bell-signup" className="block px-4 py-2.5 hover:bg-slate-50">
                     <span className="block text-[0.875rem] font-semibold text-brand-700">가입 신청</span>
                     <span className="block truncate text-[0.875rem] text-slate-700">승인을 기다리는 사람 {signupCount}명</span>
+                  </Link>
+                </li>
+              )}
+              {hellos.count > 0 && (
+                <li className="border-b border-slate-50">
+                  <Link to="/?notices=1" onClick={() => setOpen(false)} data-testid="bell-hello" className="block px-4 py-2.5 hover:bg-slate-50">
+                    <span className="block text-[0.875rem] font-semibold text-brand-700">새 상담 신청</span>
+                    <span className="block truncate text-[0.875rem] text-slate-700">
+                      {hellos.count === 1 && hellos.first ? `${hellos.first} · ` : `${hellos.count}건 · `}첫 인사 보내기
+                    </span>
                   </Link>
                 </li>
               )}
