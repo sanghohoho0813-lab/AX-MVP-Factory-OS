@@ -123,6 +123,8 @@ export function MessageModal({
 }) {
   useBackToClose(true, onClose)
   const [copied, setCopied] = useState(false)
+  /** D-661 한 번이라도 복사했나 — 그 뒤에는 [보냈어요 …] 가 주 단추(보낼 안내 · 올리기 링크 판과 같은 차례) */
+  const [copiedOnce, setCopiedOnce] = useState(false)
   const [follow, setFollow] = useState<{ busy: boolean; done: string; failed: boolean }>({ busy: false, done: '', failed: false })
   const runFollow = async () => {
     if (!followUp || follow.busy || follow.done) return
@@ -156,6 +158,7 @@ export function MessageModal({
       document.execCommand?.('copy')
     }
     setCopied(true)
+    setCopiedOnce(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
@@ -212,11 +215,26 @@ export function MessageModal({
             )}
           </div>
         )}
+        {/* D-661 차례대로 — ① 복사 → ② 보냈어요(있을 때). 보낼 안내 · 올리기 링크 판과 같은 순서 · 복사한 뒤에는 [보냈어요 …] 가 주 단추 */}
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-3.5">
+          <span className="min-w-0 flex-[1_1_12rem] text-[0.875rem] break-keep text-slate-500">복사해서 카카오톡·문자·메일에 붙여넣으세요.</span>
+          <div className="ml-auto flex shrink-0 gap-2">
+            {!followUp && (
+              <Button variant="secondary" onClick={onClose}>
+                닫기
+              </Button>
+            )}
+            <Button variant={followUp && copiedOnce ? 'secondary' : 'primary'} onClick={() => void copy()} data-testid="message-copy">
+              <ClipboardCopy aria-hidden="true" className="size-4" />
+              {copied ? '복사했습니다' : '복사'}
+            </Button>
+          </div>
+        </div>
         {/* D-191: 휴대폰에서 [복사] 가 창 밖으로 삐져나왔다 — 좁으면 안내 글 아래로 단추 줄을 내린다 */}
         {/* D-314 보냈으면 한 번에 — 3일 뒤 '받았는지 확인' 할 일(오늘 · 달력에 뜬다). 다음 약속은 덮지 않는다 */}
         {followUp && (
-          <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 px-5 py-3" data-testid="message-followup-row">
-            <Button variant="secondary" size="sm" disabled={follow.busy || !!follow.done} onClick={() => void runFollow()} data-testid="message-followup">
+          <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-t border-slate-100 px-5 py-3" data-testid="message-followup-row">
+            <Button variant={copiedOnce && !follow.done ? 'primary' : 'secondary'} size="sm" disabled={follow.busy || !!follow.done} onClick={() => void runFollow()} data-testid="message-followup">
               {follow.done ? <Check aria-hidden="true" className="size-4" /> : <CalendarCheck aria-hidden="true" className="size-4" />}
               {follow.done ? (followUp.doneLabel ?? '할 일에 넣음') : followUp.label}
             </Button>
@@ -230,20 +248,11 @@ export function MessageModal({
                 {followUp.doneLabel ? '저장하지 못했어요' : '할 일에 넣지 못했어요'} — 다시 눌러 주세요
               </span>
             )}
-          </div>
-        )}
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-3.5">
-          <span className="min-w-0 flex-[1_1_12rem] text-[0.875rem] break-keep text-slate-500">복사해서 카카오톡·문자·메일에 붙여넣으세요.</span>
-          <div className="ml-auto flex shrink-0 gap-2">
-            <Button variant="secondary" onClick={onClose}>
+            <Button variant="secondary" size="sm" onClick={onClose} className="ml-auto">
               닫기
             </Button>
-            <Button variant="primary" onClick={() => void copy()}>
-              <ClipboardCopy aria-hidden="true" className="size-4" />
-              {copied ? '복사했습니다' : '복사'}
-            </Button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

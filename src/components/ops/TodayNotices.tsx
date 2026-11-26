@@ -2,7 +2,7 @@
  * D-653 오늘 — 고객에게 보낼 안내(약속 전날 · 서류 3일째 · 받을 돈 · D-658 새 상담 신청 첫 인사).
  *
  * 오늘 머리 줄에 '보낼 안내 n건' 단추 하나(없으면 안 그림) → 누르면 아래에서 올라오는 판에 한 줄씩.
- * 줄마다 [문구 복사] → 카톡 · 문자에 붙여 보내고 → [보냈어요] → 업체 기록에 남고 목록에서 빠진다(+ 되돌리기).
+ * 줄마다 [카톡 문구 복사](D-661 — 올리기 링크 · 공고 알림과 같은 말) → 카톡 · 문자에 붙여 보내고 → [보냈어요] → 업체 기록에 남고 목록에서 빠진다(+ 되돌리기).
  * 보내는 것은 사람이다(외부 발송 · 비용 0). 문구는 규칙 글(services/outbound) — AI 가 쓰지 않는다.
  */
 import { useMemo, useState } from 'react'
@@ -179,7 +179,7 @@ function NoticeSheet({
               <div className="flex flex-wrap items-center gap-2">
                 <Button variant="secondary" onClick={() => void copy(n)} data-testid="notice-copy">
                   {copied === n.key ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />}
-                  문구 복사
+                  카톡 문구 복사
                 </Button>
                 <Button variant={copied === n.key ? 'primary' : 'secondary'} disabled={busy === n.key} onClick={() => void sent(n)} data-testid="notice-sent">
                   {busy === n.key ? '적는 중…' : '보냈어요'}
