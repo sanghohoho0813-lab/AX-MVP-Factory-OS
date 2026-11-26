@@ -499,7 +499,9 @@ export function BottomSheet({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
         {footer && (
-          <div className="pb-safe shrink-0 border-t border-slate-100 px-5 py-3.5">{footer}</div>
+          // D-680 아래 여백 — 예전에는 pb-safe 가 py-3.5 의 아래쪽을 0 으로 덮어, 맨 아래 단추가 판 끝(휴대폰은 화면 끝)에 붙어 있었다.
+          // 위와 같은 14px, 홈 막대가 있는 휴대폰은 그만큼 더.
+          <div className="shrink-0 border-t border-slate-100 px-5 pt-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom,0px))]" data-testid="sheet-footer">{footer}</div>
         )}
       </div>
     </div>

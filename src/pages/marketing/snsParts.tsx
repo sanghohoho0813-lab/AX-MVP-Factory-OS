@@ -3,7 +3,7 @@
  * 대표 "60대도 쓸 수 있게 쉽고 간편하게" — 단추는 크게(44px 이상), 글은 짧게, 고를 것은 한 번에 2~4개.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { CheckCircle2, Download, Gift, OctagonAlert, Trash2, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { CheckCircle2, Download, Gift, OctagonAlert, Trash2, TriangleAlert, UserRoundSearch, type LucideIcon } from 'lucide-react'
 import { Button } from '../../components/ui/Button'
 import { HelpHeading } from '../../components/ui/fold'
 import { TONES, type Tone } from './snsTone'
@@ -327,7 +327,7 @@ export function RewriteTable({ testId }: { testId: string }) {
 }
 
 /** D-274 사실 목록(이것만 씀) 보기 + 이번에 더 쓸 사실 — AI 와 숫자 대조가 같은 목록을 쓴다 */
-export function FactsBox({ value, onChange, testPrefix, what }: { value: string; onChange: (v: string) => void; testPrefix: string; what: string }) {
+export function FactsBox({ value, onChange, testPrefix, what, onCase }: { value: string; onChange: (v: string) => void; testPrefix: string; what: string; /** D-680 [내 고객 사례 넣기] — 업체를 골라 이름을 가린 한 줄을 이 칸에 */ onCase?: () => void }) {
   return (
     <details className="py-0.5" data-testid={`${testPrefix}-facts-box`}>
       {/* D-478 다른 접기와 같은 꺾쇠(예전: 브라우저 기본 ▶ 글자) — 공통 sum-chev */}
@@ -339,6 +339,12 @@ export function FactsBox({ value, onChange, testPrefix, what }: { value: string;
         ))}
         {ourFactsList().length === 0 && <li>아직 없음 — 설정 › 내 브랜드 '확인된 사실' 에 경력 · 숫자를 적으면 여기에 나옵니다.</li>}
       </ul>
+      {/* D-680 실제 사례는 고객 관리에서 — 이름을 가린 한 줄로(회사 이름 · 번호 · 금액은 넣지 않는다) */}
+      {onCase && (
+        <button type="button" onClick={onCase} className="tap t-sub mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-(--radius-control) border border-slate-300 bg-white px-3.5 font-semibold text-slate-800 hover:bg-slate-50" data-testid={`${testPrefix}-case-open`} data-guide="fn-mk-case">
+          <UserRoundSearch aria-hidden="true" className="size-4" /> 내 고객 사례 넣기
+        </button>
+      )}
       <label className="mt-2 flex flex-col gap-1">
         <span className="t-sub font-semibold text-slate-700">이번 {what}에 더 쓸 사실 — 한 줄에 하나(고객 실명 · 매출 · 계약금액은 적지 않기)</span>
         <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={3} className="t-body w-full min-w-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2" placeholder="예: 점검표 받은 대표님 12명(이번 달)" data-testid={`${testPrefix}-facts`} />

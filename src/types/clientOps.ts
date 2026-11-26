@@ -898,6 +898,11 @@ export interface ClientOpsRecord {
    * 진짜 상태는 서버(0031). 링크를 만들거나 · 바꾸거나 · 닫을 때 같이 적는다(services/uploadHint). payload 에 함께 저장(DB 변경 없음).
    */
   uploadHint?: { slug: string; until: string }
+  /**
+   * D-680 사례 공개 허락 — 이 고객이 '공개 글에 회사 이름을 써도 된다' 고 한 날(YYYY-MM-DD). 없으면 허락 전(글 쓰기 화면이 이름을 짚는다).
+   * 번호 · 전화 · 매출 · 금액은 허락과 상관없이 넣지 않는다(services/marketing/clientCase). payload 에 함께 저장(DB 변경 없음).
+   */
+  caseConsent?: { at: string }
   /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */
   archivedAt: string | null
   createdAt: string

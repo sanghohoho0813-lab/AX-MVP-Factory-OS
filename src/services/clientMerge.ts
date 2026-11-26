@@ -222,6 +222,7 @@ const FIELD_LABEL: Record<string, string> = {
   docRequests: '서류 요청',
   notices: '보낸 안내',
   uploadHint: '서류 올리기 링크',
+  caseConsent: '사례 공개 허락',
   archivedAt: '보관',
 }
 

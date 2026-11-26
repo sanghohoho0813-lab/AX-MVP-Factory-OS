@@ -524,5 +524,95 @@ check('QS9 이번 주 키워드 보관 — 같은 주(일요일까지)만 읽힘
   check('D560-T3 서버 지시 — 본인 댓글은 내가 그대로 다는 말 · 글을 어떻게 썼는지 설명하지 않음', ASSISTS['threads.write'].instruction.join(' ').includes('이 글을 어떻게 썼는지 설명하는 말은 쓰지 않는다'))
 }
 
+// ---------------- D-680 고객 사례 — 이름을 가린 한 줄 · 글 속 고객 이름 찾기 · 가리기 · 허락 ----------------
+{
+  const cc = await import('../marketing/clientCase')
+  const { consultLint: cl } = await import('../marketing/consultRules')
+  const base = {
+    id: 'c1',
+    companyName: '(주)미래산업',
+    representativeName: '홍길동',
+    contactName: '이영희 과장',
+    businessNumber: '123-45-67890',
+    corporateNumber: '110111-1234567',
+    contactPhone: '010-1234-5678',
+    companyPhone: '031-123-4567',
+    businessAddress: '경기도 화성시 동탄대로 123',
+    industry: '제조업(금속 가공)',
+    businessCategory: '제조',
+    businessItem: '금속',
+    employeeCount: '12명(대표 포함)',
+    establishedAt: '2019-03-02',
+  }
+  const today = '2026-11-26'
+  const parts = cc.caseParts(base, today, [{ label: '정책자금', done: true }, { label: '벤처인증', done: false }, { label: '', done: false }])
+  const line = cc.caseLine(parts)
+  check('D680-C1 가린 한 줄 — 시 · 도 · 업종 · 규모대 · 업력대 · 함께 한 일', line === '[고객 사례 · 이름 가림] 경기 제조업 회사(직원 10명대 · 창업 7~15년) — 함께 한 일: 정책자금(마침), 벤처인증(진행 중)', line)
+  const secrets = ['미래산업', '홍길동', '이영희', '123-45', '67890', '1234567', '010', '031', '화성', '동탄', '12명', '2019', '금속 가공']
+  check('D680-C2 한 줄에 회사 이름 · 사람 이름 · 번호 · 시 · 군 · 구 · 정확한 사람 수 · 설립 해가 없다', secrets.every((x) => !line.includes(x)), secrets.filter((x) => line.includes(x)).join(','))
+  check('D680-C3 재료 빼기 — 지역 · 규모를 빼면 그 말이 없다 · 다 빼면 "한 고객사"', cc.caseLine(parts, ['region', 'size']) === '[고객 사례 · 이름 가림] 제조업 회사(창업 7~15년) — 함께 한 일: 정책자금(마침), 벤처인증(진행 중)' && cc.caseLine(parts, ['region', 'industry', 'size', 'age']).startsWith('[고객 사례 · 이름 가림] 한 고객사 — '), cc.caseLine(parts, ['region', 'size']))
+  const empty = cc.caseParts({ businessAddress: '', industry: '', businessCategory: '', businessItem: '', employeeCount: '', establishedAt: '' }, today)
+  check('D680-C4 아는 것이 없는 업체 → "한 고객사" 한 줄(빈 괄호 · 빈 "함께 한 일" 없음)', cc.caseLine(empty) === '[고객 사례 · 이름 가림] 한 고객사', cc.caseLine(empty))
+  const bands = [['3', '직원 5명 미만'], ['7명', '직원 5~9명'], ['19', '직원 10명대'], ['25명', '직원 20명대'], ['45', '직원 30~40명대'], ['80', '직원 50~90명대'], ['1,200명', '직원 세 자릿수 규모'], ['', ''], ['모름', '']] as const
+  check('D680-C5 직원 규모대 — 정확한 수 대신 · 모르면 빈 글', bands.every(([a, b]) => cc.sizeBand(a) === b), bands.map(([a]) => cc.sizeBand(a)).join('|'))
+  const ages = [['2025-01-01', '창업 3년 이내'], ['2021-06-01', '창업 3~7년'], ['2015-01-01', '창업 7~15년'], ['2001-01-01', '창업 15년 차 이후'], ['', ''], ['2030-01-01', '']] as const
+  check('D680-C6 업력대 — 정확한 설립일 · 햇수 대신', ages.every(([a, b]) => cc.ageBand(a, today) === b), ages.map(([a]) => cc.ageBand(a, today)).join('|'))
+  const regions = [['서울특별시 강남구', '서울'], ['(06236) 서울 강남구', '서울'], ['충청북도 청주시', '충북'], ['전북특별자치도 전주시', '전북'], ['강원특별자치도 춘천시', '강원'], ['동탄대로 1', '']] as const
+  check('D680-C7 지역 — 시 · 도까지만 · 우편번호 앞머리 · 모르는 주소는 빈 글', regions.every(([a, b]) => cc.regionOf(a) === b), regions.map(([a]) => cc.regionOf(a)).join('|'))
+  check('D680-C8 가린 한 줄 · 규모대 · 업력대가 기존 글 점검(숫자 늘리기 · 지어낸 기준 · 지어낸 사례)에 걸리지 않는다', cl([line, ...bands.map(([a]) => cc.sizeBand(a)), ...ages.map(([a]) => cc.ageBand(a, today)), cc.caseAlias('제조업')].join('\n')).length === 0, cl(line).map((x) => x.key).join(','))
+  check('D680-C9 주제 추천 — "제조업 회사 정책자금 진행 이야기" · 한 일이 없으면 "… 상담 이야기" · 업종을 빼면 "고객사"', cc.caseTopic(parts) === '제조업 회사 정책자금 진행 이야기' && cc.caseTopic(empty) === '고객사 상담 이야기' && cc.caseTopic(parts, ['industry']) === '고객사 정책자금 진행 이야기', cc.caseTopic(parts))
+
+  // 글 속 이름 찾기
+  const others = [
+    { ...base, id: 'c2', companyName: '미래', representativeName: '김진', contactName: '', businessNumber: '', corporateNumber: '', contactPhone: '', companyPhone: '', industry: '도소매' },
+    { ...base, id: 'c3', companyName: '주식회사 디자인', representativeName: '김대표', contactName: '담당자', businessNumber: '', corporateNumber: '', contactPhone: '', companyPhone: '', industry: '', businessCategory: '', businessItem: '' },
+    { ...base, id: 'c4', companyName: 'ABC Tech', representativeName: '박철수 대표님', contactName: '', businessNumber: '', corporateNumber: '', contactPhone: '', companyPhone: '', industry: '소프트웨어 개발', caseConsent: { at: '2026-11-20' } },
+  ]
+  const idx = cc.buildNameIndex([base, ...others])
+  const found = (t: string) => cc.findClientNames(t, idx)
+  const f1 = found('지난달 (주)미래산업이 정책자금을 받았어요. 홍길동 대표님은 처음엔 걱정하셨죠. 문의 010-1234-5678 · 123-45-67890')
+  check('D680-N1 회사 이름((주) 까지) · 대표 이름(호칭까지) · 전화 · 사업자번호를 찾는다', f1.length === 4 && f1.some((h) => h.kind === 'company' && h.match === '(주)미래산업') && f1.some((h) => h.kind === 'person' && h.match === '홍길동 대표님') && f1.filter((h) => h.kind === 'number').length === 2, JSON.stringify(f1.map((h) => h.match)))
+  check('D680-N2 띄어 쓴 이름 · 뒤에 붙은 주식회사도', found('미래 산업 주식회사와 함께').some((h) => h.match === '미래 산업 주식회사') && found('미래산업').length === 1)
+  check('D680-N3 두 글자 회사 이름 · 흔한 낱말은 표시((주) · 주식회사)가 붙어 있을 때만 — "미래를 준비" · "디자인 회사" 는 고객 이름이 아니다', found('미래를 준비하는 디자인 회사').length === 0 && found('(주)미래 와 주식회사 디자인').length === 2, JSON.stringify(found('미래를 준비하는 디자인 회사')))
+  check('D680-N4 사람 이름 — 세 글자는 그대로 · 두 글자는 호칭이 붙을 때만 · "김대표" · "담당자" 는 이름으로 보지 않는다', found('홍길동이 왔다').length === 1 && found('김진 이라는 낱말').length === 0 && found('김진 대표가').length === 1 && found('김대표와 담당자').length === 0)
+  check('D680-N5 담당자 이름도(직급을 뗀 이름)', found('이영희 과장님께 보냈다').some((h) => h.kind === 'person' && h.match === '이영희 과장님'))
+  check('D680-N6 영어 이름 — 대소문자 · 띄어쓰기 달라도 · 다른 낱말 속은 아니다', found('abc tech 사례').length === 1 && found('ABCTech').length === 1 && found('xABCTechy').length === 0)
+  check('D680-N7 다른 번호(내 전화 · 다른 사업자번호)는 짚지 않는다', found('문의 010-9999-0000 · 999-88-77777').length === 0)
+  const f8 = found('ABC Tech 박철수 대표님 그리고 미래산업')
+  check('D680-N8 허락받은 고객 — consent 표시 · 날짜 · 허락 전인 이름이 앞에', f8.length === 3 && f8[0].match === '미래산업' && !f8[0].consent && f8[1].consent && f8[1].consentAt === '2026-11-20' && f8[2].consent, JSON.stringify(f8.map((h) => [h.match, h.consent])))
+  check('D680-N9 같은 글자는 한 번만 · 빈 글은 0', found('미래산업 미래산업 미래산업').length === 1 && found('  ').length === 0)
+  check('D680-N10 확인 줄 글 — 허락 전 · 허락 뒤(날짜) · 번호', cc.hitText(f8[0]).includes('내 고객 이름이에요') && cc.hitText(f8[1]).includes('허락받은 고객이에요(11월 20일)') && cc.hitText(f1.find((h) => h.kind === 'number')!).includes('공개 글에는 넣지 않아요'))
+
+  // 가리기
+  const m1 = cc.maskClientNames('지난달 (주)미래산업이 정책자금을 받았어요. 홍길동 대표님은 걱정하셨죠. 문의 010-1234-5678 로', idx)
+  check('D680-M1 가리기 — 회사 → "한 제조업 회사" · 사람 → "대표님" · 번호는 지움 · 조사 맞춤(이 → 가)', m1 === '지난달 한 제조업 회사가 정책자금을 받았어요. 대표님은 걱정하셨죠. 문의 로', m1)
+  check('D680-M2 가린 글에는 찾을 것이 없다', cc.findClientNames(m1, idx).length === 0)
+  const m3 = cc.maskClientNames('미래산업은 · 미래산업을 · 미래산업과 · 홍길동은 · 홍길동이 · 미래산업이라는 곳', idx)
+  check('D680-M3 조사 — 은→는 · 을→를 · 과→와 · (받침 있는 "대표님") 은 · 이 그대로 · 낱말 속 "이라는" 은 건드리지 않음', m3 === '한 제조업 회사는 · 한 제조업 회사를 · 한 제조업 회사와 · 대표님은 · 대표님이 · 한 제조업 회사이라는 곳', m3)
+  const m4 = cc.maskClientNames('ABC Tech 와 미래산업, 박철수 대표님 · 123-45-67890', idx, { keepConsented: true })
+  check('D680-M4 허락받은 고객 이름은 그대로 두기(keepConsented) — 번호는 그래도 지운다', m4.includes('ABC Tech') && m4.includes('박철수 대표님') && !m4.includes('미래산업') && !m4.includes('67890'), m4)
+  const skip = new Set([cc.hitKey({ clientId: 'c1', kind: 'company', match: '미래산업' })])
+  check('D680-M5 "고객 이름이 아니에요" 로 넘긴 글자는 가리지 않는다', cc.maskClientNames('미래산업 홍길동', idx, { skip }) === '미래산업 대표님')
+  check('D680-M6 업종을 모르는 고객 → "한 고객사" · 담당자 → "담당자님"', cc.maskClientNames('주식회사 디자인 · 이영희 과장', idx) === '한 고객사 · 담당자님')
+  check('D680-M7 고객 이름이 없는 글은 한 글자도 바뀌지 않는다', cc.maskClientNames('정책자금 신청 전 볼 것 3가지 — 미래를 준비해요.', idx) === '정책자금 신청 전 볼 것 3가지 — 미래를 준비해요.')
+
+  // 허락 기록
+  const on = cc.withCaseConsent({ ...base }, true, today)
+  const off = cc.withCaseConsent(on, false, today)
+  check('D680-P1 허락 적기 · 지우기 — 날짜로 · 지우면 칸이 없어진다 · 원래 기록은 그대로', on.caseConsent?.at === today && !('caseConsent' in off) && !('caseConsent' in base))
+  check('D680-P2 저장된 값 다듬기 — 날짜 모양이 아니면 버린다', cc.normalizeCaseConsent({ at: '2026-11-26' }).caseConsent?.at === '2026-11-26' && !cc.normalizeCaseConsent({ at: '어제' }).caseConsent && !cc.normalizeCaseConsent(null).caseConsent && !cc.normalizeCaseConsent('2026-11-26').caseConsent)
+  const { normalizeClientOps } = await import('../clientOpsService')
+  const kept = normalizeClientOps({ id: 'k1', companyName: '가나다', caseConsent: { at: '2026-11-26' } } as never)
+  const dropped = normalizeClientOps({ id: 'k2', companyName: '가나다', caseConsent: { at: 'x' } } as never)
+  check('D680-P3 업체 기록을 읽을 때 허락 칸이 남는다(틀린 값은 버림)', kept.caseConsent?.at === '2026-11-26' && !('caseConsent' in dropped))
+  const { mergeClientEdits, conflictLabels } = await import('../clientMerge')
+  const b0 = normalizeClientOps({ id: 'k3', companyName: '가나다' } as never)
+  const mine = { ...b0, caseConsent: { at: '2026-11-26' } }
+  const theirs = { ...b0, contactPhone: '010-0000-0000' }
+  const mg = mergeClientEdits(b0, mine, theirs)
+  check('D680-P4 두 곳에서 고쳤을 때 — 한쪽이 허락을 적고 다른 쪽이 연락처를 고치면 둘 다 산다', mg.conflicts.length === 0 && mg.merged.caseConsent?.at === '2026-11-26' && mg.merged.contactPhone === '010-0000-0000')
+  check('D680-P5 겹친 칸 이름표 — "사례 공개 허락"', conflictLabels([{ path: 'caseConsent.at', mine: 'a', theirs: 'b' }]).join() === '사례 공개 허락')
+}
+
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

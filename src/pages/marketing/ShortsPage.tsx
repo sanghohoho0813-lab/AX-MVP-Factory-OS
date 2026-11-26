@@ -6,7 +6,7 @@
  *  기록표: 조회 · 좋아요 · 댓글 · 저장 · 공유 · 문의 → 점수(좋아요 + 댓글×3) · 저장 · 공유율 · 형식별 평균.
  * 대표 전용(마케팅 · 브랜딩 모듈). 저장은 기존 모듈 기록(marketing / shorts).
  */
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DraftSyncLine, useDraftSync } from './useDraftSync'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BookOpen, CalendarCheck, ClipboardCopy, Clapperboard, Download, Eye, FilePlus2, Lightbulb, MessageCircle, RefreshCw, Save, Send, SlidersHorizontal, TriangleAlert } from 'lucide-react'
@@ -53,6 +53,7 @@ import {
   type ShortPlatform,
   type ShortPost,
 } from '../../services/marketing/shorts'
+import { useClientCase } from './ClientCase'
 import { BigChoices, DeleteTwice, FactsBox, HoverTip, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, TipBody, ToneSection } from './snsParts'
 import { TONES, scrollAndFlash, toneChip, type Tone } from './snsTone'
 import { QuickStart } from './QuickStart'
@@ -169,10 +170,15 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
     const r = recommendShort({ topic: t, platform: d.platform, posts: [] })
     return { ...d, topic: t, aim: r.aim, format: r.format, formatBy: 'rec' }
   })
+  // D-680 case=업체 로 왔으면 그 업체로 사례 판을 연다 — 주소 값은 한 번 쓰고 지운다
+  const [caseFor, setCaseFor] = useState(() => params.get('case'))
+  // 한 번 열었으면 잊는다 — 탭(기록표 · 글 틀)을 다녀와도 판이 다시 뜨지 않게
+  const caseUsed = useCallback(() => setCaseFor(null), [])
   useEffect(() => {
-    if (!params.get('topic')) return
+    if (!params.get('topic') && !params.get('case')) return
     const next = new URLSearchParams(params)
     next.delete('topic')
+    next.delete('case')
     setParams(next, { replace: true })
   }, [params, setParams])
   const setDraft = (fn: (d: Draft) => Draft) =>
@@ -182,7 +188,7 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
       return n
     })
   // D-513 다른 기기에서 이어 쓰기 — 주소로 주제 · 글을 들고 왔으면 클라우드 글로 바꾸지 않는다
-  const [openedWith] = useState(() => !!(params.get('topic') || params.get('open')))
+  const [openedWith] = useState(() => !!(params.get('topic') || params.get('open') || params.get('case')))
   const sync = useDraftSync<Draft>({ kind: 'shorts', workspaceId, readOnly, draft, replace: (d) => setDraft(() => d), blocked: openedWith, empty: draftEmpty, clean: cleanDraft })
   const draftOf = (p: ShortPost): Draft => ({ ...EMPTY, id: p.id, platform: p.platform, aim: p.aim, format: p.format, topic: p.topic, script: p.script, caption: p.caption, hashtags: p.hashtags, checks: p.checks, source: p.source })
   /**
@@ -240,7 +246,7 @@ function Shorts({ workspaceId }: { workspaceId: string | null }) {
       )}
       {readOnly && <p className="t-sub rounded-(--radius-control) bg-slate-50 px-3 py-2 text-slate-600" data-testid="mk-viewas-note">팀장 화면을 보는 중에는 저장하지 않습니다 — AI 단추는 팀장님 화면 그대로 눌러 볼 수 있어요(회사마다 가장 싼 모델 · 답은 글 칸에만).</p>}
       {tab === 'write' && <DraftSyncLine sync={sync} testPrefix="sht" />}
-      {tab === 'write' && <WritePanel draft={draft} setDraft={setDraft} editing={editing} setEditing={setEditing} store={store} brief={brief} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} />}
+      {tab === 'write' && <WritePanel caseFor={caseFor} onCaseUsed={caseUsed} draft={draft} setDraft={setDraft} editing={editing} setEditing={setEditing} store={store} brief={brief} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} />}
       {tab === 'records' && <RecordsPanel store={store} readOnly={readOnly} onOpen={openPost} />}
       {tab === 'guide' && <GuidePanel onUse={pickFormat} />}
     </div>
@@ -253,7 +259,7 @@ type Store = ReturnType<typeof useShortPosts>
 /* 오늘 만들 영상                                                        */
 /* ------------------------------------------------------------------ */
 
-function WritePanel({ draft, setDraft, editing, setEditing, store, brief, aiOk, readOnly, onRecords }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; /** D-630 이번 방문에서 대본 칸(2단계)을 열었나 */ editing: boolean; setEditing: (on: boolean) => void; store: Store; brief: ChannelBrief; aiOk: boolean; readOnly: boolean; onRecords: () => void }) {
+function WritePanel({ caseFor, onCaseUsed, draft, setDraft, editing, setEditing, store, brief, aiOk, readOnly, onRecords }: { /** D-680 주소 case=업체 — 그 업체로 사례 판을 연다 */ caseFor: string | null; onCaseUsed: () => void; draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; /** D-630 이번 방문에서 대본 칸(2단계)을 열었나 */ editing: boolean; setEditing: (on: boolean) => void; store: Store; brief: ChannelBrief; aiOk: boolean; readOnly: boolean; onRecords: () => void }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const today = todayLocalDate()
@@ -308,6 +314,22 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, brief, aiOk, 
     const r = recommendShort({ topic: t, platform: draft.platform, posts: store.posts, today })
     set({ topic: t, aim: r.aim, format: r.format, formatBy: 'rec' })
   }
+  // D-680 고객 사례 — 이름을 가린 한 줄을 사실 목록에 · 주제 · 사실 · 대본 · 설명 글에 내 고객 이름이 있으면 확인 줄
+  const cases = useClientCase({
+    testPrefix: 'sht',
+    today,
+    fields: { topic: draft.topic, facts: draft.facts, script: draft.script, caption: draft.caption },
+    onFields: (next) => set(next as Partial<Draft>),
+    onInsert: (line, topic) => {
+      const facts = draft.facts.trim() ? `${draft.facts.trim()}\n${line}` : line
+      if (draft.topic.trim()) return set({ facts })
+      pickTopic(topic)
+      set({ facts })
+    },
+    openFor: caseFor,
+    onOpened: onCaseUsed,
+    readOnly,
+  })
   const openFormats = () => {
     // D-627 내 맞춤은 [더 정하기] 안 — 바깥을 먼저 펼친 뒤(그려진 다음) 안쪽을
     openFold('sht.qs.more')
@@ -525,6 +547,7 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, brief, aiOk, 
   const pending = !editorOpen && draft.script.trim() ? (draft.topic.trim() || draft.script.trim().split('\n')[0]).slice(0, 20) : ''
   return (
     <div className="flex flex-col gap-4" data-testid="sht-write">
+      {cases.sheet}
       {pending && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="sht-resume" data-kind="local">
           <span className="min-w-0 flex-1 basis-48">
@@ -582,7 +605,7 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, brief, aiOk, 
             ))}
           </div>
         }
-        facts={<FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="sht" what="영상" />}
+        facts={<FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="sht" what="영상" onCase={cases.open} />}
         ai={{ ok: aiOk, busy: ai.busy, error: ai.error, label: 'AI로 완성 대본 쓰기', onRun: () => void runQuick() }}
         fallback={{ label: '예시로 시작', onClick: startExample }}
         // D-630 [직접 쓰기] — 예전 2단계 한 줄에 있던 단추(같은 시험 이름) · 대본 칸이 열려 있으면 숨김
@@ -705,6 +728,8 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, brief, aiOk, 
         }
         hooks={<FirstLineMaker testPrefix="sht" channel="shorts" topic={draft.topic} facts={draft.facts} aiOk={aiOk} onUse={applyFirstLine} />}
       >
+        {/* D-680 주제 · 사실에 내 고객 이름이 있으면 AI 로 쓰기 전에 짚는다(대본 칸이 열려 있으면 그 옆 규칙 검사 위에) */}
+        {!editorOpen && cases.guard('start')}
         {ai.drafts.length > 0 && (
           <ul className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 22rem), 1fr))' }} data-testid="sht-ai-drafts">
             {ai.drafts.map((d, i) => (
@@ -796,6 +821,7 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, brief, aiOk, 
               {lint.bad > 0 ? <Badge tone="danger">고칠 것 {lint.bad}</Badge> : <Badge tone="success">고칠 것 0</Badge>}
               {lint.warn > 0 && <Badge tone="warning">볼 것 {lint.warn}</Badge>}
             </div>
+            {cases.guard('edit')}
             <LintList lines={draft.script.trim() ? lintShown : []} testId="sht-lint" />
             {!draft.script.trim() && <p className="t-sub break-keep text-slate-500">대본을 쓰면 여기서 바로 확인해요.</p>}
           </div>

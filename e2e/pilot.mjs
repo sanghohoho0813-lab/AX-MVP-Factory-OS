@@ -257,6 +257,13 @@ async function route(r) {
 }
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', env: { ...process.env, LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8' } })
+// 쓰는 사람의 기기는 한국 시간대다 — 시험 브라우저도 그렇게 연다(따로 정한 창은 그대로).
+// 예전에는 기계 시계(UTC)로 열려, 한국 시각 자정 ~ 오전 9시에 돌리면 화면의 '오늘' 이 서버가 한국 날짜로 적은 날(0027 상담 신청 할 일)보다 하루 늦어
+// '첫 인사'(CH1) · 업체 '지금 할 것 3'(CH7)이 틀렸다(D-680 점검 때 실제로 겪음 — 제품 규칙은 그대로 · 미룬 할 일은 안 띄우는 것이 맞다).
+{
+  const open = browser.newContext.bind(browser)
+  browser.newContext = (opts = {}) => open({ timezoneId: 'Asia/Seoul', ...opts })
+}
 const errors = []
 
 async function login(page, u) {
@@ -1851,6 +1858,45 @@ try {
     // 뒤의 문의하기 시험(D-568)은 받은함이 빈 채로 시작한다고 본다 — 여기서 남긴 줄을 치운다(시험 DB 만)
     sql(`delete from public.support_messages where kind = 'error' and context->>'source' = 'ai'`)
     sql(`delete from public.ai_usage_ledger where user_id = '${PILOT.id}'`)
+  }
+
+  // D-680 고객 사례(진짜 RLS) — 구독 고객의 사례 판 · 고객 이름 확인은 자기 작업공간 업체만 안다(대표 업체 이름은 고객 이름으로 짚지 않는다)
+  //   [허락받았어요] 는 자기 업체 기록에만 날짜로 남고, 대표 업체 기록은 그대로다
+  {
+    await go(p4, '/marketing/threads')
+    const moreBox = p4.getByTestId('thr-qs-more').first()
+    if ((await moreBox.getAttribute('data-open').catch(() => '')) !== '1') await moreBox.getByTestId('fold-toggle').first().click().catch(() => {})
+    const factsBox = p4.getByTestId('thr-facts-box')
+    if (!(await factsBox.evaluate((e) => e.open).catch(() => true))) await factsBox.locator('summary').click().catch(() => {})
+    await p4.getByTestId('thr-case-open').click().catch(() => {})
+    await p4.getByTestId('thr-case-pick').waitFor({ timeout: 10000 }).catch(() => {})
+    for (let i = 0; i < 6 && (await p4.getByTestId('thr-case-more').count()); i++) await p4.getByTestId('thr-case-more').click()
+    const caseNames = await p4.getByTestId('thr-case-client').allInnerTexts()
+    const mine = sql(`select company_name from public.operations_clients where workspace_id = '${PILOT_WS}' and coalesce(payload->>'archivedAt', '') = '' order by company_name`).split('\n').filter(Boolean)
+    check('CASE-1 구독 고객 사례 판: 자기 작업공간 업체만(대표 업체 0) · DB 의 내 업체 수와 같다', caseNames.length > 0 && caseNames.length === mine.length && caseNames.every((n) => mine.some((m) => n.includes(m))) && !caseNames.some((n) => n.includes('대표비밀')), { caseNames, mine })
+    await p4.getByTestId('thr-case-search').fill('은혜테스트')
+    await p4.getByTestId('thr-case-client').first().click().catch(() => {})
+    const caseLine = ((await p4.getByTestId('thr-case-line').innerText().catch(() => '')) ?? '').trim()
+    check('CASE-2 이름을 가린 한 줄 — 회사 이름 0 · 머리말 그대로', caseLine.startsWith('[고객 사례 · 이름 가림]') && !caseLine.includes('은혜테스트'), caseLine)
+    await shot(p4, 'case-customer-preview')
+    await p4.getByTestId('thr-case-insert').click().catch(() => {})
+    await p4.getByTestId('thr-case-preview').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+    // 주제에 대표 업체 이름과 내 업체 이름을 같이 — 내 업체만 짚는다
+    await p4.getByTestId('thr-qs-topic').fill('대표비밀정밀(주) 와 은혜테스트정밀(주) 이야기')
+    await p4.getByTestId('thr-case-guard').waitFor({ timeout: 8000 }).catch(() => {})
+    const caseHits = await p4.locator('[data-testid="thr-case-text"]').allInnerTexts()
+    check('CASE-3 고객 이름 확인: 내 업체("은혜테스트정밀(주)")만 짚고 · 대표 업체 이름은 모른다(다른 작업공간 자료를 읽지 않음)', caseHits.length === 1 && caseHits[0].includes('은혜테스트정밀(주)') && !caseHits.join().includes('대표비밀'), caseHits)
+    const ownerBefore = sql(`select md5(payload::text) from public.operations_clients where id = '${OWNER_CLIENT}'`)
+    await p4.getByTestId('thr-case-consent').click().catch(() => {})
+    await p4.getByTestId('thr-case-yes').click().catch(() => {})
+    await p4.waitForFunction(() => document.querySelector('[data-testid="thr-case-hit"]')?.getAttribute('data-consent') === '1', null, { timeout: 10000 }).catch(() => {})
+    const consentRow = sql(`select coalesce(payload->'caseConsent'->>'at', '') || '|' || coalesce(payload->'activity'->0->>'text', '') from public.operations_clients where workspace_id = '${PILOT_WS}' and company_name = '은혜테스트정밀(주)'`)
+    check('CASE-4 [허락받았어요] → [네, 받았어요] → DB 의 내 업체 기록에 날짜 · 활동 기록 한 줄 · 대표 업체 기록은 한 글자도 안 바뀜', /^\d{4}-\d{2}-\d{2}\|사례 공개 허락받음/.test(consentRow) && sql(`select md5(payload::text) from public.operations_clients where id = '${OWNER_CLIENT}'`) === ownerBefore && sql(`select count(*) from public.operations_clients where workspace_id <> '${PILOT_WS}' and payload ? 'caseConsent'`) === '0', consentRow)
+    await shot(p4, 'case-customer-consented')
+    await p4.getByTestId('thr-case-revoke').click().catch(() => {})
+    await p4.waitForFunction(() => document.querySelector('[data-testid="thr-case-hit"]')?.getAttribute('data-consent') === '0', null, { timeout: 10000 }).catch(() => {})
+    check('CASE-5 [허락 취소] → DB 에서 허락 칸이 지워짐(활동 기록에는 남음)', sql(`select (payload ? 'caseConsent')::text || '|' || coalesce(payload->'activity'->0->>'text', '') from public.operations_clients where workspace_id = '${PILOT_WS}' and company_name = '은혜테스트정밀(주)'`).startsWith('false|사례 공개 허락 취소'))
+    await p4.getByTestId('thr-qs-topic').fill('')
   }
 
   // 휴대폰 390 — 열린 마케팅 화면도 넘침 0

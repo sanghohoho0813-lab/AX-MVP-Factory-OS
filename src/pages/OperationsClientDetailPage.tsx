@@ -37,7 +37,9 @@ import {
   FileText,
   Sparkles,
 } from 'lucide-react'
-import { FileArchive, FlaskConical, FolderOpen, HardDrive, Link2, ListTree } from 'lucide-react'
+import { FileArchive, FlaskConical, FolderOpen, HardDrive, Link2, ListTree, PenLine, ShieldCheck } from 'lucide-react'
+import { usePilotMarketingScreens } from '../config/pilotMarketing'
+import { consentDayText, withCaseConsent } from '../services/marketing/clientCase'
 import { DocOriginalsSheet } from '../components/ops/DocOriginalsSheet'
 import { originalItems } from '../services/docOriginals'
 import { withoutProvisional } from '../services/marketingTrial'
@@ -248,6 +250,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const pilot = useIsPilot()
   // D-563 외부 구독 고객 계정 — 전문 모듈로 가는 칸(먼저 제안할 것 · 전문 모듈 열기)은 그리지 않는다. 대표 · 내부 팀장은 그대로
   const customer = useCustomerAudience()
+  // D-680 마케팅 화면이 열린 계정에만 [이 업체 사례로 글 쓰기](대표는 늘 · 팀장 · 고객은 열려 있을 때)
+  const pilotMarketing = usePilotMarketingScreens()
+  const caseWriteOpen = !pilot || pilotMarketing
   const requested: DetailTab = tabParam === 'files' ? 'docs' : isDetailTab(tabParam) ? tabParam : 'overview'
   const ownerAi = useOwnerAiAccess()
   const tab: DetailTab = (pilot && PILOT_HIDDEN_TABS.has(requested)) || (requested === 'ai' && ownerAi === 'no') ? 'overview' : requested
@@ -2302,6 +2307,40 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 <ClipboardCopy aria-hidden="true" className="size-4" />
                 진행 상황 보고 문구
               </Button>
+              {/* D-680 고객사 → 마케팅 — 이 업체를 고른 채로 스레드 쓰기의 사례 판이 열린다(이름을 가린 한 줄) */}
+              {caseWriteOpen && (
+                <Button
+                  variant="secondary"
+                  className="w-full justify-start"
+                  data-testid="more-case"
+                  data-guide="fn-client-case"
+                  onClick={() => {
+                    setMoreOpen(false)
+                    navigate(`/marketing/threads?case=${encodeURIComponent(record.id)}`)
+                  }}
+                >
+                  <PenLine aria-hidden="true" className="size-4" />
+                  이 업체 사례로 글 쓰기(이름 가림)
+                </Button>
+              )}
+              {/* D-680 사례 공개 허락 — 고객이 '글에 회사 이름을 써도 된다' 고 한 날을 적어 둔다 · 다시 누르면 취소 */}
+              {caseWriteOpen && (
+                <Button
+                  variant="secondary"
+                  className="w-full justify-start"
+                  data-testid="more-case-consent"
+                  data-on={record.caseConsent ? '1' : '0'}
+                  onClick={() => {
+                    const on = !record.caseConsent
+                    const next = withActivity(withCaseConsent(record, on, today), 'profile', on ? '사례 공개 허락받음 — 공개 글에 회사 이름을 써도 됨' : '사례 공개 허락 취소 — 공개 글에 회사 이름을 쓰지 않음')
+                    setMoreOpen(false)
+                    void commit(next).then((ok) => ok && showToast(on ? '허락받은 날을 남겼어요 — 글에 이 회사 이름을 쓰면 허락받은 고객으로 보여요.' : '허락을 취소했어요 — 글에 이 회사 이름이 있으면 다시 짚어 드려요.'))
+                  }}
+                >
+                  <ShieldCheck aria-hidden="true" className="size-4" />
+                  {record.caseConsent ? `사례 공개 허락 취소(${consentDayText(record.caseConsent)} 받음)` : '사례 공개 허락받음으로 적기'}
+                </Button>
+              )}
               {/* D-154: 고객 미팅 · 재계약 때 드리는 '함께 만든 성과' 한 장 */}
               <Button
                 variant="secondary"

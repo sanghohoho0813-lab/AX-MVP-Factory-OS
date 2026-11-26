@@ -7,7 +7,7 @@
  *  ④ 하루 10분    오늘 할 일 체크 · 태그 검색 열기 · 전문가 답글 틀 · 요일 계획
  * 대표 전용(마케팅 · 브랜딩 모듈 · 팀장에게 안 보임). 저장은 기존 모듈 기록(marketing / threads).
  */
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DraftSyncLine, useDraftSync } from './useDraftSync'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AtSign, BookOpen, CalendarCheck, CheckCircle2, ClipboardCopy, Download, ExternalLink, FilePlus2, Heart, Lightbulb, MessageCircle, NotebookPen, RefreshCw, Save, Send, Share2, SlidersHorizontal, TriangleAlert, UserPlus } from 'lucide-react'
@@ -20,6 +20,7 @@ import { WorkspaceScope } from '../../components/workspace/WorkspaceScope'
 import { useViewingPilot } from '../../auth/osAccess'
 import { useMarketingAiOn } from '../../auth/ownerAiAccess'
 import { MarketingTabs } from '../../tools/marketing/MarketingTabs'
+import { useClientCase } from './ClientCase'
 import { BigChoices, DeleteTwice, FactsBox, HoverTip, InnerTabs, LintList, RewriteTable, ShareKit, StatInputs, StepTitle, TipBody, ToneSection, chip } from './snsParts'
 import { TONES, scrollAndFlash, toneChip, type Tone } from './snsTone'
 import { QuickStart } from './QuickStart'
@@ -245,10 +246,15 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
     const r = recommendThread({ topic: t })
     return { ...d, topic: t, goal: r.goal, template: r.template, tag: r.tag || d.tag, formatBy: 'rec' }
   })
+  // D-680 업체 화면 [이 업체 사례로 글 쓰기] 로 왔으면(case=업체) 그 업체로 사례 판을 연다 — 주소 값은 한 번 쓰고 지운다
+  const [caseFor, setCaseFor] = useState(() => params.get('case'))
+  // 한 번 열었으면 잊는다 — 탭(기록표 · 글 틀)을 다녀와도 판이 다시 뜨지 않게
+  const caseUsed = useCallback(() => setCaseFor(null), [])
   useEffect(() => {
-    if (!params.get('topic')) return
+    if (!params.get('topic') && !params.get('case')) return
     const next = new URLSearchParams(params)
     next.delete('topic')
+    next.delete('case')
     setParams(next, { replace: true })
   }, [params, setParams])
   const setDraft = (fn: (d: Draft) => Draft) =>
@@ -258,7 +264,7 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
       return n
     })
   // D-513 다른 기기에서 이어 쓰기 — 주소로 주제 · 글을 들고 왔으면 클라우드 글로 바꾸지 않는다 · 참고 글은 올리지 않는다
-  const [openedWith] = useState(() => !!(params.get('topic') || params.get('open')))
+  const [openedWith] = useState(() => !!(params.get('topic') || params.get('open') || params.get('case')))
   const syncDraft = useMemo(() => ({ ...draft, reference: '' }), [draft])
   const sync = useDraftSync<Draft>({ kind: 'threads', workspaceId, readOnly, draft: syncDraft, replace: (d) => setDraft(() => d), blocked: openedWith, empty: draftEmpty, clean: cleanDraft })
   const draftOf = (p: ThreadPost): Draft => ({ ...EMPTY_DRAFT, id: p.id, goal: p.goal, template: p.template, topic: p.topic, tag: p.tag, body: p.body, selfComment: p.selfComment, checks: p.checks, source: p.source })
@@ -313,7 +319,7 @@ function Threads({ workspaceId }: { workspaceId: string | null }) {
       )}
       {readOnly && <p className="t-sub rounded-(--radius-control) bg-slate-50 px-3 py-2 text-slate-600" data-testid="mk-viewas-note">팀장 화면을 보는 중에는 저장하지 않습니다 — AI 단추는 팀장님 화면 그대로 눌러 볼 수 있어요(회사마다 가장 싼 모델 · 답은 글 칸에만).</p>}
       {tab === 'write' && <DraftSyncLine sync={sync} testPrefix="thr" />}
-      {tab === 'write' && <WritePanel draft={draft} setDraft={setDraft} editing={editing} setEditing={setEditing} store={store} weekRef={week.ref} brief={brief} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} onLibrary={() => go('library')} onRoutine={() => go('routine')} />}
+      {tab === 'write' && <WritePanel caseFor={caseFor} onCaseUsed={caseUsed} draft={draft} setDraft={setDraft} editing={editing} setEditing={setEditing} store={store} weekRef={week.ref} brief={brief} aiOk={aiOk} readOnly={readOnly} onRecords={() => go('records')} onLibrary={() => go('library')} onRoutine={() => go('routine')} />}
       {tab === 'records' && <RecordsPanel store={store} readOnly={readOnly} onOpen={openPost} />}
       {tab === 'library' && <LibraryPanel onUse={pickTemplate} />}
       {tab === 'routine' && <RoutinePanel week={week} readOnly={readOnly} onWrite={() => go('write')} onRecords={() => go('records')} />}
@@ -327,7 +333,7 @@ type Store = ReturnType<typeof useThreadPosts>
 /* ① 오늘 쓸 글                                                         */
 /* ------------------------------------------------------------------ */
 
-function WritePanel({ draft, setDraft, editing, setEditing, store, weekRef, brief, aiOk, readOnly, onRecords, onLibrary, onRoutine }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; /** D-630 이번 방문에서 글 칸(2단계)을 열었나 */ editing: boolean; setEditing: (on: boolean) => void; store: Store; weekRef: WeekRef | null; brief: ChannelBrief; aiOk: boolean; readOnly: boolean; onRecords: () => void; onLibrary: () => void; onRoutine: () => void }) {
+function WritePanel({ caseFor, onCaseUsed, draft, setDraft, editing, setEditing, store, weekRef, brief, aiOk, readOnly, onRecords, onLibrary, onRoutine }: { /** D-680 주소 case=업체 — 그 업체로 사례 판을 연다 */ caseFor: string | null; onCaseUsed: () => void; draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; /** D-630 이번 방문에서 글 칸(2단계)을 열었나 */ editing: boolean; setEditing: (on: boolean) => void; store: Store; weekRef: WeekRef | null; brief: ChannelBrief; aiOk: boolean; readOnly: boolean; onRecords: () => void; onLibrary: () => void; onRoutine: () => void }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const today = todayLocalDate()
@@ -389,6 +395,23 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, weekRef, brie
     const r = recommendThread({ topic: t, today, weekRef })
     set({ topic: t, goal: r.goal, template: r.template, tag: r.tag || draft.tag, formatBy: 'rec' })
   }
+  // D-680 고객 사례 — 이름을 가린 한 줄을 사실 목록에 · 주제 · 사실 · 글에 내 고객 이름이 있으면 확인 줄
+  const cases = useClientCase({
+    testPrefix: 'thr',
+    today,
+    fields: { topic: draft.topic, facts: draft.facts, body: draft.body, selfComment: draft.selfComment },
+    onFields: (next) => set(next as Partial<Draft>),
+    onInsert: (line, topic) => {
+      const facts = draft.facts.trim() ? `${draft.facts.trim()}\n${line}` : line
+      // 주제가 비어 있으면 사례 주제를 넣고 형식도 맞춘다(적어 둔 주제는 그대로)
+      if (draft.topic.trim()) return set({ facts })
+      pickTopic(topic)
+      set({ facts })
+    },
+    openFor: caseFor,
+    onOpened: onCaseUsed,
+    readOnly,
+  })
   const openFormats = () => {
     // D-627 내 맞춤은 [더 정하기] 안 — 바깥을 먼저 펼친 뒤(그려진 다음) 안쪽을
     openFold('thr.qs.more')
@@ -601,6 +624,7 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, weekRef, brie
   const pending = !editorOpen && draft.body.trim() ? draft.body.trim().split('\n')[0].slice(0, 20) : ''
   return (
     <div className="flex flex-col gap-4" data-testid="thr-write">
+      {cases.sheet}
       {pending && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid="thr-resume" data-kind="local">
           <span className="min-w-0 flex-1 basis-48">
@@ -647,7 +671,7 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, weekRef, brie
         recTip={templateOf(eff.template) ? templateTip(templateOf(eff.template) as ThreadTemplate) : undefined}
         picked={!!draft.template && draft.formatBy !== 'rec'}
         onChangeFormat={openFormats}
-        facts={<FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="thr" what="글" />}
+        facts={<FactsBox value={draft.facts} onChange={(v) => set({ facts: v })} testPrefix="thr" what="글" onCase={cases.open} />}
         ai={{ ok: aiOk, busy: ai.busy, error: ai.error, label: 'AI로 완성 글 쓰기', onRun: () => void runQuick() }}
         fallback={{ label: aiOk ? '뼈대만 받기' : '뼈대로 시작', onClick: startSkeleton }}
         // D-630 [직접 쓰기] — 예전 2단계 한 줄에 있던 단추(같은 시험 이름) · 글 칸이 열려 있으면 숨김
@@ -855,6 +879,8 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, weekRef, brie
           </details>
         }
       >
+        {/* D-680 주제 · 사실에 내 고객 이름이 있으면 AI 로 쓰기 전에 짚는다(글 칸이 열려 있으면 그 옆 규칙 검사 위에) */}
+        {!editorOpen && cases.guard('start')}
         {ai.drafts.length > 0 && (
           <ul className="grid grid-cols-1 gap-2 lg:grid-cols-3" data-testid="thr-ai-drafts">
             {ai.drafts.map((d, i) => (
@@ -940,6 +966,7 @@ function WritePanel({ draft, setDraft, editing, setEditing, store, weekRef, brie
               {lint.bad > 0 ? <Badge tone="danger">고칠 것 {lint.bad}</Badge> : <Badge tone="success">고칠 것 0</Badge>}
               {lint.warn > 0 && <Badge tone="warning">볼 것 {lint.warn}</Badge>}
             </div>
+            {cases.guard('edit')}
             <LintList lines={draft.body.trim() ? lintShown : []} testId="thr-lint" />
             {!draft.body.trim() && <p className="t-sub break-keep text-slate-500">글을 쓰면 여기서 바로 확인해요.</p>}
             <details className="border-t border-slate-100 pt-2">
