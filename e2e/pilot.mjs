@@ -2154,6 +2154,80 @@ try {
       check('L9-12 고객 390: 링크 칸 펼친 채 가로 넘침 0', (await overflowX(pk)) <= 0, String(await overflowX(pk)))
       await shot(pk, 'l9-4-card-390')
       await pk.setViewportSize({ width: 1440, height: 900 })
+
+      // ---------------------------------------------------------------- D-656 ~ D-660 한 줄로(진짜 서버 0027 · 0031 · RLS)
+      // 상담 신청 링크로 들어온 곳 → 오늘 '첫 인사' → 서류 올리기 링크 [보냈어요] → 업체 대표가 올림 → 오늘 '받은 서류' → 그 업체 서류함
+      {
+        await go(pk, '/')
+        const nChip = pk.getByTestId('today-notices-open')
+        await nChip.waitFor({ timeout: 8000 }).catch(() => {})
+        await nChip.click().catch(() => {})
+        const hello = pk.locator('[data-testid="notice-row"][data-kind="hello"]').first()
+        await hello.waitFor({ timeout: 6000 }).catch(() => {})
+        const helloRow = ((await hello.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+        await hello.getByTestId('notice-peek').click().catch(() => {})
+        const helloText = ((await hello.getByTestId('notice-text').innerText().catch(() => '')) ?? '')
+        check("CH1 링크로 들어온 잠재고객 → 고객 오늘 '보낼 안내' 에 '첫 인사'(서버가 적은 할 일 글을 규칙이 그대로 알아봄) · 문구 = 신청한 사람 이름 · OS 이름 0",
+          /첫 인사/.test(helloRow) && helloRow.includes('(주)링크로온상사') && /새 상담 신청/.test(helloRow) && helloText.startsWith('안녕하세요, 박신청님.') && /상담 신청해 주셔서 감사합니다/.test(helloText) && !/MIRAE|미래AI랩|미래에이아이랩/.test(helloText),
+          `${helloRow.slice(0, 120)} / ${helloText.slice(0, 80)}`)
+        await shot(pk, 'ch-1-hello')
+        await pk.keyboard.press('Escape')
+        const leadId = sql(`select id from public.operations_clients where workspace_id = '${cwsLead}' and company_name = '(주)링크로온상사'`)
+        await go(pk, `/ops/clients/${leadId}?tab=docs`)
+        const linkBtn = pk.getByTestId('docs-upload-link')
+        await linkBtn.waitFor({ timeout: 8000 }).catch(() => {})
+        if ((await linkBtn.count()) === 0) {
+          check('CH2 고객 계정 서류함에 [링크로 받기](0031)', false, '단추 없음')
+        } else {
+          await linkBtn.click()
+          const sh = pk.getByTestId('upload-link-sheet')
+          await sh.waitFor({ timeout: 8000 })
+          const firstDoc = sh.getByTestId('upload-link-doc').first()
+          const docKey = (await firstDoc.getAttribute('data-key')) ?? ''
+          if (!(await firstDoc.locator('input').isChecked())) await firstDoc.locator('input').check()
+          await sh.getByTestId('upload-link-save').click()
+          await pk.waitForFunction(() => document.querySelector('[data-testid="upload-link-sheet"]')?.getAttribute('data-view') === 'ready', null, { timeout: 8000 }).catch(() => {})
+          const upUrl = (await sh.getByTestId('upload-link-url').inputValue().catch(() => '')) ?? ''
+          const upSlug = upUrl.split('/up/')[1] ?? ''
+          await pk.waitForTimeout(800)
+          const hintSlug = sql(`select coalesce(payload->'uploadHint'->>'slug', '') from public.operations_clients where id = '${leadId}'`)
+          check('CH2 고객이 링크 만들기(진짜 0031) → 주소 20자리 · 업체 기록에 사본(다시 부탁 문구가 주소를 붙인다)', /^[0-9a-z]{20}$/.test(upSlug) && hintSlug === upSlug, `${upSlug} / ${hintSlug}`)
+          await sh.getByTestId('upload-link-sent').click()
+          await sh.getByTestId('upload-link-sent-done').waitFor({ timeout: 8000 }).catch(() => {})
+          const reqN = sql(`select jsonb_array_length(coalesce(payload->'docRequests', '[]'::jsonb)) from public.operations_clients where id = '${leadId}'`)
+          const todoN = sql(`select count(*) from public.ops_journal_entries where workspace_id = '${cwsLead}' and client_id = '${leadId}' and entry_type = 'follow_up'`)
+          check("CH3 [보냈어요] → 서류함 '요청한 서류' 1건 · 3일 뒤 '받았는지 확인' 할 일 1개(고객 작업공간에)", reqN === '1' && todoN === '1', `req=${reqN} todo=${todoN}`)
+          await pk.keyboard.press('Escape')
+          // 업체 대표(로그인 없음) — 진짜 함수로 예약 → 보관함에 들어간 것처럼(로컬 DB 의 storage.objects) → 다 올림
+          const anonRpc = async (fn, body) => {
+            const r = await fetch(`http://127.0.0.1:${PGRST_PORT}/rpc/${fn}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+            return r.ok ? r.json() : `http ${r.status}`
+          }
+          const reserved = await anonRpc('public_upload_reserve', { p_slug: upSlug, p_doc_key: docKey, p_file_name: '서류.pdf', p_size: 12345, p_type: 'application/pdf' })
+          if (reserved?.path) sql(`insert into storage.objects (bucket_id, name) values ('client-documents', '${reserved.path}')`)
+          const doneRes = reserved?.path ? await anonRpc('public_upload_done', { p_slug: upSlug, p_path: reserved.path }) : 'no path'
+          check('CH4 업체 대표(로그인 없음): 예약 → 다 올림(진짜 함수) = ok', reserved?.status === 'ok' && doneRes === 'ok', `${JSON.stringify(reserved).slice(0, 120)} / ${JSON.stringify(doneRes)}`)
+          await go(pk, '/')
+          const upChip = pk.getByTestId('today-uploads-open')
+          await upChip.waitFor({ timeout: 8000 }).catch(() => {})
+          check("CH5 고객 오늘 머리 줄 '받은 서류 1개'(진짜 upload_link_inbox 답으로)", (await upChip.getAttribute('data-count').catch(() => '')) === '1', (await upChip.innerText().catch(() => '없음')) ?? '')
+          await shot(pk, 'ch-2-today-uploads')
+          await upChip.click().catch(() => {})
+          await pk.getByTestId('uploads-go').first().click().catch(() => {})
+          await pk.getByTestId('upload-inbox').waitFor({ timeout: 8000 }).catch(() => {})
+          check("CH6 [넣으러 가기] → 그 업체 서류함 · '고객이 올린 서류' 판에 1줄(서류.pdf)", new URL(pk.url()).pathname === `/ops/clients/${leadId}` && (await pk.getByTestId('upload-inbox-row').count()) === 1 && /서류\.pdf/.test((await pk.getByTestId('upload-inbox').innerText().catch(() => '')) ?? ''), pk.url())
+          await pk.keyboard.press('Escape')
+          await go(pk, `/ops/clients/${leadId}?tab=overview`)
+          const nowTxt = ((await pk.getByTestId('client-now').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
+          check("CH7 업체 머리 '지금 할 것' — 받은 서류 1개 · 보낼 안내(첫 인사) · 서류 요청 오늘 0/1 이 한 줄에", /받은 서류 1개/.test(nowTxt) && /보낼 안내 1건/.test(nowTxt) && /서류 요청 오늘 0\/1/.test(nowTxt), nowTxt)
+          await shot(pk, 'ch-3-client-now')
+          const ownerSees = await (async () => {
+            const r = await fetch(`http://127.0.0.1:${PGRST_PORT}/rpc/upload_link_inbox`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${jwt(OWNER)}` }, body: JSON.stringify({ p_ws: cwsLead }) })
+            return r.ok ? JSON.stringify(await r.json()) : `http ${r.status}`
+          })()
+          check('CH8 대표 토큰으로는 그 고객 작업공간의 받은 서류 목록 빈 칸(0024 · 0031)', ownerSees === '[]', ownerSees)
+        }
+      }
     }
     await cK.close()
     // 출시 목록 L-5: 이용약관 · 개인정보처리방침 초안 — 로그인 없이 열리고(초안 띠), 검토 전에는 로그인 화면에 링크가 없다

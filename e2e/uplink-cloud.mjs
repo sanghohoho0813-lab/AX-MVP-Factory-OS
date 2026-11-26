@@ -381,6 +381,18 @@ await cardUp.click()
 await page.getByTestId('upload-link-sheet').waitFor({ timeout: 8000 }).catch(() => {})
 check('T5 카드에서 눌러도 올린 서류 판이 열린 채', (await page.getByTestId('upload-link-sheet').getAttribute('data-view').catch(() => '')) === 'inbox')
 await page.keyboard.press('Escape')
+// D-663 종(알림) — 어느 화면에 있든
+await page.goto(`${BASE}/ops/calendar`, { waitUntil: 'networkidle' })
+await page.waitForTimeout(1200)
+await page.getByRole('button', { name: /챙길 것/ }).click()
+const bellUp = page.getByTestId('bell-uploads')
+await bellUp.waitFor({ timeout: 6000 }).catch(() => {})
+check("T6 종에 '고객이 올린 서류 · 2개 — 칸에 넣기' → 누르면 그 업체 서류함(올린 서류 판)", (await bellUp.count()) === 1 && /2개 — 칸에 넣기/.test(await bellUp.innerText()))
+if (SHOTS) await page.screenshot({ path: join(SHOTS, 'bell-uploads-pc.png') })
+await bellUp.click()
+await page.getByTestId('upload-link-sheet').waitFor({ timeout: 8000 }).catch(() => {})
+check('T7 종에서 눌러도 올린 서류 판이 열린 채', new URL(page.url()).pathname === `/ops/clients/${CID}` && (await page.getByTestId('upload-link-sheet').getAttribute('data-view').catch(() => '')) === 'inbox', page.url())
+await page.keyboard.press('Escape')
 
 // ---------------------------------------------------------------- 컨설턴트: 받은 서류 넣기
 await page.reload({ waitUntil: 'networkidle' })

@@ -93,6 +93,31 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
     }
   }, [pilot, tick, signupTick])
 
+  // D-663 고객이 올리기 링크로 올리고 아직 칸에 안 넣은 서류 — 어느 화면에 있든 종에서 보이게(0031 전 · 로컬 모드는 0).
+  // 서비스는 종이 셀 때 불러온다(앱 뼈대에 싣지 않는다 — D-112 와 같은 까닭)
+  const [uploads, setUploads] = useState<{ clients: number; files: number; first: string }>({ clients: 0, files: 0, first: '' })
+  const [uploadTick, setUploadTick] = useState(0)
+  useEffect(() => {
+    const bump = () => setUploadTick((t) => t + 1)
+    window.addEventListener('axmvp:upload-link-changed', bump)
+    return () => window.removeEventListener('axmvp:upload-link-changed', bump)
+  }, [])
+  useEffect(() => {
+    let alive = true
+    void import('../../services/uploadLink')
+      .then(({ loadUploadInbox }) => loadUploadInbox(workspaceId))
+      .then((m) => {
+        if (!alive) return
+        let files = 0
+        for (const n of m.values()) files += n
+        setUploads({ clients: m.size, files, first: m.keys().next().value ?? '' })
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [workspaceId, tick, uploadTick])
+
   const critical = useMemo(() => alerts.filter((a) => a.severity === 'critical'), [alerts])
   // D-188: 팀장이 보낸 새 피드백 — 대표 종에도
   const { entries: feedback, unread: feedbackUnread } = useFeedbackInbox()
@@ -101,7 +126,7 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
   const { entries: support, unread: supportUnread } = useSupportInbox()
   const supportNew = (support ?? []).filter((m) => !m.readAt)
   const supportText = [supportNew.some((m) => m.kind === 'question') ? `문의 ${supportNew.filter((m) => m.kind === 'question').length}건` : '', supportNew.some((m) => m.kind === 'error') ? `화면 오류 ${supportNew.filter((m) => m.kind === 'error').length}건` : ''].filter(Boolean).join(' · ')
-  const count = critical.length + events.length + feedbackUnread + supportUnread + signupCount
+  const count = critical.length + events.length + feedbackUnread + supportUnread + signupCount + (uploads.files > 0 ? 1 : 0)
 
   return (
     <div ref={containerRef} className="relative">
@@ -132,6 +157,22 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
                   <Link to="/settings?tab=workspace&focus=signup" onClick={() => setOpen(false)} data-testid="bell-signup" className="block px-4 py-2.5 hover:bg-slate-50">
                     <span className="block text-[0.875rem] font-semibold text-brand-700">가입 신청</span>
                     <span className="block truncate text-[0.875rem] text-slate-700">승인을 기다리는 사람 {signupCount}명</span>
+                  </Link>
+                </li>
+              )}
+              {uploads.files > 0 && (
+                <li className="border-b border-slate-50">
+                  <Link
+                    to={uploads.clients === 1 && uploads.first ? `/ops/clients/${uploads.first}?tab=docs&inbox=1` : '/'}
+                    onClick={() => setOpen(false)}
+                    data-testid="bell-uploads"
+                    className="block px-4 py-2.5 hover:bg-slate-50"
+                  >
+                    <span className="block text-[0.875rem] font-semibold text-brand-700">고객이 올린 서류</span>
+                    <span className="block truncate text-[0.875rem] text-slate-700">
+                      {uploads.clients > 1 ? `${uploads.clients}곳 · ` : ''}
+                      {uploads.files}개 — 칸에 넣기
+                    </span>
                   </Link>
                 </li>
               )}
