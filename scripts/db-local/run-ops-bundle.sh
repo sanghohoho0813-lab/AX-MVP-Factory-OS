@@ -20,6 +20,8 @@ blk() { su postgres -c "psql -At -F '|' -d $DB -c \"\$(cat)\"" < "$1" 2>&1; }
 blks() { su postgres -c "psql -At -F '|' -d $DB -c \"\$(cat)\"" 2>&1; }
 BAD=0
 check() { if [ "$2" = "$3" ]; then echo "PASS  $1 = $2"; else echo "FAIL  $1 = $2 (기대 $3)"; BAD=1; fi; }
+# 묶음 뒤에 따로 넣는 것(0032 — 0026 이 있어야 한다)
+LATER='20261126000032_view_always'
 SIX='20261114000026_view_consent|20261114000027_intake_links|20261115000028_self_signup|20261118000029_signup_approval|20261119000030_ai_assist_results|20261123000031_upload_links'
 
 # 운영 모양 — 0025 까지(여섯 개만 빼고 차례대로)
@@ -27,7 +29,7 @@ fresh() {
   su postgres -c "dropdb --if-exists $DB; createdb $DB" || exit 1
   q < scripts/db-local/supabase-shim.sql > /dev/null || exit 1
   for f in supabase/migrations/*.sql; do
-    if echo "$f" | grep -qE "$SIX"; then continue; fi
+    if echo "$f" | grep -qE "$SIX|$LATER"; then continue; fi
     q < "$f" > /dev/null 2>/tmp/bundle-err || { echo "적용 실패 $f"; cat /tmp/bundle-err; exit 1; }
   done
 }
@@ -67,6 +69,16 @@ for m in 20261114000026_view_consent 20261114000027_intake_links; do q < supabas
 before=$(blk $CHECK)
 out=$(blk $BUNDLE)
 check "묶음 ⑦ 0026 · 0027 을 먼저 따로 넣어 둔 DB — 넣기 전 '들어감' 2 · '없음' 4 → 묶음 뒤 오류 0 · 여섯 줄 '들어감'" "$(rows "$before" 들어감) $(rows "$before" 없음) $(echo "$out" | grep -c ERROR) $(rows "$out" 들어감)" "2 4 0 6"
+
+# ⑧ 묶음 뒤 0032(D-675 — 2026-11-26 운영과 같은 차례): SQL Editor 처럼 한 덩어리 · 오류 0 · 확인 SQL 1~5 '좋음' · 넣기만 해서는 켜진 곳 0 · 다시 · 들여쓰기
+M32=supabase/migrations/20261126000032_view_always.sql
+V32=supabase/manual/verify_after_0032.sql
+out=$(blk $M32)
+vfy=$(blk $V32)
+check "묶음 ⑧ 묶음 뒤 0032 한 덩어리 — 오류 0 · 표 · 함수 있음 · 켜진 곳 0 / 확인 SQL 1~5 '좋음' · 6번 0곳 · 읽기 전용" "$(echo "$out" | grep -c ERROR) $(echo "$out" | tail -1) $(echo "$vfy" | grep -cE '^[1-5]\|.*\|좋음$') $(echo "$vfy" | grep -E '^6\|' | cut -d'|' -f3) $(grep -v '^--' $V32 | grep -m1 -v '^\s*$')" "0 t|t|0 5 0곳 set transaction read only;"
+out=$(blk $M32); out2=$(sed 's/^/    /' $M32 | blks)
+check "묶음 ⑧ 0032 다시 넣어도 · 계단 들여쓰기로 붙여도 오류 0" "$(echo "$out" | grep -c ERROR) $(echo "$out2" | grep -c ERROR)" "0 0"
+check "묶음 ⑧ 예전 한 장 점검(0026~0031)은 0032 뒤에도 여섯 줄 '들어감'" "$(rows "$(blk $CHECK)" 들어감)" "6"
 
 su postgres -c "dropdb --if-exists $DB" > /dev/null 2>&1
 exit $BAD

@@ -14,7 +14,7 @@ psqlq() { su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB"; }
 su postgres -c "dropdb --if-exists $DB; createdb $DB"
 psqlq < $DIR/supabase-shim.sql > /dev/null
 for f in supabase/migrations/*.sql; do
-  case "$f" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_intake_links.sql|*_self_signup.sql|*_signup_approval.sql|*_upload_links.sql) continue ;; esac
+  case "$f" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_view_always.sql|*_intake_links.sql|*_self_signup.sql|*_signup_approval.sql|*_upload_links.sql) continue ;; esac
   psqlq < "$f" > /dev/null
 done
 
@@ -67,6 +67,9 @@ psqlq < supabase/migrations/20261110000025_support_messages.sql > /dev/null
 
 # 0026 — L-27 · D-608 대표가 팀장 화면을 볼 때 고객 자료는 팀장 허락 동안만(0020 · 0024 뒤)
 psqlq < supabase/migrations/20261114000026_view_consent.sql > /dev/null
+
+# 0032 — L-27 보완 · D-675 대표가 '늘 보기' 로 정해 둔 내부 팀장 작업공간은 허락 없이도(0024 · 0026 뒤 — 넣기만 해서는 아무것도 안 켜짐)
+psqlq < supabase/migrations/20261126000032_view_always.sql > /dev/null
 
 # 0027 — L-9 · D-609 고객(컨설턴트)마다 상담 신청 링크(0019 뒤 — 사용 승인 있는 주인만)
 psqlq < supabase/migrations/20261114000027_intake_links.sql > /dev/null

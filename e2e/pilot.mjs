@@ -1366,7 +1366,6 @@ try {
       sql(`select count(*) from public.workspace_view_grants where workspace_id = '${PILOT_WS}' and revoked_at is null and expires_at > now()`) === '0',
       `clients=${nClients} mods=${nMods}`)
     await shot(pp, 'l27-8-pilot-revoked')
-    await cp.close()
     currentWho = OWNER
     await go(page, '/settings')
     await page.locator('[data-testid="settings-view-as"] [data-testid="view-as-switch"] [data-view="pilot"]').click()
@@ -1376,6 +1375,106 @@ try {
     await page.getByTestId('viewing-consent').waitFor({ timeout: 8000 }).catch(() => {})
     const pv3 = await bodyText(page)
     check('L27-9 대표 → 팀장 화면(닫은 뒤): 팀장 업체 다시 안 보임 · 띠 아래 "허락해야 보여요" · 마케팅 메뉴는 그대로', !pv3.includes('은혜테스트정밀') && (await page.getByTestId('viewing-consent').getAttribute('data-consent').catch(() => '')) === 'closed' && (await page.locator('aside a[href="/marketing"]').count()) >= 1, pv3.slice(0, 200))
+
+    /* ---------- D-675(0032) 늘 보기 — 대표가 내부 팀장 화면을 허락 없이: 켜기(한 번 더 묻기) → 보임 → 팀장 화면에 표시 → 팀장은 못 끔 → 대표 [끄기] → 다시 0 ---------- */
+    {
+      const vc = page.getByTestId('viewing-consent')
+      const always = (extra = '') => sql(`select count(*) from public.workspace_view_always where workspace_id = '${PILOT_WS}' ${extra}`)
+      const hasBtn = (await page.getByTestId('viewing-consent-always').count()) === 1
+      /** 휴대폰 390: 띠 아래 한 줄이 옆으로 안 넘치고 · 글이 단추에 눌려 짜부라지지 않는다(글 칸 폭 200px 이상) */
+      const phoneLine = async (name) => {
+        const vp = page.viewportSize()
+        await page.setViewportSize({ width: 390, height: 844 })
+        await page.waitForTimeout(400)
+        const over = await overflowX(page)
+        const textW = await vc.locator('p').first().evaluate((el) => Math.round(el.getBoundingClientRect().width)).catch(() => 0)
+        if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}-390.png` })
+        await page.setViewportSize(vp)
+        await page.waitForTimeout(300)
+        return { over, textW }
+      }
+      const closedPhone = await phoneLine('l27-11-owner-closed')
+      await page.getByTestId('viewing-consent-always').click().catch(() => {})
+      await page.locator('[data-testid="viewing-consent"][data-consent="confirm-always"]').waitFor({ timeout: 8000 }).catch(() => {})
+      const askText = (await vc.innerText().catch(() => '')) ?? ''
+      await shot(page, 'l27-11-owner-always-ask')
+      const askPhone = await phoneLine('l27-11-owner-always-ask')
+      await page.getByTestId('viewing-consent-always-cancel').click().catch(() => {})
+      check('L27-11 대표 띠 [늘 보기로 켜기] → 한 번 더 묻기(팀장 이름 · 팀장 설정에 표시 · 기록 · 끄는 것은 대표만) · 390 옆 넘침 0 · 글 칸 200px 이상(닫힌 줄 · 묻는 줄) · [취소] → 그대로 · DB 켜진 줄 0',
+        hasBtn && /최은혜/.test(askText) && /허락 없이 늘 볼까요/.test(askText) && /팀장님 설정/.test(askText) && /기록/.test(askText) && /대표님만/.test(askText) &&
+        askPhone.over <= 1 && askPhone.textW >= 200 && closedPhone.over <= 1 && closedPhone.textW >= 200 &&
+        (await vc.getAttribute('data-consent').catch(() => '')) === 'closed' && always() === '0', `btn=${hasBtn} ask=${JSON.stringify(askPhone)} closed=${JSON.stringify(closedPhone)} db=${always()} ${askText.slice(0, 160)}`)
+      await page.getByTestId('viewing-consent-always').click().catch(() => {})
+      await page.getByTestId('viewing-consent-always-go').click().catch(() => {})
+      await page.locator('[data-testid="viewing-consent"][data-consent="always"]').waitFor({ timeout: 15000 }).catch(() => {})
+      await page.waitForLoadState('networkidle')
+      await page.waitForTimeout(1500)
+      const pv4 = await bodyText(page)
+      const onClients = await restCount('operations_clients', `workspace_id=eq.${PILOT_WS}`)
+      const onOwner = await restCount('operations_clients', `workspace_id=neq.${PILOT_WS}`)
+      check('L27-12 [늘 보기 켜기] → 화면을 새로 읽어 팀장 업체 보임 · 띠 "늘 보기 켜짐" + [끄기] · 대표 업체는 안 섞임 · DB 켜진 줄 1(대표) · 허락(기간)은 0 그대로 · 대표 토큰으로 팀장 업체 1곳 이상',
+        (await vc.getAttribute('data-consent').catch(() => '')) === 'always' && /늘 보기 켜짐/.test((await vc.innerText().catch(() => '')) ?? '') && (await page.getByTestId('viewing-consent-always-off').count()) === 1 &&
+        pv4.includes('은혜테스트정밀') && leaked(pv4).length === 0 && (await page.getByTestId('viewing-pilot').count()) === 1 &&
+        always(`and ended_at is null and viewer_id = '${OWNER.id}'`) === '1' &&
+        sql(`select count(*) from public.workspace_view_grants where workspace_id = '${PILOT_WS}' and revoked_at is null and expires_at > now()`) === '0' &&
+        typeof onClients === 'number' && onClients >= 1, `clients=${onClients} ownerOwn=${onOwner} db=${always('and ended_at is null')} ${pv4.slice(0, 120)}`)
+      await shot(page, 'l27-12-owner-always-on')
+      {
+        const onPhone = await phoneLine('l27-12-owner-always-on')
+        check('L27-12c 휴대폰 390: "늘 보기 켜짐" 줄 옆 넘침 0 · 글 칸 200px 이상 · [끄기] 보임', onPhone.over <= 1 && onPhone.textW >= 200 && (await page.getByTestId('viewing-consent-always-off').count()) === 1, JSON.stringify(onPhone))
+      }
+      {
+        const ec2 = sql(`select id from public.operations_clients where workspace_id = '${PILOT_WS}' and company_name = '은혜테스트정밀(주)'`)
+        await go(page, `/ops/clients/${ec2}?tab=docs`)
+        const dv = await bodyText(page)
+        check('L27-12b 늘 보기 동안 팀장 업체 상세 · 서류함도 열림(화면 못 찾음 0)', dv.includes('은혜테스트정밀') && !dv.includes('화면을 찾지 못했습니다') && !dv.includes('업체를 찾지 못했'), dv.slice(0, 200))
+        await go(page, '/ops/clients')
+      }
+      // 팀장 화면 — 맨 위 한 번 알림 → 설정 칸
+      await go(pp, '/ops/clients')
+      const an = pp.getByTestId('consent-always-notice')
+      await an.waitFor({ timeout: 8000 }).catch(() => {})
+      const anText = (await an.innerText().catch(() => '')) ?? ''
+      check('L27-13 팀장 화면 맨 위: "…님이 내 고객 자료를 ‘늘 보기’ 로 정해 두었어요" · [설정에서 보기] · 허락 요청 알림은 없음',
+        (await an.count()) === 1 && /늘 보기/.test(anText) && /정해 두었어요/.test(anText) && (await pp.getByTestId('consent-request-notice').count()) === 0, anText.slice(0, 160))
+      await shot(pp, 'l27-13-pilot-always-notice')
+      await pp.getByTestId('consent-always-open').click().catch(() => {})
+      await pp.waitForURL(/\/settings/, { timeout: 8000 }).catch(() => {})
+      const cs2 = pp.getByTestId('consent-settings')
+      await pp.locator('[data-testid="consent-settings"][data-consent="always"]').waitFor({ timeout: 8000 }).catch(() => {})
+      const csText = (await cs2.innerText().catch(() => '')) ?? ''
+      const histText = (await pp.getByTestId('consent-history').textContent().catch(() => '')) ?? ''
+      check('L27-14 팀장 설정: "대표님이 ‘늘 보기’ 로 정해 두었어요 · …부터" · 끄는 것은 대표님만 · 허락 · 닫기 단추 없음 · 지난 기록에 "늘 보기로 켬 · 지금 켜져 있음"',
+        (await cs2.getAttribute('data-consent').catch(() => '')) === 'always' && (await pp.getByTestId('consent-always').count()) === 1 && /정해 두었어요/.test(csText) && /대표님만/.test(csText) &&
+        (await pp.getByTestId('consent-grant').count()) === 0 && (await pp.getByTestId('consent-revoke').count()) === 0 && /늘 보기로 켬 · 지금 켜져 있음/.test(histText), `${csText.slice(0, 200)} | ${histText.slice(-120)}`)
+      await shot(pp, 'l27-14-pilot-always-settings')
+      // 팀장 토큰으로는 끄지도 켜지도 못한다(서버가 막는다)
+      const pr = async (on) => {
+        const r = await fetch(`http://127.0.0.1:${PGRST_PORT}/rpc/view_always_set`, { method: 'POST', headers: { authorization: `Bearer ${jwt(PILOT)}`, 'content-type': 'application/json' }, body: JSON.stringify({ p_ws: PILOT_WS, p_on: on }) })
+        return r.status
+      }
+      const offByPilot = await pr(false)
+      const onByPilot = await pr(true)
+      check('L27-15 팀장 토큰으로 끄기 · 켜기 → 둘 다 막힘 · DB 켜진 줄 그대로 1', offByPilot >= 400 && onByPilot >= 400 && always('and ended_at is null') === '1', `off=${offByPilot} on=${onByPilot}`)
+      // 대표 [끄기] → 그 순간부터 다시 허락 방식
+      await page.getByTestId('viewing-consent-always-off').click().catch(() => {})
+      await page.locator('[data-testid="viewing-consent"][data-consent="closed"]').waitFor({ timeout: 15000 }).catch(() => {})
+      await page.waitForLoadState('networkidle')
+      await page.waitForTimeout(1500)
+      const pv5 = await bodyText(page)
+      const offClients = await restCount('operations_clients', `workspace_id=eq.${PILOT_WS}`)
+      check('L27-16 대표 [끄기] → 띠 "허락해야 보여요" · [늘 보기로 켜기] 다시 · 팀장 업체 안 보임 · 대표 토큰 0 · DB 켜진 줄 0 · 기록 1줄 남음(끈 때 · 끈 사람)',
+        (await vc.getAttribute('data-consent').catch(() => '')) === 'closed' && (await page.getByTestId('viewing-consent-always').count()) === 1 && !pv5.includes('은혜테스트정밀') && offClients === 0 &&
+        always('and ended_at is null') === '0' && always(`and ended_at is not null and ended_by = '${OWNER.id}'`) === '1', `clients=${offClients} open=${always('and ended_at is null')} all=${always()}`)
+      await shot(page, 'l27-16-owner-always-off')
+      await go(pp, '/settings?focus=consent')
+      await pp.locator('[data-testid="consent-settings"][data-consent="closed"]').waitFor({ timeout: 8000 }).catch(() => {})
+      const hist2 = (await pp.getByTestId('consent-history').textContent().catch(() => '')) ?? ''
+      check('L27-17 팀장 설정(끈 뒤): 다시 "지금 닫혀 있어요" · 허락 단추 돌아옴 · 지난 기록에 "늘 보기로 켬 · …에 끔" · 맨 위 알림 없음',
+        (await pp.getByTestId('consent-settings').getAttribute('data-consent').catch(() => '')) === 'closed' && (await pp.getByTestId('consent-grant').count()) === 1 && /늘 보기로 켬 · .+에 끔/.test(hist2) &&
+        (await pp.getByTestId('consent-always-notice').count()) === 0, hist2.slice(-160))
+    }
+    await cp.close()
     await page.getByTestId('viewing-pilot-back').click()
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(1500)

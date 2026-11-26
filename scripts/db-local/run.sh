@@ -44,6 +44,20 @@ v31=$(su postgres -c "psql -At -F '|' -d $DB -c \"\$(cat supabase/manual/verify_
 if echo "$a" | grep -q '0 확인|0|읽기 전용 거래|on|on' && [ "$(echo "$a" | grep -o '|들어감' | wc -l)" = "4" ] && echo "$a" | grep -q '7/7|들어감' && echo "$b" | grep -q '꺼짐(되돌림)' && echo "$c" | grep -q '7/7|들어감' && [ "$v31" = "5" ]; then out="$out
 PASS  점검 SQL(0031): 읽기 전용 on · 먼저 3줄 · '들어감'(7/7) → 되돌리기 → '꺼짐(되돌림)' → 다시 실행 → '들어감' · 확인 SQL 1~5 '좋음'"; else out="$out
 FAIL  점검 SQL(0031): [$a] [$b] [$c] 확인 $v31/5"; fi
+# D-675 0032 확인(verify_after_0032.sql) — 전부 넣은 DB: 1~5 '좋음' → 대표가 켠 뒤 되돌리기 → 켜진 0 · 앱이 못 켬 → 0032 다시 → 다시 켤 수 있음
+v32() { su postgres -c "psql -At -F '|' -d $DB -c \"\$(cat supabase/manual/verify_after_0032.sql)\"" 2>&1; }
+on32() { su postgres -c "psql -At -d $DB" 2>&1 <<SQL
+select set_config('request.jwt.claim.sub', '19000000-0000-0000-0000-0000000000a1', false);
+set role authenticated;
+select coalesce((public.view_always_set((select w.id from public.workspaces w where w.owner_id = '19000000-0000-0000-0000-0000000000b1' limit 1), $1)->'always') is not null, false);
+SQL
+}
+a=$(v32 | grep -cE '^[1-5]\|.*\|좋음$'); t=$(on32 true | tail -1); n1=$(v32 | grep -E '^6\|' | cut -d'|' -f3)
+psqlq < supabase/manual/rollback_0032.sql > /dev/null 2>&1; n2=$(v32 | grep -E '^6\|' | cut -d'|' -f3); e=$(on32 true | grep -c 'permission denied')
+psqlq < supabase/migrations/20261126000032_view_always.sql > /dev/null 2>&1; t2=$(on32 true | tail -1); on32 false > /dev/null
+if [ "$a" = "5" ] && [ "$t" = "t" ] && echo "$n1" | grep -q '최 팀장 작업공간' && [ "$n2" = "0곳" ] && [ "$e" = "1" ] && [ "$t2" = "t" ]; then out="$out
+PASS  확인 SQL(0032): 1~5 '좋음' · 켜면 6번에 그 작업공간 이름 → 되돌리기 → '0곳' · 앱이 못 켬 → 다시 실행 → 다시 켤 수 있음"; else out="$out
+FAIL  확인 SQL(0032): 좋음 $a/5 · 켜기 [$t] · 켠 뒤 [$n1] · 되돌린 뒤 [$n2] · 막힘 $e · 다시 [$t2]"; fi
 echo "$out"
 pass=$(echo "$out" | grep -c '^PASS'); bad=$(echo "$out" | grep -cE '^FAIL|ERROR')
 echo "통과 $pass · 실패 $bad"

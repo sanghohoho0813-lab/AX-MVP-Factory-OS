@@ -6,7 +6,7 @@
  */
 
 import { isUserScopedKey, vaultSignOut, vaultSwitchTo } from '../storageVault'
-import { historyLine, isConsentMissing, koWhen, leftText, parseConsentState } from '../../services/viewConsent'
+import { alwaysLine, historyLine, isConsentMissing, koWhen, leftText, parseConsentState } from '../../services/viewConsent'
 import { EMPTY_INTAKE_FORM, defaultIntakeTitle, intakeErrorText, intakeLine, intakeUrl, isIntakeMissing, koDay, parseIntakeState, slugFromPath, sourceFromQuery, validateIntake } from '../../services/intakeLink'
 import { LINK_SOURCE, leadsThisMonth } from '../../services/marketing/mkPath'
 import { clampPolicyNumber, defaultWorkspaceName, isSelfSignupMissing, parseSelfSignupAccounts, parseSelfSignupAdmin, parseSelfSignupStart, parseSelfSignupState, selfSignupStartText, selfSignupSummary } from '../../services/selfSignup'
@@ -450,6 +450,19 @@ check('키: D-513 마케팅 쓰던 글(mirae.threads.draft · mirae.shorts.draft
   check('허락 상태(대표): 지금 허락 · 끝나는 때 · 마지막으로 닫힌 요청', v.role === 'viewer' && v.active?.expiresAt === '2026-11-21T01:00:00Z' && v.request === null && v.lastClosed?.closedReason === 'granted')
   check('한국 시각 · 요일 · 오전/오후 · 정각은 분 없음', koWhen('2026-11-21T01:00:00Z') === '11월 21일(토) 오전 10시' && koWhen('2026-11-14T15:05:00Z') === '11월 15일(일) 오전 12시 5분' && koWhen('엉뚱') === '', koWhen('2026-11-21T01:00:00Z'))
   check('남은 시간: 일 · 시간 · 곧 · 끝남', leftText('2026-11-21T01:00:00Z', now) === '6일 남음' && leftText('2026-11-14T08:00:00Z', now) === '5시간 남음' && leftText('2026-11-14T03:30:00Z', now) === '곧 끝남' && leftText('2026-11-14T02:00:00Z', now) === '끝남')
+  // D-675 늘 보기(서버 0032) — 0032 전 서버 답에는 canAlways · always 가 없다 → 단추 없음 · 켜진 것 없음
+  check('늘 보기(D-675): 0032 전 모양(값 없음) → 대표 canAlways false · always 없음 / 팀장 always 없음 · 기록 0', v.role === 'viewer' && v.canAlways === false && v.always === null && o.role === 'owner' && o.always === null && o.alwaysHistory.length === 0)
+  const va = parseConsentState({ role: 'viewer', active: null, request: null, lastClosed: null, canAlways: true, always: { since: '2026-11-26T06:00:00Z' } })
+  const vb = parseConsentState({ role: 'viewer', active: null, request: null, lastClosed: null, canAlways: 'true', always: { since: '' } })
+  check('늘 보기(대표): 켤 수 있는 곳 · 켠 때 / 이상한 값(글자 true · 빈 때)은 못 켬 · 꺼짐으로', va.role === 'viewer' && va.canAlways && va.always?.since === '2026-11-26T06:00:00Z' && vb.role === 'viewer' && !vb.canAlways && vb.always === null)
+  const oa = parseConsentState({ role: 'owner', viewers: 1, active: null, request: null, history: [], always: { since: '2026-11-26T06:00:00Z', by: '김상호' }, alwaysHistory: [
+    { since: '2026-11-26T06:00:00Z', endedAt: null, by: '김상호' },
+    { since: '2026-11-20T01:00:00Z', endedAt: '2026-11-21T02:30:00Z', by: '김상호' },
+    { endedAt: '2026-11-21T02:30:00Z' }, null, 'x'] })
+  check('늘 보기(팀장): 켠 사람 · 켠 때 · 기록 2줄(켠 때 없는 줄 · 이상한 줄은 버림)', oa.role === 'owner' && oa.always?.by === '김상호' && oa.always.since === '2026-11-26T06:00:00Z' && oa.alwaysHistory.length === 2)
+  if (oa.role === 'owner') {
+    check('늘 보기 기록 한 줄: 지금 켜져 있음 / 끈 때', alwaysLine(oa.alwaysHistory[0]) === '11월 26일(목) 오후 3시 · 김상호님이 늘 보기로 켬 · 지금 켜져 있음' && alwaysLine(oa.alwaysHistory[1]) === '11월 20일(금) 오전 10시 · 김상호님이 늘 보기로 켬 · 11월 21일(토) 오전 11시 30분에 끔', oa.alwaysHistory.map(alwaysLine).join(' / '))
+  }
   check('함수 없음 · 권한 거둠(되돌림) → 화면 숨김 / 그 밖의 오류는 아님', isConsentMissing({ code: 'PGRST202' }) && isConsentMissing({ code: '42883' }) && isConsentMissing({ code: '42501', message: 'permission denied for function view_consent_state' }) && !isConsentMissing({ code: '08006', message: 'connection failure' }) && !isConsentMissing(null))
 }
 

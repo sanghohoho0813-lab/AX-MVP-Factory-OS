@@ -5,17 +5,23 @@
  *  - ConsentRequestNotice: 팀장 화면 맨 위 — '대표님이 고객 자료 보기 허락을 요청했어요' → 설정의 그 칸으로.
  *  - ViewConsentPanel: 팀장 설정 — 하루 · 7일 · 30일 허락 · 지금 닫기 · 거절 · 지난 기록.
  * 서버 0026 이 없으면(missing) 셋 다 아무것도 그리지 않는다 — 지금 화면 그대로.
+ *
+ * D-675 '늘 보기'(서버 0032) — 대표(2026-11-26): "최은혜 팀장 화면은 계속 확인해야 하니 오가도 제약이 없게, 당분간은."
+ *  - 대표 띠: 내부 팀장 화면일 때만 [늘 보기로 켜기](한 번 더 묻기) → 켜지면 '늘 보기 켜짐' 한 줄 + [끄기]. 켜고 끈 뒤에는 화면을 새로 읽는다(자료를 처음부터).
+ *  - 팀장 화면: 맨 위에 한 번 알림 + 설정 칸에 '대표님이 늘 보기로 정해 두었어요'(허락 단추는 그동안 숨김) · 기록은 남는다. 끄는 것은 대표만.
+ *  - 0032 전에는 서버가 canAlways 를 주지 않는다 → 단추 없음(지금 화면 그대로).
  * 박스는 흰 바탕 + 얇은 회색 테두리 · 강조는 글자색(D-370).
  */
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { KeyRound, LockKeyhole, LockKeyholeOpen, X } from 'lucide-react'
+import { Eye, KeyRound, LockKeyhole, LockKeyholeOpen, X } from 'lucide-react'
 import { AuthContext } from '../../auth/authContext'
 import { useViewingPilot } from '../../auth/osAccess'
 import { Panel } from '../ui/Panel'
 import {
   CONSENT_CHANGED,
   CONSENT_DAYS,
+  alwaysLine,
   consentErrorText,
   declineConsent,
   grantConsent,
@@ -25,6 +31,7 @@ import {
   loadConsent,
   requestConsent,
   revokeConsent,
+  setAlwaysView,
   type ConsentDays,
   type ConsentState,
 } from '../../services/viewConsent'
@@ -71,7 +78,23 @@ export function ViewingConsentLine() {
   const { state, setState } = useViewConsent(ws)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  /** D-675 [늘 보기로 켜기] — 한 번 더 묻는 중 */
+  const [confirming, setConfirming] = useState(false)
   if (!ws || !state || state.role !== 'viewer') return null
+  const who = viewing ? `${viewing.personName} ${viewing.personTitle}`.trim() || '팀장' : '팀장'
+
+  /** D-675 늘 보기 켜기 · 끄기 — 문(DB 정책)이 바뀌었으니 업체 · 서류 · 모듈 기록을 처음부터 다시 읽는다 */
+  const setAlways = async (on: boolean) => {
+    setBusy(true)
+    setErr('')
+    try {
+      await setAlwaysView(ws, on)
+      window.location.reload()
+    } catch (e) {
+      setErr(consentErrorText(e))
+      setBusy(false)
+    }
+  }
 
   const ask = async () => {
     setBusy(true)
@@ -85,13 +108,59 @@ export function ViewingConsentLine() {
     }
   }
 
+  if (state.always) {
+    return (
+      <div data-testid="viewing-consent" data-consent="always" className="no-print mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 sm:px-4">
+        <Eye aria-hidden="true" className="size-4 shrink-0 text-brand-700" />
+        <div className="min-w-0 flex-1">
+          <p className="t-sub break-keep text-slate-800">
+            <b>늘 보기 켜짐</b> · {koWhen(state.always.since)}부터 <span className="hidden text-slate-600 sm:inline">(허락 없이 보여요 · 팀장님 설정에도 표시돼요)</span>
+          </p>
+          {err && <p role="alert" className="t-sub mt-1 break-keep text-red-700">{err}</p>}
+        </div>
+        <button type="button" onClick={() => void setAlways(false)} disabled={busy} data-testid="viewing-consent-always-off" className="tap t-sub shrink-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-1.5 font-semibold whitespace-nowrap text-slate-800 hover:bg-slate-50 disabled:opacity-60">
+          {busy ? '끄는 중…' : '끄기'}
+        </button>
+      </div>
+    )
+  }
+
+  if (confirming) {
+    return (
+      <div data-testid="viewing-consent" data-consent="confirm-always" className="no-print mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 sm:px-4">
+        <Eye aria-hidden="true" className="size-4 shrink-0 text-slate-700" />
+        <div className="min-w-0 flex-1 basis-56">
+          <p className="t-sub font-bold break-keep text-slate-900">{who} 화면의 고객 자료를 허락 없이 늘 볼까요?</p>
+          <p className="t-sub mt-0.5 break-keep text-slate-700">팀장님 설정에 &lsquo;대표님이 늘 볼 수 있어요&rsquo; 로 표시되고, 켠 때 · 끈 때가 기록에 남아요. 끄는 것은 대표님만 할 수 있어요.</p>
+          {err && <p role="alert" className="t-sub mt-1 break-keep text-red-700">{err}</p>}
+        </div>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <button type="button" onClick={() => setConfirming(false)} disabled={busy} data-testid="viewing-consent-always-cancel" className="tap t-sub rounded-(--radius-control) border border-slate-300 bg-white px-3 py-1.5 font-semibold whitespace-nowrap text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+            취소
+          </button>
+          <button type="button" onClick={() => void setAlways(true)} disabled={busy} data-testid="viewing-consent-always-go" className="tap t-sub rounded-(--radius-control) bg-navy-900 px-3 py-1.5 font-semibold whitespace-nowrap text-white hover:bg-navy-800 disabled:opacity-60">
+            {busy ? '켜는 중…' : '늘 보기 켜기'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  /** D-675 내부 팀장 화면일 때만(서버가 알려 준다) — 허락을 기다리지 않고 늘 보게 */
+  const alwaysButton = state.canAlways ? (
+    <button type="button" onClick={() => { setErr(''); setConfirming(true) }} disabled={busy} data-testid="viewing-consent-always" data-guide="fn-view-always" className="tap t-sub shrink-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-1.5 font-semibold whitespace-nowrap text-slate-800 hover:bg-slate-50 disabled:opacity-60">
+      늘 보기로 켜기
+    </button>
+  ) : null
+
   if (state.active) {
     return (
-      <div data-testid="viewing-consent" data-consent="active" className="no-print mb-4 flex items-center gap-2.5 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 sm:px-4">
+      <div data-testid="viewing-consent" data-consent="active" className="no-print mb-4 flex flex-wrap items-center gap-x-2.5 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 sm:px-4">
         <LockKeyholeOpen aria-hidden="true" className="size-4 shrink-0 text-brand-700" />
         <p className="t-sub min-w-0 flex-1 break-keep text-slate-800">
           <b>고객 자료 보기 허락됨</b> · {koWhen(state.active.expiresAt)}까지 <span className="text-slate-600">({leftText(state.active.expiresAt)})</span>
         </p>
+        {alwaysButton}
       </div>
     )
   }
@@ -100,7 +169,7 @@ export function ViewingConsentLine() {
   return (
     <div data-testid="viewing-consent" data-consent={state.request ? 'requested' : 'closed'} className="no-print mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5 sm:px-4">
       <LockKeyhole aria-hidden="true" className="size-4 shrink-0 text-slate-700" />
-      <div className="min-w-0 flex-1">
+      <div className={`min-w-0 flex-1 ${alwaysButton ? 'basis-56' : ''}`}>
         <p className="t-sub font-bold break-keep text-slate-900">
           {state.request ? `허락 요청을 보냈어요 · ${koWhen(state.request.createdAt)}` : declined ? '지난 요청은 팀장님이 거절했어요' : '고객 자료는 팀장님이 허락해야 보여요'}
         </p>
@@ -111,11 +180,14 @@ export function ViewingConsentLine() {
         </p>
         {err && <p role="alert" className="t-sub mt-1 break-keep text-red-700">{err}</p>}
       </div>
-      {!state.request && (
-        <button type="button" onClick={() => void ask()} disabled={busy} data-testid="viewing-consent-ask" className="tap t-sub shrink-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-1.5 font-semibold whitespace-nowrap text-slate-800 hover:bg-slate-50 disabled:opacity-60">
-          {busy ? '보내는 중…' : declined ? '다시 요청하기' : '허락 요청 보내기'}
-        </button>
-      )}
+      <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2 empty:hidden">
+        {!state.request && (
+          <button type="button" onClick={() => void ask()} disabled={busy} data-testid="viewing-consent-ask" className="tap t-sub shrink-0 rounded-(--radius-control) border border-slate-300 bg-white px-3 py-1.5 font-semibold whitespace-nowrap text-slate-800 hover:bg-slate-50 disabled:opacity-60">
+            {busy ? '보내는 중…' : declined ? '다시 요청하기' : '허락 요청 보내기'}
+          </button>
+        )}
+        {alwaysButton}
+      </div>
     </div>
   )
 }
@@ -134,10 +206,8 @@ export function ConsentRequestNotice() {
       return ''
     }
   })
-  if (!mine || !state || state.role !== 'owner' || !state.request || state.viewers === 0) return null
-  if (closed === state.request.createdAt) return null
-  const close = () => {
-    const at = state.role === 'owner' && state.request ? state.request.createdAt : ''
+  if (!mine || !state || state.role !== 'owner' || state.viewers === 0) return null
+  const close = (at: string) => {
     setClosed(at)
     try {
       localStorage.setItem(NOTICE_KEY, at)
@@ -145,6 +215,29 @@ export function ConsentRequestNotice() {
       // 저장이 막힌 브라우저 — 이번 화면에서만 닫힘
     }
   }
+  // D-675 대표가 '늘 보기' 로 켜 두었다 — 허락 요청 대신 그 사실을 한 번 알린다(닫으면 그 켬은 다시 안 띄움)
+  if (state.always) {
+    const key = `always:${state.always.since}`
+    if (closed === key) return null
+    return (
+      <div role="status" data-testid="consent-always-notice" className="no-print mb-4 flex items-start gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3">
+        <Eye aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-brand-700" />
+        <div className="min-w-0 flex-1">
+          <p className="t-sub font-bold break-keep text-slate-900">{state.always.by}님이 내 고객 자료를 &lsquo;늘 보기&rsquo; 로 정해 두었어요</p>
+          <p className="t-sub mt-0.5 break-keep text-slate-700">끌 때까지는 허락하지 않아도 업체 · 서류 · 계약이 대표님에게 보여요.</p>
+          <Link to="/settings?focus=consent" className="t-sub mt-1 inline-block font-semibold text-brand-700 underline" data-testid="consent-always-open">
+            설정에서 보기 →
+          </Link>
+        </div>
+        <button type="button" aria-label="알림 닫기" onClick={() => close(key)} className="tap rounded-(--radius-control) p-1 text-slate-500 hover:bg-slate-100">
+          <X aria-hidden="true" className="size-4" />
+        </button>
+      </div>
+    )
+  }
+  if (!state.request) return null
+  if (closed === state.request.createdAt) return null
+  const requestAt = state.request.createdAt
   return (
     <div role="status" data-testid="consent-request-notice" className="no-print mb-4 flex items-start gap-3 rounded-(--radius-panel) border border-slate-200 bg-white px-4 py-3">
       <KeyRound aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-brand-700" />
@@ -155,7 +248,7 @@ export function ConsentRequestNotice() {
           설정에서 허락 · 거절하기 →
         </Link>
       </div>
-      <button type="button" aria-label="알림 닫기" onClick={close} className="tap rounded-(--radius-control) p-1 text-slate-500 hover:bg-slate-100">
+      <button type="button" aria-label="알림 닫기" onClick={() => close(requestAt)} className="tap rounded-(--radius-control) p-1 text-slate-500 hover:bg-slate-100">
         <X aria-hidden="true" className="size-4" />
       </button>
     </div>
@@ -188,17 +281,22 @@ export function ViewConsentPanel({ focus = false }: { focus?: boolean }) {
       setBusy(false)
     }
   }
+  // 지난 기록 — 허락 · 요청과 D-675 늘 보기(켬 · 끔)를 한 목록에 새것부터
+  const lines = [
+    ...state.history.map((h, i) => ({ key: `${h.kind}-${h.createdAt}-${i}`, at: h.createdAt, text: historyLine(h) })),
+    ...state.alwaysHistory.map((h, i) => ({ key: `always-${h.since}-${i}`, at: h.since, text: alwaysLine(h) })),
+  ].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
   const pill = (on: boolean) =>
     `tap h-11 min-w-16 rounded-(--radius-control) border px-3 text-[0.9375rem] font-semibold whitespace-nowrap ${on ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`
 
   return (
-    <div ref={ref} id="view-consent" className="scroll-mt-20" data-testid="consent-settings" data-consent={state.active ? 'active' : 'closed'}>
+    <div ref={ref} id="view-consent" className="scroll-mt-20" data-testid="consent-settings" data-consent={state.always ? 'always' : state.active ? 'active' : 'closed'}>
       <Panel title="대표님의 내 고객 자료 보기">
         <p className="t-sub break-keep text-slate-700">
-          대표님은 팀장님 화면을 오가며 볼 수 있어요. <b>업체 · 서류 · 계약 · 모듈 기록</b>은 팀장님이 허락한 동안만 보이고, 마케팅 · 화면 설정은 늘 보여요.
+          대표님은 팀장님 화면을 오가며 볼 수 있어요. <b>업체 · 서류 · 계약 · 모듈 기록</b>은 {state.always ? '지금 대표님이 ‘늘 보기’ 로 정해 두어 허락 없이도 보이고' : '팀장님이 허락한 동안만 보이고'}, 마케팅 · 화면 설정은 늘 보여요.
         </p>
 
-        {state.request && (
+        {state.request && !state.always && (
           <div data-testid="consent-request-line" className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-y border-slate-100 py-3">
             <KeyRound aria-hidden="true" className="size-4 shrink-0 text-brand-700" />
             <p className="t-sub min-w-0 flex-1 break-keep text-slate-900">
@@ -210,7 +308,15 @@ export function ViewConsentPanel({ focus = false }: { focus?: boolean }) {
           </div>
         )}
 
-        {state.active ? (
+        {state.always ? (
+          <div className="mt-4" data-testid="consent-always">
+            <p className="flex items-center gap-2 text-[0.9375rem] break-keep text-slate-900">
+              <Eye aria-hidden="true" className="size-5 shrink-0 text-brand-700" />
+              <span><b>대표님이 &lsquo;늘 보기&rsquo; 로 정해 두었어요</b> · {koWhen(state.always.since)}부터</span>
+            </p>
+            <p className="t-sub mt-2 break-keep text-slate-600">허락하지 않아도 {state.always.by}님에게 내 업체 · 서류 · 계약이 보여요. 끄는 것은 대표님만 할 수 있고, 끄면 다시 내가 허락한 동안만 보여요.</p>
+          </div>
+        ) : state.active ? (
           <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="consent-active">
             <LockKeyholeOpen aria-hidden="true" className="size-5 shrink-0 text-brand-700" />
             <p className="min-w-0 flex-1 text-[0.9375rem] break-keep text-slate-900">
@@ -242,12 +348,12 @@ export function ViewConsentPanel({ focus = false }: { focus?: boolean }) {
 
         {err && <p role="alert" className="t-sub mt-3 break-keep text-red-700">{err}</p>}
 
-        {state.history.length > 0 && (
+        {lines.length > 0 && (
           <details className="mt-4 border-t border-slate-100 pt-3" data-testid="consent-history">
-            <summary className="t-sub cursor-pointer font-semibold text-slate-700">지난 기록 {state.history.length}개(지우지 않고 남아요)</summary>
+            <summary className="t-sub cursor-pointer font-semibold text-slate-700">지난 기록 {lines.length}개(지우지 않고 남아요)</summary>
             <ul className="mt-2 divide-y divide-slate-100">
-              {state.history.map((h, i) => (
-                <li key={`${h.kind}-${h.createdAt}-${i}`} className="t-sub py-2 break-keep text-slate-700">{historyLine(h)}</li>
+              {lines.map((l) => (
+                <li key={l.key} className="t-sub py-2 break-keep text-slate-700">{l.text}</li>
               ))}
             </ul>
           </details>

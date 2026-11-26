@@ -5,6 +5,10 @@
  *  - 0026 전(함수 없음) · 되돌린 뒤(실행 권한 없음) · 로컬 모드 → 'missing' — 화면은 아무것도 그리지 않는다(지금과 같다).
  *  - 팀장(작업공간 주인): 대표 계정이 구성원일 때만 설정 칸이 보인다(외부 구독 고객은 대표가 구성원이 아니다 — 0024 → 안 보임).
  *  - 대표(full 구성원): 팀장 화면 보기 띠 아래 한 줄 — 허락 상태 · [허락 요청 보내기].
+ *
+ * D-675 · 서버 0032 '늘 보기' — 대표(2026-11-26): "최은혜 팀장 화면은 내가 계속 확인해야 하니 그 아이디로 오가도 제약이 없게, 당분간은."
+ *  - 내부 팀장 작업공간에서만(서버가 본다 — 외부 구독 고객은 켤 수 없다). 대표가 켜고 대표만 끈다. 켠 때 · 끈 때가 남고 팀장 설정에도 보인다.
+ *  - 0032 전에는 서버 답에 canAlways 가 없다 → 단추를 그리지 않는다(눌러서 실패하는 단추를 두지 않는다).
  */
 import { getDataModeConfig } from '../data/dataMode'
 import { getSupabaseClient } from '../lib/supabase/client'
@@ -30,6 +34,13 @@ export interface ConsentHistoryItem {
   person: string
 }
 
+/** D-675 늘 보기 기록 한 줄 — 켠 때 · (끈 때) · 켠 사람 */
+export interface AlwaysHistoryItem {
+  since: string
+  endedAt?: string
+  by: string
+}
+
 export type ConsentState =
   | { role: 'none' }
   | {
@@ -39,12 +50,18 @@ export type ConsentState =
       active: ConsentWindow | null
       request: { createdAt: string; by: string } | null
       history: ConsentHistoryItem[]
+      /** D-675 대표가 '늘 보기' 로 켜 둠(내부 팀장만) — 허락 없이도 보인다 */
+      always: { since: string; by: string } | null
+      alwaysHistory: AlwaysHistoryItem[]
     }
   | {
       role: 'viewer'
       active: ConsentWindow | null
       request: { createdAt: string } | null
       lastClosed: { closedAt: string; closedReason: 'granted' | 'declined' | '' } | null
+      /** D-675 이 작업공간을 늘 보기로 켤 수 있나(내부 팀장 · 서버 0032 가 있을 때만 true) */
+      canAlways: boolean
+      always: { since: string } | null
     }
 
 /** 상태가 바뀌었다(허락 · 닫기 · 요청 · 거절) — 띠 · 설정 칸이 다시 읽는다 */
@@ -64,6 +81,8 @@ function windowOf(v: unknown): ConsentWindow | null {
 function reasonOf(v: unknown): 'granted' | 'declined' | '' {
   return v === 'granted' || v === 'declined' ? v : ''
 }
+
+const objOf = (v: unknown): Record<string, unknown> | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null)
 
 /** 서버가 준 JSON → 화면이 쓰는 모양. 모르는 모양은 'none'(아무것도 안 그림) */
 export function parseConsentState(raw: unknown): ConsentState {
@@ -90,6 +109,16 @@ export function parseConsentState(raw: unknown): ConsentState {
       active: windowOf(o.active),
       request: req && str(req.createdAt) ? { createdAt: str(req.createdAt), by: str(req.by) || '대표' } : null,
       history,
+      always: (() => {
+        const a = objOf(o.always)
+        return a && str(a.since) ? { since: str(a.since), by: str(a.by) || '대표' } : null
+      })(),
+      alwaysHistory: Array.isArray(o.alwaysHistory)
+        ? (o.alwaysHistory as unknown[])
+            .map(objOf)
+            .filter((h): h is Record<string, unknown> => !!h && !!str(h.since))
+            .map((h): AlwaysHistoryItem => ({ since: str(h.since), endedAt: str(h.endedAt) || undefined, by: str(h.by) || '대표' }))
+        : [],
     }
   }
   if (o.role === 'viewer') {
@@ -100,6 +129,11 @@ export function parseConsentState(raw: unknown): ConsentState {
       active: windowOf(o.active),
       request: req && str(req.createdAt) ? { createdAt: str(req.createdAt) } : null,
       lastClosed: lc && str(lc.closedAt) ? { closedAt: str(lc.closedAt), closedReason: reasonOf(lc.closedReason) } : null,
+      canAlways: o.canAlways === true,
+      always: (() => {
+        const a = objOf(o.always)
+        return a && str(a.since) ? { since: str(a.since) } : null
+      })(),
     }
   }
   return { role: 'none' }
@@ -142,6 +176,11 @@ export function historyLine(h: ConsentHistoryItem, now = Date.now()): string {
   }
   const state = h.closedReason === 'granted' ? '허락함' : h.closedReason === 'declined' ? '거절함' : '답 기다림'
   return `${koWhen(h.createdAt)} · ${h.person}님이 허락 요청 · ${state}`
+}
+
+/** D-675 늘 보기 기록 한 줄(팀장 설정 칸) */
+export function alwaysLine(h: AlwaysHistoryItem): string {
+  return `${koWhen(h.since)} · ${h.by}님이 늘 보기로 켬 · ${h.endedAt ? `${koWhen(h.endedAt)}에 끔` : '지금 켜져 있음'}`
 }
 
 /** 함수가 없거나(0026 전) 실행 권한이 없으면(되돌림) 'missing' 으로 본다 */
@@ -210,3 +249,5 @@ export const grantConsent = (workspaceId: string, days: ConsentDays) => call('vi
 export const revokeConsent = (workspaceId: string) => call('view_consent_revoke', { p_ws: workspaceId })
 export const requestConsent = (workspaceId: string) => call('view_consent_request', { p_ws: workspaceId })
 export const declineConsent = (workspaceId: string) => call('view_consent_decline', { p_ws: workspaceId })
+/** D-675 대표만 · 내부 팀장 작업공간만(서버 0032 가 본다) — 늘 보기 켜기 · 끄기 */
+export const setAlwaysView = (workspaceId: string, on: boolean) => call('view_always_set', { p_ws: workspaceId, p_on: on })

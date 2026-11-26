@@ -687,6 +687,17 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     next: '보여 줄 업체만 골라 허락하게 해요.',
     basicHidden: true,
   },
+  // D-675 대표가 내부 팀장 화면을 볼 때 띠 아래 — 허락을 기다리지 않고 늘 보기(팀장 · 고객 화면에는 없음)
+  'fn-view-always': {
+    label: '팀장 화면 늘 보기',
+    menu: 'settings',
+    what: '설정에서 팀장 화면으로 바꾼 뒤 띠 아래 [늘 보기로 켜기] 를 누르면, 그 팀장의 업체 · 서류 · 계약을 허락을 기다리지 않고 늘 볼 수 있어요.',
+    why: '같이 일하는 팀장 화면은 대표님이 계속 확인해야 해서 있어요. 팀장 설정에도 늘 보기로 표시되고, 켠 때 · 끈 때가 남아요.',
+    effect: '오갈 때마다 허락을 받지 않아도 돼요. 끄면 다시 팀장이 허락한 동안만 보여요. 외부 구독 고객 화면에는 켤 수 없어요.',
+    next: '팀장이 여럿이 되면 사람마다 켜고 끄는 목록을 한곳에 모아요.',
+    hiddenForPilot: true,
+    basicHidden: true,
+  },
   // D-623 지원사업 알림 — 업체마다 맞는 공고를 골라 한 통으로(외부 구독 고객 화면에는 지원사업 알림이 없다)
   'fn-grant-digest': {
     label: '골라서 보내기',
