@@ -14,11 +14,12 @@ import { Link } from 'react-router-dom'
 import { ArrowUp, Check, Copy, ExternalLink } from 'lucide-react'
 import { AuthContext } from '../../auth/authContext'
 import { useCurrentUser } from '../../components/layout/useCurrentUser'
-import { useBrandProfile } from '../../services/brandProfile'
+import { saveBrand, useBrandProfile } from '../../services/brandProfile'
 import { copyText } from '../../services/grants/grantView'
 import {
   INTAKE_CHANGED,
   defaultIntakeTitle,
+  endingWithIntake,
   intakeErrorText,
   intakeLine,
   intakeUrl,
@@ -75,6 +76,8 @@ export function IntakeLinkCard({ onUse, defaultOpen = false, testId = 'mk-intake
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [copied, setCopied] = useState<'' | 'url' | 'line' | 'saved'>('')
+  // D-664 끝인사(새로 쓰는 글 끝에 저절로 붙는 한 줄)에 이 주소 넣기 — 넣은 뒤 한 줄 알림
+  const [endingNote, setEndingNote] = useState('')
   const [confirm, setConfirm] = useState<'' | 'rotate' | 'off'>('')
   // 마케팅 첫 화면 [내 상담 신청 링크] 로 왔으면(?open=intake) 칸이 그려지자마자 그 자리로 한 번 내려 준다(아래쪽에 있어서)
   const boxRef = useRef<HTMLDetailsElement>(null)
@@ -106,6 +109,23 @@ export function IntakeLinkCard({ onUse, defaultOpen = false, testId = 'mk-intake
     if (await copyText(text)) {
       setCopied(what)
       window.setTimeout(() => setCopied((c) => (c === what ? '' : c)), 2500)
+    }
+  }
+
+  /** 끝인사에 지금 주소를 넣거나(없으면 붙이고 · 예전 주소면 바꾼다) — 길어서 못 넣으면 알려 준다 */
+  const putEnding = async (slug: string, quiet = false): Promise<void> => {
+    if (!loaded) return
+    const next = endingWithIntake(profile.ending, slug)
+    if (next.state === 'same') return
+    if (next.state === 'long') {
+      if (!quiet) setEndingNote('끝인사가 길어 주소를 넣지 못했어요 — 설정 › 내 브랜드에서 끝인사를 줄여 주세요')
+      return
+    }
+    try {
+      await saveBrand(ws, { ...profile, ending: next.text })
+      setEndingNote(next.state === 'replaced' ? '끝인사의 주소도 새 주소로 바꿨어요' : '끝인사에 넣었어요 — 새로 쓰는 글 끝에 저절로 붙어요')
+    } catch {
+      if (!quiet) setEndingNote('넣지 못했어요 — 다시 눌러 주세요')
     }
   }
 
@@ -191,7 +211,23 @@ export function IntakeLinkCard({ onUse, defaultOpen = false, testId = 'mk-intake
                   <ArrowUp aria-hidden="true" className="size-4" /> 소개 글에 이 줄 넣기
                 </button>
               )}
+              {/* D-664 끝인사에 넣어 두면 새로 쓰는 글(짧은 글 · 대본) 끝에 저절로 붙는다 — 이미 들어 있으면 체크만 */}
+              {loaded &&
+                (endingWithIntake(profile.ending, link.slug).state === 'same' ? (
+                  <span className="t-body inline-flex min-h-11 items-center gap-1.5 font-semibold text-success-700" data-testid={`${testId}-ending-on`}>
+                    <Check aria-hidden="true" className="size-4" /> 끝인사에 들어 있어요
+                  </span>
+                ) : (
+                  <button type="button" onClick={() => void putEnding(link.slug)} className={btnLine} data-testid={`${testId}-ending`}>
+                    <ArrowUp aria-hidden="true" className="size-4" /> 끝인사에 넣기
+                  </button>
+                ))}
             </div>
+            {endingNote && (
+              <p role="status" className="t-body break-keep text-success-700" data-testid={`${testId}-ending-note`}>
+                {endingNote}
+              </p>
+            )}
             <div>
               <a href={intakeUrl(link.slug)} target="_blank" rel="noopener noreferrer" className={btnLine} data-testid={`${testId}-preview`}>
                 <ExternalLink aria-hidden="true" className="size-4" /> 신청 화면 미리 보기
@@ -252,7 +288,16 @@ export function IntakeLinkCard({ onUse, defaultOpen = false, testId = 'mk-intake
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => void run(() => (confirm === 'rotate' ? rotateIntakeLink(ws) : offIntakeLink(ws)))}
+                        onClick={() => {
+                          const rotating = confirm === 'rotate'
+                          const hadOld = loaded && /\/ask\//.test(profile.ending)
+                          void run(async () => {
+                            const next = await (rotating ? rotateIntakeLink(ws) : offIntakeLink(ws))
+                            // D-664 끝인사에 예전 주소가 들어 있었으면 새 주소로(죽은 주소가 새 글 끝에 붙지 않게)
+                            if (rotating && hadOld && next.role === 'owner' && next.link) await putEnding(next.link.slug, true)
+                            return next
+                          })
+                        }}
                         className={btnLine}
                         data-testid={`${testId}-confirm-yes`}
                       >

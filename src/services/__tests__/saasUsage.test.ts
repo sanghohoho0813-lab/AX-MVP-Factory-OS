@@ -12,7 +12,7 @@ import { nextToasts } from '../../components/ui/toastContext'
 import { NEXT_TIME_OPTIONS, joinNextTime, splitNextTime } from '../clientOpsNextAction'
 import { OTHER_UPLOAD_LABEL, UPLOAD_ACCEPT, isUploadMissing, parseUploadState, uploadErrorText, uploadFileProblem, uploadRequestText, uploadSlugFromPath, uploadUrl } from '../uploadLink'
 import { UPLOAD_LINK_FOLDER, placementForUpload, withUploadedFile } from '../uploadLinkAccept'
-import { INTAKE_NEXT_ACTION } from '../intakeLink'
+import { ENDING_MAX, INTAKE_NEXT_ACTION, endingWithIntake } from '../intakeLink'
 import { FEE_QUIET_DAYS, HELLO_KEEP_DAYS, HELLO_NEXT_ACTION, normalizeNotices, noticeWho, outboundNotices, withNoticeSent, wonShortText } from '../outbound'
 import { requestLinesOf, resendText, sameOpenRequest, uploadDocsForRequest } from '../docRequests'
 import { hintFromLink, normalizeUploadHint, openHint, sameHint, withUploadHint, withUploadLine } from '../uploadHint'
@@ -27,7 +27,7 @@ import { OWNER_IDENTITY_WORDS, cleanBrand, customerize } from '../../../api/_ai/
 import { OWNER_FACT_MARKERS, customerLabel, customerOutput, customerPack, stripOwnerContext } from '../../../api/_ai/customerMarketing.js'
 import { MK_KNOWLEDGE } from '../../../api/_ai/mkKnowledge.js'
 import { usageUnits } from '../../../api/_ai/usage.js'
-import { __setBrandForTest, normalizeBrand } from '../brandProfile'
+import { __setBrandForTest, normalizeBrand, BRAND_FIELDS } from '../brandProfile'
 import { __setMarketingCustomerForTest, customerBrief, mkText } from '../marketing/persona'
 import { radarBundle, packBundle } from '../aiAssist/marketingBuilders'
 import { customSource, makePack, packRules, PACK_RULES } from '../marketing/contentPack'
@@ -1202,6 +1202,22 @@ async function run() {
       JSON.stringify(norm) === JSON.stringify({ notices: { 'meet:2026-11-25': '2026-11-24', 'fee:abc': '2026-11-20' } }) && round.notices?.['fee:over'] === today &&
         normalizeClientOps({ id: 'x', companyName: 'x' } as never).notices === undefined && JSON.stringify(normalizeNotices([])) === '{}',
     )
+    // D-664 끝인사에 상담 신청 주소 — 마케팅 글 끝 → 상담 신청 → 잠재고객이 한 줄로
+    {
+      const o = 'https://os.example'
+      const a = endingWithIntake('', 'abc123def456', o)
+      const b = endingWithIntake('궁금한 점은 편하게 물어보세요.', 'abc123def456', o)
+      const same = endingWithIntake(b.text, 'abc123def456', o)
+      const rot = endingWithIntake(b.text, 'fff000aaa111', o)
+      const long = endingWithIntake('가'.repeat(190), 'abc123def456', o)
+      check(
+        "K57 D-664 끝인사에 상담 신청 주소 — 비어 있으면 그 한 줄 · 있으면 뒤에 붙임 · 이미 있으면 그대로 · 주소를 새로 만들면 예전 주소만 새것으로 · 200자를 넘으면 바꾸지 않음",
+        a.state === 'added' && a.text === '상담 신청은 여기로 → https://os.example/ask/abc123def456' && b.state === 'added' && b.text === '궁금한 점은 편하게 물어보세요. 상담 신청은 여기로 → https://os.example/ask/abc123def456' &&
+          same.state === 'same' && same.text === b.text && rot.state === 'replaced' && rot.text === '궁금한 점은 편하게 물어보세요. 상담 신청은 여기로 → https://os.example/ask/fff000aaa111' &&
+          long.state === 'long' && long.text === '가'.repeat(190) && ENDING_MAX === BRAND_FIELDS.find((f) => f.key === 'ending')?.max,
+        [a, b, same, rot, long.state],
+      )
+    }
     // D-658 새 상담 신청 → 첫 인사(상담 신청 링크로 들어온 잠재고객 — 서버가 적는 할 일 글 그대로일 때만)
     {
       const lead = { ...rec, id: 'lead1', companyName: '홍길동', representativeName: '', contactName: '홍길동', nextAction: HELLO_NEXT_ACTION, nextActionDueDate: today, fees: [], docRequests: [], notices: undefined }
@@ -1399,7 +1415,7 @@ async function run() {
     check(
       'K51 D-651 미팅 메모 — [기록] 한 번에 업무 일기 + 이 업체(autoTalk) · 알림 "업무 일기에 적고 …에도 기록했어요" + [되돌리기](그 전 기록으로) · 읽을 것 없을 때만 "업무 일기에 적었어요"',
       /autoTalk = false/.test(qc) && /else if \(autoTalk\)/.test(qc) && /talkTestId="talk-memo-talk"\n\s+autoTalk/.test(talk) && /업무 일기에 적고 \$\{record\.companyName\}에도 기록했어요/.test(talk) &&
-        /label: '되돌리기'/.test(talk) && /\.onCommit\(before\)/.test(talk) && /if \(!hasTalk\(talkFound\(input\.content, record, todayLocalDate\(\)\)\)\) showToast\('업무 일기에 적었어요'\)/.test(talk),
+        /label: '되돌리기'/.test(talk) && /\.onCommit\(keepSince\(before, latest\.current\)\)/.test(talk) /* D-659 되돌려도 그 사이 적은 서류 요청은 남김 */ && /if \(!hasTalk\(talkFound\(input\.content, record, todayLocalDate\(\)\)\)\) showToast\('업무 일기에 적었어요'\)/.test(talk),
     )
     // ⑥ 오늘 '할 일 n건' 누르면 같은 화면 할 일 칸으로 · ⑦ 1차 미팅 항목 — 분야 7개 단추 · 누른 분야만 펼침
     const today = src('src/pages/TodayCommandCenterPage.tsx')

@@ -64,6 +64,29 @@ export function intakeLine(slug: string, origin?: string): string {
   return `상담 신청은 여기로 → ${intakeUrl(slug, origin)}`
 }
 
+/** 내 브랜드 '끝인사 · 바라는 행동' 칸 한도(brandProfile BRAND_FIELDS 의 ending 과 같은 값) */
+export const ENDING_MAX = 200
+
+/**
+ * D-664 끝인사(새로 쓰는 글 끝에 저절로 붙는 한 줄)에 상담 신청 주소 넣기 — 마케팅 글 → 상담 신청 → 잠재고객이 한 줄로.
+ *   same     이미 이 주소가 들어 있다(그대로)
+ *   replaced 예전 상담 신청 주소(/ask/…)가 있었다 → 새 주소로 바꿈(주소를 새로 만든 뒤)
+ *   added    끝인사 뒤에 한 줄 붙임(비어 있으면 그 한 줄이 끝인사)
+ *   long     붙이면 한도를 넘는다 → 바꾸지 않음(사람이 끝인사를 줄인다)
+ */
+export function endingWithIntake(ending: string, slug: string, origin?: string): { text: string; state: 'same' | 'replaced' | 'added' | 'long' } {
+  const cur = (ending ?? '').trim()
+  const url = intakeUrl(slug, origin)
+  if (cur.includes(url)) return { text: cur, state: 'same' }
+  const OLD = /\S*\/ask\/[0-9a-z]{6,40}/i
+  if (OLD.test(cur)) {
+    const next = cur.replace(OLD, url)
+    return next.length <= ENDING_MAX ? { text: next, state: 'replaced' } : { text: cur, state: 'long' }
+  }
+  const next = cur ? `${cur} ${intakeLine(slug, origin)}` : intakeLine(slug, origin)
+  return next.length <= ENDING_MAX ? { text: next, state: 'added' } : { text: cur, state: 'long' }
+}
+
 /** 처음 만들 때 제목 — '김은혜 상담 신청'. 이름이 비었거나 기본 이름이면 '상담 신청' */
 export function defaultIntakeTitle(name: string, company = ''): string {
   const n = name.trim()
