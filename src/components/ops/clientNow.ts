@@ -45,3 +45,9 @@ export function useClientNow(record: ClientOpsRecord | null, today: string, uplo
   const sender = useSenderLine()
   return useMemo(() => (record ? clientNowItems(record, today, sender, uploads, inDocs) : []), [record, today, sender, uploads, inDocs])
 }
+
+/** D-672 이 업체에 '받았다고 알리기' 가 걸려 있나 — 올린 서류를 넣은 그 판에서 바로 잇는다 */
+export function gotNoticeCount(record: ClientOpsRecord | null, today: string): number {
+  if (!record || record.archivedAt) return 0
+  return outboundNotices([record], today).filter((n) => n.kind === 'got').length
+}

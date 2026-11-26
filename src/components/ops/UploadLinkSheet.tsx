@@ -7,7 +7,7 @@
  *  - 0031 전 · 로컬 모드 · 쓸 수 없는 사람(허락 없는 대표 등)은 상태가 none/missing → 아무것도 안 그린다.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, Copy, Inbox, Link2 } from 'lucide-react'
+import { Check, Copy, Inbox, Link2, Send } from 'lucide-react'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
@@ -114,6 +114,7 @@ export function UploadLinkSheet({
   current,
   onLink,
   onSent,
+  notify,
 }: {
   record: ClientOpsRecord
   workspaceId: string
@@ -128,6 +129,8 @@ export function UploadLinkSheet({
   onLink?: (link: UploadLinkInfo | null) => void
   /** D-656 문구를 보냈다 — 서류함 '요청한 서류' · 3일 뒤 할 일로 잇는다(성공하면 보일 글 · 실패면 false) */
   onSent?: (text: string) => Promise<string | false>
+  /** D-672 넣은 서류가 부탁한 서류였다 — 이 판에서 바로 '받았다고 알리기'(count = 걸린 안내 수 · open = 그 문구 판) */
+  notify?: { count: number; open: () => void }
 }) {
   const { showToast } = useToast()
   const [view, setView] = useState<'make' | 'ready' | 'inbox'>(initialView ?? (state.files.length ? 'inbox' : state.link ? 'ready' : 'make'))
@@ -147,7 +150,7 @@ export function UploadLinkSheet({
           />
         )}
         {view === 'ready' && state.link && (
-          <ReadyView record={record} workspaceId={workspaceId} today={today} state={state} onEdit={() => setView('make')} onInbox={() => setView('inbox')} onLink={onLink} onSent={onSent} />
+          <ReadyView record={record} workspaceId={workspaceId} today={today} state={state} onEdit={() => setView('make')} onInbox={() => setView('inbox')} onLink={onLink} onSent={onSent} notify={notify} />
         )}
         {view === 'ready' && !state.link && <MakeView record={record} workspaceId={workspaceId} today={today} state={state} onDone={() => setView('ready')} onLink={onLink} />}
         {view === 'inbox' && (
@@ -273,6 +276,7 @@ function ReadyView({
   onInbox,
   onLink,
   onSent,
+  notify,
 }: {
   record: ClientOpsRecord
   workspaceId: string
@@ -282,6 +286,7 @@ function ReadyView({
   onInbox: () => void
   onLink?: (link: UploadLinkInfo | null) => void
   onSent?: (text: string) => Promise<string | false>
+  notify?: { count: number; open: () => void }
 }) {
   const { showToast } = useToast()
   const link = state.link!
@@ -338,11 +343,19 @@ function ReadyView({
     }
   }
 
+  /** D-672 받은 서류를 방금 넣었고 '받았다고 알리기' 가 걸려 있다 — 다음에 누를 것은 그 단추(문구 복사는 한 단계 옅게) */
+  const tell = notify && notify.count > 0 && state.files.length === 0 ? notify : null
   return (
     <>
+      {tell && (
+        <Button variant="primary" onClick={tell.open} className="w-full justify-center" data-testid="upload-link-tell">
+          <Send aria-hidden="true" className="size-4" />
+          받았다고 알리기 — 문구 보기
+        </Button>
+      )}
       <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} className="t-sub h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 text-slate-800" aria-label="서류 올리기 주소" data-testid="upload-link-url" />
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant={copied && canMark && !sent.done ? 'secondary' : 'primary'} onClick={() => void copy('msg')} data-testid="upload-link-copy-msg">
+        <Button variant={tell || (copied && canMark && !sent.done) ? 'secondary' : 'primary'} onClick={() => void copy('msg')} data-testid="upload-link-copy-msg">
           {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />}
           카톡 문구 복사
         </Button>

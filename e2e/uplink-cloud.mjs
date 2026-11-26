@@ -420,6 +420,18 @@ const docs2 = row.payload?.documents ?? {}
 const smeKey = Object.keys(docs2).find((k) => docs2[k]?.storagePath === files[1].storagePath)
 check("I4 그 밖의 서류 → 글자를 읽어 '중소기업 확인서' 칸으로(알아서 칸 정하기)", smeKey === 'smeCertificate' && /중소기업 확인서/.test(t2), `${smeKey} ${t2}`)
 check('I5 다 넣으면 받은 서류 줄 0 → 서류함 한 줄은 링크 줄로(받은 2개)', (await page.getByTestId('upload-link-bar').count()) === 1 && /받은 2개/.test(await page.getByTestId('upload-link-bar').innerText()), await page.getByTestId('upload-link-bar').innerText().catch(() => ''))
+// D-672 다 넣은 그 판에서 바로 다음 걸음 — [받았다고 알리기 — 문구 보기] 가 주 단추(문구 복사는 한 단계 옅게)
+{
+  const tell = sheet.getByTestId('upload-link-tell')
+  await tell.waitFor({ timeout: 5000 }).catch(() => {})
+  check(
+    'I5b D-672 받은 서류를 다 넣으면 같은 판에 [받았다고 알리기 — 문구 보기](주 단추) · [카톡 문구 복사] 는 옅게',
+    (await tell.count()) === 1 && /받았다고 알리기/.test(await tell.innerText().catch(() => '')) && /bg-brand-600|bg-navy/.test((await tell.getAttribute('class').catch(() => '')) ?? '') &&
+      !/bg-brand-600/.test((await sheet.getByTestId('upload-link-copy-msg').getAttribute('class').catch(() => '')) ?? ''),
+    await sheet.innerText().catch(() => ''),
+  )
+  if (SHOTS) { await page.waitForTimeout(600); await page.screenshot({ path: join(SHOTS, 'uplink-tell-pc.png') }) }
+}
 // 되돌리기 — 마지막 넣기를 되돌리면 칸에서 빠지고 다시 '고객이 올린 서류'
 await page.getByRole('button', { name: '되돌리기' }).last().click()
 await page.waitForTimeout(1500)

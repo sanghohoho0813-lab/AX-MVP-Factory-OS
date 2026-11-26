@@ -159,7 +159,7 @@ import { createJournalEntry, listJournal, updateJournalEntry } from '../services
 import { pendingDocKeys, recordRequestSent, resendText, uploadDocsForRequest, withRequestResentLogged } from '../services/docRequests'
 import { hintFromLink, openHint, sameHint, withUploadHint, withUploadLine } from '../services/uploadHint'
 import { ClientNowPill, ClientNowSheets } from '../components/ops/ClientNowRow'
-import { useClientNow, type NowKind } from '../components/ops/clientNow'
+import { gotNoticeCount, useClientNow, type NowKind } from '../components/ops/clientNow'
 import { saveUploadLink } from '../services/uploadLink'
 import { DocRequestPanel } from '../components/ops/DocRequestPanel'
 import { requestFollowUpText } from '../services/recoFollowUp'
@@ -2224,6 +2224,13 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           current={current}
           onLink={syncUploadHint}
           onSent={(text) => sendRequest('서류 올리기 링크 요청', text, true)}
+          notify={{
+            count: gotNoticeCount(record, today),
+            open: () => {
+              setUplView(null)
+              setNowSheet('notices')
+            },
+          }}
         />
       )}
 
