@@ -254,3 +254,15 @@ export function hiddenIds(defaults: readonly string[], layout: PageLayout, today
 export function isCustomized(layout: PageLayout, today = todayLocalDate()): boolean {
   return layout.order.length > 0 || layout.off.length > 0 || Object.values(layout.today).some((d) => d === today)
 }
+
+/**
+ * D-679 두 칸으로 나란히 놓을 수 있는 가장 좁은 칸 영역(px).
+ * 기준: 판을 닫은 1280 화면의 칸 영역이 897px(좁은 칸 364px — 제목 한 줄). 1600 에서 판을 열면 765px(좁은 칸 309px — 제목이 꺾이기 시작).
+ * 그 사이에서, 세로 막대(15 ~ 17px)가 생겨도 1280 화면의 지금 모양이 바뀌지 않게 잡았다. 글자 크기 설정과는 묶지 않는다(지금 모양 그대로).
+ */
+export const PAIR_MIN_WIDTH = 860
+
+/** 이 폭이면 두 칸으로 나란히 놓아도 되나 */
+export function pairsFit(width: number): boolean {
+  return width >= PAIR_MIN_WIDTH
+}

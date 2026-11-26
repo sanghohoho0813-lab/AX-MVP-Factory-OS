@@ -7,7 +7,7 @@
  * 실행: npm run test:catalog
  */
 
-import { arrangeIds, hiddenIds, isCustomized, keepAbsent, localLayouts, mergeLayout, moveSection, readLayoutForTest, resetLayout, setSectionVisibility, visibilityOf } from '../../lib/pageLayout'
+import { PAIR_MIN_WIDTH, arrangeIds, hiddenIds, isCustomized, keepAbsent, localLayouts, mergeLayout, moveSection, pairsFit, readLayoutForTest, resetLayout, setSectionVisibility, visibilityOf } from '../../lib/pageLayout'
 import { pullLayouts, startLayoutSync } from '../../services/preferences/layoutSync'
 import { writeRaw } from '../../storage/localStore'
 import { ghostsByDate, mergeTrail, readTrail, recordMove } from '../../services/todoTrail'
@@ -283,6 +283,8 @@ await storage()
   check('D-287 바꾼 적 없으면 기본 순서 그대로', arrangeIds(D, empty).join() === 'a,b,c,d,e')
   check('D-287 저장한 뒤 생긴 칸은 기본 순서의 앞 칸 바로 뒤 · 없어진 칸은 버림', arrangeIds([...D, 'f'], { ...empty, order: ['c', 'a', 'b', 'x', 'e', 'd'] }).join() === 'c,a,b,e,f,d' && arrangeIds(['n', ...D], { ...empty, order: ['e', 'd', 'c', 'b', 'a'] }).join() === 'n,e,d,c,b,a')
   resetLayout('t1')
+  // D-679 두 칸 짝은 칸 영역이 넉넉할 때만 — 판을 닫은 1280 화면(897px)은 두 칸 · 1600 에서 판을 연 폭(765px) · 1440 에서 판을 연 폭(673px)은 한 칸
+  check('D-679 두 칸 짝 문턱: 897 · 880(세로 막대가 굵어도) 두 칸 / 765 · 673 · 휴대폰 390 한 칸 · 문턱 860', PAIR_MIN_WIDTH === 860 && pairsFit(897) && pairsFit(880) && pairsFit(860) && !pairsFit(859) && !pairsFit(765) && !pairsFit(673) && !pairsFit(390))
   moveSection('t1', D, 'd', 'top')
   const l1 = readLayoutForTest('t1')
   check('D-287 맨 위로 — d 가 첫째', arrangeIds(D, l1).join() === 'd,a,b,c,e')

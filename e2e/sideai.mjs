@@ -406,6 +406,24 @@ await ctx.close()
   let g = await geo()
   check(`D2 [AI 대화] → 새 창 없이 오른쪽 판(${g.dock}px · 옆에 붙임) · 본문이 판 왼쪽에서 끝남(본문 ${g.main}px) · 화면 · 머리줄 넘침 0 · 판 위 메뉴 판 닫힘`, g.mode === 'dock' && g.dock === 384 && g.mainRight <= g.dockX + 1 && g.over <= 0 && g.hdr <= 0 && c.pages().length === 1 && (await p.getByTestId('side-ai-panel').count()) === 0, g)
   check(`D2b 판은 머리줄(시각 · 찾기) 아래부터(판 위 ${g.dockTop} · 머리줄 아래 ${g.hdrBottom}) · 머리줄은 판 위까지 그대로(오른쪽 ${g.hdrRight})`, g.dockTop >= g.hdrBottom && g.hdrRight > g.dockX + 100, g)
+  // D-679 판이 열려 본문이 좁아지면 오늘 화면의 두 칸 짝(다가오는 마감 + 무슨 일이 있었나요 · 상담신청 + 영업)은 한 줄에 한 칸으로
+  const pairState = () =>
+    p.evaluate(() => {
+      const area = document.querySelector('[data-arrange]')
+      const pairs = [...document.querySelectorAll('[data-arrange-pair]')].filter((el) => el.getClientRects().length)
+      return {
+        mode: area?.getAttribute('data-pairs') ?? '',
+        area: Math.round(area?.getBoundingClientRect().width ?? 0),
+        pairs: pairs.map((el) => {
+          const cells = [...el.children].filter((c) => c.getClientRects().length)
+          const lines = [...el.querySelectorAll('h2 button span.break-keep')].map((t) => Math.max(1, Math.round(t.getBoundingClientRect().height / (parseFloat(getComputedStyle(t).lineHeight) || 24))))
+          return { n: cells.length, cols: new Set(cells.map((c) => Math.round(c.getBoundingClientRect().left))).size, minW: Math.min(...cells.map((c) => Math.round(c.getBoundingClientRect().width))), maxLines: Math.max(1, ...lines) }
+        }),
+      }
+    })
+  const pairsOpen = await pairState()
+  check(`D2c(D-679) 판이 열려 칸 영역이 좁아지면(${pairsOpen.area}px) 오늘 화면의 두 칸 짝은 한 줄에 한 칸 · 접기 제목 2줄 이하(예전: 좁은 칸 270px · 제목이 한 낱말씩 꺾임)`,
+    pairsOpen.mode === 'stack' && pairsOpen.area < 860 && pairsOpen.pairs.length >= 1 && pairsOpen.pairs.every((x) => x.n < 2 || x.cols === 1) && pairsOpen.pairs.every((x) => x.maxLines <= 2) && pairsOpen.pairs.every((x) => x.minW >= 600), pairsOpen)
   const starters = await p.getByTestId('dock-starter').count()
   check('D3 처음 — "무엇이든 물어보세요" · 예시 질문 4개 · 모델 고르기 단추', (await p.getByTestId('dock-chat-empty').isVisible()) && starters === 4 && (await p.getByTestId('dock-model').isVisible()), starters)
   await shot(p, 'D3-chat-empty')
@@ -625,6 +643,12 @@ await ctx.close()
   await p.waitForTimeout(200)
   g = await geo()
   check('D21 [닫기] → 판 없음 · 본문 비킴 0 · 다시 열어도 닫힘', g.dock === 0 && g.pad === '0px' && g.over <= 0, g)
+  {
+    await p.waitForTimeout(300)
+    const pairsClosed = await pairState()
+    check(`D21c(D-679) 판을 닫으면 칸 영역이 다시 넓어져(${pairsClosed.area}px) 두 칸 짝이 나란히(두 칸) · 제목 한 줄`,
+      pairsClosed.mode === 'side' && pairsClosed.area >= 860 && pairsClosed.pairs.length >= 1 && pairsClosed.pairs.every((x) => x.n < 2 || x.cols === 2) && pairsClosed.pairs.every((x) => x.maxLines === 1), pairsClosed)
+  }
   await p.reload({ waitUntil: 'networkidle' })
   check('D21b 다시 열어도 닫혀 있음', (await p.getByTestId('side-dock').count()) === 0)
   await c.close()

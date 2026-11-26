@@ -8,16 +8,18 @@
  *
  *  - 화면은 칸을 기본 순서대로 넘긴다. 사람이 바꾼 순서 · 숨김만 여기서 덧씌운다(바꾼 적 없으면 예전 화면 그대로).
  *  - span: 'wide' · 'narrow' · 'half' 칸은 바로 옆 칸과 PC 에서 한 줄에 나란히(넓음 + 좁음 = 7 : 5, 그 밖은 반반). 짝이 없으면 한 줄 전체.
+ *    D-679 나란히 놓는 것은 '이 칸 영역의 폭' 이 넉넉할 때만(lib/pageLayout PAIR_MIN_WIDTH) — 화면은 넓어도 오른쪽 대화 판 · 넓힌 왼쪽 메뉴로
+ *    본문이 좁아지면 한 줄에 한 칸으로. (예전: 화면 폭 1280 만 봐서, 1440 에서 판을 열면 좁은 칸이 270px 가 되어 제목이 한 낱말씩 꺾였다.)
  *  - 칸 안이 비면(그릴 것이 없으면) 자리도 차지하지 않는다(empty:hidden).
  *  - [화면 꾸미기] 단추는 경로 줄 오른쪽(AppShell) — 이 화면에 꾸밀 칸이 있을 때만. 숨긴 칸이 있으면 화면 맨 아래에 '숨긴 칸 n개 · 다시 보기'.
  */
-import { Children, isValidElement, useEffect, useMemo, useState, useSyncExternalStore, type ReactElement, type ReactNode } from 'react'
+import { Children, isValidElement, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { MENU_ROW, useInPageTools } from '../layout/PageTools'
 import { ArrowDown, ArrowUp, ArrowUpToLine, EyeOff, SlidersHorizontal } from 'lucide-react'
 import { Modal } from './Modal'
 import { Button } from './Button'
-import { arrangeIds, hiddenIds, isCustomized, moveSection, resetLayout, setSectionVisibility, usePageLayout, visibilityOf, type SectionVisibility } from '../../lib/pageLayout'
+import { arrangeIds, hiddenIds, isCustomized, moveSection, pairsFit, resetLayout, setSectionVisibility, usePageLayout, visibilityOf, type SectionVisibility } from '../../lib/pageLayout'
 
 type Span = 'full' | 'wide' | 'narrow' | 'half'
 
@@ -70,8 +72,34 @@ const PAIR: Record<string, string> = {
   'narrow+wide': 'xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]',
 }
 
+/**
+ * 칸 영역이 두 칸을 놓을 만큼 넓은가 — 그리기 전에 한 번 재고(깜빡임 없이), 폭이 바뀔 때마다 다시 잰다(판 열고 닫기 · 메뉴 경계선 끌기 · 창 크기).
+ * 높이가 아니라 폭만 본다 — 한 칸 ↔ 두 칸으로 바뀌어도 이 영역의 폭은 그대로라 되먹임이 없다.
+ */
+function usePairRoom(ref: RefObject<HTMLElement | null>): boolean {
+  // 처음 값은 '넉넉함'(예전과 같은 모양) — 좁으면 아래에서 그리기 전에 바로잡는다
+  const [room, setRoom] = useState(true)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const check = () => {
+      const w = el.getBoundingClientRect().width
+      // 숨겨진 채(폭 0)로는 판단하지 않는다 — 보이게 될 때 다시 잰다
+      if (w > 0) setRoom(pairsFit(w))
+    }
+    check()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ref])
+  return room
+}
+
 export function ArrangeArea({ page, title, children, className = 'flex flex-col gap-6', pairGap = 'gap-6' }: { page: string; title: string; children: ReactNode; className?: string; pairGap?: string }) {
   const layout = usePageLayout(page)
+  const areaRef = useRef<HTMLDivElement>(null)
+  const room = usePairRoom(areaRef)
   const items = useMemo(() => {
     const out: ArrangeItemProps[] = []
     Children.forEach(children, (c) => {
@@ -117,12 +145,12 @@ export function ArrangeArea({ page, title, children, className = 'flex flex-col 
   )
 
   return (
-    <div className={className} data-arrange={page}>
+    <div ref={areaRef} className={className} data-arrange={page} data-pairs={room ? 'side' : 'stack'}>
       {rows.map((r) =>
         r.length === 1 ? (
           cell(r[0])
         ) : (
-          <div key={`${r[0].id}+${r[1].id}`} data-arrange-pair="" className={`grid grid-cols-1 ${pairGap} ${PAIR[`${r[0].span}+${r[1].span}`] ?? 'xl:grid-cols-2'} [&:not(:has(>:not(:empty)))]:hidden`}>
+          <div key={`${r[0].id}+${r[1].id}`} data-arrange-pair="" className={`grid grid-cols-1 ${pairGap} ${room ? (PAIR[`${r[0].span}+${r[1].span}`] ?? 'xl:grid-cols-2') : ''} [&:not(:has(>:not(:empty)))]:hidden`}>
             {cell(r[0])}
             {cell(r[1])}
           </div>
