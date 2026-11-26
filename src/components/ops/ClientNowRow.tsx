@@ -33,6 +33,7 @@ export function ClientNowPill({ items, onRun }: { items: NowItem[]; onRun: (what
       title={full}
       className="tap t-sub -my-1 inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 font-bold whitespace-nowrap hover:border-slate-300 hover:bg-slate-50"
       data-testid="client-now"
+      data-guide="fn-client-now"
       data-count={items.length}
       data-kind={one?.kind ?? 'many'}
     >

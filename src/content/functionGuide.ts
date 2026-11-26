@@ -396,6 +396,14 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     effect: '올라온 서류가 이 서류함에 모이고, [넣기] 한 번이면 맞는 칸에 들어가 회사 정보까지 채워져요.',
     next: '받은 서류를 칸에 저절로 넣는 것까지 넓혀요.',
   },
+  'fn-client-now': {
+    label: '지금 할 것',
+    menu: 'client-ops',
+    what: '이 업체에 지금 걸린 일을 알약 하나로 보여 줘요 — 고객이 올린 서류 · 보낼 안내 · 기다리는 서류 요청.',
+    why: '탭을 하나씩 열어 보지 않아도 이 업체에서 먼저 할 일을 알 수 있게 하려고 있어요.',
+    effect: '하나뿐이면 누르자마자 그 일로 가고, 여럿이면 한 줄씩 골라 가요. 걸린 일이 없으면 보이지 않아요.',
+    next: '약속 · 받을 돈도 같은 자리에서 한 번에 처리하게 해요.',
+  },
   'fn-docs-request': {
     label: '서류 요청 문구',
     menu: 'client-ops',
