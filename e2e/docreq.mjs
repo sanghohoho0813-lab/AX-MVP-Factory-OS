@@ -67,7 +67,8 @@ check('D3 요청한 서류 — 0/n 받음 · 오늘 보냄 · 아직: …', coun
 
 // D4
 const chips0 = await page.getByTestId('doc-req-chip').allInnerTexts()
-check('D4 부탁한 서류 칸 알약 \'요청함 · 오늘\'(안 받음 대신)', chips0.length >= 1 && chips0.every((t) => t.trim() === '요청함 · 오늘'), chips0)
+// 견본 서류 가운데 유효기간이 오늘로 지난 것이 있으면 그 칸은 '새 발급본 요청함'(날짜에 따라 생긴다 — D-659 점검에서 11-26 에 처음 나옴)
+check('D4 부탁한 서류 칸 알약 \'요청함 · 오늘\'(안 받음 대신 · 기한 지난 칸은 \'새 발급본 요청함\')', chips0.some((t) => t.trim() === '요청함 · 오늘') && chips0.every((t) => /^(요청함 · 오늘|새 발급본 요청함)$/.test(t.trim())), chips0)
 
 // D5
 await row.getByTestId('doc-req-list-toggle').click()

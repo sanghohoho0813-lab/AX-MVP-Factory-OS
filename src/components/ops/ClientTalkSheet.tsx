@@ -7,7 +7,7 @@
  *  - [미팅 메모] 여쭤볼 것을 보며 대표님 답을 적기 → 업무 일기 · 사정 · 숫자 · 다음 약속은 [이 업체에 기록] 한 번(업무 일기와 같은 길, D-505)
  * 컨설턴트가 보는 메모다(고객 종이가 아니다) — 수수료 · 영업자 · 업무 일기는 없다. 규칙으로 만든 글이다('AI' 아님).
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Copy, GraduationCap, MessageCircle, NotebookPen, Printer, RotateCcw, Search } from 'lucide-react'
@@ -25,6 +25,10 @@ import { QuickCapture } from '../journal/QuickCapture'
 import { createJournalEntry } from '../../services/journalService'
 import { applyTalk, hasTalk, talkFound } from '../../services/homeAsk/talkApply'
 import { nowIso, todayLocalDate } from '../../lib/appClock'
+import { recordRequestSent } from '../../services/docRequests'
+import { uploadHintLines } from '../../services/uploadHint'
+import { addDaysLocal } from '../../services/clientOpsNextAction'
+import { generateId } from '../../storage/localStore'
 import { buildDiagnosis, meetingFollowUp } from '../../services/clientDiagnosis'
 import { useSenderLine } from '../layout/useCurrentUser'
 import { MeetingRecorder } from './MeetingRecorder'
@@ -263,6 +267,16 @@ function AskFinder({ insights }: { insights: readonly Insight[] }) {
   )
 }
 
+/** D-659 메모 [되돌리기] — 예전 기록으로 돌리되, 메모가 건드리지 않는 칸(서류 요청 · 올리기 링크 사본 · 보낸 안내)은 지금 것을 남긴다 */
+function keepSince(before: ClientOpsRecord, now: ClientOpsRecord): ClientOpsRecord {
+  const next: ClientOpsRecord = { ...before }
+  for (const k of ['docRequests', 'uploadHint', 'notices'] as const) {
+    if (now[k] === undefined) delete next[k]
+    else (next as unknown as Record<string, unknown>)[k] = now[k]
+  }
+  return next
+}
+
 /** 미팅 메모 — 여쭤볼 것(미팅 순서와 같은 줄)을 보며 답을 적으면 업무 일기 + 읽은 것 [이 업체에 기록] */
 function MemoView({ record, insights, asks, memo }: { record: ClientOpsRecord; insights: readonly Insight[]; asks: readonly string[]; memo: TalkMemoTarget }) {
   const { showToast } = useToast()
@@ -271,11 +285,44 @@ function MemoView({ record, insights, asks, memo }: { record: ClientOpsRecord; i
   const canRecord = useAiAssistAccess() === 'owner' && canRecordHere()
   const [inject, setInject] = useState<{ id: number; text: string } | null>(null)
   // 미팅이 끝나면 대표님께 — 진단서와 같은 판정 · 받을 자료(고객 말) + 다음 만남(방금 기록한 약속도 바로)
-  const followUp = useMemo(() => {
+  const { followUp, requestText } = useMemo(() => {
     const today = todayLocalDate()
     const next = record.nextAction?.trim() && record.nextActionDueDate ? { date: record.nextActionDueDate, text: record.nextAction } : null
-    return meetingFollowUp(buildDiagnosis(record, insights, today), next, sender)
+    const sheet = buildDiagnosis(record, insights, today)
+    return {
+      // D-659 열린 올리기 링크가 있으면 '보내 주실 자료' 아래에 주소 — 서류함 [다시 요청] 과 같은 줄
+      followUp: meetingFollowUp(sheet, next, sender, uploadHintLines(record, today)),
+      // 보낸 자료 요청을 서류함 '요청한 서류' 로 잇는 글(번호 줄 — 요청 문구와 같은 모양)
+      requestText: sheet.requests.map((r, i) => `${i + 1}. ${r.label}${r.where ? `\n   - ${r.where}` : ''}`).join('\n'),
+    }
   }, [record, insights, sender])
+  // D-659 정리 문자를 보냈다 — 그 안의 '보내 주실 자료' 를 서류함 '요청한 서류' · 3일 뒤 할 일로(요청 문구 [보냈어요] 와 한 길)
+  const [copied, setCopied] = useState(false)
+  const [sent, setSent] = useState<{ busy: boolean; done: string }>({ busy: false, done: '' })
+  const latest = useRef(record)
+  latest.current = record
+  const markSent = async () => {
+    if (sent.busy || sent.done || !requestText) return
+    setSent({ busy: true, done: '' })
+    const today = todayLocalDate()
+    const r = await recordRequestSent({
+      title: '미팅 뒤 자료 요청',
+      text: requestText,
+      today,
+      due: addDaysLocal(today, 3),
+      nowIso: nowIso(),
+      newId: generateId(),
+      dedupe: true,
+      current: () => latest.current,
+      commit: (next) => {
+        latest.current = next
+        return memo.onCommit(next)
+      },
+      createTodo: (content, due) => createJournalEntry(memo.workspaceId, memo.userId, { entryType: 'follow_up', entryDate: today, content, clientId: record.id, dueDate: due }),
+    }).catch(() => false as const)
+    setSent({ busy: false, done: r || '' })
+    if (!r) showToast('적지 못했어요 — 다시 눌러 주세요')
+  }
   return (
     <div className="flex flex-col gap-3" data-testid="talk-memo">
       <p className="t-sub break-keep text-slate-700">
@@ -326,7 +373,8 @@ function MemoView({ record, insights, asks, memo }: { record: ClientOpsRecord; i
               label: '되돌리기',
               onClick: () =>
                 void memo
-                  .onCommit(before)
+                  // D-659 되돌리는 것은 메모가 고친 칸만 — 그 사이 적은 서류 요청 · 올리기 링크 사본 · 보낸 안내는 그대로 둔다
+                  .onCommit(keepSince(before, latest.current))
                   .catch(() => false)
                   .then((back) => showToast(back ? `${record.companyName} 기록을 되돌렸어요 — 업무 일기 글은 그대로예요` : '되돌리지 못했어요 — 업체 화면에서 고쳐 주세요')),
             })
@@ -341,12 +389,27 @@ function MemoView({ record, insights, asks, memo }: { record: ClientOpsRecord; i
           </p>
           <Button
             variant="secondary"
-            onClick={async () => showToast((await copyText(followUp)) ? '정리 문자를 복사했어요 — 카톡이나 문자에 붙여 넣으세요' : '복사하지 못했어요 — 다시 눌러 주세요')}
+            onClick={async () => {
+              const ok = await copyText(followUp)
+              if (ok) setCopied(true)
+              showToast(ok ? (requestText ? '정리 문자를 복사했어요 — 카톡 · 문자에 붙여 보내고 [보냈어요] 를 눌러 주세요' : '정리 문자를 복사했어요 — 카톡이나 문자에 붙여 넣으세요') : '복사하지 못했어요 — 다시 눌러 주세요')
+            }}
             data-testid="talk-followup-copy"
           >
             <Copy aria-hidden="true" className="size-4" /> 정리 문자 복사
           </Button>
+          {/* D-659 보낸 뒤 한 번 — 받을 자료가 서류함 '요청한 서류' 로 · 3일 뒤 할 일 · 안 오면 '보낼 안내' 가 다시 부탁할 글을 준비 */}
+          {requestText && (
+            <Button variant={copied && !sent.done ? 'primary' : 'secondary'} disabled={sent.busy || !!sent.done} onClick={() => void markSent()} data-testid="talk-followup-sent">
+              {sent.busy ? '적는 중…' : sent.done ? '보낸 것으로 적음' : '보냈어요'}
+            </Button>
+          )}
         </div>
+        {sent.done && (
+          <p role="status" className="t-sub break-keep text-success-700" data-testid="talk-followup-sent-done">
+            {sent.done}
+          </p>
+        )}
         <details className="rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2">
           <summary className="sum-chev t-sub cursor-pointer font-semibold text-slate-800">보낼 글 미리 보기</summary>
           <pre className="t-sub mt-2 font-sans break-keep whitespace-pre-wrap text-slate-800" data-testid="talk-followup-text">

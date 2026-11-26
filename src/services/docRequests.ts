@@ -12,6 +12,7 @@
 import type { ClientOpsRecord, DocRequest, DocRequestItem, DocumentKey } from '../types/clientOps'
 import { allDocumentMetas } from './clientOpsDocuments'
 import { uploadHintLines } from './uploadHint'
+import { requestFollowUpText } from './recoFollowUp'
 
 /**
  * D-532 보관 ≠ 표시. 예전에는 업체마다 요청 기록을 12개만 남기고 넘으면 **끝내지 않은 요청까지** 오래된 것부터 버렸다(읽을 때도 12개로 잘랐다).
@@ -334,6 +335,41 @@ export function resendText(
     '',
     '사진이나 PDF로 보내 주셔도 됩니다. 감사합니다.',
   ].join('\n')
+}
+
+/**
+ * D-656 · D-659 요청을 보냈다 — 3일 뒤 '받았는지 확인' 할 일 + 서류함 '요청함'(D-314 · D-512 의 [보냈어요] 한 길).
+ * 업체 상세의 요청 문구 창 · 올리기 링크 판 · 미팅 메모의 정리 문자가 같이 쓴다.
+ * dedupe 면 같은 서류를 이미 부탁해 둔 열린 요청이 있을 때 새 요청 · 새 할 일을 만들지 않고 '다시 보낸 날' 만 적는다.
+ * 돌려주는 값: 성공하면 화면에 보일 한 줄 · 할 일로 만들 줄이 없거나 저장에 실패하면 false.
+ */
+export async function recordRequestSent(opts: {
+  title: string
+  text: string
+  today: string
+  /** 3일 뒤 날짜(YYYY-MM-DD) */
+  due: string
+  nowIso: string
+  newId: string
+  dedupe: boolean
+  /** 지금 화면의 가장 새 기록 */
+  current: () => ClientOpsRecord
+  commit: (next: ClientOpsRecord) => Promise<boolean>
+  /** 할 일(업무 일기) 한 줄 만들기 */
+  createTodo: (content: string, due: string) => Promise<{ id: string }>
+}): Promise<string | false> {
+  // 할 일 한 줄은 예전 그대로(D-314 requestFollowUpText) — 줄이 없으면 요청이 아니다
+  const follow = requestFollowUpText(opts.text)
+  if (!follow) return false
+  const first = opts.current()
+  const same = opts.dedupe ? sameOpenRequest(first, requestLinesOf(opts.text).map((l) => l.label)) : null
+  if (same) return (await opts.commit(withRequestResent(first, same.id, opts.today))) ? '서류함 ‘요청한 서류’ 에 다시 보낸 날로 적었어요' : false
+  const todo = await opts.createTodo(follow, opts.due)
+  // D-512 무엇을 · 언제 부탁했는지 업체에 남긴다 — 서류가 들어오면 그 줄이 저절로 받음(서류함 · 고객 관리 · 오늘 할 일)
+  const base = opts.current()
+  const req = newDocRequest(base, { id: opts.newId, title: opts.title, text: opts.text, today: opts.today, nowIso: opts.nowIso, todoId: todo.id })
+  const kept = req ? await opts.commit(withDocRequest(base, req)) : false
+  return `할 일에 넣었어요 · 기한 ${opts.due.slice(5).replace('-', '/')} — 오늘 · 일정에 떠요${kept ? ` · 서류함에 '요청함' 으로 남겼어요(${req?.items.length ?? 0}가지)` : ''}`
 }
 
 /** D-656 요청 문구의 줄 → 올리기 링크에 넣을 서류(서류함 칸이 있는 줄만 · 한 칸에 한 번). 칸이 없는 줄은 고객이 '그 밖의 서류' 로 올린다 */

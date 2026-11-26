@@ -156,8 +156,9 @@ const SalesJourneyCard = lazy(() => import('../components/sales/SalesJourneyCard
 import { factNoteFor, readFact, withFactValue, withProfileFieldEdit, withProfileFieldTyped } from '../services/customerFacts'
 import { TodoComposer } from '../components/journal/TodoBoard'
 import { createJournalEntry, listJournal, updateJournalEntry } from '../services/journalService'
-import { newDocRequest, pendingDocKeys, requestLinesOf, resendText, sameOpenRequest, uploadDocsForRequest, withDocRequest, withRequestResent } from '../services/docRequests'
+import { pendingDocKeys, recordRequestSent, resendText, uploadDocsForRequest, withRequestResent } from '../services/docRequests'
 import { hintFromLink, openHint, sameHint, withUploadHint, withUploadLine } from '../services/uploadHint'
+import { ClientNowRow } from '../components/ops/ClientNowRow'
 import { saveUploadLink } from '../services/uploadLink'
 import { DocRequestPanel } from '../components/ops/DocRequestPanel'
 import { requestFollowUpText } from '../services/recoFollowUp'
@@ -769,24 +770,20 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
     void commit(withUploadHint(base, link))
   }
 
-  /**
-   * 요청을 보냈다(D-314 · D-512) — 3일 뒤 '받았는지 확인' 할 일 + 서류함 '요청함'.
-   * 링크 판에서는 같은 서류를 이미 부탁해 뒀으면 새 요청 · 새 할 일을 만들지 않고 '다시 보낸 날' 만 적는다(dedupe).
-   */
-  const recordRequestSent = async (title: string, text: string, dedupe: boolean): Promise<string | false> => {
-    const follow = requestFollowUpText(text)
-    if (!follow) return false
-    const first = current() ?? record
-    const same = dedupe ? sameOpenRequest(first, requestLinesOf(text).map((l) => l.label)) : null
-    if (same) return (await commit(withRequestResent(first, same.id, today))) ? '서류함 ‘요청한 서류’ 에 다시 보낸 날로 적었어요' : false
-    const due = addDaysLocal(today, 3)
-    const todo = await createJournalEntry(workspaceId, userId, { entryType: 'follow_up', entryDate: today, content: follow, clientId: record.id, dueDate: due })
-    // D-512 무엇을 · 언제 부탁했는지 업체에 남긴다 — 서류가 들어오면 그 줄이 저절로 받음(서류함 · 고객 관리 · 오늘 할 일)
-    const base = current() ?? record
-    const req = newDocRequest(base, { id: generateId(), title, text, today, nowIso: nowIso(), todoId: todo.id })
-    const kept = req ? await commit(withDocRequest(base, req)) : false
-    return `할 일에 넣었어요 · 기한 ${due.slice(5).replace('-', '/')} — 오늘 · 일정에 떠요${kept ? ` · 서류함에 '요청함' 으로 남겼어요(${req?.items.length ?? 0}가지)` : ''}`
-  }
+  /** 요청을 보냈다 — 3일 뒤 '받았는지 확인' 할 일 + 서류함 '요청함'(services/docRequests recordRequestSent 한 길). 링크 판 · 미팅 메모는 dedupe */
+  const sendRequest = (title: string, text: string, dedupe: boolean): Promise<string | false> =>
+    recordRequestSent({
+      title,
+      text,
+      today,
+      due: addDaysLocal(today, 3),
+      nowIso: nowIso(),
+      newId: generateId(),
+      dedupe,
+      current: () => current() ?? record,
+      commit,
+      createTodo: (content, due) => createJournalEntry(workspaceId, userId, { entryType: 'follow_up', entryDate: today, content, clientId: record.id, dueDate: due }),
+    })
 
   /** 새 요청 문구인가(다시 요청 문구는 resendText 가 주소를 이미 붙인다) */
   const isRequestMessage = Boolean(message && /요청/.test(message.title) && !message.resendId)
@@ -865,6 +862,22 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             {/* D-627 '가장 임박' 줄은 머리에서 뺐다 — 개요 '다음 약속' · 맞춤 추천 '지금 챙길 것' 이 같은 기한을 보여 준다 */}
           </div>
         </div>
+
+        {/* D-660 이 업체에서 지금 할 것 — 받은 서류 · 보낼 안내 · 서류 요청(있을 때만 한 줄 · 오늘 화면과 같은 알약) */}
+        <ClientNowRow
+          record={record}
+          today={today}
+          workspaceId={workspaceId}
+          uploads={upl.state?.files.length ?? 0}
+          onUploads={() => setUplView('inbox')}
+          onDocs={() => setTab('docs')}
+          onSaved={(saved) => {
+            latestRef.current = saved
+            setRecord(saved)
+            setSavedAt(Date.now())
+          }}
+          inDocs={tab === 'docs'}
+        />
 
         {/* 주요 행동 — 한 화면에 강조 버튼은 하나만 둔다. D-126: 잠재고객은 서류보다 미팅이 먼저 · U4 휴대폰은 사이를 좁혀 세 단추가 한 줄에 */}
         <div className="flex flex-wrap items-center gap-2 max-sm:gap-1.5">
@@ -2194,7 +2207,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           onCommit={commit}
           current={current}
           onLink={syncUploadHint}
-          onSent={(text) => recordRequestSent('서류 올리기 링크 요청', text, true)}
+          onSent={(text) => sendRequest('서류 올리기 링크 요청', text, true)}
         />
       )}
 
@@ -2736,7 +2749,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
             if (!isRequestMessage || !requestFollowUpText(messageText)) return undefined
             return {
               label: '보냈어요 · 3일 뒤 받았는지 확인',
-              run: () => recordRequestSent(message.title, messageText, false),
+              run: () => sendRequest(message.title, messageText, false),
             }
           })()}
         />

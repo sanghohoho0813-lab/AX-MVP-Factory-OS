@@ -255,7 +255,7 @@ const dayK = (iso: string): string => {
  * D-508 미팅 뒤 대표님께 보내는 정리 문자 — 진단서와 같은 판정 · 같은 받을 자료(고객 말 그대로) + 다음 만남(약속이 미팅 · 방문일 때만).
  * 고객에게 가는 글 — 업무 일기 · 미팅 메모 · 수수료 · 영업자는 넣지 않는다. 새 숫자 0(진단서 금액 그대로).
  */
-export function meetingFollowUp(d: DiagnosisSheet, next: { date: string; text: string } | null, sender = ''): string {
+export function meetingFollowUp(d: DiagnosisSheet, next: { date: string; text: string } | null, sender = '', /** D-659 열린 올리기 링크 안내 줄(없으면 []) — '보내 주실 자료' 바로 아래 */ uploadLines: readonly string[] = []): string {
   const out: string[] = [`대표님, 오늘 시간 내 주셔서 감사합니다. ${d.companyName} 건 오늘 말씀드린 내용을 정리해 드려요.`, '']
   if (d.picks.length) {
     out.push('■ 오늘 말씀드린 것')
@@ -265,6 +265,7 @@ export function meetingFollowUp(d: DiagnosisSheet, next: { date: string; text: s
   if (d.requests.length) {
     out.push('■ 보내 주실 자료')
     for (const r of d.requests) out.push(`- ${r.label}${r.where ? ` (${r.where})` : ''}`)
+    for (const l of uploadLines) if (l.trim()) out.push(l)
     out.push('')
   }
   out.push('■ 다음 순서')

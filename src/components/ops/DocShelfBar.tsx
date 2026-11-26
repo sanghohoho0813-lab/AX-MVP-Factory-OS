@@ -3,7 +3,7 @@
  * 확인 필요(기타 칸) · 겹친 서류 · 만료 · 지금 필요한데 없음. 누르면 그 칸으로 간다(차례로 돈다).
  */
 import { useEffect, useRef, useState } from 'react'
-import { CircleAlert, Copy, FileWarning, FileX, ListChecks, Paperclip } from 'lucide-react'
+import { Check, CircleAlert, Copy, FileWarning, FileX, ListChecks, Paperclip } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { DocShelfSummary } from '../../services/docShelf'
 import { allDocumentMetas } from '../../services/clientOpsDocuments'
@@ -53,7 +53,13 @@ export function DocShelfBar({ summary, onJump, onReview }: { summary: DocShelfSu
               · 확인할 정보 <b className="font-bold text-warning-800" data-testid="doc-stage-review">{st.reviewFacts}</b>
             </span>
           )}
-          {st.review === 0 && st.received > 0 && <span className="text-success-700" data-testid="doc-stage-done" title="받은 서류에서 읽은 정보는 모두 확인했어요">· 다 확인함</span>}
+          {/* D-659 휴대폰은 글 대신 초록 체크 하나 — 만료 서류가 생기면 '만료 n' 칩이 더해져 글자 수 한도(150)를 넘었다(2026-11-26 전체 화면 자) */}
+          {st.review === 0 && st.received > 0 && (
+            <span className="inline-flex items-center text-success-700" data-testid="doc-stage-done" title="받은 서류에서 읽은 정보는 모두 확인했어요">
+              <Check role="img" aria-label="다 확인함" className="size-4 sm:hidden" />
+              <span className="max-sm:hidden">· 다 확인함</span>
+            </span>
+          )}
         </p>
       )}
     <div className="flex flex-wrap items-center gap-2" data-testid="doc-shelf">

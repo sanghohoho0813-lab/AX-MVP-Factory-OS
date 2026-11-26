@@ -272,13 +272,34 @@ if (memoShown) {
     fuText.startsWith('대표님, 오늘 시간 내 주셔서 감사합니다.') && fuText.includes('■ 오늘 말씀드린 것') && /- 다음 만남: \d{1,2}월 \d{1,2}일\([일월화수목금토]\) · .*미팅/.test(fuText) && !fuText.includes('대표님 말씀') && fuClip.trim() === fuText.trim(),
     fuText.slice(0, 400),
   )
+  // D-659 정리 문자를 보냈으면 [보냈어요] 한 번 — '보내 주실 자료' 가 서류함 '요청한 서류' 로 · 3일 뒤 할 일(요청 문구 [보냈어요] 와 한 길)
+  const asksDocs = fuText.includes('■ 보내 주실 자료')
+  const fuSent = fuBox.getByTestId('talk-followup-sent')
+  if (asksDocs) {
+    const j0 = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').filter((e) => e.clientId === 'cli_hansol' && e.entryType === 'follow_up').length)
+    const r0 = await page.evaluate(() => (JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_hansol')?.docRequests ?? []).length)
+    const primary = /bg-brand-600|bg-navy/.test((await fuSent.getAttribute('class')) ?? '')
+    await fuSent.click()
+    await fuBox.getByTestId('talk-followup-sent-done').waitFor({ timeout: 5000 })
+    const doneLine = await fuBox.getByTestId('talk-followup-sent-done').innerText()
+    const j1 = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').filter((e) => e.clientId === 'cli_hansol' && e.entryType === 'follow_up').length)
+    const reqs = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_hansol')?.docRequests ?? [])
+    check(
+      "T13-3b D-659 복사 뒤 [보냈어요] 가 주 단추 → 누르면 서류함 '요청한 서류' 1건(정리 문자의 자료 줄 수만큼) · 3일 뒤 '받았는지 확인' 할 일 1개 · 단추는 '보낸 것으로 적음'",
+      primary && reqs.length === r0 + 1 && reqs[0].title === '미팅 뒤 자료 요청' && reqs[0].items.length === (fuText.split('■ 보내 주실 자료')[1].split('■')[0].match(/^- /gm) ?? []).length && j1 === j0 + 1 && /할 일에 넣었어요/.test(doneLine) && (await fuSent.isDisabled()) && /보낸 것으로 적음/.test(await fuSent.innerText()),
+      { primary, r0, reqs: reqs.map((r) => [r.title, r.items.length]), j0, j1, doneLine },
+    )
+  } else {
+    check('T13-3b D-659 보내 주실 자료가 없는 업체는 [보냈어요] 단추 없음', (await fuSent.count()) === 0)
+  }
   // D-651 [되돌리기] → 업체 기록만 그 전으로(직원 수 · 설비 답) · 업무 일기 글은 그대로
   const undoBtn = page.getByRole('button', { name: '되돌리기' }).last()
   if (await undoBtn.isVisible().catch(() => false)) await undoBtn.click()
   await page.waitForTimeout(700)
   const back = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.operations_clients') ?? '[]').find((c) => c.id === 'cli_hansol') ?? {})
   const journalKept = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.ops_journal_entries') ?? '[]').filter((e) => e.clientId === 'cli_hansol').length)
-  check('T13-4 [되돌리기] → 업체 기록은 그 전(직원 수 23명 · 설비 답 아님) · 업무 일기 글은 그대로', back.employeeCount !== '23명' && back.decided?.['scn.facility']?.a !== 'yes' && journalKept === journalAfter, { e: back.employeeCount, d: back.decided?.['scn.facility'], journalKept, journalAfter })
+  check('T13-4 [되돌리기] → 업체 기록은 그 전(직원 수 23명 · 설비 답 아님) · 업무 일기 글은 그대로', back.employeeCount !== '23명' && back.decided?.['scn.facility']?.a !== 'yes' && journalKept === journalAfter + (asksDocs ? 1 : 0), { e: back.employeeCount, d: back.decided?.['scn.facility'], journalKept, journalAfter })
+  if (asksDocs) check("T13-4b D-659 메모를 되돌려도 그 사이 적은 '미팅 뒤 자료 요청' 은 그대로(되돌리는 것은 메모가 고친 칸만)", (back.docRequests ?? []).some((r) => r.title === '미팅 뒤 자료 요청'), JSON.stringify((back.docRequests ?? []).map((r) => r.title)))
 }
 await page.keyboard.press('Escape')
 
