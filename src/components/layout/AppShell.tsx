@@ -51,6 +51,7 @@ import { isMarketingArea } from '../../lib/marketingArea'
 import { LayoutCloudSync } from './LayoutCloudSync'
 import { useAiAssistAccess } from '../../auth/ownerAiAccess'
 import { setAllowedProviders, setCheapOnly } from '../../services/aiAssist/store'
+import { setFailReportOn } from '../../services/aiAssist/failReport'
 
 function PilotRouteGuard({ pathname, children }: { pathname: string; children: React.ReactNode }) {
   const pilot = useIsPilot()
@@ -89,6 +90,8 @@ export function AppShell() {
   setCheapOnly(cheapOnly)
   // 대표가 팀장 화면으로 볼 때 — 가장 싼 모델 이름을 먼저 받아 둔다(대표가 고른 비싼 모델이 이 보기에서 쓰이지 않게). 팀장 본인은 아래 마케팅 확인이 같이 받는다
   const viewingAsPilot = useViewingPilot() !== null
+  // D-676 AI 가 운영 쪽 문제로 멈추면 운영자 받은함에 한 줄 — 진짜 팀장 · 구독 고객 계정일 때만(대표가 팀장 화면으로 볼 때는 보내지 않는다)
+  setFailReportOn(assistAccess === 'pilot' && !viewingAsPilot)
   useEffect(() => {
     if (cheapOnly && viewingAsPilot) void fetchAssistStatus().catch(() => undefined)
   }, [cheapOnly, viewingAsPilot])

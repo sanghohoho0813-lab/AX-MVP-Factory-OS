@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react'
 import { Info, X } from 'lucide-react'
 import { ToastContext, nextToasts, type ToastAction, type ToastEntry } from './toastContext'
+import { plainMessage } from '../../lib/errorText'
 
 /** D-650 휴대폰에서 창(시트)이 열려 있으면 알림은 위쪽에 — 아래에 띄우면 창의 방금 나온 결과 · 저장 단추를 덮었다 */
 function dialogOpen(): boolean {
@@ -27,7 +28,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const showToast = useCallback(
-    (message: string, action?: ToastAction) => {
+    (raw: string, action?: ToastAction) => {
+      // D-678 실패 원문(Failed to fetch · TypeError …)이 섞여 들어오면 그 조각만 걷어 낸다 — 한국어 글은 그대로
+      const message = plainMessage(raw)
       const id = nextId.current++
       setOverDialog(dialogOpen())
       setToasts((prev) => nextToasts(prev, { id, message, action }))

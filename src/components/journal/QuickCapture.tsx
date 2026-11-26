@@ -9,6 +9,7 @@ import { useSessionDraft } from '../../lib/useSessionDraft'
 import { ClientPickerOptions } from '../ops/ClientPickerOptions'
 import { TalkCard } from '../home/TalkCard'
 import { hasTalk, talkFound, type TalkFound } from '../../services/homeAsk/talkApply'
+import { errorText } from '../../lib/errorText'
 
 /**
  * 빠른 기록 — "무슨 일이 있었나요?" 한 줄이면 저장된다.
@@ -112,7 +113,7 @@ export function QuickCapture({
       if (type !== 'note') setType('note')
       textRef.current?.focus()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+      setError(errorText(cause, '저장하지 못했습니다.'))
     } finally {
       busyRef.current = false
       setBusy(false)

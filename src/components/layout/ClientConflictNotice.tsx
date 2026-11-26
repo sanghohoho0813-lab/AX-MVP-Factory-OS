@@ -11,6 +11,7 @@ import { GitMerge, X } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { onClientSaveNews, resolveClientConflict, type ClientSaveConflictError } from '../../services/clientOpsService'
 import { conflictRows } from '../../services/clientMerge'
+import { errorText } from '../../lib/errorText'
 
 const LABEL_ROWS = 4
 
@@ -46,7 +47,7 @@ export function ClientConflictNotice() {
       setConflict(null)
       setMerged(null)
     } catch (e) {
-      setError(e instanceof Error && e.message ? e.message : '저장하지 못했어요 — 다시 눌러 주세요.')
+      setError(errorText(e, '저장하지 못했어요 — 다시 눌러 주세요.'))
     } finally {
       setBusy(false)
     }

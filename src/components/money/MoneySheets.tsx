@@ -27,6 +27,7 @@ import {
   type PayMethod,
   type Subscription,
 } from '../../services/finance/financeCore'
+import { errorText } from '../../lib/errorText'
 
 const inputCls = 'w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2.5 t-body focus:border-brand-500 focus:outline-none'
 
@@ -128,7 +129,7 @@ export function IncomeSheet({
     try {
       await onSave({ amount: won, name: name.trim(), category, received, date, clientId, memo: memo.trim() })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+      setError(errorText(cause, '저장하지 못했습니다.'))
     } finally {
       setBusy(false)
     }
@@ -277,7 +278,7 @@ export function ExpenseSheet({
     try {
       await onSave({ amount: a.amount, currency: a.currency, name: name.trim(), category, date, payMethod, clientId, memo: memo.trim() })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+      setError(errorText(cause, '저장하지 못했습니다.'))
     } finally {
       setBusy(false)
     }
@@ -429,7 +430,7 @@ export function SubscriptionSheet({
     try {
       await onSave({ name: name.trim(), category, amount: a.amount, currency: a.currency, cycle, billingDay: day, billingMonth: month, payMethod, startDate, endDate, memo: memo.trim(), ...patch })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+      setError(errorText(cause, '저장하지 못했습니다.'))
     } finally {
       setBusy(false)
     }

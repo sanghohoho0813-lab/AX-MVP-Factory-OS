@@ -5,6 +5,7 @@
 
 import { getSupabaseClient } from '../lib/supabase/client'
 import { sha256Hex } from '../repositories/async/publicTokenClient'
+import { errorText } from '../lib/errorText'
 
 export type WorkspaceRole = 'owner' | 'admin' | 'editor' | 'viewer'
 
@@ -70,7 +71,7 @@ export async function createWorkspace(name: string, slug?: string): Promise<Work
     workspace_name: name,
     workspace_slug: slug ?? null,
   })
-  if (error) throw new Error(error.message || '작업공간을 생성하지 못했습니다.')
+  if (error) throw new Error(errorText(error, '작업공간을 생성하지 못했습니다.'))
   return mapWorkspace(data as WorkspaceRow)
 }
 
@@ -79,7 +80,7 @@ export async function acceptInvite(inviteToken: string): Promise<WorkspaceMember
   const { data, error } = await getSupabaseClient().rpc('accept_workspace_invite', {
     invite_token: inviteToken,
   })
-  if (error) throw new Error(error.message || '초대를 수락하지 못했습니다.')
+  if (error) throw new Error(errorText(error, '초대를 수락하지 못했습니다.'))
   const r = data as { workspace_id: string; user_id: string; role: WorkspaceRole }
   return { workspaceId: r.workspace_id, userId: r.user_id, role: r.role }
 }

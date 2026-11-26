@@ -17,7 +17,8 @@ import { SKILLS, COMMON_RULES } from '../../../api/_ai/skills.js'
 import { ASSIST_PRESETS, askPresetOf } from '../aiAssist/presets'
 import { safeText, personNames, RefBook, clientRow, normRef } from '../aiAssist/context'
 import { betterModel, dueFromWhen, isSamePage, pointsAtTodo, refLabel, todoText, unaliasAnswer } from '../aiAssist/actions'
-import { AssistError, __resetAssistStatusCache, __setRecoverTimes, callAssist, fetchAssistStatus, peekAssistStatus, providerMessage } from '../aiAssist/client'
+import { AssistError, __resetAssistStatusCache, __setRecoverTimes, assistMessage, callAssist, fetchAssistStatus, peekAssistStatus, providerMessage } from '../aiAssist/client'
+import { failReportBody, isAccountSide, isOperatorSide, reportAssistFail } from '../aiAssist/failReport'
 import { askWeight, autoPlan, classifyAsk, pickAuto, presetWeight } from '../aiAssist/autoModel'
 import { __setRetryTimes, callAssistRetry } from '../aiAssist/retry'
 import { __resetJudgeSkill, readJudgeSkill, saveJudgeSkill, syncJudgeSkill } from '../aiAssist/judgeSkill'
@@ -1270,6 +1271,34 @@ async function d629Tests() {
   setAllowedProviders(null)
   setCheapOnly(false)
   check('AS4 구독 고객 화면 · 팀장 화면은 올려 쓰지 않음 — 대표 화면만 · 화면 모양이 바뀔 때만 계정 번호가 바뀜(같은 값이면 그대로)', !customerScreen && !pilotScreen && autoUpgradeAllowed() && e1 === e0 + 1 && accountEpoch() === e1 + 4, { e0, e1, now: accountEpoch() })
+
+  /* ---- 4b. D-676 대표가 아닌 화면(팀장 · 구독 고객)의 실패 글 — 운영자 말 0 · 운영 쪽 실패는 받은함으로 ---- */
+  {
+    const OPS = ['setup_needed', 'db_setup_needed', 'provider_auth', 'provider_billing', 'provider_model', 'provider_rejected']
+    const ADMIN_WORDS = /키|DB|0021|충전|Vercel|콘솔|console|대표 계정|Redeploy|Supabase|팀장 계정/
+    const ownerSetup = assistMessage('setup_needed')
+    const ownerBill = providerMessage('provider_billing', 'gemini', 'x')
+    const ownerForbidden = assistMessage('forbidden')
+    setAllowedProviders(['gemini'])
+    const guest = (code: string) => [assistMessage(code), providerMessage(code, 'gemini', '회사가 준 까닭'), providerMessage(code, 'anthropic')]
+    const guestAll = [...OPS, 'forbidden', 'provider_not_allowed', 'subscription_inactive', 'not_deployed'].flatMap(guest)
+    check('GM1 대표 화면 글은 그대로(키 · 충전하는 곳 · 대표 계정) / 구독 고객 화면에는 운영자 말 0(키 · DB · 0021 · 충전 · 콘솔 · 대표 계정 · 회사가 준 까닭)',
+      /키/.test(ownerSetup) && /충전/.test(ownerBill) && /대표 계정/.test(ownerForbidden) && guestAll.every((t) => !ADMIN_WORDS.test(t) && !t.includes('회사가 준 까닭')), guestAll.filter((t) => ADMIN_WORDS.test(t)))
+    check('GM2 구독 고객 화면: 운영 쪽 실패 여섯은 같은 한 줄("운영 쪽에서 고쳐야") · 이용 기간 · 모델 · 기능은 무엇을 하면 되는지',
+      new Set(OPS.flatMap(guest)).size === 1 && assistMessage('setup_needed').includes('운영 쪽에서 고쳐야') && assistMessage('subscription_inactive').includes('이용 기간') && assistMessage('provider_not_allowed').includes('모델 바꾸기') && assistMessage('forbidden').includes('이 계정에서는') &&
+      assistMessage('quota_exceeded').includes('이번 달') && assistMessage('rate_limited').includes('1분'), [...new Set(OPS.flatMap(guest))])
+    setAllowedProviders(['gemini', 'openai', 'anthropic'])
+    setCheapOnly(true)
+    const pilotOps = new Set(OPS.flatMap(guest))
+    setAllowedProviders(null)
+    setCheapOnly(false)
+    check('GM3 팀장 화면(회사마다 가장 싼 모델)도 같은 한 줄 · 대표 화면으로 돌아오면 다시 대표 글', pilotOps.size === 1 && [...pilotOps][0].includes('운영 쪽에서 고쳐야') && assistMessage('setup_needed') === ownerSetup && providerMessage('provider_billing', 'gemini', 'x') === ownerBill)
+    check('GM4 받은함에 남는 글 — 무슨 문제 · 어느 회사만(같은 글 → 서버가 하루 한 줄) · 운영 쪽이 아닌 실패는 글 없음 · 계정 사정 셋은 따로',
+      failReportBody('provider_billing', 'gemini') === 'AI 도우미가 답하지 못했어요 — AI 회사 계정의 잔액 · 사용 한도가 다 됨 (Gemini)' && failReportBody('setup_needed') === 'AI 도우미가 답하지 못했어요 — AI 키가 서버에 없음' &&
+      failReportBody('quota_exceeded') === '' && failReportBody('rate_limited', 'gemini') === '' && OPS.every(isOperatorSide) && !isOperatorSide('quota_exceeded') && !isOperatorSide('provider_busy') &&
+      ['quota_exceeded', 'subscription_inactive', 'marketing_not_included'].every(isAccountSide) && !isAccountSide('provider_billing'))
+    check('GM5 로컬 모드(운영자가 따로 없음) · 운영 쪽이 아닌 실패는 보내지 않음(off)', (await reportAssistFail('provider_billing', 'gemini', '000123')) === 'off' && (await reportAssistFail('rate_limited', 'gemini', '000124')) === 'off')
+  }
 
   /* ---- 5. 한 곳에서 정한다 — 화면 → callAssist → 진짜 서버 함수 → 가짜 공급자 ---- */
   setEnv()

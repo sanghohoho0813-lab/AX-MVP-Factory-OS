@@ -25,6 +25,7 @@ import { InPageTools, MENU_ROW, useInPageTools } from '../layout/PageTools'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation } from 'react-router-dom'
+import { isAccountSide, isOperatorSide, reportAssistFail, type FailReport } from '../../services/aiAssist/failReport'
 import { AlertTriangle, ArrowRight, Check, ChevronDown, ClipboardList, Copy, ExternalLink, History, Loader2, RefreshCw, Send, Settings2, Sparkles, Wand2, X } from 'lucide-react'
 import { AuthContext } from '../../auth/authContext'
 import { useAiAssistAccess } from '../../auth/ownerAiAccess'
@@ -470,7 +471,7 @@ function AssistPanel({
   useEscToClose(!docked || explicit, onClose)
   const { showToast } = useToast()
   const [running, setRunning] = useState<string | null>(null)
-  const [error, setError] = useState<{ code: string; message: string; missing: string[]; ref?: string } | null>(null)
+  const [error, setError] = useState<{ code: string; message: string; missing: string[]; ref?: string; provider?: string } | null>(null)
   // D-634 이 판에서 주고받은 대화(오래된 것 먼저). 맨 끝이 지금 답 — 판을 새로 열면 새 대화(지난 대화는 머리 [지난 대화])
   const [turns, setTurns] = useState<NonNullable<Shown>[]>([])
   // 보내는 중(또는 못 받은) 질문 — 답을 기다리는 동안 내 말풍선으로 먼저 보인다
@@ -570,7 +571,7 @@ function AssistPanel({
         toTurn()
       } catch (e) {
         const ref = requestId.slice(-6)
-        if (e instanceof AssistError) setError({ code: e.code, message: e.message, missing: e.missing, ref })
+        if (e instanceof AssistError) setError({ code: e.code, message: e.message, missing: e.missing, ref, provider: e.provider })
         else setError({ code: 'provider_error', message: assistMessage('provider_error'), missing: [], ref })
         toEnd()
       } finally {
@@ -1289,11 +1290,52 @@ function probeText(x: ProviderProbe): string {
 /* 오류 · 결과                                                            */
 /* ------------------------------------------------------------------ */
 
-function ErrorBox({ error }: { error: { code: string; message: string; missing: string[]; ref?: string } }) {
+function ErrorBox({ error }: { error: { code: string; message: string; missing: string[]; ref?: string; provider?: string } }) {
   let how: ReactNode = null
   // D-638 키 이름 · 서버 설정 · 문서 이름은 대표 화면에만
   const admin = autoUpgradeAllowed()
-  if (!admin && (error.code === 'setup_needed' || error.code === 'db_setup_needed')) how = <>관리자에게 'AI 연결' 을 부탁해 주세요.</>
+  // D-676 팀장 · 구독 고객 화면 — 운영자만 고칠 수 있는 실패는 운영자 받은함에 한 줄(callAssist 가 이미 보냈으면 같은 것을 기다린다).
+  //   보낸 것을 확인한 뒤에만 '알렸어요' 라고 말한다. 못 보냈으면 [문의하기] 로.
+  const opSide = !admin && isOperatorSide(error.code)
+  const acctSide = !admin && isAccountSide(error.code)
+  const [told, setTold] = useState<FailReport | 'sending'>('sending')
+  useEffect(() => {
+    if (!opSide) return
+    let alive = true
+    setTold('sending')
+    void reportAssistFail(error.code, error.provider ?? '', error.ref ?? '').then((r) => {
+      if (alive) setTold(r)
+    })
+    return () => {
+      alive = false
+    }
+  }, [opSide, error.code, error.provider, error.ref])
+  const supportLink = (label: string) => (
+    <Link to={`/support?from=${encodeURIComponent(typeof window === 'undefined' ? '' : window.location.pathname)}`} className="font-semibold text-amber-950 underline" data-testid="ai-assist-error-support">
+      {label}
+    </Link>
+  )
+  if (opSide)
+    how =
+      told === 'sent' ? (
+        <span data-testid="ai-assist-error-told" data-told="sent">운영자에게 알렸어요 — 고쳐지면 다시 눌러 주세요.</span>
+      ) : told === 'sending' ? (
+        <span data-testid="ai-assist-error-told" data-told="sending">운영자에게 알리는 중…</span>
+      ) : (
+        <span data-testid="ai-assist-error-told" data-told={told}>{supportLink('문의하기')} 에서 운영자에게 알려 주세요.</span>
+      )
+  else if (acctSide)
+    how = (
+      <span data-testid="ai-assist-error-account">
+        {error.code === 'quota_exceeded' ? (
+          <>
+            <Link to="/settings" className="font-semibold text-amber-950 underline">설정</Link> 에서 남은 양을 볼 수 있어요. 더 쓰고 싶으면 {supportLink('문의하기')} 로 알려 주세요.
+          </>
+        ) : (
+          <>{supportLink('문의하기')} 로 운영자에게 물어보세요.</>
+        )}
+      </span>
+    )
   else if (error.code === 'setup_needed')
     how = (
       <>
@@ -1308,6 +1350,8 @@ function ErrorBox({ error }: { error: { code: string; message: string; missing: 
         <span className="t-meta block">관리자용: Supabase SQL Editor 에서 0021(AI 전략실 권한) 실행 — 운영 적용 안내 문서 §12.</span>
       </>
     )
+  // 번호 줄: 키 · 설정 문제(대표) · 이미 운영자에게 번호까지 간 것 · 계정 사정에는 필요 없다
+  const showRef = !!error.ref && !['setup_needed', 'db_setup_needed', 'login_required', 'forbidden', 'not_deployed'].includes(error.code) && !acctSide && !(opSide && told !== 'fail' && told !== 'off')
   return (
     <div role="alert" className="flex gap-2 rounded-(--radius-control) border border-amber-300 bg-amber-50 px-3 py-3" data-testid="ai-assist-error" data-code={error.code}>
       <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-amber-700" />
@@ -1315,9 +1359,9 @@ function ErrorBox({ error }: { error: { code: string; message: string; missing: 
         <span className="t-body font-semibold break-keep text-amber-950">{error.message}</span>
         {how && <span className="t-sub break-keep text-amber-900">{how}</span>}
         {/* NX-2 같은 오류가 되풀이되면 이 번호로 관리자가 서버 기록을 찾는다(키 · 설정 문제는 번호가 필요 없다) */}
-        {error.ref && !['setup_needed', 'db_setup_needed', 'login_required', 'forbidden', 'not_deployed'].includes(error.code) && (
+        {showRef && (
           <span className="t-meta break-keep text-amber-800" data-testid="ai-assist-error-ref">
-            문의 번호 {error.ref} — 계속 안 되면 관리자에게 이 번호를 알려 주세요
+            문의 번호 {error.ref} — 계속 안 되면 {admin ? '관리자' : '운영자'}에게 이 번호를 알려 주세요
           </span>
         )}
       </span>

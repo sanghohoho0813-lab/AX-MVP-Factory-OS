@@ -35,6 +35,7 @@ import { isFeedNotice } from '../../services/grants/grantFeed'
 import { GRANT_SOURCE_LABEL } from '../../services/grants/grantMatch'
 import { manText, type FilterVerdict, type GrantFacts } from '../../services/grants/grantFilter'
 import { CATEGORY_TONE } from './grantTone'
+import { errorText } from '../../lib/errorText'
 
 
 /* ------------------------------------------------------------------ */
@@ -381,7 +382,7 @@ export function AddNoticeSheet({
       setDocRead({ name: f.name, read: r, note: res.note })
       setDraft({ ...r.draft, published: false })
     } catch (cause) {
-      setError(cause instanceof Error && cause.message ? cause.message : '파일을 읽지 못했어요 — 다시 올려 주세요.')
+      setError(errorText(cause, '파일을 읽지 못했어요 — 다시 올려 주세요.'))
     } finally {
       setReading('')
     }
@@ -414,7 +415,7 @@ export function AddNoticeSheet({
         await onSave({ ...rest, rules: normalizeRules(v.rules), ...(docs.length ? { documents: docs } : {}) })
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '저장하지 못했습니다.')
+      setError(errorText(cause, '저장하지 못했습니다.'))
     } finally {
       setBusy(false)
     }

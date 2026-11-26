@@ -126,6 +126,8 @@ const json = (body, status = 200) => ({ status, contentType: 'application/json',
 const { default: assistHandler } = await import(pathToFileURL(path.resolve('api/ai-assist.js')).href)
 Object.assign(process.env, { SUPABASE_URL: `https://${REF}.supabase.co`, SUPABASE_ANON_KEY: 'qa-anon', GEMINI_API_KEY: 'gem-pilot-e2e-KEY', ANTHROPIC_API_KEY: 'ant-pilot-e2e-KEY', AI_ASSIST_RATE_PER_MIN: '100', AI_ASSIST_RATE_PER_HOUR: '500' })
 const aiCalls = [] // { provider, sys, user }
+// D-676 가짜 AI 회사가 '잔액 · 사용 한도' 로 거절하게(운영 쪽 실패) — 'billing' 일 때만
+let aiFail = ''
 const rpcCalls = [] // { who, fn, body }
 // SAAS-2 서버는 로그인 등급을 60초 기억한다(gate.js) — 화면이 여는 순간 마케팅 열림을 물어(?status=1) 기억이 먼저 채워질 수 있어, '물은 적 있나' 는 지우지 않는 목록으로 본다
 const rpcSeen = new Set()
@@ -147,6 +149,7 @@ globalThis.fetch = async (input, init = {}) => {
   if (url.includes('generativelanguage.googleapis.com') && url.includes(':generateContent')) {
     const body = JSON.parse(String(init.body ?? '{}'))
     aiCalls.push({ provider: 'gemini', url, sys: String(body.systemInstruction?.parts?.[0]?.text ?? ''), user: String(body.contents?.[0]?.parts?.map((x) => x.text ?? '').join('\n') ?? '') })
+    if (aiFail === 'billing') return new Response(JSON.stringify({ error: { code: 429, status: 'RESOURCE_EXHAUSTED', message: 'You exceeded your current quota, please check your plan and billing details.' } }), { status: 429 })
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(AI_ANSWER) }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 900, candidatesTokenCount: 120 } }), { status: 200 })
   }
   if (url.includes('api.anthropic.com') || url.includes('api.openai.com')) {
@@ -1727,6 +1730,129 @@ try {
   const nm2 = await assistDirect(PILOT, { requestId: 'req-saas21-nom-000002', assistId: 'radar.top5', page: 'radar', context: mkCtx })
   check('SAAS-2.1 마케팅 빠진 요금제: 일반 AI 200 · 장부에 customer 줄 · 마케팅 403 marketing_not_included', nm1.statusCode === 200 && sql(`select kind || ':' || feature || ':' || status from public.ai_usage_ledger where request_id = 'req-saas21-nom-000001'`) === 'customer:general:settled' && nm2.statusCode === 403 && nm2.body.code === 'marketing_not_included', `${nm1.raw.slice(0, 120)} ${nm2.raw.slice(0, 120)}`)
   sql(`update public.ai_entitlements set marketing = true where user_id = '${PILOT.id}'`)
+  /* ---------- D-676 · D-677 상태 안내(SALE-4) — 막히기 전에 알린다 · 막혔을 때는 고객 말 + 운영자 받은함에 한 줄 ---------- */
+  {
+    const usageUnit = (n) => { for (let i = 0; i < n; i += 1) sql(`insert into public.ai_usage_ledger (user_id, request_id, assist_id, tier, units, status, kind, feature) values ('${PILOT.id}', 'req-st-fill-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}', 'today.top3', 'cheap', 1, 'settled', 'customer', 'general')`) }
+    const reset = (until, units = 0) => {
+      sql(`delete from public.ai_usage_ledger where user_id = '${PILOT.id}'`)
+      sql(`update public.ai_entitlements set active_until = ${until}, marketing = true where user_id = '${PILOT.id}'`)
+      usageUnit(units)
+    }
+    const settings = async () => {
+      await go(p4, '/settings')
+      await p4.locator('[data-testid="ai-usage"]:not([data-state="loading"])').waitFor({ timeout: 8000 }).catch(() => {})
+      const box = p4.getByTestId('ai-usage')
+      return {
+        key: (await box.getAttribute('data-notice').catch(() => '')) ?? '',
+        text: ((await box.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' '),
+        period: ((await p4.getByTestId('ai-usage-period').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' '),
+        ask: (await p4.getByTestId('ai-usage-ask').getAttribute('href').catch(() => '')) ?? '',
+      }
+    }
+    const bell = async () => {
+      const btn = p4.locator('header button[aria-label^="챙길 것"]').first()
+      const label = (await btn.getAttribute('aria-label').catch(() => '')) ?? ''
+      await btn.click().catch(() => {})
+      await p4.waitForTimeout(500)
+      const row = p4.getByTestId('bell-ai')
+      // 종 숫자 — 이 계정의 다른 경고와 섞이므로 '넉넉할 때' 숫자와 견준다
+      const count = Number((label.match(/(\d+)건/) ?? [0, 0])[1])
+      const r = { n: await row.count(), key: (await row.getAttribute('data-key').catch(() => '')) ?? '', text: ((await row.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' '), href: (await row.getAttribute('href').catch(() => '')) ?? '', label, count }
+      await p4.keyboard.press('Escape')
+      await p4.waitForTimeout(200)
+      return r
+    }
+    /** 오늘 화면에서 AI 단추 한 번 → 실패 상자 */
+    const askAi = async () => {
+      await go(p4, '/')
+      await openTools(p4)
+      await p4.getByTestId('ai-assist-chip').first().click()
+      await p4.getByTestId('ai-assist-confirm-go').click().catch(() => {})
+      await p4.getByTestId('ai-assist-error').waitFor({ timeout: 15000 }).catch(() => {})
+      const box = p4.getByTestId('ai-assist-error')
+      await p4.locator('[data-testid="ai-assist-error-told"]:not([data-told="sending"])').waitFor({ timeout: 6000 }).catch(() => {})
+      return {
+        code: (await box.getAttribute('data-code').catch(() => '')) ?? '',
+        text: ((await box.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' '),
+        told: (await p4.getByTestId('ai-assist-error-told').getAttribute('data-told').catch(() => '')) ?? '',
+        account: await p4.getByTestId('ai-assist-error-account').count(),
+        support: (await p4.getByTestId('ai-assist-error-support').first().getAttribute('href').catch(() => '')) ?? '',
+        ref: await p4.getByTestId('ai-assist-error-ref').count(),
+      }
+    }
+    const ADMIN = /키|DB|0021|충전|Vercel|콘솔|대표 계정|Redeploy|Supabase|Google AI|aistudio|billing|quota/i
+
+    // ① 넉넉함 — 이용 기한 한 줄만 · 알림 0 · 종 0
+    reset(`now() + interval '30 days'`)
+    const s1 = await settings()
+    const b1 = await bell()
+    check('ST1 넉넉할 때: 설정에 "이용 기한 …까지 · 30일 남음" · 알림 0 · 종에 AI 줄 0', /까지 · (30|29)일 남음/.test(s1.period) && s1.key === '' && b1.n === 0, `${s1.period} | ${s1.key} | bell=${b1.n}`)
+    // ② 7일 안에 끝남 — 설정 한 줄 + [문의하기] · 종에 줄(숫자에는 안 셈)
+    reset(`now() + interval '3 days'`)
+    const s2 = await settings()
+    const b2 = await bell()
+    check('ST2 3일 남음: 설정 "AI 이용 기간이 3일 남았어요 · …까지" + [문의하기](/support) · 종 줄 → 설정 그 칸(?focus=usage) · 종 숫자는 그대로(곧 끝남은 안 셈)',
+      s2.key === 'ending' && /AI 이용 기간이 3일 남았어요/.test(s2.text) && s2.ask.startsWith('/support') && b2.n === 1 && b2.key === 'ending' && /3일 남았어요/.test(b2.text) && b2.href === '/settings?focus=usage' && b2.count === b1.count,
+      `${s2.key} ${s2.ask} | bell=${JSON.stringify(b2)} | ${s2.text.slice(0, 160)}`)
+    await shot(p4, 'st2-ending-settings')
+    // ③ 80% 넘음 — 한 줄만(문의하기 단추 없음)
+    reset(`now() + interval '30 days'`, 10)
+    const s3 = await settings()
+    const b3 = await bell()
+    check('ST3 12 가운데 10 씀: 설정 "이번 달 AI 사용량을 83% 썼어요 · 남은 양 2" · 종 줄 · 숫자는 그대로', s3.key === 'low' && /83% 썼어요/.test(s3.text) && /남은 양 2/.test(s3.text) && b3.key === 'low' && b3.count === b1.count, `${s3.key} | ${s3.text.slice(0, 160)} | ${JSON.stringify(b3)}`)
+    // ④ 다 씀 — 설정 · 종(숫자 1) · AI 단추는 고객 말 + 설정 · 문의하기 길
+    reset(`now() + interval '30 days'`, 12)
+    const s4 = await settings()
+    const b4 = await bell()
+    aiCalls.length = 0
+    const a4 = await askAi()
+    check('ST4 다 씀: 설정 "이번 달 AI 사용량을 다 썼어요" + [문의하기] · 종 줄(지금 멈춤 → 숫자 +1) · AI 단추 → quota_exceeded "이번 달 … (12 / 12)" + 설정 · 문의하기 길 · 번호 줄 없음 · AI 회사 부름 0',
+      s4.key === 'quota' && /다 썼어요/.test(s4.text) && s4.ask.startsWith('/support') && b4.key === 'quota' && b4.count === b1.count + 1 &&
+      a4.code === 'quota_exceeded' && /12 \/ 12/.test(a4.text) && a4.account === 1 && a4.support.startsWith('/support') && a4.ref === 0 && aiCalls.length === 0,
+      `${s4.key} | ${JSON.stringify(b4)} | ${JSON.stringify(a4)}`)
+    await shot(p4, 'st4-quota-ai')
+    // ⑤ 이용 기간 끝 — 설정 · 종 · AI 단추
+    reset(`now() - interval '2 days'`)
+    const s5 = await settings()
+    const b5 = await bell()
+    const a5 = await askAi()
+    check('ST5 기간 끝: 설정 "AI 이용 기간이 …에 끝났어요 · 업체 · 서류 · 일정은 그대로" + [문의하기] · 종 줄(숫자 +1) · AI 단추 → "이용 기간이 끝났거나 아직 시작 전" + 문의하기 길 · 운영자 말 0',
+      s5.key === 'ended' && /에 끝났어요/.test(s5.text) && /그대로 쓸 수 있어요/.test(s5.text) && s5.ask.startsWith('/support') && b5.key === 'ended' && b5.count === b1.count + 1 &&
+      a5.code === 'subscription_inactive' && /이용 기간이 끝났거나 아직 시작 전/.test(a5.text) && a5.account === 1 && !/구독을 확인|요금제/.test(a5.text),
+      `${s5.key} | ${s5.text.slice(0, 160)} | ${JSON.stringify(a5)}`)
+    await shot(p4, 'st5-ended-ai')
+    // ⑥ 운영 쪽 실패(AI 회사 잔액) — 고객 화면에는 쉬운 말만 · 운영자 받은함에 한 줄(같은 문제는 하루 한 줄)
+    reset(`now() + interval '30 days'`)
+    sql(`delete from public.support_messages where user_id = '${PILOT.id}' and kind = 'error' and context->>'source' = 'ai'`)
+    aiFail = 'billing'
+    const a6 = await askAi()
+    const row6 = sql(`select count(*) || '|' || coalesce(max(body), '') || '|' || coalesce(max(context->>'source'), '') || '|' || coalesce(max(context->>'code'), '') || '|' || coalesce(max(context->>'provider'), '') || '|' || (coalesce(max(context->>'ref'), '') <> '')::text || '|' || coalesce(max(context->>'path'), '') from public.support_messages where user_id = '${PILOT.id}' and kind = 'error' and context->>'source' = 'ai'`)
+    check('ST6 AI 회사 잔액 부족(운영 쪽): 고객 화면 "지금은 AI 를 쓸 수 없어요 — 운영 쪽에서 고쳐야" · "운영자에게 알렸어요" · 운영자 말(키 · 충전 · 회사 관리 화면 · 원문) 0 · DB 받은함 1줄(종류 · 회사 · 문의 번호 · 화면 주소 — 물어본 글 0)',
+      a6.code === 'provider_billing' && /운영 쪽에서 고쳐야/.test(a6.text) && a6.told === 'sent' && /운영자에게 알렸어요/.test(a6.text) && !ADMIN.test(a6.text) && a6.ref === 0 &&
+      row6 === '1|AI 도우미가 답하지 못했어요 — AI 회사 계정의 잔액 · 사용 한도가 다 됨 (Gemini)|ai|provider_billing|Gemini|true|/', `${JSON.stringify(a6)} | ${row6}`)
+    await shot(p4, 'st6-operator-side')
+    const a6b = await askAi()
+    check('ST7 같은 문제로 또 실패: 받은함은 그대로 한 줄(하루에 한 줄로 합침) · 화면은 같은 글', a6b.told === 'sent' && sql(`select count(*) from public.support_messages where user_id = '${PILOT.id}' and kind = 'error' and context->>'source' = 'ai'`) === '1', JSON.stringify(a6b))
+    aiFail = ''
+    // 운영자(대표) 받은함 — 누가 · 무슨 문제 · 어느 화면(대표 창은 앞에서 닫혔다 — 새로 연다)
+    const cO = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR' })
+    await cO.route(`https://${REF}.supabase.co/**`, route)
+    const po = await cO.newPage()
+    po.on('pageerror', (e) => errors.push(String(e)))
+    await login(po, OWNER)
+    await go(po, '/feedback/inbox?tab=support')
+    await po.getByTestId('support-inbox-body').first().waitFor({ timeout: 8000 }).catch(() => {})
+    const inbox = (await bodyText(po)).replace(/\s+/g, ' ')
+    check('ST8 대표 받은함: "AI 도우미가 답하지 못했어요 — AI 회사 계정의 잔액 · 사용 한도가 다 됨 (Gemini)" · 딱지 "AI 멈춤" · 잡힌 곳: AI 도우미 · 종류 · AI 회사 · 문의 번호',
+      inbox.includes('AI 도우미가 답하지 못했어요 — AI 회사 계정의 잔액 · 사용 한도가 다 됨 (Gemini)') && inbox.includes('잡힌 곳: AI 도우미') && inbox.includes('AI 멈춤') && inbox.includes('종류: provider_billing') && inbox.includes('AI 회사: Gemini') && inbox.includes('문의 번호: '), inbox.slice(0, 400))
+    await shot(po, 'st8-owner-inbox')
+    await cO.close()
+    currentWho = PILOT
+    // 뒤의 문의하기 시험(D-568)은 받은함이 빈 채로 시작한다고 본다 — 여기서 남긴 줄을 치운다(시험 DB 만)
+    sql(`delete from public.support_messages where kind = 'error' and context->>'source' = 'ai'`)
+    sql(`delete from public.ai_usage_ledger where user_id = '${PILOT.id}'`)
+  }
+
   // 휴대폰 390 — 열린 마케팅 화면도 넘침 0
   await p4.setViewportSize({ width: 390, height: 844 })
   for (const pth of ['/marketing/threads', '/marketing/shorts', '/marketing']) {

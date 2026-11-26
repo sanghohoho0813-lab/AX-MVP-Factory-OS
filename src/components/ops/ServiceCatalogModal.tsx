@@ -22,6 +22,7 @@ import {
 } from '../../services/customServiceService'
 import { useBackToClose } from '../../lib/backToClose'
 import { DEFAULT_PACKAGES, PKG_CATEGORIES } from '../../services/salesProposal'
+import { errorText } from '../../lib/errorText'
 
 /**
  * D-171 대표: "항목 추가는 웬만하면 클릭으로 — 모듈 · 상품표에 있는 40개 정도에서 골라 바로 만들게, 직접 쓰기도 되게".
@@ -89,7 +90,7 @@ export function ServiceCatalogModal({
       await reload()
       onChanged()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '항목을 추가하지 못했습니다.')
+      setError(errorText(cause, '항목을 추가하지 못했습니다.'))
     } finally {
       setBusy(false)
     }
@@ -102,7 +103,7 @@ export function ServiceCatalogModal({
       await reload()
       onChanged()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '바꾸지 못했습니다.')
+      setError(errorText(cause, '바꾸지 못했습니다.'))
     }
   }
 
@@ -120,7 +121,7 @@ export function ServiceCatalogModal({
       await reload()
       onChanged()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '항목을 추가하지 못했습니다.')
+      setError(errorText(cause, '항목을 추가하지 못했습니다.'))
     } finally {
       setBusy(false)
     }

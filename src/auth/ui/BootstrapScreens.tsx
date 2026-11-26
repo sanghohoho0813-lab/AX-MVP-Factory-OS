@@ -122,11 +122,15 @@ export function ConnectionErrorScreen({ detail, onRetry }: { detail?: string; on
       <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-danger-100 text-danger-700">
         <WifiOff aria-hidden="true" className="size-6" />
       </span>
-      <h1 className="mt-4 text-lg font-bold text-slate-900">연결에 실패했습니다</h1>
+      <h1 className="mt-4 text-lg font-bold text-slate-900" data-testid="connection-error">연결에 실패했습니다</h1>
       <p className="mt-2 text-[1rem] break-keep text-slate-700">
-        {detail ?? '클라우드 서버에 연결하지 못했습니다. 네트워크를 확인해 주세요.'}
+        {detail ?? '서버에 연결하지 못했어요.'}
       </p>
-      <Button variant="primary" className="mt-5 w-full" onClick={onRetry}>
+      {/* D-678 무엇을 하면 되는지 · 자료는 안전한지 — 회사 이름 · 기술 말 없이 */}
+      <p className="mt-2 text-[1rem] break-keep text-slate-700" data-testid="connection-error-how">
+        인터넷(와이파이 · 데이터)을 확인한 뒤 <b>다시 시도</b>를 눌러 주세요. 저장해 둔 자료는 그대로 있어요.
+      </p>
+      <Button variant="primary" className="mt-5 h-12 w-full text-[1rem] font-semibold sm:h-12" onClick={onRetry} data-testid="connection-error-retry">
         <RefreshCw aria-hidden="true" className="size-4" /> 다시 시도
       </Button>
     </CenteredCard>

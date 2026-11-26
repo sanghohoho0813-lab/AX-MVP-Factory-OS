@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button'
 import { acceptInvite } from '../workspaceService'
 import { useAuth } from '../AuthProvider'
 import { AuthLayout, AuthError, AuthNotice } from './AuthLayout'
+import { errorText } from '../../lib/errorText'
 
 /**
  * 초대 수락 화면. /join/:inviteToken
@@ -48,7 +49,7 @@ export function JoinPage() {
       setNotice('작업공간에 합류했습니다. 잠시 후 이동합니다.')
       setTimeout(() => navigate('/', { replace: true }), 1200)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '초대를 수락하지 못했습니다.')
+      setError(errorText(err, '초대를 수락하지 못했습니다.'))
     } finally {
       setWorking(false)
     }

@@ -129,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setBootstrap(readyState('supabase'))
       } catch {
         if (mounted.current) {
-          setBootstrap(connectionErrorState('supabase', '작업공간 정보를 불러오지 못했습니다.'))
+          setBootstrap(connectionErrorState('supabase', '내 작업공간을 불러오지 못했어요.'))
         }
       }
     },
@@ -172,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
       } catch {
         if (mounted.current) {
-          setBootstrap(connectionErrorState('supabase', 'Supabase 에 연결하지 못했습니다.'))
+          setBootstrap(connectionErrorState('supabase', '서버에 연결하지 못했어요.'))
         }
       }
     })()

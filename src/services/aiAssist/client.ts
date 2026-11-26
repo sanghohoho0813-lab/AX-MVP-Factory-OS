@@ -8,6 +8,8 @@ import type { AssistContext } from './context'
 import type { AssistPage } from './presets'
 import { brandForRequest } from '../brandProfile'
 import { accountEpoch, allowedProviders, autoUpgradeAllowed, lastAutoPick, noteAutoPick, noteCheapModels, readChoice } from './store'
+import { isOperatorSide, reportAssistFail } from './failReport'
+import { noteAiUsed } from '../aiAccess'
 import { classifyAsk, pickAuto, type AskWeight } from './autoModel'
 
 export const ASSIST_ENDPOINT = '/api/ai-assist'
@@ -123,8 +125,9 @@ const isProvider = (v: unknown): v is ProviderId => v === 'gemini' || v === 'ope
 export function providerMessage(code: string, provider: ProviderId | '', detail = ''): string {
   if (!provider) return assistMessage(code)
   const name = PROVIDER_NAME[provider]
-  // D-638 대표가 아닌 화면(팀장 · 구독 고객)에는 키 · 결제 · 서버 설정 이야기를 보이지 않는다 — 고칠 수 있는 사람은 관리자뿐
-  if (!autoUpgradeAllowed() && (code === 'provider_billing' || code === 'provider_auth')) return 'AI 연결에 잠깐 문제가 있어요 — 관리자에게 알려 두었어요. 잠시 뒤 다시 해 주세요.'
+  // D-638 · D-676 대표가 아닌 화면(팀장 · 구독 고객)에는 키 · 결제 · 서버 설정 · 회사 관리 화면 이야기를 보이지 않는다 — 고칠 수 있는 사람은 운영자뿐.
+  // 운영자에게 알리는 일은 callAssist 가 따로 한다(failReport) — 여기 글은 알렸다고 미리 말하지 않는다(화면이 보낸 뒤에 말한다).
+  if (!autoUpgradeAllowed() && isOperatorSide(code)) return GUEST_MESSAGE[code] ?? GUEST_OPERATOR
   const why = detail ? ` (회사가 준 까닭: ${detail})` : ''
   if (code === 'provider_billing') return `${name} 계정의 잔액(크레딧) · 사용 한도가 다 됐어요 — ${PROVIDER_CONSOLE[provider]} 에서 충전하면 바로 됩니다(키는 그대로).${why}`
   if (code === 'provider_auth') return `${name} 키가 틀렸거나 폐기됐어요 — ${PROVIDER_CONSOLE[provider]} 에서 새 키를 만들어 Vercel 환경변수에 넣고 Redeploy 해 주세요.${why}`
@@ -176,7 +179,28 @@ const MESSAGE: Record<string, string> = {
   result_not_found: '답을 받지 못했습니다. 다시 눌러 주세요.',
 }
 
+/**
+ * D-676 대표가 아닌 화면(팀장 · 구독 고객)에 보이는 글 — 스스로 고칠 수 없는 것은 '운영 쪽에서 고쳐야 해요' 한 가지로,
+ * 계정 사정은 무엇을 하면 되는지로. 키 이름 · DB 번호 · 충전 · '대표 계정' 같은 운영자 말은 쓰지 않는다.
+ */
+const GUEST_OPERATOR = '지금은 AI 를 쓸 수 없어요 — 운영 쪽에서 고쳐야 하는 문제예요.'
+const GUEST_MESSAGE: Record<string, string> = {
+  setup_needed: GUEST_OPERATOR,
+  db_setup_needed: GUEST_OPERATOR,
+  provider_auth: GUEST_OPERATOR,
+  provider_billing: GUEST_OPERATOR,
+  provider_model: GUEST_OPERATOR,
+  provider_rejected: GUEST_OPERATOR,
+  forbidden: '이 계정에서는 쓸 수 없는 기능이에요.',
+  provider_not_allowed: '이 계정에서는 그 모델을 쓸 수 없어요 — [모델 바꾸기] 에서 기본 모델로 바꿔 주세요.',
+  subscription_inactive: '이용 기간이 끝났거나 아직 시작 전이에요 — AI 기능은 그동안 쉬어요.',
+  // 어디서 남은 양을 보는지 · 더 쓰려면 어떻게 하는지는 실패 상자가 바로 아래에 길(설정 · 문의하기)로 보여 준다
+  quota_exceeded: '이번 달 AI 사용량을 다 썼어요. 다음 달 1일에 다시 채워져요.',
+  not_deployed: '지금 주소에서는 AI 를 쓸 수 없어요.',
+}
+
 export function assistMessage(code: string): string {
+  if (!autoUpgradeAllowed() && GUEST_MESSAGE[code]) return GUEST_MESSAGE[code]
   return MESSAGE[code] ?? MESSAGE.provider_error
 }
 
@@ -453,7 +477,7 @@ async function recoverRun(first: AssistError, body: PostBody, signal?: AbortSign
   throw last
 }
 
-export async function callAssist(req: { requestId: string; assistId: string; page: AssistPage; choice: { provider: ProviderId; model: string } | null; context: AssistContext; ask?: string; video?: AssistVideo; audio?: AssistAudio; skill?: string; signal?: AbortSignal }): Promise<AssistRun> {
+async function callAssistOnce(req: { requestId: string; assistId: string; page: AssistPage; choice: { provider: ProviderId; model: string } | null; context: AssistContext; ask?: string; video?: AssistVideo; audio?: AssistAudio; skill?: string; signal?: AbortSignal }): Promise<AssistRun> {
   const brand = brandForRequest()
   // D-629 자동이면 이 요청의 물음 · 단추로 모델을 정한다(직접 고른 모델은 그대로)
   const { choice, auto } = await resolveAssistChoice(req)
@@ -472,4 +496,19 @@ export async function callAssist(req: { requestId: string; assistId: string; pag
   // 방금 답은 자동이 고른 것이 아니다(직접 고른 모델 · 이번 한 번만 다른 모델) — 앞의 '방금' 줄을 남겨 두지 않는다
   else if (lastAutoPick()) noteAutoPick(null)
   return run
+}
+
+export async function callAssist(req: { requestId: string; assistId: string; page: AssistPage; choice: { provider: ProviderId; model: string } | null; context: AssistContext; ask?: string; video?: AssistVideo; audio?: AssistAudio; skill?: string; signal?: AbortSignal }): Promise<AssistRun> {
+  try {
+    const run = await callAssistOnce(req)
+    // D-677 팀장 · 구독 고객 화면 — 방금 쓴 만큼 남은 양이 줄었다(설정 칸 · 종의 '거의 다 썼어요' 가 다시 읽는다)
+    if (!autoUpgradeAllowed()) noteAiUsed()
+    return run
+  } catch (e) {
+    if (e instanceof AssistError && !autoUpgradeAllowed() && (e.code === 'quota_exceeded' || e.code === 'subscription_inactive')) noteAiUsed()
+    // D-676 팀장 · 구독 고객 화면에서 운영 쪽 문제(키 · 잔액 · 권한 설정)로 멈추면 운영자 받은함에 한 줄 — 어느 화면의 AI 단추든 여기를 지난다.
+    // 기다리지 않는다(보내지 못해도 화면 글은 그대로) · 고객사 자료 · 물어본 글은 가지 않는다.
+    if (e instanceof AssistError && !autoUpgradeAllowed() && isOperatorSide(e.code)) void reportAssistFail(e.code, e.provider, req.requestId.slice(-6))
+    throw e
+  }
 }

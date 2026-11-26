@@ -56,6 +56,8 @@ import { searchScreens, squashForSearch } from '../../content/screenSearch'
 import { WHATS_NEW, WHATS_NEW_MAX, whatsNewDateLabel, whatsNewFor } from '../../content/whatsNew'
 import { IN_APP_LABEL, externalOpenUrl, hasOneTimeToken, inAppBrowserOf } from '../../lib/inAppBrowser'
 import { CONTACT_PATHS, CONTACT_PATH_AFTER, CONTACT_PATH_NOTE } from '../../content/contactPathHowTo'
+import { aiNotice, daysLeft, koDay, parseAiAccess, periodText, usedPct, type AiAccess } from '../aiAccess'
+import { GENERIC_FAIL_TEXT, OFFLINE_TEXT, errorText, plainMessage } from '../../lib/errorText'
 
 let passed = 0
 let failed = 0
@@ -1728,6 +1730,62 @@ async function run() {
   {
     // 시간 — 함수 끝 8초 전까지만 AI 를 기다린다(조사 단추가 55초 + 55초를 기다리다 함수가 잘리지 않게)
     check('W10 AI 를 기다릴 수 있는 시간 — 남은 시간만큼(최소 1초) · 기본 55초를 넘지 않음', aiBudget(Date.now() + 52_000) <= 52_000 && aiBudget(Date.now() + 52_000) >= 51_000 && aiBudget(Date.now() + 500) === 1000 && aiBudget(Date.now() + 200_000) === 55_000 && AFTER_AI_MS === 8000)
+  }
+
+  /* ---- D-677 이용 기간 · 이번 달 양을 막히기 전에 알린다(설정 칸 · 종이 같은 규칙) ---- */
+  {
+    const now = Date.parse('2026-11-26T06:00:00Z') // 한국 11월 26일 오후 3시
+    const base: AiAccess = { kind: 'customer', active: true, marketing: true, used: 10, limit: 300, month: '2026-11', activeUntil: '2026-12-26T06:00:00Z' }
+    check('N1 남은 날은 한국 날짜로 센다 — 오늘 밤 끝나면 0 · 내일 새벽이면 1 · 30일 뒤 30 · 지났으면 음수 · 기한 없음 null',
+      daysLeft('2026-11-26T14:59:00Z', now) === 0 && daysLeft('2026-11-26T15:01:00Z', now) === 1 && daysLeft(base.activeUntil, now) === 30 && (daysLeft('2026-11-25T00:00:00Z', now) ?? 0) < 0 && daysLeft(null, now) === null && daysLeft('엉뚱', now) === null,
+      [daysLeft('2026-11-26T14:59:00Z', now), daysLeft('2026-11-26T15:01:00Z', now), daysLeft(base.activeUntil, now)])
+    check('N2 이용 기한 한 줄 — "12월 26일까지 · 30일 남음" · 오늘 끝나면 "오늘까지" · 지났으면 "…에 끝남" · 기한 없으면 빈 글',
+      periodText(base, now) === '12월 26일까지 · 30일 남음' && periodText({ activeUntil: '2026-11-26T14:00:00Z' }, now) === '11월 26일까지 · 오늘까지' && periodText({ activeUntil: '2026-11-20T03:00:00Z' }, now) === '11월 20일에 끝남' && periodText({ activeUntil: null }, now) === '' && koDay('2026-12-31T15:30:00Z') === '1월 1일',
+      [periodText(base, now), periodText({ activeUntil: '2026-11-26T14:00:00Z' }, now)])
+    check('N3 넉넉하면 알릴 것 없음 · 내부 팀장 · 장부 없음(null)도 없음', aiNotice(base, now) === null && aiNotice({ ...base, kind: 'internal', limit: null, used: 9999 }, now) === null && aiNotice(null, now) === null)
+    const low = aiNotice({ ...base, used: 240 }, now)
+    const quota = aiNotice({ ...base, used: 300 }, now)
+    const over = aiNotice({ ...base, used: 320 }, now)
+    check('N4 80% 넘으면 "80% 썼어요 · 남은 양 60"(곧 멈춤) · 다 쓰면 "다 썼어요 · 다음 달 1일"(지금 멈춤) · 넘겨 써도 같은 글',
+      low?.key === 'low' && low.tone === 'warn' && low.title === '이번 달 AI 사용량을 80% 썼어요' && low.detail.includes('남은 양 60') && aiNotice({ ...base, used: 239 }, now) === null &&
+      quota?.key === 'quota' && quota.tone === 'danger' && quota.detail.includes('다음 달 1일') && over?.key === 'quota' && usedPct({ used: 320, limit: 300 }) === 100 && usedPct({ used: 5, limit: null }) === null, [low, quota])
+    const ending = aiNotice({ ...base, activeUntil: '2026-11-29T06:00:00Z' }, now)
+    const today = aiNotice({ ...base, activeUntil: '2026-11-26T14:00:00Z' }, now)
+    check('N5 7일 안에 끝나면 "3일 남았어요 · 11월 29일까지" · 오늘 끝나면 "오늘까지예요" · 8일 남으면 아직 안 알림',
+      ending?.key === 'ending' && ending.tone === 'warn' && ending.title === 'AI 이용 기간이 3일 남았어요' && ending.detail === '11월 29일까지 쓸 수 있어요.' && today?.title === 'AI 이용 기간이 오늘까지예요' &&
+      aiNotice({ ...base, activeUntil: '2026-12-04T06:00:00Z' }, now) === null && aiNotice({ ...base, activeUntil: '2026-12-03T06:00:00Z' }, now)?.key === 'ending', [ending, today])
+    const ended = aiNotice({ ...base, active: false, activeUntil: '2026-11-20T03:00:00Z' }, now)
+    const notYet = aiNotice({ ...base, active: false, activeUntil: null }, now)
+    check('N6 이용 기간이 끝났으면 "11월 20일에 끝났어요"(지금 멈춤 · 업체 · 서류는 그대로) · 기간을 받은 적 없으면 "아직 시작 전"',
+      ended?.key === 'ended' && ended.tone === 'danger' && ended.title === 'AI 이용 기간이 11월 20일에 끝났어요' && ended.detail.includes('그대로 쓸 수 있어요') && notYet?.key === 'ended' && notYet.title === 'AI 이용 기간이 아직 시작 전이에요', [ended, notYet])
+    check('N7 하나만 알린다 — 순서: 기간 끝 → 다 씀 → 곧 끝남 → 80%',
+      aiNotice({ ...base, active: false, used: 300, activeUntil: '2026-11-20T03:00:00Z' }, now)?.key === 'ended' && aiNotice({ ...base, used: 300, activeUntil: '2026-11-28T03:00:00Z' }, now)?.key === 'quota' && aiNotice({ ...base, used: 250, activeUntil: '2026-11-28T03:00:00Z' }, now)?.key === 'ending')
+    const parsed = parseAiAccess({ configured: true, kind: 'customer', plan: 'basic', active: true, marketing: true, used: 7, limit: 300, month: '2026-11', active_until: '2026-12-26T06:00:00+00:00' })
+    check('N8 서버가 준 모양 읽기 — 이용 기간이 끝나는 때까지 · 장부 없음(configured 아님) · 모르는 종류 · 이상한 날짜는 버림',
+      parsed?.kind === 'customer' && parsed.limit === 300 && parsed.used === 7 && daysLeft(parsed.activeUntil, now) === 30 && parseAiAccess({ configured: false, kind: 'customer' }) === null && parseAiAccess({ configured: true, kind: 'x' }) === null && parseAiAccess(null) === null &&
+      parseAiAccess({ configured: true, kind: 'customer', active: false, active_until: '엉뚱' })?.activeUntil === null && parseAiAccess({ configured: true, kind: 'internal', limit: null, used: 3 })?.limit === null, parsed)
+    const WORDS = /요금제 이름|basic|plan|0022|DB|SQL|대표 계정|키/
+    check('N9 알림 글에 내부 말 0(요금제 내부 이름 · DB · 키 · 대표 계정)', [low, quota, ending, today, ended, notYet].every((n) => !!n && !WORDS.test(n.title + n.detail)))
+  }
+
+  /* ---- D-678 실패를 사람 말로 — 영어 원문을 화면에 보이지 않는다 ---- */
+  {
+    const fb = '저장하지 못했습니다.'
+    check('E1 우리가 한국어로 적어 던진 글은 그대로(Error · 서버가 준 모양 · 글자)',
+      errorText(new Error('파일이 너무 큽니다 (12MB).'), fb) === '파일이 너무 큽니다 (12MB).' && errorText({ message: '늘 보기로 바꿀 수 없는 작업공간입니다.', code: '42501' }, fb) === '늘 보기로 바꿀 수 없는 작업공간입니다.' && errorText('이미 있는 이름입니다', fb) === '이미 있는 이름입니다')
+    check('E2 통신이 끊긴 원문(Failed to fetch · NetworkError · Load failed) → "인터넷 연결이 끊긴 것 같아요"',
+      [new TypeError('Failed to fetch'), new Error('NetworkError when attempting to fetch resource.'), { message: 'TypeError: Failed to fetch' }, new Error('Load failed')].every((c) => errorText(c, fb) === OFFLINE_TEXT))
+    check('E3 그 밖의 영어 원문(코드 오류 · DB · 규약)은 화면이 정한 글로 — 원문 0',
+      [new TypeError("Cannot read properties of undefined (reading 'id')"), { message: 'new row violates row-level security policy for table "operations_clients"' }, { message: 'JWT expired', code: 'PGRST301' }, new Error('support_rate_limited'), new Error(''), null, undefined, 42].every((c) => errorText(c, fb) === fb))
+    check('E4 한국어 글에 원문 조각이 붙어 오면 그 조각만 뺀다 · 통신 끊김이면 한마디 덧붙임',
+      errorText(new Error('되돌리지 못했습니다 — Failed to fetch'), fb) === '되돌리지 못했습니다 — 인터넷 연결을 확인해 주세요.' && errorText(new Error("저장하지 못했습니다: TypeError: x is not a function"), fb) === '저장하지 못했습니다')
+    check('E5 알림 띠 안전망: 한국어 글 · 원문 모양이 아닌 영어는 그대로 / 통째로 원문이면 사람 말로',
+      plainMessage('저장했어요') === '저장했어요' && plainMessage('report-final.pdf 를 올렸어요') === 'report-final.pdf 를 올렸어요' && plainMessage('PDF') === 'PDF' && plainMessage('3건 처리 · 2건은 다시 눌러 주세요') === '3건 처리 · 2건은 다시 눌러 주세요' &&
+      plainMessage('Failed to fetch') === OFFLINE_TEXT && plainMessage("TypeError: Cannot read properties of null (reading 'x')") === GENERIC_FAIL_TEXT && plainMessage('permission denied for table module_data') === GENERIC_FAIL_TEXT &&
+      plainMessage('2건 처리 · Failed to fetch') === '2건 처리 — 인터넷 연결을 확인해 주세요.' && plainMessage('12 / 12 · PDF 3장 · 다 올렸어요') === '12 / 12 · PDF 3장 · 다 올렸어요', [plainMessage('Failed to fetch'), plainMessage('2건 처리 · Failed to fetch')])
+    check('E6 알림 띠: "…했습니다 — Failed to fetch" · "…: duplicate key value violates…" 에서 원문만 걷어 냄',
+      plainMessage('되돌리지 못했습니다 — Failed to fetch') === '되돌리지 못했습니다 — 인터넷 연결을 확인해 주세요.' && plainMessage('저장하지 못했습니다: duplicate key value violates unique constraint "x_pkey"') === '저장하지 못했습니다' &&
+      plainMessage('파일을 읽지 못했습니다: 암호가 걸린 PDF 입니다') === '파일을 읽지 못했습니다: 암호가 걸린 PDF 입니다')
   }
 
   console.log(`\nsaas-usage: ${passed} passed, ${failed} failed`)

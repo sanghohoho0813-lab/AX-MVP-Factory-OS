@@ -19,8 +19,9 @@ function whenText(iso: string): string {
   return `${d.getMonth() + 1}월 ${d.getDate()}일(${days[d.getDay()]}) ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-const CONTEXT_LABELS: Record<string, string> = { path: '화면', source: '잡힌 곳', build: '버전', viewport: '화면 크기', agent: '브라우저' }
-const SOURCE_LABELS: Record<string, string> = { screen: '화면 오류 판', window: '잡히지 않은 오류', promise: '끝나지 않은 작업' }
+// D-676 AI 도우미가 운영 쪽 문제로 멈춘 것(services/aiAssist/failReport) — 종류(오류 코드) · AI 회사 · 문의 번호(서버 기록을 찾는 번호)
+const CONTEXT_LABELS: Record<string, string> = { path: '화면', source: '잡힌 곳', build: '버전', viewport: '화면 크기', agent: '브라우저', code: '종류', provider: 'AI 회사', ref: '문의 번호' }
+const SOURCE_LABELS: Record<string, string> = { screen: '화면 오류 판', window: '잡히지 않은 오류', promise: '끝나지 않은 작업', ai: 'AI 도우미' }
 
 function ReplyBox({ m }: { m: InboxMessage }) {
   const [open, setOpen] = useState(false)
@@ -95,7 +96,7 @@ function Card({ m, fresh }: { m: InboxMessage; fresh: boolean }) {
     <li className={`flex flex-col gap-2.5 rounded-(--radius-panel) border bg-white px-4 py-4 sm:px-5 ${fresh ? 'border-danger-300' : 'border-slate-200'}`} data-testid="support-inbox-entry" data-kind={m.kind} data-fresh={fresh ? '1' : '0'}>
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
         {fresh && <span className="rounded-full bg-danger-500 px-2 py-0.5 text-[0.78rem] font-bold text-white">새로</span>}
-        <span className={`t-meta rounded-full border px-2 py-0.5 font-semibold ${m.kind === 'error' ? 'border-danger-200 text-danger-700' : 'border-brand-200 text-brand-700'}`}>{m.kind === 'error' ? '화면 오류' : '문의'}</span>
+        <span className={`t-meta rounded-full border px-2 py-0.5 font-semibold ${m.kind === 'error' ? 'border-danger-200 text-danger-700' : 'border-brand-200 text-brand-700'}`}>{m.kind === 'error' ? (m.context.source === 'ai' ? 'AI 멈춤' : '화면 오류') : '문의'}</span>
         <span className="text-[1rem] font-bold text-slate-900" data-testid="support-inbox-who">
           {who}
         </span>
@@ -105,7 +106,7 @@ function Card({ m, fresh }: { m: InboxMessage; fresh: boolean }) {
           {m.authorName && m.authorEmail ? ` · ${m.authorEmail}` : ''}
         </span>
       </div>
-      <p className={`break-all whitespace-pre-wrap text-slate-900 ${m.kind === 'error' ? 't-sub font-mono' : 'text-[1rem] break-keep'}`} data-testid="support-inbox-body">
+      <p className={`break-all whitespace-pre-wrap text-slate-900 ${m.kind === 'error' && m.context.source !== 'ai' ? 't-sub font-mono' : 'text-[1rem] break-keep'}`} data-testid="support-inbox-body">
         {m.body}
       </p>
       {context.length > 0 && (

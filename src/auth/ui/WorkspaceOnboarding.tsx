@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/Button'
 import { AuthField, AuthError, AuthNotice } from './AuthLayout'
 import { createWorkspace, acceptInvite } from '../workspaceService'
 import { useAuth } from '../AuthProvider'
+import { errorText } from '../../lib/errorText'
 
 export function WorkspaceOnboarding() {
   const { refreshWorkspaces, selectWorkspace, signOut } = useAuth()
@@ -34,7 +35,7 @@ export function WorkspaceOnboarding() {
       selectWorkspace(ws.id)
       setNotice('작업공간을 만들었습니다.')
     } catch (err) {
-      setError(err instanceof Error ? err.message : '작업공간을 만들지 못했습니다.')
+      setError(errorText(err, '작업공간을 만들지 못했습니다.'))
     } finally {
       setBusy(false)
     }
@@ -56,7 +57,7 @@ export function WorkspaceOnboarding() {
       selectWorkspace(membership.workspaceId)
       setNotice('작업공간에 합류했습니다.')
     } catch (err) {
-      setError(err instanceof Error ? err.message : '초대를 수락하지 못했습니다.')
+      setError(errorText(err, '초대를 수락하지 못했습니다.'))
     } finally {
       setBusy(false)
     }

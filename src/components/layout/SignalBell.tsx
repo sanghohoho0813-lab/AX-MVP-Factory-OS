@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Bell } from 'lucide-react'
 import { useDismissable } from '../../lib/useDismissable'
@@ -9,6 +9,8 @@ import type { OpsAlert } from '../../types/clientOps'
 import { useIsPilot } from '../../auth/osAccess'
 import { useFeedbackInbox } from '../feedback/useFeedback'
 import { useSupportInbox } from '../support/useSupport'
+import { AuthContext } from '../../auth/authContext'
+import type { AiNotice } from '../../services/aiAccess'
 
 /**
  * 헤더 알림 종 — 데모 상수가 아니라 실제 경고(마감·서류·수금)와 열린 고객 이벤트 수를 보여준다.
@@ -126,6 +128,34 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
     }
   }, [workspaceId, tick, uploadTick])
 
+  // D-677 구독 고객 — AI 이용 기간이 곧 끝남 · 끝남 / 이번 달 양을 거의 다 씀 · 다 씀(설정 › 이번 달 AI 사용량과 같은 값 · 같은 글).
+  // 진짜 팀장 등급 계정만 묻는다(대표 · 대표가 팀장 화면으로 볼 때는 요청 0). 내부 팀장 · 장부 전(0022)은 알릴 것이 없다.
+  const auth = useContext(AuthContext)
+  const aiUser = auth?.access === 'pilot' ? (auth.session?.user.id ?? null) : null
+  const [aiNote, setAiNote] = useState<AiNotice | null>(null)
+  const [aiTick, setAiTick] = useState(0)
+  useEffect(() => {
+    const bump = () => setAiTick((t) => t + 1)
+    window.addEventListener('axmvp:ai-access-changed', bump)
+    return () => window.removeEventListener('axmvp:ai-access-changed', bump)
+  }, [])
+  useEffect(() => {
+    if (!aiUser) {
+      setAiNote(null)
+      return
+    }
+    let alive = true
+    void import('../../services/aiAccess')
+      .then(({ aiNotice, loadAiAccess }) => loadAiAccess(aiUser).then((a) => aiNotice(a)))
+      .then((n) => {
+        if (alive) setAiNote(n)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [aiUser, tick, aiTick])
+
   const critical = useMemo(() => alerts.filter((a) => a.severity === 'critical'), [alerts])
   // D-188: 팀장이 보낸 새 피드백 — 대표 종에도
   const { entries: feedback, unread: feedbackUnread } = useFeedbackInbox()
@@ -134,7 +164,8 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
   const { entries: support, unread: supportUnread } = useSupportInbox()
   const supportNew = (support ?? []).filter((m) => !m.readAt)
   const supportText = [supportNew.some((m) => m.kind === 'question') ? `문의 ${supportNew.filter((m) => m.kind === 'question').length}건` : '', supportNew.some((m) => m.kind === 'error') ? `화면 오류 ${supportNew.filter((m) => m.kind === 'error').length}건` : ''].filter(Boolean).join(' · ')
-  const count = critical.length + events.length + feedbackUnread + supportUnread + signupCount + (uploads.files > 0 ? 1 : 0) + (hellos.count > 0 ? 1 : 0)
+  // 종 숫자에는 '지금 멈춘 것'(기간 끝 · 다 씀)만 센다 — 곧 끝남 · 80% 는 줄로만 보인다(달마다 숫자가 떠 있지 않게)
+  const count = critical.length + events.length + feedbackUnread + supportUnread + signupCount + (uploads.files > 0 ? 1 : 0) + (hellos.count > 0 ? 1 : 0) + (aiNote?.tone === 'danger' ? 1 : 0)
 
   return (
     <div ref={containerRef} className="relative">
@@ -156,10 +187,18 @@ function BellContent({ workspaceId }: { workspaceId: string | null }) {
       {open && (
         <div className="absolute top-full right-0 z-30 mt-1.5 w-80 max-w-[calc(100vw-2rem)] rounded-(--radius-card) border border-slate-200 bg-white shadow-(--shadow-overlay)">
           <p className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-900">지금 챙길 것</p>
-          {count === 0 ? (
+          {count === 0 && !aiNote ? (
             <p className="px-4 py-4 text-[0.875rem] text-slate-500">{pilot ? '급한 경고가 없습니다.' : '급한 경고와 새 상담신청이 없습니다.'}</p>
           ) : (
             <ul className="max-h-80 overflow-y-auto">
+              {aiNote && (
+                <li className="border-b border-slate-50">
+                  <Link to="/settings?focus=usage" onClick={() => setOpen(false)} data-testid="bell-ai" data-key={aiNote.key} className="block px-4 py-2.5 hover:bg-slate-50">
+                    <span className={`block text-[0.875rem] font-semibold ${aiNote.tone === 'danger' ? 'text-danger-700' : 'text-brand-700'}`}>{aiNote.title}</span>
+                    <span className="block truncate text-[0.875rem] text-slate-700">{aiNote.detail}</span>
+                  </Link>
+                </li>
+              )}
               {signupCount > 0 && (
                 <li className="border-b border-slate-50">
                   <Link to="/settings?tab=workspace&focus=signup" onClick={() => setOpen(false)} data-testid="bell-signup" className="block px-4 py-2.5 hover:bg-slate-50">

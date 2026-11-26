@@ -25,6 +25,7 @@ import {
   type WorkspaceMember,
   type WorkspaceRole,
 } from '../../auth/workspaceService'
+import { errorText } from '../../lib/errorText'
 
 const ROLES: WorkspaceRole[] = ['owner', 'admin', 'editor', 'viewer']
 const ROLE_LABEL: Record<WorkspaceRole, string> = {
@@ -66,7 +67,7 @@ export function WorkspaceMembersPanel() {
     try {
       setMembers(await listMembers(currentWorkspaceId))
     } catch (err) {
-      setError(err instanceof Error ? err.message : '구성원을 불러오지 못했습니다.')
+      setError(errorText(err, '구성원을 불러오지 못했습니다.'))
     } finally {
       setLoading(false)
     }
@@ -95,7 +96,7 @@ export function WorkspaceMembersPanel() {
       showToast(done ? `${confirmRevoke.email} 초대를 취소했어요 — 그 링크로는 들어올 수 없어요.` : `${confirmRevoke.email} 초대는 그새 들어왔거나 이미 처리됐어요 — 목록을 다시 불러왔어요.`)
       await loadInvites()
     } catch (err) {
-      showToast(err instanceof Error ? err.message : '초대를 취소하지 못했습니다.')
+      showToast(errorText(err, '초대를 취소하지 못했습니다.'))
     } finally {
       setBusy(false)
     }
@@ -118,7 +119,7 @@ export function WorkspaceMembersPanel() {
       void loadInvites()
       showToast('초대 코드를 생성했습니다. 지금 복사해 전달하세요(다시 표시되지 않습니다).')
     } catch (err) {
-      setError(err instanceof Error ? err.message : '초대를 생성하지 못했습니다.')
+      setError(errorText(err, '초대를 생성하지 못했습니다.'))
     } finally {
       setBusy(false)
     }
@@ -130,7 +131,7 @@ export function WorkspaceMembersPanel() {
       await updateMemberRole(currentWorkspaceId, member.userId, role)
       await load()
     } catch (err) {
-      showToast(err instanceof Error ? err.message : '역할을 변경하지 못했습니다.')
+      showToast(errorText(err, '역할을 변경하지 못했습니다.'))
     }
   }
 
@@ -142,7 +143,7 @@ export function WorkspaceMembersPanel() {
       setConfirmRemove(null)
       await load()
     } catch (err) {
-      showToast(err instanceof Error ? err.message : '구성원을 제거하지 못했습니다.')
+      showToast(errorText(err, '구성원을 제거하지 못했습니다.'))
     } finally {
       setBusy(false)
     }
