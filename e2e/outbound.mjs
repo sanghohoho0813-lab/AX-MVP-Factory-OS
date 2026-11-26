@@ -206,6 +206,8 @@ await ctx.close()
       helloText.startsWith('안녕하세요, 홍길동님.') && /상담 신청해 주셔서 감사합니다/.test(helloText) && /통화 편하신 시간/.test(helloText),
     helloText,
   )
+  const call = first.getByTestId('call-button')
+  check('N1b D-671 줄마다 전화 단추 — 글 대신 바로 통화(tel: 번호 · 44px) · 문구 · 수수료가 주소에 실리지 않음', (await call.getAttribute('href')) === 'tel:01011112222' && ((await call.boundingBox())?.height ?? 0) >= 44 && (await sheet4.getByTestId('call-button').count()) === 3, await call.getAttribute('href'))
   if (SHOTS) await p4.screenshot({ path: join(SHOTS, 'outbound-hello-pc.png') })
   await first.getByTestId('notice-sent').click()
   await p4.waitForTimeout(700)

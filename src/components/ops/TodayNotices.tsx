@@ -17,6 +17,7 @@ import { copyText } from '../consulting/studioParts'
 import { useToast } from '../ui/toastContext'
 import { Button } from '../ui/Button'
 import { BottomSheet } from '../ui/primitives'
+import { CallButton } from './opsControls'
 import { useSenderLine } from '../layout/useCurrentUser'
 
 const SHOW = 5
@@ -190,16 +191,20 @@ function NoticeSheet({
         <ul className="flex flex-col divide-y divide-slate-200">
           {shown.map((n) => (
             <li key={n.key} className="flex flex-col gap-2 py-3 first:pt-0" data-testid="notice-row" data-kind={n.kind} data-client={n.clientId}>
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="t-meta font-semibold text-slate-500">{KIND_WORD[n.kind]}</span>
-                <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                  <Link to={`/ops/clients/${n.clientId}`} className="tap t-body font-bold [overflow-wrap:anywhere] text-slate-900 hover:text-brand-700 hover:underline" onClick={onClose}>
-                    {n.companyName}
-                  </Link>
-                  <span className={`t-sub break-keep ${n.kind === 'fee' && /지남/.test(n.title) ? 'font-semibold text-danger-700' : 'text-slate-700'}`} data-testid="notice-title">
-                    {n.title}
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="t-meta font-semibold text-slate-500">{KIND_WORD[n.kind]}</span>
+                  <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                    <Link to={`/ops/clients/${n.clientId}`} className="tap t-body font-bold [overflow-wrap:anywhere] text-slate-900 hover:text-brand-700 hover:underline" onClick={onClose}>
+                      {n.companyName}
+                    </Link>
+                    <span className={`t-sub break-keep ${n.kind === 'fee' && /지남/.test(n.title) ? 'font-semibold text-danger-700' : 'text-slate-700'}`} data-testid="notice-title">
+                      {n.title}
+                    </span>
                   </span>
-                </span>
+                </div>
+                {/* D-671 글 대신 전화로 — 첫 인사 · 약속 확인은 통화가 빠를 때가 많다(번호가 없으면 안 그림). 통화한 뒤에도 [보냈어요] 로 적는다 */}
+                <CallButton phone={n.phone} name={n.companyName} />
               </div>
               {peek === n.key && (
                 <p className="t-sub rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2 break-keep whitespace-pre-wrap text-slate-800" data-testid="notice-text">
