@@ -34,6 +34,7 @@ const FILTER_KEY = 'axmvp.clients.filter'
 const SEGMENT_KEY = 'axmvp.clients.segment'
 
 import { ClientBoardCard } from '../components/ops/ClientBoardCard'
+import { uploadInboxHref, useUploadInbox } from '../components/ops/useUploadInbox'
 import { matchesClientSearch, searchHit } from '../services/clientOpsSearch'
 import {
   CLIENT_FILTER_LABEL,
@@ -322,6 +323,8 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
   const today = todayLocalDate()
   // D-143: 업체마다 맞는 지원사업 수 — 기업마당 공고는 한 번 받아 모든 화면이 같이 쓴다
   const grantSums = useClientGrantSummaries(workspaceId, records, today)
+  /** D-657 고객이 올리고 아직 칸에 안 넣은 서류(업체 id → 개수) */
+  const uploadInbox = useUploadInbox(workspaceId)
   // D-190: 카드 추천 띠 · '추천 많은 순' — 맞춤 추천과 같은 판정(지원사업은 위에서 센 맞는 공고 수)
   const grantFit = useCallback((id: string) => grantSums.get(id)?.fit ?? 0, [grantSums])
   const reco = useClientReco(records, today, grantFit)
@@ -1240,6 +1243,8 @@ function OperationsHubContent({ workspaceId, myWorkspaces = [] }: { workspaceId:
                         onMoney={() => setQuick({ id: record.id, kind: 'money' })}
                         onBulkDocs={() => setBulkDocsFor(record.id)}
                         onDocs={() => navigate(`/ops/clients/${record.id}?tab=docs`)}
+                        uploads={uploadInbox.get(record.id) ?? 0}
+                        onUploads={() => navigate(uploadInboxHref(record.id))}
                         hit={query.trim() !== '' ? searchHit(record, query) : null}
                         grants={grantSums.get(record.id) ?? null}
                         reco={reco.chips.get(record.id) ?? []}

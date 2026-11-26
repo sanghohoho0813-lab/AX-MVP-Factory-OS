@@ -16,7 +16,7 @@
 
 import { useMoneyWords } from './useMoneyWords'
 import { createElement, useState } from 'react'
-import { ArrowRight, BellRing, ChevronDown, ChevronRight, FileUp, Sparkles } from 'lucide-react'
+import { ArrowRight, BellRing, ChevronDown, ChevronRight, FileUp, Inbox, Sparkles } from 'lucide-react'
 import { useFold } from '../ui/fold'
 import { CONTRACT_KIND_LABEL, CONTRACT_STAGE_LABEL, contractStageOf } from '../../types/clientOps'
 import { salesStageLabelOf } from '../../services/salesPipeline'
@@ -152,6 +152,8 @@ export function ClientBoardCard({
   onMoney,
   onBulkDocs,
   onDocs,
+  uploads = 0,
+  onUploads,
   hit = null,
   grants = null,
   onGrants,
@@ -179,6 +181,10 @@ export function ClientBoardCard({
   onBulkDocs?: () => void
   /** D-526 '서류 n/m' · '서류 요청 n일째' 를 누르면 그 업체 서류함으로(개요가 아니라) — 없으면 글자만 */
   onDocs?: () => void
+  /** D-657 고객이 올리기 링크로 올리고 아직 칸에 안 넣은 서류 수 — 0 이면 줄을 그리지 않는다 */
+  uploads?: number
+  /** 그 줄을 누르면(서류함의 '고객이 올린 서류' 판으로) */
+  onUploads?: () => void
 }) {
   const moneyWords = useMoneyWords()
   const [allChips, setAllChips] = useState(false)
@@ -292,11 +298,26 @@ export function ClientBoardCard({
           )}
           {/* D-631 ml-auto — 펼친 카드(휴대폰)에서 이 묶음이 아랫줄로 넘어가면 왼쪽 끝으로 붙어, 접기 화살표 자리가 접힌 때(오른쪽 끝)와 달라졌다 */}
           <div className="ml-auto flex shrink-0 items-center gap-2">
+            {/* D-657 고객이 올리기 링크로 올린 서류 — 접힌 카드에서도 보이게 상태 알약 자리에(누르면 서류함의 그 판). 할 일이 생긴 것이라 '이상 없음' 은 그리지 않는다 */}
+            {uploads > 0 && onUploads && (
+              <button
+                type="button"
+                onClick={onUploads}
+                title="고객이 올린 서류 — 눌러서 칸에 넣기"
+                aria-label={`고객이 올린 서류 ${uploads}개 — 눌러서 칸에 넣기`}
+                className="tap t-meta inline-flex shrink-0 items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 font-semibold whitespace-nowrap text-brand-700 hover:bg-brand-100"
+                data-testid="card-uploads"
+                data-count={uploads}
+              >
+                <Inbox aria-hidden="true" className="size-3.5 shrink-0" />
+                받은 서류 {uploads}
+              </button>
+            )}
             {criticalCount > 0 ? (
               <Badge tone={tone}>지금 {criticalCount}</Badge>
             ) : warningCount > 0 ? (
               <Badge tone={tone === 'neutral' ? 'warning' : tone}>곧 {warningCount}</Badge>
-            ) : (
+            ) : uploads > 0 && onUploads ? null : (
               <Badge tone="success">이상 없음</Badge>
             )}
             {/* D-159: 진행률(%)은 뺐다 — 대표: 몇 % 진행됐는지는 의미가 없다 */}

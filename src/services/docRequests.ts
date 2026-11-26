@@ -11,6 +11,7 @@
  */
 import type { ClientOpsRecord, DocRequest, DocRequestItem, DocumentKey } from '../types/clientOps'
 import { allDocumentMetas } from './clientOpsDocuments'
+import { uploadHintLines } from './uploadHint'
 
 /**
  * D-532 보관 ≠ 표시. 예전에는 업체마다 요청 기록을 12개만 남기고 넘으면 **끝내지 않은 요청까지** 오래된 것부터 버렸다(읽을 때도 12개로 잘랐다).
@@ -310,7 +311,12 @@ export function withRequestResent(record: ClientOpsRecord, id: string, today: st
 }
 
 /** 아직 안 온 것만 다시 부탁하는 문구 — 같은 '1. 이름 / - 어디서' 모양(다시 [보냈어요] 로 이어짐) */
-export function resendText(record: Pick<ClientOpsRecord, 'contactName' | 'representativeName' | 'companyName' | 'customDocuments' | 'documents'>, req: DocRequest, today: string): string {
+export function resendText(
+  record: Pick<ClientOpsRecord, 'contactName' | 'representativeName' | 'companyName' | 'customDocuments' | 'documents'> & Pick<Partial<ClientOpsRecord>, 'uploadHint'>,
+  req: DocRequest,
+  today: string,
+  origin?: string,
+): string {
   const pending = requestProgress(record, req, today).pending
   if (!pending.length) return ''
   const who = (record.representativeName || record.contactName || '').trim()
@@ -323,9 +329,35 @@ export function resendText(record: Pick<ClientOpsRecord, 'contactName' | 'repres
     `${md}에 부탁드린 자료 중 아래 ${pending.length}가지가 아직 도착하지 않아 다시 부탁드립니다.`,
     '',
     body,
+    // D-656 열린 올리기 링크가 있으면 주소 한 줄 — 서류함 [다시 요청] · 오늘 '보낼 안내' 가 같은 글
+    ...uploadHintLines(record, today, origin),
     '',
     '사진이나 PDF로 보내 주셔도 됩니다. 감사합니다.',
   ].join('\n')
+}
+
+/** D-656 요청 문구의 줄 → 올리기 링크에 넣을 서류(서류함 칸이 있는 줄만 · 한 칸에 한 번). 칸이 없는 줄은 고객이 '그 밖의 서류' 로 올린다 */
+export function uploadDocsForRequest(record: Pick<ClientOpsRecord, 'customDocuments'>, text: string): { key: string; label: string }[] {
+  const metas = allDocumentMetas(record)
+  const out: { key: string; label: string }[] = []
+  for (const line of requestLinesOf(text)) {
+    const key = slotsFor(record, line.label)[0]
+    if (!key || out.some((d) => d.key === key)) continue
+    out.push({ key, label: metas.find((m) => m.key === key)?.label ?? line.label })
+  }
+  return out
+}
+
+/** D-656 같은 서류를 이미 부탁해 둔 열린 요청 — 링크 판 [보냈어요] 를 또 눌러도 요청이 둘이 되지 않게(있으면 '다시 보냄') */
+export function sameOpenRequest(record: Pick<ClientOpsRecord, 'docRequests'>, labels: readonly string[]): DocRequest | null {
+  const want = [...new Set(labels.map((l) => l.trim()).filter(Boolean))].sort()
+  if (!want.length) return null
+  return (
+    openRequests(record).find((r) => {
+      const have = [...new Set(r.items.map((i) => i.label.trim()))].sort()
+      return have.length === want.length && have.every((l, i) => l === want[i])
+    }) ?? null
+  )
 }
 
 /* ------------------------------------------------------------------ */

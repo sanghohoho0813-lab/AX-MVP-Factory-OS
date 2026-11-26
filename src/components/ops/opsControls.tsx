@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CalendarCheck, Check, ClipboardCopy, Phone, X } from 'lucide-react'
+import { CalendarCheck, Check, ClipboardCopy, Link2, Phone, X } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { wonOf } from '../../lib/format'
 import { useBackToClose } from '../../lib/backToClose'
@@ -110,11 +110,14 @@ export function MessageModal({
   text,
   onClose,
   followUp,
+  tool,
 }: {
   title: string
   description: string
   text: string
   onClose: () => void
+  /** D-656 문구를 바꾸는 도구 하나(예: 올리기 링크 붙이기) — run 이 끝나면 부모가 text 를 새로 준다. 성공하면 보일 글 · 실패면 false */
+  tool?: { label: string; run: () => Promise<string | false> }
   /** D-314 보낸 뒤 할 일 — 누르면 run(성공하면 보일 글 · 실패면 false). 없으면 단추를 그리지 않는다 */
   followUp?: { label: string; run: () => Promise<string | false>; /** D-512 누른 뒤 단추 글(기본 '할 일에 넣음') */ doneLabel?: string }
 }) {
@@ -126,6 +129,13 @@ export function MessageModal({
     setFollow({ busy: true, done: '', failed: false })
     const r = await followUp.run().catch(() => false as const)
     setFollow(r ? { busy: false, done: r, failed: false } : { busy: false, done: '', failed: true })
+  }
+  const [tooling, setTooling] = useState<{ busy: boolean; done: string; failed: boolean }>({ busy: false, done: '', failed: false })
+  const runTool = async () => {
+    if (!tool || tooling.busy) return
+    setTooling({ busy: true, done: '', failed: false })
+    const r = await tool.run().catch(() => false as const)
+    setTooling(r ? { busy: false, done: r, failed: false } : { busy: false, done: '', failed: true })
   }
   const ref = useRef<HTMLTextAreaElement>(null)
 
@@ -181,6 +191,27 @@ export function MessageModal({
             className="w-full resize-none rounded-(--radius-control) border border-slate-200 bg-slate-50 px-3 py-3 font-mono text-[0.9375rem] leading-relaxed text-slate-800"
           />
         </div>
+        {/* D-656 요청 문구에 올리기 주소 붙이기 — 붙인 뒤에는 한 줄 알림만 남는다(단추는 부모가 거둔다) */}
+        {(tool || tooling.done) && (
+          <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 px-5 py-3" data-testid="message-tool-row">
+            {tool && (
+              <Button variant="secondary" size="sm" disabled={tooling.busy} onClick={() => void runTool()} data-testid="message-tool">
+                <Link2 aria-hidden="true" className="size-4" />
+                {tooling.busy ? '만드는 중…' : tool.label}
+              </Button>
+            )}
+            {tooling.done && (
+              <span role="status" className="text-[0.875rem] break-keep text-success-700" data-testid="message-tool-done">
+                {tooling.done}
+              </span>
+            )}
+            {tooling.failed && (
+              <span role="alert" className="text-[0.875rem] break-keep text-danger-700">
+                붙이지 못했어요 — 다시 눌러 주세요
+              </span>
+            )}
+          </div>
+        )}
         {/* D-191: 휴대폰에서 [복사] 가 창 밖으로 삐져나왔다 — 좁으면 안내 글 아래로 단추 줄을 내린다 */}
         {/* D-314 보냈으면 한 번에 — 3일 뒤 '받았는지 확인' 할 일(오늘 · 달력에 뜬다). 다음 약속은 덮지 않는다 */}
         {followUp && (

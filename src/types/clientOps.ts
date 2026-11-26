@@ -893,6 +893,11 @@ export interface ClientOpsRecord {
    * 서류 독촉은 여기 말고 그 요청의 resentAt. payload 에 함께 저장된다(DB 변경 없음).
    */
   notices?: Record<string, string>
+  /**
+   * D-656 열린 서류 올리기 링크의 사본(주소 20자리 · 열려 있는 마지막 날) — 다시 부탁 문구 · 요청 문구에 주소 한 줄을 붙인다.
+   * 진짜 상태는 서버(0031). 링크를 만들거나 · 바꾸거나 · 닫을 때 같이 적는다(services/uploadHint). payload 에 함께 저장(DB 변경 없음).
+   */
+  uploadHint?: { slug: string; until: string }
   /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */
   archivedAt: string | null
   createdAt: string

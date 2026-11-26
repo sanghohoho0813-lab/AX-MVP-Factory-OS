@@ -10,6 +10,7 @@
 import { getDataModeConfig } from '../data/dataMode'
 import { getAnonSupabaseClient, getSupabaseClient } from '../lib/supabase/client'
 
+import { uploadUrl } from './uploadHint'
 export { uploadSlugFromPath } from '../lib/askPath'
 
 export interface UploadDoc {
@@ -115,9 +116,7 @@ export function parseUploadState(raw: unknown): UploadState {
 }
 
 /** 공개 주소 — 지금 열린 주소(운영 · 미리 보기 모두 같은 곳) */
-export function uploadUrl(slug: string, origin: string = typeof window !== 'undefined' ? window.location.origin : ''): string {
-  return `${origin.replace(/\/+$/, '')}/up/${slug}`
-}
+export { uploadUrl }
 
 /** '12월 7일' — 한국 날짜 */
 export function koDate(iso: string): string {

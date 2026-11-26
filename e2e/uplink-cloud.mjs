@@ -86,6 +86,7 @@ const files = []
 const calls = []
 const storagePuts = []
 const patches = []
+const journal = []
 const fileBytes = {}
 const SLUGS = ['abcdef0123456789abcd', 'fedcba9876543210fedc']
 let slugIdx = 0
@@ -144,7 +145,11 @@ async function routeCloud(ctx, who) {
         if (ok) f.status = to
         return route.fulfill(json({ changed: Boolean(ok), status: f?.status ?? null }))
       }
-      if (fn === 'upload_link_inbox') return route.fulfill(json([]))
+      if (fn === 'upload_link_inbox') {
+        // D-657 작업공간 전체 — 업체마다 '올리고 아직 칸에 안 넣은' 파일 수
+        const waiting = files.filter((f) => f.status === 'uploaded').length
+        return route.fulfill(json(waiting ? [{ clientId: CID, waiting }] : []))
+      }
       if (fn === 'public_upload_form') {
         const l = openLink(body.p_slug)
         if (!l) return route.fulfill(json(null))
@@ -196,6 +201,16 @@ async function routeCloud(ctx, who) {
     }
     if (path.includes('/rest/v1/workspace_members')) return route.fulfill(json([{ workspace_id: WS, user_id: OWNER, role: 'owner', workspaces: { id: WS, name: '대표 작업공간', owner_id: OWNER, created_at: '2026-01-01T00:00:00Z' } }]))
     if (path.includes('/rest/v1/workspaces')) return route.fulfill(json([{ id: WS, name: '대표 작업공간', owner_id: OWNER, created_at: '2026-01-01T00:00:00Z' }]))
+    if (path.includes('/rest/v1/ops_journal_entries')) {
+      // D-656 [보냈어요] 가 만드는 '받았는지 확인' 할 일 — 넣은 줄을 그대로 돌려준다
+      const single = (req.headers()['accept'] ?? '').includes('vnd.pgrst.object')
+      if (method === 'POST') {
+        const made = { id: `j${journal.length + 1}0000000-0000-4000-8000-000000000000`.slice(0, 36), created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...body }
+        journal.push(made)
+        return route.fulfill(json(single ? made : [made], 201))
+      }
+      return route.fulfill(json(single ? (journal[0] ?? null) : journal))
+    }
     if (path.includes('/rest/v1/operations_clients')) {
       const single = (req.headers()['accept'] ?? '').includes('vnd.pgrst.object')
       if (method === 'PATCH') {
@@ -249,8 +264,36 @@ check('U5 만들기 → 고른 서류 2가지 · 7일 · 주소 /up/<20자리>',
 await sheet.getByTestId('upload-link-copy-msg').click()
 await page.waitForTimeout(300)
 const clip = await page.evaluate(() => navigator.clipboard.readText())
+const hint5 = row.payload?.uploadHint
+check('J1 D-656 링크를 만들면 업체 기록에 사본(주소 20자리 · 열려 있는 마지막 날) — 다시 부탁 문구가 주소를 붙인다', Boolean(hint5) && linkUrl.endsWith(`/up/${hint5.slug}`) && /^\d{4}-\d{2}-\d{2}$/.test(hint5.until), JSON.stringify(hint5))
 check('U6 [카톡 문구 복사] — 대표님 이름 · 로그인 없음 · 서류 목록 · 주소 · 기한 · OS 이름 0', clip.startsWith('안녕하세요, 박대표 대표님.') && clip.includes(linkUrl) && /1\. 사업자등록증/.test(clip) && /재무제표/.test(clip) && /까지 열려 있어요/.test(clip) && !/MIRAE|미래AI랩/.test(clip), clip)
+// D-656 문구를 보냈으면 [보냈어요] 한 번 — 서류함 '요청한 서류' · 3일 뒤 할 일로 이어진다
+const sentBtn = sheet.getByTestId('upload-link-sent')
+check('J2 문구를 복사하면 [보냈어요] 가 주 단추로(복사 단추는 한 단계 옅게)', (await sentBtn.count()) === 1 && /보냈어요/.test(await sentBtn.innerText()) && /bg-brand-600|bg-navy/.test((await sentBtn.getAttribute('class')) ?? '') && !/bg-brand-600/.test((await sheet.getByTestId('upload-link-copy-msg').getAttribute('class')) ?? ''), await sentBtn.getAttribute('class'))
+await sentBtn.click()
+await sheet.getByTestId('upload-link-sent-done').waitFor({ timeout: 5000 })
+const sentLine = await sheet.getByTestId('upload-link-sent-done').innerText()
+const req1 = row.payload?.docRequests ?? []
+check("J3 [보냈어요] → 3일 뒤 '받았는지 확인' 할 일 1개 · 서류함에 '요청함' 2가지 · 단추는 '보낸 것으로 적음'(또 못 누름)", journal.length === 1 && /자료 받았는지 확인 — 사업자등록증/.test(journal[0].content ?? '') && req1.length === 1 && req1[0].items.length === 2 && /할 일에 넣었어요/.test(sentLine) && /요청함/.test(sentLine) && (await sentBtn.isDisabled()) && /보낸 것으로 적음/.test(await sentBtn.innerText()), JSON.stringify({ journal: journal.length, req1, sentLine }))
 if (SHOTS) { await page.waitForTimeout(900); await page.screenshot({ path: join(SHOTS, 'uplink-ready-pc.png') }) }
+await page.keyboard.press('Escape')
+await page.waitForTimeout(400)
+const reqRow = page.getByTestId('doc-req-row').first()
+check("J4 서류함 '요청한 서류' 에 그 요청 — 0/2 · 오늘 보냄(링크로 부탁한 것과 문구로 부탁한 것이 한 줄에서 만난다)", (await reqRow.count()) === 1 && /0\s*\/\s*2/.test(await reqRow.innerText()), await reqRow.innerText().catch(() => ''))
+await reqRow.getByTestId('doc-req-resend').click()
+const again = await page.getByRole('dialog').locator('textarea').inputValue()
+check('J5 [다시 요청] 문구 — 아직 안 온 2가지 + 올리기 주소 한 줄(끝인사 앞)', /1\. 사업자등록증/.test(again) && again.includes(linkUrl) && again.indexOf(linkUrl) < again.indexOf('사진이나 PDF로'), again)
+if (SHOTS) await page.screenshot({ path: join(SHOTS, 'uplink-resend-pc.png') })
+await page.keyboard.press('Escape')
+await page.waitForTimeout(300)
+// 링크 판을 다시 열어 또 [보냈어요] — 같은 서류를 이미 부탁해 뒀으니 요청 · 할 일이 늘지 않고 '다시 보낸 날' 만
+await page.getByTestId('upload-link-bar').click()
+await sheet.waitFor()
+await sheet.getByTestId('upload-link-copy-msg').click()
+await sheet.getByTestId('upload-link-sent').click()
+await sheet.getByTestId('upload-link-sent-done').waitFor({ timeout: 5000 })
+const req2 = row.payload?.docRequests ?? []
+check("J6 또 [보냈어요] → 요청 1개 그대로 · 할 일 1개 그대로 · 그 요청에 '다시 보낸 날'", req2.length === 1 && journal.length === 1 && /^\d{4}-\d{2}-\d{2}$/.test(req2[0].resentAt ?? '') && /다시 보낸 날/.test(await sheet.getByTestId('upload-link-sent-done').innerText()), JSON.stringify(req2))
 await page.keyboard.press('Escape')
 await page.waitForTimeout(400)
 const bar = page.getByTestId('upload-link-bar')
@@ -315,6 +358,30 @@ await up.getByTestId('up-closed').waitFor({ timeout: 8000 })
 check('P8 없는 · 닫힌 주소 → "이 주소는 지금 서류를 받지 않아요" · 새 주소 물어보라는 한 줄', (await up.getByTestId('up-closed').count()) === 1 && (await up.locator('main').innerText()).includes('새 주소'))
 check('P9 공개 화면 JS 오류 0', upErrors.length === 0, upErrors.join(' | '))
 
+// ---------------------------------------------------------------- D-657 컨설턴트: 오늘 · 고객 관리에서 '고객이 올린 서류' 를 바로 안다
+await page.goto(`${BASE}/`, { waitUntil: 'networkidle' })
+const upChip = page.getByTestId('today-uploads-open')
+await upChip.waitFor({ timeout: 8000 }).catch(() => {})
+check("T1 오늘 머리 줄 '받은 서류 2개'(업체를 열지 않아도 누가 올렸는지)", (await upChip.count()) === 1 && (await upChip.getAttribute('data-count')) === '2' && /받은 서류 2개/.test(await upChip.innerText()), await upChip.innerText().catch(() => '없음'))
+await upChip.click()
+const upSheet = page.getByTestId('uploads-sheet')
+await upSheet.waitFor()
+check('T2 누르면 판 — 업체 한 줄 · 2개 · [넣으러 가기]', (await upSheet.getByTestId('uploads-row').count()) === 1 && /\(주\)업로드정밀/.test(await upSheet.innerText()) && /2개/.test(await upSheet.innerText()) && /넣으러 가기/.test(await upSheet.innerText()), await upSheet.innerText())
+if (SHOTS) { await page.waitForTimeout(700); await page.screenshot({ path: join(SHOTS, 'today-uploads-pc.png') }) }
+await upSheet.getByTestId('uploads-go').click()
+await page.getByTestId('upload-link-sheet').waitFor({ timeout: 8000 }).catch(() => {})
+check("T3 [넣으러 가기] → 그 업체 서류함 · '고객이 올린 서류' 판이 열린 채 · 주소의 inbox 값은 지워짐(새로 고쳐도 또 안 뜸)", new URL(page.url()).pathname === `/ops/clients/${CID}` && new URL(page.url()).searchParams.get('tab') === 'docs' && !new URL(page.url()).searchParams.has('inbox') && (await page.getByTestId('upload-link-sheet').getAttribute('data-view').catch(() => '')) === 'inbox', page.url())
+await page.keyboard.press('Escape')
+await page.goto(`${BASE}/ops/clients`, { waitUntil: 'networkidle' })
+const cardUp = page.getByTestId('card-uploads')
+await cardUp.first().waitFor({ timeout: 8000 }).catch(() => {})
+check("T4 고객 관리 카드(접힌 채)에도 '받은 서류 2' 알약 · 그 카드는 '이상 없음' 대신 이 알약", (await cardUp.count()) === 1 && /받은 서류 2/.test(await cardUp.innerText()) && !/이상 없음/.test(await page.locator(`[data-testid="client-card"][data-client-id="${CID}"]`).innerText()), await cardUp.innerText().catch(() => '없음'))
+if (SHOTS) await page.screenshot({ path: join(SHOTS, 'hub-card-uploads-pc.png') })
+await cardUp.click()
+await page.getByTestId('upload-link-sheet').waitFor({ timeout: 8000 }).catch(() => {})
+check('T5 카드에서 눌러도 올린 서류 판이 열린 채', (await page.getByTestId('upload-link-sheet').getAttribute('data-view').catch(() => '')) === 'inbox')
+await page.keyboard.press('Escape')
+
 // ---------------------------------------------------------------- 컨설턴트: 받은 서류 넣기
 await page.reload({ waitUntil: 'networkidle' })
 await page.waitForTimeout(800)
@@ -361,11 +428,42 @@ await sheet.getByTestId('upload-link-rotate').click()
 check('L1 [새 주소] 한 번은 확인 글로 바뀜(바로 안 바뀜)', /예전 주소를 막고/.test(await sheet.getByTestId('upload-link-rotate').innerText()) && !calls.some((c) => c.fn === 'upload_link_rotate'))
 await sheet.getByTestId('upload-link-rotate').click()
 await page.waitForTimeout(800)
+await page.waitForTimeout(500)
+check('J7 D-656 새 주소로 바꾸면 업체 기록의 사본도 새 주소로', Boolean(row.payload?.uploadHint?.slug) && (await sheet.getByTestId('upload-link-url').inputValue()).endsWith(`/up/${row.payload.uploadHint.slug}`) && row.payload.uploadHint.slug !== hint5.slug, JSON.stringify(row.payload?.uploadHint))
 check('L2 두 번째 누르면 새 주소 · 화면 주소도 바뀜', calls.some((c) => c.fn === 'upload_link_rotate') && (await sheet.getByTestId('upload-link-url').inputValue()).endsWith(SLUGS[1]))
 await sheet.getByTestId('upload-link-off').click()
 await sheet.getByTestId('upload-link-off').click()
 await page.waitForTimeout(800)
 check('L3 [링크 닫기] 두 번 → 닫힘(받은 서류 기록은 그대로)', calls.some((c) => c.fn === 'upload_link_off') && link === null && files.length === 2)
+await page.waitForTimeout(500)
+check('J8 D-656 링크를 닫으면 사본도 지움(다시 부탁 문구에 죽은 주소를 붙이지 않게) · 요청 기록은 그대로', row.payload?.uploadHint === undefined && (row.payload?.docRequests ?? []).length === 1, JSON.stringify(Object.keys(row.payload ?? {})))
+// D-656 반대 길 — 요청 문구 창에서 바로 링크를 만들어 붙인다(링크가 없을 때만 단추가 보인다)
+await page.keyboard.press('Escape')
+await page.waitForTimeout(300)
+// 진행 중인 업무가 있어야 '받을 서류' 가 생긴다 — 사업목적 추가(사업자등록증 · 법인등기부등본 · 공동인증서)를 진행 중으로
+row = { ...row, payload: { ...row.payload, services: { ...(row.payload.services ?? {}), businessScope: { status: 'in_progress' } } }, updated_at: new Date().toISOString() }
+await page.reload({ waitUntil: 'networkidle' })
+await page.waitForTimeout(800)
+await page.getByTestId('client-more').click()
+await page.getByTestId('more-doc-request').click()
+const dlg = page.getByRole('dialog')
+const askBefore = await dlg.locator('textarea').inputValue()
+const toolBtn = dlg.getByTestId('message-tool')
+check('J9 요청 문구 창 — 링크가 없으면 [올리기 링크 붙이기] 한 단추 · 문구에는 아직 주소 없음', (await toolBtn.count()) === 1 && /올리기 링크 붙이기/.test(await toolBtn.innerText()) && !askBefore.includes('/up/'), askBefore.slice(-120))
+const savesBefore = calls.filter((c) => c.fn === 'upload_link_save').length
+await toolBtn.click()
+await dlg.getByTestId('message-tool-done').waitFor({ timeout: 5000 })
+const after2 = await dlg.locator('textarea').inputValue()
+const made2 = calls.filter((c) => c.fn === 'upload_link_save').at(-1)
+check('J10 누르면 → 문구의 서류(서류함 칸이 있는 것)로 링크 · 14일 → 끝인사 앞에 주소 한 줄(나머지 글은 그대로) · 단추는 사라지고 한 줄 알림 · 업체 기록에 사본', calls.filter((c) => c.fn === 'upload_link_save').length === savesBefore + 1 && made2.body.p_days === 14 && made2.body.p_docs.length >= 1 && after2.includes(`/up/${row.payload?.uploadHint?.slug}`) && after2.indexOf('/up/') < after2.lastIndexOf('감사합니다') && after2.trimEnd().endsWith('감사합니다.') && after2.replace(/\n\n아래 주소를[^\n]*\n[^\n]*\/up\/[^\n]*/, '').trimEnd() === askBefore.trimEnd() && (await dlg.getByTestId('message-tool').count()) === 0 && /주소를 붙였어요/.test(await dlg.getByTestId('message-tool-done').innerText()), JSON.stringify({ docs: made2?.body?.p_docs, tail: after2.slice(-160) }))
+if (SHOTS) await page.screenshot({ path: join(SHOTS, 'uplink-request-tool-pc.png') })
+const journalBefore = journal.length
+await dlg.getByTestId('message-followup').click()
+await dlg.getByTestId('message-followup-done').waitFor({ timeout: 5000 })
+const reqs3 = row.payload?.docRequests ?? []
+check("J11 그 문구로 [보냈어요 · 3일 뒤 받았는지 확인] → 새 요청 · 새 할 일(주소 줄은 서류 줄로 세지 않음)", journal.length === journalBefore + 1 && reqs3.length === 2 && reqs3[0].items.every((i) => !/up\//.test(i.label)), JSON.stringify(reqs3.map((r) => r.items.map((i) => i.label))))
+await page.keyboard.press('Escape')
+await page.waitForTimeout(300)
 check('L4 컨설턴트 화면 JS 오류 0', errors.length === 0, errors.join(' | '))
 
 // 휴대폰에서 컨설턴트 판(390) — 옆 넘침 0

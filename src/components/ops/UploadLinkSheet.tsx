@@ -32,6 +32,7 @@ import {
   uploadRequestText,
   uploadUrl,
   type UploadDoc,
+  type UploadLinkInfo,
   type UploadLoad,
   type UploadState,
   type UploadedFile,
@@ -111,6 +112,8 @@ export function UploadLinkSheet({
   onClose,
   onCommit,
   current,
+  onLink,
+  onSent,
 }: {
   record: ClientOpsRecord
   workspaceId: string
@@ -121,6 +124,10 @@ export function UploadLinkSheet({
   onCommit: (next: ClientOpsRecord) => Promise<boolean>
   /** 지금 화면의 가장 새 기록 */
   current: () => ClientOpsRecord | null
+  /** D-656 링크를 만들거나 · 바꾸거나 · 닫았다 — 업체 기록의 사본도 같이(다시 부탁 문구에 주소) */
+  onLink?: (link: UploadLinkInfo | null) => void
+  /** D-656 문구를 보냈다 — 서류함 '요청한 서류' · 3일 뒤 할 일로 잇는다(성공하면 보일 글 · 실패면 false) */
+  onSent?: (text: string) => Promise<string | false>
 }) {
   const { showToast } = useToast()
   const [view, setView] = useState<'make' | 'ready' | 'inbox'>(initialView ?? (state.files.length ? 'inbox' : state.link ? 'ready' : 'make'))
@@ -136,10 +143,13 @@ export function UploadLinkSheet({
             state={state}
             onDone={() => setView('ready')}
             onCancel={state.link ? () => setView('ready') : undefined}
+            onLink={onLink}
           />
         )}
-        {view === 'ready' && state.link && <ReadyView record={record} workspaceId={workspaceId} state={state} onEdit={() => setView('make')} onInbox={() => setView('inbox')} />}
-        {view === 'ready' && !state.link && <MakeView record={record} workspaceId={workspaceId} today={today} state={state} onDone={() => setView('ready')} />}
+        {view === 'ready' && state.link && (
+          <ReadyView record={record} workspaceId={workspaceId} state={state} onEdit={() => setView('make')} onInbox={() => setView('inbox')} onLink={onLink} onSent={onSent} />
+        )}
+        {view === 'ready' && !state.link && <MakeView record={record} workspaceId={workspaceId} today={today} state={state} onDone={() => setView('ready')} onLink={onLink} />}
         {view === 'inbox' && (
           <InboxView
             record={record}
@@ -162,6 +172,7 @@ function MakeView({
   state,
   onDone,
   onCancel,
+  onLink,
 }: {
   record: ClientOpsRecord
   workspaceId: string
@@ -169,6 +180,7 @@ function MakeView({
   state: Writer
   onDone: () => void
   onCancel?: () => void
+  onLink?: (link: UploadLinkInfo | null) => void
 }) {
   const { showToast } = useToast()
   const sug = useMemo(() => suggestedUploadDocs(record, today), [record, today])
@@ -192,7 +204,8 @@ function MakeView({
     setBusy(true)
     try {
       const docs = sug.options.filter((o) => picked.has(o.key))
-      await saveUploadLink(workspaceId, record.id, docs, days)
+      const next = await saveUploadLink(workspaceId, record.id, docs, days)
+      if (next.role === 'writer') onLink?.(next.link)
       onDone()
     } catch (cause) {
       showToast(uploadErrorText(cause))
@@ -251,16 +264,53 @@ function MakeView({
   )
 }
 
-function ReadyView({ record, workspaceId, state, onEdit, onInbox }: { record: ClientOpsRecord; workspaceId: string; state: Writer; onEdit: () => void; onInbox: () => void }) {
+function ReadyView({
+  record,
+  workspaceId,
+  state,
+  onEdit,
+  onInbox,
+  onLink,
+  onSent,
+}: {
+  record: ClientOpsRecord
+  workspaceId: string
+  state: Writer
+  onEdit: () => void
+  onInbox: () => void
+  onLink?: (link: UploadLinkInfo | null) => void
+  onSent?: (text: string) => Promise<string | false>
+}) {
   const { showToast } = useToast()
   const link = state.link!
   const url = uploadUrl(link.slug)
   const [confirm, setConfirm] = useState<'rotate' | 'off' | null>(null)
   const [busy, setBusy] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [sent, setSent] = useState<{ busy: boolean; done: string }>({ busy: false, done: '' })
+  const message = uploadRequestText({ contactName: record.contactName, link })
+  /** 받을 서류를 골라 둔 링크만 '요청한 서류' 로 잇는다(그 밖의 서류만 받는 링크는 셀 줄이 없다) */
+  const canMark = Boolean(onSent && link.docs.length && !link.expired)
 
   const copy = async (what: 'msg' | 'url') => {
-    const ok = await copyText(what === 'msg' ? uploadRequestText({ contactName: record.contactName, link }) : url)
-    showToast(ok ? (what === 'msg' ? '카톡 문구를 복사했어요 — 대표님께 붙여 보내세요' : '주소를 복사했어요') : '복사하지 못했어요 — 주소를 길게 눌러 복사해 주세요')
+    const ok = await copyText(what === 'msg' ? message : url)
+    if (ok && what === 'msg') setCopied(true)
+    showToast(
+      ok
+        ? what === 'msg'
+          ? canMark
+            ? '문구를 복사했어요 — 카톡 · 문자에 붙여 보내고 [보냈어요] 를 눌러 주세요'
+            : '문구를 복사했어요 — 카톡 · 문자에 붙여 보내세요'
+          : '주소를 복사했어요'
+        : '복사하지 못했어요 — 주소를 길게 눌러 복사해 주세요',
+    )
+  }
+  const markSent = async () => {
+    if (!onSent || sent.busy || sent.done) return
+    setSent({ busy: true, done: '' })
+    const r = await onSent(message).catch(() => false as const)
+    setSent({ busy: false, done: r || '' })
+    if (!r) showToast('적지 못했어요 — 다시 눌러 주세요')
   }
   const act = async (kind: 'rotate' | 'off') => {
     if (confirm !== kind) {
@@ -269,8 +319,8 @@ function ReadyView({ record, workspaceId, state, onEdit, onInbox }: { record: Cl
     }
     setBusy(true)
     try {
-      if (kind === 'rotate') await rotateUploadLink(workspaceId, record.id)
-      else await offUploadLink(workspaceId, record.id)
+      const next = kind === 'rotate' ? await rotateUploadLink(workspaceId, record.id) : await offUploadLink(workspaceId, record.id)
+      if (next.role === 'writer') onLink?.(next.link)
       showToast(kind === 'rotate' ? '새 주소를 만들었어요 — 예전 주소는 이제 안 열려요' : '링크를 닫았어요 — 받은 서류는 그대로예요')
       setConfirm(null)
     } catch (cause) {
@@ -284,14 +334,25 @@ function ReadyView({ record, workspaceId, state, onEdit, onInbox }: { record: Cl
     <>
       <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} className="t-sub h-11 w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 text-slate-800" aria-label="서류 올리기 주소" data-testid="upload-link-url" />
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="primary" onClick={() => void copy('msg')} data-testid="upload-link-copy-msg">
-          <Copy aria-hidden="true" className="size-4" />
+        <Button variant={copied && canMark && !sent.done ? 'secondary' : 'primary'} onClick={() => void copy('msg')} data-testid="upload-link-copy-msg">
+          {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />}
           카톡 문구 복사
         </Button>
-        <Button variant="secondary" onClick={() => void copy('url')} data-testid="upload-link-copy-url">
+        {canMark && (
+          <Button variant={copied && !sent.done ? 'primary' : 'secondary'} disabled={sent.busy || !!sent.done} onClick={() => void markSent()} data-testid="upload-link-sent">
+            {sent.done ? <Check aria-hidden="true" className="size-4" /> : null}
+            {sent.busy ? '적는 중…' : sent.done ? '보낸 것으로 적음' : '보냈어요'}
+          </Button>
+        )}
+        <button type="button" onClick={() => void copy('url')} className="tap t-sub min-h-10 font-semibold text-brand-700 hover:underline" data-testid="upload-link-copy-url">
           주소만 복사
-        </Button>
+        </button>
       </div>
+      {sent.done && (
+        <p role="status" className="t-sub break-keep text-success-700" data-testid="upload-link-sent-done">
+          {sent.done}
+        </p>
+      )}
       <p className="t-sub text-slate-600" data-testid="upload-link-meta">
         {link.expired ? '기한이 지났어요 — [받을 서류 고치기] 로 다시 열어요' : `${koDate(link.expiresAt)}까지 · 받은 ${link.uploaded}개`} · 서류 {link.docs.length}가지
       </p>

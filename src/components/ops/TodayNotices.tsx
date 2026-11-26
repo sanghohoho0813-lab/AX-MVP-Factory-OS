@@ -1,5 +1,5 @@
 /**
- * D-653 오늘 — 고객에게 보낼 안내(약속 전날 · 서류 3일째 · 받을 돈).
+ * D-653 오늘 — 고객에게 보낼 안내(약속 전날 · 서류 3일째 · 받을 돈 · D-658 새 상담 신청 첫 인사).
  *
  * 오늘 머리 줄에 '보낼 안내 n건' 단추 하나(없으면 안 그림) → 누르면 아래에서 올라오는 판에 한 줄씩.
  * 줄마다 [문구 복사] → 카톡 · 문자에 붙여 보내고 → [보냈어요] → 업체 기록에 남고 목록에서 빠진다(+ 되돌리기).
@@ -21,6 +21,7 @@ import { useSenderLine } from '../layout/useCurrentUser'
 const SHOW = 5
 
 const KIND_WORD: Record<OutboundNotice['kind'], string> = {
+  hello: '첫 인사',
   meet: '약속 안내',
   docs: '서류 다시 부탁',
   fee: '입금 안내',

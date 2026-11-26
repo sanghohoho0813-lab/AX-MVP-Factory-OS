@@ -12,7 +12,10 @@ import { nextToasts } from '../../components/ui/toastContext'
 import { NEXT_TIME_OPTIONS, joinNextTime, splitNextTime } from '../clientOpsNextAction'
 import { OTHER_UPLOAD_LABEL, UPLOAD_ACCEPT, isUploadMissing, parseUploadState, uploadErrorText, uploadFileProblem, uploadRequestText, uploadSlugFromPath, uploadUrl } from '../uploadLink'
 import { UPLOAD_LINK_FOLDER, placementForUpload, withUploadedFile } from '../uploadLinkAccept'
-import { FEE_QUIET_DAYS, normalizeNotices, noticeWho, outboundNotices, withNoticeSent, wonShortText } from '../outbound'
+import { INTAKE_NEXT_ACTION } from '../intakeLink'
+import { FEE_QUIET_DAYS, HELLO_KEEP_DAYS, HELLO_NEXT_ACTION, normalizeNotices, noticeWho, outboundNotices, withNoticeSent, wonShortText } from '../outbound'
+import { requestLinesOf, resendText, sameOpenRequest, uploadDocsForRequest } from '../docRequests'
+import { hintFromLink, normalizeUploadHint, openHint, sameHint, withUploadHint, withUploadLine } from '../uploadHint'
 import { LINE_MAX, REC_CHUNK_SEC, clockOf, heardLinesOf, heardText, memoFromSummary, pickRecordMime, secOf, summaryContext, transcribeContext } from '../meetingRecord'
 import { hasTalk, talkFound } from '../homeAsk/talkApply'
 import { slugFromPath } from '../../lib/askPath'
@@ -721,7 +724,7 @@ async function run() {
     fnMissing.length === 0 && fnThin.length === 0 && fnNoMenu.length === 0 && fnBadBasic.length === 0 && usedFn.size >= 50 && functionGuidesOf('sales').length === 5 &&
       !functionGuidesOf('client-ops', { pilot: true }).some((x) => ['fn-client-portal', 'fn-client-consulting', 'fn-client-ai'].includes(x.key)) &&
       !functionGuidesOf('client-ops', { pilot: true, basic: true }).some((x) => x.key === 'fn-client-funding') &&
-      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 21 /* D-654 녹음해서 적기 */ && functionGuidesOf('client-ops', { pilot: true }).every((x) => !x.key.startsWith('fn-talk-')) && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 5 /* D-653 보낼 안내 */ && functionGuidesOf('mk-threads').length === 5 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 4 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
+      functionGuidesOf('client-ops').length === CLIENT_DETAIL_TABS.length + 21 /* D-654 녹음해서 적기 */ && functionGuidesOf('client-ops', { pilot: true }).every((x) => !x.key.startsWith('fn-talk-')) && functionGuidesOf('decide').length === 2 && functionGuidesOf('calendar').length === 3 && functionGuidesOf('today').length === 6 /* D-653 보낼 안내 · D-657 받은 서류 */ && functionGuidesOf('mk-threads').length === 5 && functionGuidesOf('mk-plan').length === 1 && functionGuidesOf('mk-shorts').length === 1 && functionGuidesOf('mk-week').length === 2 && functionGuidesOf('mk-make').length === 2 && functionGuidesOf('mk-top').length === 1 && functionGuidesOf('mk-basics').length === 4 && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-export') && functionGuidesOf('settings', { pilot: true, basic: true }).some((x) => x.key === 'fn-textscale') && menuGuide('fn-client-smart').what.includes('제도') && !menuGuide('fn-client-smart', { basic: true }).what.includes('제도') && hasMenuGuide('fn-search'),
     `missing=${fnMissing.join()} thin=${fnThin.join()} nomenu=${fnNoMenu.join()} basic=${fnBadBasic.join()} used=${usedFn.size}`,
   )
   const bf = basicFlow(CLIENT_FLOW)
@@ -1166,8 +1169,8 @@ async function run() {
     const keep = ['2차 미팅', '방문 상담 · 오후 3시', '제안 브리핑', '현장 실사'].map((t) => ({ ...rec, nextAction: t, nextActionDueDate: today, fees: [], docRequests: [] }))
     check(
       "K53b D-655 약속 — '연락드리기 · 보내기 · 준비 · 잡기 · 전화 드리기 · 정리 · 상담 신청' 은 안내 안 함 · '2차 미팅 · 방문 상담 · 제안 브리핑 · 현장 실사' 는 그대로",
-      own.every((r) => outboundNotices([r], today).length === 0) && keep.every((r) => outboundNotices([r], today).length === 1),
-      own.filter((r) => outboundNotices([r], today).length).map((r) => r.nextAction),
+      own.every((r) => outboundNotices([r], today).filter((n) => n.kind === 'meet').length === 0) && keep.every((r) => outboundNotices([r], today).length === 1),
+      own.filter((r) => outboundNotices([r], today).filter((n) => n.kind === 'meet').length).map((r) => r.nextAction),
     )
     // 보냈어요 → 목록에서 빠짐 · 기록 한 줄 · 되돌리기
     const s1 = withNoticeSent(rec, meet, today, '2026-11-24T01:00:00Z')
@@ -1199,6 +1202,80 @@ async function run() {
       JSON.stringify(norm) === JSON.stringify({ notices: { 'meet:2026-11-25': '2026-11-24', 'fee:abc': '2026-11-20' } }) && round.notices?.['fee:over'] === today &&
         normalizeClientOps({ id: 'x', companyName: 'x' } as never).notices === undefined && JSON.stringify(normalizeNotices([])) === '{}',
     )
+    // D-658 새 상담 신청 → 첫 인사(상담 신청 링크로 들어온 잠재고객 — 서버가 적는 할 일 글 그대로일 때만)
+    {
+      const lead = { ...rec, id: 'lead1', companyName: '홍길동', representativeName: '', contactName: '홍길동', nextAction: HELLO_NEXT_ACTION, nextActionDueDate: today, fees: [], docRequests: [], notices: undefined }
+      const hello = outboundNotices([lead, rec], today, '김컨설 팀장')[0]
+      const sent = withNoticeSent(lead as never, hello, today, '2026-11-24T02:00:00Z')
+      check(
+        "K56 D-658 새 상담 신청 → 첫 인사 — 맨 위 · '홍길동님' · 보내는 사람 한 줄 · 감사 · 통화 시간 · 문의 내용 · 금액은 문구에 0 · [보냈어요] 뒤에는 안 뜸(할 일은 그대로) · 되돌리면 다시",
+        hello?.kind === 'hello' && hello.clientId === 'lead1' && hello.title === '새 상담 신청 · 오늘 들어옴' && hello.text.startsWith('안녕하세요, 홍길동님. 김컨설 팀장입니다.') &&
+          /상담 신청해 주셔서 감사합니다/.test(hello.text) && /통화 편하신 시간/.test(hello.text) && sent.record.notices?.[`hello:${today}`] === today && sent.record.nextAction === HELLO_NEXT_ACTION &&
+          outboundNotices([sent.record], today).length === 0 && outboundNotices([sent.undo(sent.record)], today)[0]?.kind === 'hello' && INTAKE_NEXT_ACTION === HELLO_NEXT_ACTION,
+        hello,
+      )
+      const d3 = { ...lead, nextActionDueDate: '2026-11-21' }
+      const old = { ...lead, nextActionDueDate: '2026-11-09' }
+      const future = { ...lead, nextActionDueDate: '2026-11-25' }
+      const edited = { ...lead, nextAction: '상담 신청 — 연락드리기 (통화함)' }
+      check(
+        "K56 D-658 첫 인사 — 3일째면 '3일째 연락 전' · 14일 넘으면 안 뜸 · 앞날 · 고친 할 일 글 · 보관한 곳은 안 뜸 · 저장 모양 'hello:' 열쇠",
+        outboundNotices([d3], today)[0]?.title === '새 상담 신청 · 3일째 연락 전' && outboundNotices([old], today).length === 0 && outboundNotices([future], today).length === 0 &&
+          outboundNotices([edited], today).length === 0 && outboundNotices([{ ...lead, archivedAt: '2026-11-24T00:00:00Z' }], today).length === 0 &&
+          JSON.stringify(normalizeNotices({ [`hello:${today}`]: today, 'hi:x': today })) === JSON.stringify({ notices: { [`hello:${today}`]: today } }) && HELLO_KEEP_DAYS === 14,
+      )
+    }
+    // D-656 서류 받기 한 길 — 열린 올리기 링크의 사본 · 다시 부탁 문구에 주소 · 같은 요청은 한 번 · 요청 문구 → 링크 서류
+    {
+      const slug = 'abcdefghij0123456789'
+      const hinted = withUploadHint(rec, { slug, expiresAt: '2026-12-08T03:00:00Z' })
+      const nudge = outboundNotices([hinted], today).find((n) => n.kind === 'docs')
+      const r1 = hinted.docRequests!.find((r) => r.id === 'r1')!
+      check(
+        "K55 D-656 열린 링크 사본 — 기한은 한국 날짜 · 다시 부탁 문구(서류함 = 오늘 '보낼 안내')에 주소 한 줄이 끝인사 앞에 · 기한이 지난 날에는 안 붙음",
+        hinted.uploadHint?.until === '2026-12-08' && !!nudge && nudge.text.includes(`https://os.example/up/${slug}`) === false && nudge.text.includes(`/up/${slug}`) &&
+          nudge.text.indexOf(`/up/${slug}`) < nudge.text.indexOf('사진이나 PDF로') && nudge.text.split('\n').slice(1).join('\n') === resendText(hinted, r1, today).split('\n').slice(1).join('\n') &&
+          resendText(hinted, r1, today, 'https://os.example/').includes(`https://os.example/up/${slug}`) && !resendText(hinted, r1, '2026-12-09').includes('/up/') &&
+          !resendText(rec, r1, today).includes('/up/'),
+        nudge?.text,
+      )
+      const closed = withUploadHint(hinted, null)
+      const expired = withUploadHint(hinted, { slug, expiresAt: '2026-12-08T03:00:00Z', expired: true })
+      check(
+        'K55 D-656 사본 지우기 · 다듬기 — 닫거나 기한이 지난 링크는 칸을 지움 · 없던 업체는 그대로(같은 객체) · 이상한 값은 버림 · 다시 읽어도 그대로 · 같은지 비교',
+        closed.uploadHint === undefined && expired.uploadHint === undefined && withUploadHint(rec, null) === rec && hintFromLink({ slug: 'short', expiresAt: '2026-12-08T03:00:00Z' }) === null &&
+          JSON.stringify(normalizeUploadHint({ slug, until: '2026-12-08', extra: 1 })) === JSON.stringify({ uploadHint: { slug, until: '2026-12-08' } }) &&
+          JSON.stringify(normalizeUploadHint({ slug: '../x', until: '2026-12-08' })) === '{}' && JSON.stringify(normalizeUploadHint({ slug, until: '내일' })) === '{}' &&
+          normalizeClientOps(JSON.parse(JSON.stringify(hinted))).uploadHint?.slug === slug && normalizeClientOps({ id: 'x', companyName: 'x' } as never).uploadHint === undefined &&
+          sameHint(hinted.uploadHint, { slug, until: '2026-12-08' }) && !sameHint(hinted.uploadHint, null) && sameHint(null, undefined) && openHint(hinted, '2026-12-08')?.slug === slug && openHint(hinted, '2026-12-09') === null,
+      )
+      const ask = ['안녕하세요.', '', '1. 대표님 생년월일', '2. 주주 구성 메모'].join('\n')
+      const once = withUploadLine(ask, hinted, today, 'https://os.example')
+      check(
+        'K55 D-656 요청 문구에 주소 — 끝에 한 번만(다시 불러도 그대로) · 끝인사가 있으면 그 앞에 · 링크가 없으면 글 그대로 · 주소 줄은 번호 줄이 아니라 요청 줄 수는 그대로',
+        once.endsWith(`https://os.example/up/${slug}`) && withUploadLine(once, hinted, today, 'https://os.example') === once && withUploadLine(ask, rec, today) === ask &&
+          withUploadLine(`${ask}\n\n준비되시는 대로 보내 주세요. 감사합니다.`, hinted, today, 'https://os.example').endsWith(`https://os.example/up/${slug}\n\n준비되시는 대로 보내 주세요. 감사합니다.`) &&
+          requestLinesOf(once).length === 2 && requestLinesOf(uploadRequestText({ contactName: '김한빛', link: { slug, docs: [{ key: 'a', label: '재무제표' }, { key: 'b', label: '주주명부' }], expiresAt: '2026-12-08T03:00:00Z' }, origin: 'https://os.example' })).map((l) => l.label).join(',') === '재무제표,주주명부',
+        once,
+      )
+      const same = sameOpenRequest(rec, ['주주 구성 메모', ' 대표님 생년월일 '])
+      const done = { ...rec, docRequests: rec.docRequests!.map((r) => (r.id === 'r2' ? { ...r, closedAt: today } : r)) }
+      check(
+        'K55 D-656 같은 서류를 이미 부탁한 열린 요청 — 순서 · 빈칸이 달라도 같은 요청 · 한 가지라도 다르면 새 요청 · 끝낸 요청은 치지 않음 · 빈 목록은 없음',
+        same?.id === 'r1' && sameOpenRequest(rec, ['대표님 생년월일']) === null && sameOpenRequest(rec, ['임대차 메모'])?.id === 'r2' && sameOpenRequest(done, ['임대차 메모']) === null && sameOpenRequest(rec, []) === null,
+      )
+      const pick = uploadDocsForRequest(rec, ['1. 재무제표(최근 3년)', '   - 세무사무소', '2. 최근 3개년 재무제표', '3. 대표님 생년월일', '4. 중소기업 확인서'].join('\n'))
+      check(
+        'K55 D-656 요청 문구 → 올리기 링크 서류 — 서류함 칸이 있는 줄만 · 같은 칸은 한 번 · 칸 이름으로 · 칸 없는 줄(생년월일)은 빠짐',
+        pick.length === 2 && pick[0].key === 'financialStatements' && pick[0].label === '최근 3개년 재무제표' && /중소기업/.test(pick[1].label) && !pick.some((d) => /생년월일/.test(d.label)),
+        pick,
+      )
+      const hintSrc = src('src/services/uploadHint.ts')
+      check(
+        'K55 D-656 사본 파일은 순수 함수만 — 서버 · 화면을 끌어오지 않음(오늘 화면이 가볍게) · 합치기 이름표에 칸 이름',
+        !/^import /m.test(hintSrc) && /uploadHint: '서류 올리기 링크'/.test(src('src/services/clientMerge.ts')),
+      )
+    }
     const outSrc = src('src/services/outbound.ts')
     check(
       'K53 D-653 약속 — 규칙 글(AI 부름 0) · 밖으로 보내는 길 0(fetch · 알림 함수 없음) · 수수료 칸을 문구에 쓰지 않음',

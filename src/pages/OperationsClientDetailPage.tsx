@@ -156,7 +156,9 @@ const SalesJourneyCard = lazy(() => import('../components/sales/SalesJourneyCard
 import { factNoteFor, readFact, withFactValue, withProfileFieldEdit, withProfileFieldTyped } from '../services/customerFacts'
 import { TodoComposer } from '../components/journal/TodoBoard'
 import { createJournalEntry, listJournal, updateJournalEntry } from '../services/journalService'
-import { newDocRequest, pendingDocKeys, resendText, withDocRequest, withRequestResent } from '../services/docRequests'
+import { newDocRequest, pendingDocKeys, requestLinesOf, resendText, sameOpenRequest, uploadDocsForRequest, withDocRequest, withRequestResent } from '../services/docRequests'
+import { hintFromLink, openHint, sameHint, withUploadHint, withUploadLine } from '../services/uploadHint'
+import { saveUploadLink } from '../services/uploadLink'
 import { DocRequestPanel } from '../components/ops/DocRequestPanel'
 import { requestFollowUpText } from '../services/recoFollowUp'
 import { addDaysLocal } from '../services/clientOpsNextAction'
@@ -305,6 +307,21 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   /* L-41 · D-652 서류 올리기 링크 — 업체 대표가 휴대폰으로 올린 서류(0031 전 · 로컬 모드면 아무것도 안 그림) */
   const [uplView, setUplView] = useState<null | 'make' | 'ready' | 'inbox'>(null)
   const upl = useUploadLink(workspaceId, clientId, canUploadFiles())
+  // D-657 오늘 '받은 서류' · 고객 카드의 '고객이 올린 서류 n개' 는 ?inbox=1 로 들어와 그 판을 바로 연다(올린 것이 없으면 조용히 서류함만)
+  const inboxParam = searchParams.get('inbox') === '1'
+  const uplFiles = upl.state?.files.length ?? null
+  useEffect(() => {
+    if (!inboxParam || uplFiles === null) return
+    if (uplFiles > 0) setUplView('inbox')
+    setSearchParams(
+      (cur) => {
+        const next = new URLSearchParams(cur)
+        next.delete('inbox')
+        return next
+      },
+      { replace: true },
+    )
+  }, [inboxParam, uplFiles, setSearchParams])
   // D-154: 성과 보고서 한 장
   // D-155: 오늘 '안부 챙길 계약 고객' 의 [성과 보고서] 는 ?report=1 로 들어와 바로 연다
   const [reportOpen, setReportOpen] = useState(() => searchParams.get('report') === '1')
@@ -742,6 +759,53 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const cardOpen = (key: ServiceKey, auto: boolean) => openCards[key] ?? (key === focusedService ? true : auto)
   const toggleCard = (key: ServiceKey, auto: boolean) =>
     setOpenCards((s) => ({ ...s, [key]: !(s[key] ?? auto) }))
+
+  /* ---- D-656 서류 받기 한 길 — 요청 문구 ↔ 올리기 링크 ↔ 회신 대기 ---- */
+
+  /** 링크를 만들거나 · 바꾸거나 · 닫으면 업체 기록의 사본도 같이(다시 부탁 문구 · 오늘 '보낼 안내' 가 주소를 붙인다). 같으면 저장하지 않는다 */
+  const syncUploadHint = (link: Parameters<typeof hintFromLink>[0]) => {
+    const base = current() ?? record
+    if (sameHint(base.uploadHint ?? null, hintFromLink(link))) return
+    void commit(withUploadHint(base, link))
+  }
+
+  /**
+   * 요청을 보냈다(D-314 · D-512) — 3일 뒤 '받았는지 확인' 할 일 + 서류함 '요청함'.
+   * 링크 판에서는 같은 서류를 이미 부탁해 뒀으면 새 요청 · 새 할 일을 만들지 않고 '다시 보낸 날' 만 적는다(dedupe).
+   */
+  const recordRequestSent = async (title: string, text: string, dedupe: boolean): Promise<string | false> => {
+    const follow = requestFollowUpText(text)
+    if (!follow) return false
+    const first = current() ?? record
+    const same = dedupe ? sameOpenRequest(first, requestLinesOf(text).map((l) => l.label)) : null
+    if (same) return (await commit(withRequestResent(first, same.id, today))) ? '서류함 ‘요청한 서류’ 에 다시 보낸 날로 적었어요' : false
+    const due = addDaysLocal(today, 3)
+    const todo = await createJournalEntry(workspaceId, userId, { entryType: 'follow_up', entryDate: today, content: follow, clientId: record.id, dueDate: due })
+    // D-512 무엇을 · 언제 부탁했는지 업체에 남긴다 — 서류가 들어오면 그 줄이 저절로 받음(서류함 · 고객 관리 · 오늘 할 일)
+    const base = current() ?? record
+    const req = newDocRequest(base, { id: generateId(), title, text, today, nowIso: nowIso(), todoId: todo.id })
+    const kept = req ? await commit(withDocRequest(base, req)) : false
+    return `할 일에 넣었어요 · 기한 ${due.slice(5).replace('-', '/')} — 오늘 · 일정에 떠요${kept ? ` · 서류함에 '요청함' 으로 남겼어요(${req?.items.length ?? 0}가지)` : ''}`
+  }
+
+  /** 새 요청 문구인가(다시 요청 문구는 resendText 가 주소를 이미 붙인다) */
+  const isRequestMessage = Boolean(message && /요청/.test(message.title) && !message.resendId)
+  /** 열린 올리기 링크가 있으면 요청 문구 끝에 주소 한 줄 */
+  const messageText = message ? (isRequestMessage ? withUploadLine(message.text, record, today) : message.text) : ''
+  /** 링크가 아직 없으면 문구 창에서 바로 만들어 붙인다 — 문구의 서류 가운데 서류함 칸이 있는 것으로 · 14일 */
+  const linkDocs = isRequestMessage && message && upl.state && workspaceId && !openHint(record, today) ? uploadDocsForRequest(record, message.text) : []
+  const linkTool = linkDocs.length
+    ? {
+        label: '올리기 링크 붙이기',
+        run: async (): Promise<string | false> => {
+          if (!workspaceId) return false
+          const next = await saveUploadLink(workspaceId, record.id, linkDocs, 14)
+          if (next.role !== 'writer' || !next.link) return false
+          const ok = await commit(withUploadHint(current() ?? record, next.link))
+          return ok ? `문구 끝에 올리기 주소를 붙였어요 — 대표님이 휴대폰으로 바로 올려요(서류 ${linkDocs.length}가지 · 14일)` : false
+        },
+      }
+    : undefined
 
   return (
     <div className="flex flex-col gap-5">
@@ -2129,6 +2193,8 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
           onClose={() => setUplView(null)}
           onCommit={commit}
           current={current}
+          onLink={syncUploadHint}
+          onSent={(text) => recordRequestSent('서류 올리기 링크 요청', text, true)}
         />
       )}
 
@@ -2649,8 +2715,9 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
         <MessageModal
           title={message.title}
           description={message.description}
-          text={message.text}
+          text={messageText}
           onClose={() => setMessage(null)}
+          tool={linkTool}
           followUp={(() => {
             // D-512 '아직 안 온 것 다시 요청' 문구 — 새 요청 · 새 할 일을 만들지 않고 그 요청에 '다시 보낸 날' 만 적는다(기다린 날을 새로 셈)
             const resendId = message.resendId
@@ -2666,19 +2733,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
               }
             }
             // D-314 요청 문구(받을 자료 · 서류 요청 · 정책자금 신청 서류)를 보냈으면 — 3일 뒤 '받았는지 확인' 할 일(오늘 · 일정). 다음 약속은 덮지 않는다
-            const follow = /요청/.test(message.title) ? requestFollowUpText(message.text) : ''
-            if (!follow) return undefined
+            if (!isRequestMessage || !requestFollowUpText(messageText)) return undefined
             return {
               label: '보냈어요 · 3일 뒤 받았는지 확인',
-              run: async () => {
-                const due = addDaysLocal(today, 3)
-                const todo = await createJournalEntry(workspaceId, userId, { entryType: 'follow_up', entryDate: today, content: follow, clientId: record.id, dueDate: due })
-                // D-512 무엇을 · 언제 부탁했는지 업체에 남긴다 — 서류가 들어오면 그 줄이 저절로 받음(서류함 · 고객 관리 · 오늘 할 일)
-                const base = latestRef.current ?? record
-                const req = newDocRequest(base, { id: generateId(), title: message.title, text: message.text, today, nowIso: nowIso(), todoId: todo.id })
-                const kept = req ? await commit(withDocRequest(base, req)) : false
-                return `할 일에 넣었어요 · 기한 ${due.slice(5).replace('-', '/')} — 오늘 · 일정에 떠요${kept ? ` · 서류함에 '요청함' 으로 남겼어요(${req?.items.length ?? 0}가지)` : ''}`
-              },
+              run: () => recordRequestSent(message.title, messageText, false),
             }
           })()}
         />

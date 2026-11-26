@@ -5,6 +5,7 @@
  *   - 약속 안내   다음 약속이 미팅 · 상담 · 방문이고 내일(또는 오늘)이면 → '내일 ○시 미팅 확인차 연락드립니다'
  *   - 서류 독촉   보낸 서류 요청에 아직 안 온 것이 있고 3일이 지났으면 → 남은 것만 다시 부탁(D-512 다시 요청과 같은 글)
  *   - 받을 돈     받기로 한 날이 2일 안 · 오늘 · 지났으면(조건 대기는 빼고 — D-140 수금 상태 그대로) → 입금 안내
+ *   - 첫 인사     상담 신청 링크로 들어온 잠재고객에게 아직 연락 전이면(D-658) → '상담 신청 감사합니다 · 통화 편한 시간'
  * 보내는 것은 사람이다 — 앱은 문구만 만든다(외부 발송 · 비용 0). [보냈어요] 를 누르면 업체 기록에 남고 목록에서 빠진다.
  *   약속 · 받을 돈은 `notices`(무엇을 · 언제 보냈나) · 서류는 그 요청의 '다시 부탁한 날'(withRequestResent — 서류함과 같은 기록).
  * 나중에 알림톡을 열면 같은 목록 · 같은 문구가 자동 발송으로 바뀐다(템플릿이 이 글).
@@ -16,7 +17,7 @@ import { openRequests, requestProgress, resendText, withRequestResent } from './
 import { feeStateOf, fundingFactsOf } from './feeStatus'
 import { withActivity } from './clientOpsActivity'
 
-export type NoticeKind = 'meet' | 'docs' | 'fee'
+export type NoticeKind = 'hello' | 'meet' | 'docs' | 'fee'
 
 export interface OutboundNotice {
   /** 목록 안에서 하나뿐인 열쇠 */
@@ -45,6 +46,13 @@ export const MEET_NOTICE_WORDS = /미팅|상담|방문|제안|만남|브리핑|�
 export const MEET_NOTICE_SKIP = /연락\s*드리기|연락하기|전화\s*(?:드리기|하기)|회신|답장|보내기|보내\s*드리기|준비|작성|쓰기|정리|독촉|잡기|상담\s*신청/
 
 /** 서류 요청을 보낸(다시 보낸) 뒤 며칠이 지나면 다시 부탁할까 */
+/**
+ * D-658 상담 신청 링크로 들어온 잠재고객의 다음 할 일(서버 0027 이 적는 글 그대로 — services/intakeLink INTAKE_NEXT_ACTION 과 같은 글).
+ * 여기 따로 적는 까닭: 이 파일은 서버 · 화면을 끌어오지 않는다(오늘 화면이 가볍게).
+ */
+export const HELLO_NEXT_ACTION = '상담 신청 — 연락드리기'
+/** 신청한 지 이만큼 지나도록 연락 전이면 '첫 인사' 는 더 띄우지 않는다(할 일 목록에는 그대로 남는다) */
+export const HELLO_KEEP_DAYS = 14
 export const DOCS_NUDGE_DAYS = 3
 /** 받을 돈 — 예정일 며칠 전부터 미리 안내할까 */
 export const FEE_AHEAD_DAYS = 2
@@ -96,6 +104,36 @@ function greet(record: ClientOpsRecord, sender: string): string {
 /* ------------------------------------------------------------------ */
 /* 하나씩                                                               */
 /* ------------------------------------------------------------------ */
+
+/**
+ * D-658 새 상담 신청 → 첫 인사. 신청이 들어오면 서버가 '상담 신청 — 연락드리기' 를 그날 할 일로 적는다.
+ * 그 할 일이 그대로 남아 있고(아직 연락 전) 14일이 안 지났으면 한 번만 — [보냈어요] 뒤에는 다시 안 뜬다(할 일은 사람이 끝낸다).
+ */
+function helloNotice(record: ClientOpsRecord, today: string, sender: string): OutboundNotice | null {
+  if ((record.nextAction ?? '').trim() !== HELLO_NEXT_ACTION) return null
+  const date = record.nextActionDueDate
+  if (!date || !DAY.test(date)) return null
+  const waited = daysBetween(date, today)
+  if (waited < 0 || waited > HELLO_KEEP_DAYS) return null
+  const id = `hello:${date}`
+  if (record.notices?.[id]) return null
+  return {
+    key: `${record.id}|${id}`,
+    kind: 'hello',
+    clientId: record.id,
+    companyName: record.companyName || '(이름 없음)',
+    title: waited === 0 ? '새 상담 신청 · 오늘 들어옴' : `새 상담 신청 · ${waited}일째 연락 전`,
+    text: [
+      greet(record, sender),
+      '상담 신청해 주셔서 감사합니다. 남겨 주신 내용 잘 확인했습니다.',
+      '통화 편하신 시간을 알려 주시면 그때 연락드리겠습니다. 감사합니다.',
+    ].join('\n'),
+    phone: record.contactPhone ?? '',
+    mark: { type: 'notice', id },
+    // 새 문의는 맨 위 — 오래 기다린 곳이 먼저
+    rank: -1 - Math.min(waited, 99) / 100,
+  }
+}
 
 function meetNotice(record: ClientOpsRecord, today: string, sender: string): OutboundNotice | null {
   const date = record.nextActionDueDate
@@ -207,6 +245,8 @@ export function outboundNotices(clients: readonly ClientOpsRecord[], today: stri
   const out: OutboundNotice[] = []
   for (const c of clients) {
     if (c.archivedAt) continue
+    const hello = helloNotice(c, today, sender)
+    if (hello) out.push(hello)
     const meet = meetNotice(c, today, sender)
     if (meet) out.push(meet)
     out.push(...docsNotices(c, today, sender), ...feeNotices(c, today, sender))
@@ -273,12 +313,12 @@ export function withNoticeSent(
   }
 }
 
-/** 저장된 값 다듬기(clientOpsService.normalizeClientOps) — 'meet:' · 'fee:' 열쇠 · 날짜만 */
+/** 저장된 값 다듬기(clientOpsService.normalizeClientOps) — 'meet:' · 'fee:' · 'hello:' 열쇠 · 날짜만 */
 export function normalizeNotices(value: unknown): { notices?: Record<string, string> } {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const out: Record<string, string> = {}
   for (const [k, v] of Object.entries(value as Record<string, unknown>).slice(-300)) {
-    if (!/^(meet|fee):[^\s]{1,120}$/.test(k) || typeof v !== 'string' || !DAY.test(v)) continue
+    if (!/^(meet|fee|hello):[^\s]{1,120}$/.test(k) || typeof v !== 'string' || !DAY.test(v)) continue
     out[k] = v
   }
   return Object.keys(out).length ? { notices: out } : {}

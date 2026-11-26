@@ -221,6 +221,7 @@ const FIELD_LABEL: Record<string, string> = {
   diagnosisGiven: '진단서 드린 기록',
   docRequests: '서류 요청',
   notices: '보낸 안내',
+  uploadHint: '서류 올리기 링크',
   archivedAt: '보관',
 }
 
