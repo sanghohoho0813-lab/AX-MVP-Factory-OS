@@ -2234,6 +2234,7 @@ try {
           await pk.getByTestId('client-now-sheet').waitFor({ timeout: 5000 }).catch(() => {})
           const nowTxt = ((await pk.getByTestId('client-now-sheet').innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ')
           check("CH7 업체 '지금 할 것 3' 알약 하나(D-667) → 누르면 받은 서류 1개 · 보낼 안내 1건(첫 인사) · 서류 요청 오늘 0/1 이 한 판에", nowPill === '지금 할 것 3' && /받은 서류 1개/.test(nowTxt) && /보낼 안내 1건/.test(nowTxt) && /서류 요청 오늘 0\/1/.test(nowTxt), `${nowPill} | ${nowTxt}`)
+          await pk.waitForTimeout(600)
           await shot(pk, 'ch-3-client-now')
           await pk.keyboard.press('Escape')
           const ownerSees = await (async () => {
