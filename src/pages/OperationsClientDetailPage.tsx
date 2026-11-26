@@ -156,7 +156,7 @@ const SalesJourneyCard = lazy(() => import('../components/sales/SalesJourneyCard
 import { factNoteFor, readFact, withFactValue, withProfileFieldEdit, withProfileFieldTyped } from '../services/customerFacts'
 import { TodoComposer } from '../components/journal/TodoBoard'
 import { createJournalEntry, listJournal, updateJournalEntry } from '../services/journalService'
-import { pendingDocKeys, recordRequestSent, resendText, uploadDocsForRequest, withRequestResent } from '../services/docRequests'
+import { pendingDocKeys, recordRequestSent, resendText, uploadDocsForRequest, withRequestResentLogged } from '../services/docRequests'
 import { hintFromLink, openHint, sameHint, withUploadHint, withUploadLine } from '../services/uploadHint'
 import { ClientNowPill, ClientNowSheets } from '../components/ops/ClientNowRow'
 import { useClientNow, type NowKind } from '../components/ops/clientNow'
@@ -2756,7 +2756,7 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
                 doneLabel: '다시 보냄으로 적음',
                 run: async () => {
                   const base = latestRef.current ?? record
-                  const ok = await commit(withRequestResent(base, resendId, today))
+                  const ok = await commit(withRequestResentLogged(base, resendId, today))
                   return ok ? '서류함 ‘요청한 서류’ 에 다시 보낸 날로 적었어요' : false
                 },
               }

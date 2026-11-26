@@ -14,7 +14,7 @@ import { OTHER_UPLOAD_LABEL, UPLOAD_ACCEPT, isUploadMissing, parseUploadState, u
 import { UPLOAD_LINK_FOLDER, placementForUpload, withUploadedFile } from '../uploadLinkAccept'
 import { ENDING_MAX, INTAKE_NEXT_ACTION, endingWithIntake } from '../intakeLink'
 import { FEE_QUIET_DAYS, HELLO_KEEP_DAYS, HELLO_NEXT_ACTION, normalizeNotices, noticeWho, outboundNotices, withNoticeSent, wonShortText } from '../outbound'
-import { requestLinesOf, resendText, sameOpenRequest, uploadDocsForRequest } from '../docRequests'
+import { recordRequestSent, requestLinesOf, requestSentText, resendText, sameOpenRequest, uploadDocsForRequest, withRequestResentLogged } from '../docRequests'
 import { hintFromLink, normalizeUploadHint, openHint, sameHint, withUploadHint, withUploadLine } from '../uploadHint'
 import { LINE_MAX, REC_CHUNK_SEC, clockOf, heardLinesOf, heardText, memoFromSummary, pickRecordMime, secOf, summaryContext, transcribeContext } from '../meetingRecord'
 import { hasTalk, talkFound } from '../homeAsk/talkApply'
@@ -1356,6 +1356,36 @@ async function run() {
           upNotice.length === 1 && upNotice[0].kind === 'got' && upNotice[0].text.includes('받은 서류\n1. 최근 3개년 재무제표') && upNotice[0].text.includes('아직 남은 서류\n1. 주주 구성 메모') &&
           outboundNotices([morning], today)[0]?.kind === 'got',
         [stale.map((n) => n.title), upNotice.map((n) => n.text)],
+      )
+    }
+    // D-669 업체 활동 기록에 '서류 요청 보냄 · 다시 부탁함' — 부탁 → 받음 → 알림이 한 목록에서 이어지게
+    {
+      const bare = { ...rec, nextAction: '', nextActionDueDate: null, fees: [], docRequests: [], activity: [] } as typeof rec
+      let cur = bare
+      const todos: string[] = []
+      const run = (text: string, dedupe: boolean, id: string) =>
+        recordRequestSent({
+          title: '서류 요청', text, today, due: '2026-11-27', nowIso: '2026-11-24T05:00:00Z', newId: id, dedupe,
+          current: () => cur,
+          commit: async (next) => { cur = next; return true },
+          createTodo: async (content) => { todos.push(content); return { id: `todo_${todos.length}` } },
+        })
+      const ask = ['안녕하세요.', '', '1. 대표님 생년월일', '2. 주주 구성 메모', '3. 임대차 메모'].join('\n')
+      const first = await run(ask, true, 'q1')
+      const afterFirst = cur
+      const again = await run(ask, true, 'q2')
+      check(
+        "K59 D-669 [보냈어요] → 활동 기록 '서류 요청 보냄 — 대표님 생년월일 · 주주 구성 메모 외 1가지'(고객에게 보낸 안내 종류) · 같은 요청을 또 보내면 요청 · 할 일은 그대로이고 '서류 다시 부탁함 — 남은 3가지' 한 줄",
+        typeof first === 'string' && afterFirst.docRequests?.length === 1 && afterFirst.activity[0]?.kind === 'notice' && afterFirst.activity[0]?.text === '서류 요청 보냄 — 대표님 생년월일 · 주주 구성 메모 외 1가지' && afterFirst.activity[0]?.at === '2026-11-24T05:00:00Z' &&
+          typeof again === 'string' && cur.docRequests?.length === 1 && todos.length === 1 && cur.activity.length === 2 && cur.activity[0]?.text === '서류 다시 부탁함 — 남은 3가지' && cur.docRequests?.[0]?.resentAt === today,
+        cur.activity,
+      )
+      const logged = withRequestResentLogged(rec, 'r1', today, '2026-11-24T06:00:00Z')
+      check(
+        "K59 D-669 서류함 [다시 요청] → 다시 부탁한 날 + '서류 다시 부탁함 — 남은 2가지' · 없는 요청이면 기록 없이 그대로 · 한 가지면 이름 하나만",
+        logged.docRequests!.find((r) => r.id === 'r1')?.resentAt === today && logged.activity[0]?.text === '서류 다시 부탁함 — 남은 2가지' && withRequestResentLogged(rec, 'none', today).activity.length === rec.activity.length &&
+          requestSentText({ items: [{ label: '재무제표', where: '' }] }) === '서류 요청 보냄 — 재무제표',
+        logged.activity[0],
       )
     }
     const outSrc = src('src/services/outbound.ts')

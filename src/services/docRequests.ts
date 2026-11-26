@@ -13,6 +13,7 @@ import type { ClientOpsRecord, DocRequest, DocRequestItem, DocumentKey } from '.
 import { allDocumentMetas } from './clientOpsDocuments'
 import { uploadHintLines } from './uploadHint'
 import { requestFollowUpText } from './recoFollowUp'
+import { withActivity } from './clientOpsActivity'
 
 /**
  * D-532 보관 ≠ 표시. 예전에는 업체마다 요청 기록을 12개만 남기고 넘으면 **끝내지 않은 요청까지** 오래된 것부터 버렸다(읽을 때도 12개로 잘랐다).
@@ -313,6 +314,24 @@ export function withRequestResent(record: ClientOpsRecord, id: string, today: st
   return replace(record, id, (r) => ({ ...r, resentAt: today }))
 }
 
+/** D-669 활동 기록 한 줄 — 무엇을 부탁했나(두 가지까지 · 나머지는 수로) */
+export function requestSentText(req: Pick<DocRequest, 'items'>): string {
+  const names = req.items.map((i) => i.label)
+  return `서류 요청 보냄 — ${names.slice(0, 2).join(' · ')}${names.length > 2 ? ` 외 ${names.length - 2}가지` : ''}`
+}
+
+/**
+ * D-669 다시 부탁한 날 + 활동 기록 한 줄('서류 다시 부탁함 — 남은 n가지').
+ * 서류함 [다시 요청] 창 · 올리기 링크 판 · 미팅 정리 문자의 [다시 보냈어요] 가 쓴다(오늘 '보낼 안내' 는 자기 줄을 따로 남긴다).
+ */
+export function withRequestResentLogged(record: ClientOpsRecord, id: string, today: string, at?: string): ClientOpsRecord {
+  const req = (record.docRequests ?? []).find((r) => r.id === id)
+  const next = withRequestResent(record, id, today)
+  if (!req) return next
+  const left = requestProgress(record, req, today).pending.length
+  return withActivity(next, 'notice', left ? `서류 다시 부탁함 — 남은 ${left}가지` : '서류 요청 다시 보냄', null, at)
+}
+
 /** 아직 안 온 것만 다시 부탁하는 문구 — 같은 '1. 이름 / - 어디서' 모양(다시 [보냈어요] 로 이어짐) */
 export function resendText(
   record: Pick<ClientOpsRecord, 'contactName' | 'representativeName' | 'companyName' | 'customDocuments' | 'documents'> & Pick<Partial<ClientOpsRecord>, 'uploadHint'>,
@@ -365,12 +384,13 @@ export async function recordRequestSent(opts: {
   if (!follow) return false
   const first = opts.current()
   const same = opts.dedupe ? sameOpenRequest(first, requestLinesOf(opts.text).map((l) => l.label)) : null
-  if (same) return (await opts.commit(withRequestResent(first, same.id, opts.today))) ? '서류함 ‘요청한 서류’ 에 다시 보낸 날로 적었어요' : false
+  if (same) return (await opts.commit(withRequestResentLogged(first, same.id, opts.today, opts.nowIso))) ? '서류함 ‘요청한 서류’ 에 다시 보낸 날로 적었어요' : false
   const todo = await opts.createTodo(follow, opts.due)
   // D-512 무엇을 · 언제 부탁했는지 업체에 남긴다 — 서류가 들어오면 그 줄이 저절로 받음(서류함 · 고객 관리 · 오늘 할 일)
   const base = opts.current()
   const req = newDocRequest(base, { id: opts.newId, title: opts.title, text: opts.text, today: opts.today, nowIso: opts.nowIso, todoId: todo.id })
-  const kept = req ? await opts.commit(withDocRequest(base, req)) : false
+  // D-669 업체 활동 기록에도 한 줄 — 부탁 → 받음 → 받았다고 알림이 한 목록에서 이어진다
+  const kept = req ? await opts.commit(withActivity(withDocRequest(base, req), 'notice', requestSentText(req), null, opts.nowIso)) : false
   return `할 일에 넣었어요 · 기한 ${opts.due.slice(5).replace('-', '/')} — 오늘 · 일정에 떠요${kept ? ` · 서류함에 '요청함' 으로 남겼어요(${req?.items.length ?? 0}가지)` : ''}`
 }
 
