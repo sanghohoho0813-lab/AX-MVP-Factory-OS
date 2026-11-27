@@ -1373,7 +1373,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             )}
           </Fold>
         </ArrangeItem>
-        <ArrangeItem id="care" label="안부 챙길 계약 고객" hint="한 달 넘게 조용 · 계약 1주년(없으면 칸 없음)" span="half">
+        <ArrangeItem id="care" label="안부 챙길 계약 고객" hint="한 달 넘게 조용 · 계약 1주년 · 재계약(없으면 칸 없음)" span="half">
           {/* D-155: 계약 고객 돌봄 — 한 달 넘게 조용 · 계약 1주년. 없으면 칸 없음 */}
           <TodayCare clients={clients} today={today} workspaceId={workspaceId} onSaved={(r) => setClients((cs) => cs.map((c) => (c.id === r.id ? r : c)))} />
         </ArrangeItem>
