@@ -7,6 +7,8 @@
  *  OFF: 0033 없음 · 되돌림(실행 권한 없음) 알아보기 — 다른 오류는 '꺼짐' 으로 숨기지 않음
  *  REN: (D-684) 계약 끝나는 날 · 재계약 — 예전 기록 '' · 1년 · 2년 · 윤년 · 30일 창 · 7일 급함 · 1주년과 겹치지 않음 · 연락 = 7일 뒤 ·
  *       [재계약했어요] 새 기간 · 두 번 눌러도 한 번 · 문구 · 재계약 전 연간 보고 줄(보고 공백 · 월말 줄 대신) · [열기] 종류 · 계약 완료 기간
+ *  RES: (D-685) 공유한 결과 자료 7일 안 열어 봄 — 6일 0 · 7일 한 줄 · 여럿이면 한 줄 n개 · 누구라도 열면 빠짐 · 기록 전 공유는 안 셈 · 멈춘 연결 0 ·
+ *       0034 없으면(since 없음) 0 · 연습 모드 0 · 시각 모양 달라도 · 차례 · [열기] 는 탭만 · 열람 종류 읽기(모르는 종류 건너뜀)
  */
 import { normalizeClientOps } from '../clientOpsService'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -33,7 +35,7 @@ import {
 import { growthErrorText, isGrowthOff, reportCustomerUrl } from '../portalGrowth'
 import { contractEndText, currentTermEnd, endAfterYears, renewalDefaultEnd, renewalState, renewalYears, withRenewal } from '../contractRenewal'
 import { careList, careMessage, careSnoozeUntil, withCareContactFor } from '../clientCare'
-import { followUpReportKind, periodLabelFor } from '../portalGrowthRules'
+import { RESULT_UNSEEN_DAYS, followUpReportKind, periodLabelFor, type SharedResultLite } from '../portalGrowthRules'
 import { withContractClose } from '../salesContract'
 
 let passed = 0
@@ -245,6 +247,29 @@ const pre = base({ status: 'prospect' } as Partial<ClientOpsRecord>)
 check('REN-19 계약 완료 — 기간 고르면 끝나는 날(1년 = 2027-11-26) · 안 고르면 "" (짐작 0)',
   withContractClose(pre, { ...closeDraft, termYears: 1 }, '2026-11-27T03:00:00Z').contract.endsAt === '2027-11-26' && withContractClose(pre, closeDraft, '2026-11-27T03:00:00Z').contract.endsAt === '')
 check('REN-20 이미 끝나는 날이 있는 업체의 추가 계약 — 기간을 안 고르면 그대로', withContractClose(signedRec(C({ endsAt: '2027-03-01' })), closeDraft, '2026-11-27T03:00:00Z').contract.endsAt === '2027-03-01')
+
+// ---------------- D-685 공유한 결과 자료 열람 ----------------
+const SINCE = '2026-11-01T00:00:00+00:00'
+const sr = (id: string, sharedAt: string, kind: 'document' | 'result' = 'document', linkId = 'l1', title = '벤처인증 확인서'): SharedResultLite => ({ id, kind, linkId, title, sharedAt })
+const rsf = (over: Partial<Parameters<typeof portalFollowUps>[0]> = {}, t = today) =>
+  portalFollowUps({ clientId: 'c1', links: [L('l1', 'active', '2026-10-01T00:00:00Z')], homeSeen: seen({ l1: { first: '2026-10-02T00:00:00Z', last: '2026-11-26T00:00:00Z' } }), reports: [], reportSeen: new Set(), activeWork: false, contracted: false, resultsSince: SINCE, resultSeen: new Set(), ...over }, t)
+const resOf = (x: ReturnType<typeof portalFollowUps>) => x.filter((f) => f.rule === 'result_unseen')
+check('RES-01 6일째 0 · 7일째 한 줄("공유한 \'…\' 을 7일째 안 열어 보셨어요") · 열쇠에 그 자료',
+  RESULT_UNSEEN_DAYS === 7 && resOf(rsf({ results: [sr('d1', '2026-11-21T03:00:00Z')] })).length === 0 &&
+  (() => { const r = resOf(rsf({ results: [sr('d1', '2026-11-20T03:00:00Z')] })); return r.length === 1 && r[0].key === 'c1:result:d1' && r[0].text === "공유한 '벤처인증 확인서' 을 7일째 안 열어 보셨어요 — 안내 문구를 다시 보내 보세요" && r[0].days === 7 })(),
+  rsf({ results: [sr('d1', '2026-11-20T03:00:00Z')] }))
+check('RES-02 여럿이면 한 업체 한 줄 — 개수 · 가장 오래된 날 수', (() => { const r = resOf(rsf({ results: [sr('d1', '2026-11-20T03:00:00Z'), sr('u1', '2026-11-10T03:00:00Z', 'result', 'l1', '결과 안내')] })); return r.length === 1 && r[0].text === '공유한 결과 자료 2개를 안 열어 보셨어요(17일째) — 안내 문구를 다시 보내 보세요' && r[0].key === 'c1:result:u1' })())
+check('RES-03 누구라도 열어 보면 그 자료는 빠짐(나머지만)', (() => { const r = resOf(rsf({ results: [sr('d1', '2026-11-20T03:00:00Z'), sr('u1', '2026-11-10T03:00:00Z', 'result')], resultSeen: new Set(['u1']) })); return r.length === 1 && r[0].key === 'c1:result:d1' })() && resOf(rsf({ results: [sr('d1', '2026-11-20T03:00:00Z')], resultSeen: new Set(['d1']) })).length === 0)
+check('RES-04 기록을 남기기 전에 공유한 자료는 안 셈(모른다) · since 와 같은 때는 셈', resOf(rsf({ results: [sr('d0', '2026-10-31T23:59:59Z')] })).length === 0 && resOf(rsf({ results: [sr('d0', '2026-11-01T00:00:00Z')] })).length === 1)
+check('RES-05 멈춘 · 끊은 연결에 공유한 것 0 · 다른 연결(활성)에 공유한 것은 셈', resOf(rsf({ links: [L('l1', 'paused')], results: [sr('d1', '2026-11-10T03:00:00Z')] })).length === 0 &&
+  resOf(rsf({ links: [L('l1', 'revoked'), L('l2', 'active')], homeSeen: seen({ l2: { first: '2026-10-02T00:00:00Z', last: '2026-11-26T00:00:00Z' } }), results: [sr('d1', '2026-11-10T03:00:00Z', 'document', 'l1'), sr('d2', '2026-11-10T03:00:00Z', 'document', 'l2')] })).map((f) => f.key).join() === 'c1:result:d2')
+check('RES-06 0034 없음(since 없음) · 연습 모드(방문 모름) · 결과 자료 없음 → 0', resOf(rsf({ resultsSince: null, results: [sr('d1', '2026-11-10T03:00:00Z')] })).length === 0 && resOf(rsf({ visitsKnown: false, results: [sr('d1', '2026-11-10T03:00:00Z')] })).length === 0 && resOf(rsf({ results: [] })).length === 0)
+check('RES-07 시각 글자 모양이 달라도(Z · +00:00 · 소수점) 같은 때로 견줌', resOf(rsf({ resultsSince: '2026-11-01T00:00:00.000000+00:00', results: [sr('d1', '2026-11-01T00:00:00Z')] })).length === 1 && resOf(rsf({ resultsSince: '2026-11-01T09:00:00+09:00', results: [sr('d1', '2026-10-31T23:59:00Z')] })).length === 0)
+check('RES-08 긴 제목은 18자에서 … · 차례는 보고서 안 열어 봄 다음', (() => {
+  const r = rsf({ results: [sr('d1', '2026-11-10T03:00:00Z', 'document', 'l1', '2026년 하반기 기업부설연구소 설립 신고 결과 안내서')], reports: [rep('r1', '2026-11-20T03:00:00Z')], reportSeen: new Set() })
+  return r[0].rule === 'report_unseen' && r[1].rule === 'result_unseen' && r[1].text.includes("'2026년 하반기 기업부설연구소…'")
+})())
+check('RES-09 [열기] 는 탭만(보고서 창 아님)', followUpReportKind('result_unseen') === null)
 
 console.log(`\nportalGrowth: ${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

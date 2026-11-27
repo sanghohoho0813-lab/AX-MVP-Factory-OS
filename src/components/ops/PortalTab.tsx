@@ -48,7 +48,7 @@ import { getDataModeConfig } from '../../data/dataMode'
 import { brand } from '../../brand/brand.config'
 import { useIsPilot, useViewingPilot } from '../../auth/osAccess'
 import { copyText } from '../../services/grants/grantView'
-import { isGrowthOff, listClientReports, listLinkAccounts, listReceipts, type PortalReceipt, type PortalReport } from '../../services/portalGrowth'
+import { isGrowthOff, listClientReports, listLinkAccounts, listReceipts, listSharedResults, resultReceiptsSince, type PortalReceipt, type PortalReport, type SharedResult } from '../../services/portalGrowth'
 import { PORTAL_USAGE_LABEL, REPORT_KINDS_NOW, hasActiveWork, portalFollowUps, portalInviteText, portalUsage, daysBetween, type PortalReportKind, type PortalSeen } from '../../services/portalGrowthRules'
 import { currentTermEnd } from '../../services/contractRenewal'
 import { PortalReportsCard } from './PortalReportsCard'
@@ -97,6 +97,8 @@ export function PortalTab({
   // D-681 고객성장관리 — 보고서 · 고객 열람 기록(0033). off = 아직 안 켬(그 칸만 숨기고 나머지는 예전 그대로)
   const [growth, setGrowth] = useState<{ off: boolean; reports: PortalReport[]; receipts: PortalReceipt[] }>({ off: true, reports: [], receipts: [] })
   const [reportSheet, setReportSheet] = useState<{ correcting: PortalReport | null; kind?: PortalReportKind } | null>(null)
+  // D-685 공유한 결과 자료 · 열람 기록을 남기기 시작한 때(0034 없으면 since = null → 새 줄을 그리지 않는다)
+  const [resultInfo, setResultInfo] = useState<{ since: string | null; items: SharedResult[] }>({ since: null, items: [] })
   const [inviteOpen, setInviteOpen] = useState(false)
   // 끊기 한 번 더 묻는 중인 연결 id · 연결된 계정 이메일(연결 id → 이메일 — 0033 서버 함수)
   const [revoking, setRevoking] = useState('')
@@ -108,6 +110,18 @@ export function PortalTab({
 
   const link = links.find((l) => l.status === 'active') ?? links[0] ?? null
   const emailOf = (l: PortalClientLink) => l.profileEmail || accounts.get(l.id) || ''
+  /** D-685 공유 서류 · 결과 글 — 고객이 열어 본 때(0034 가 있을 때만 · 연습 모드는 고객 기록이 없어 안 그림) */
+  const resultSeenLine = (kind: 'document' | 'result', id: string, sharedAt: string | null) => {
+    if (!resultInfo.since || isLocal || growth.off) return null
+    const rc = growth.receipts.filter((r) => r.itemKind === kind && r.itemId === id).sort((a, b) => a.firstSeenAt.localeCompare(b.firstSeenAt))[0]
+    if (rc) {
+      const d = localDateOf(rc.firstSeenAt)
+      return <span className="text-success-700" data-testid="result-seen" data-state="seen">{` · 열어 보심 ${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}${rc.seenCount > 1 ? ` · ${rc.seenCount}번` : ''}`}</span>
+    }
+    if (!sharedAt || Date.parse(sharedAt) < Date.parse(resultInfo.since)) return <span className="text-slate-400" data-testid="result-seen" data-state="before">{' · 열람 기록 전 공유'}</span>
+    const age = daysBetween(localDateOf(sharedAt), today)
+    return <span className={age >= 7 ? 'font-semibold text-danger-700' : 'text-slate-500'} data-testid="result-seen" data-state="unseen">{` · 아직 안 여심${age >= 7 ? `(${age}일째)` : ''}`}</span>
+  }
 
   const load = useCallback(async () => {
     try {
@@ -139,6 +153,9 @@ export function PortalTab({
         ])
         setGrowth({ off: false, reports: reps, receipts: rcs })
         setAccounts(accs)
+        const since = await resultReceiptsSince()
+        const items = since ? await listSharedResults(workspaceId, ls.map((l) => ({ id: l.id, operationsClientId: l.operationsClientId })), record.id).catch(() => []) : []
+        setResultInfo({ since, items })
       } catch (cause) {
         setGrowth({ off: true, reports: [], receipts: [] })
         if (!isGrowthOff(cause)) showToast('보고서 기록을 읽지 못했어요 — 잠시 뒤 다시 열어 주세요.')
@@ -238,10 +255,13 @@ export function PortalTab({
               visitsKnown: !isLocal,
               contracted: contractStageOf(record.status) === 'signed',
               contractEndsAt: currentTermEnd(record.contract, today),
+              results: resultInfo.items,
+              resultSeen: new Set(growth.receipts.filter((r) => r.itemKind === 'document' || r.itemKind === 'result').map((r) => r.itemId)),
+              resultsSince: resultInfo.since,
             },
             today,
           ),
-    [growth, linkLites, homeSeen, record, today, isLocal],
+    [growth, linkLites, homeSeen, record, today, isLocal, resultInfo],
   )
   const inviteText = portalInviteText({
     who: record.representativeName ? `${record.representativeName} 대표님` : `${record.companyName} 담당자님`,
@@ -464,6 +484,7 @@ export function PortalTab({
                       <span className="block text-[0.875rem] text-slate-500">
                         {DOCUMENT_STATUS_LABEL[d.status]}
                         {d.visibility === 'shared_with_customer' && ' · 고객에게 공유됨'}
+                        {d.visibility === 'shared_with_customer' && d.storagePath && resultSeenLine('document', d.id, d.createdAt)}
                         {d.fileName && ` · ${d.fileName}`}
                         {d.uploadedAt && ` · ${activityTimeText(d.uploadedAt)}`}
                         {d.customerNote && ` · 안내: ${d.customerNote}`}
@@ -602,6 +623,7 @@ export function PortalTab({
                     <div className="flex flex-wrap items-center gap-2 text-[0.875rem]">
                       <span className="rounded-full bg-brand-50 px-2 py-0.5 font-semibold text-brand-700">{UPDATE_CATEGORY_LABEL[u.category]}</span>
                       <span className="text-slate-400">{u.publishedAt ? activityTimeText(u.publishedAt) : ''}</span>
+                      {u.category === 'result' && <span className="text-[0.875rem]">{resultSeenLine('result', u.id, u.publishedAt)}</span>}
                       {u.customerActionRequired && (
                         <span className={`rounded-full px-2 py-0.5 font-semibold ${u.customerCompletedAt ? 'bg-success-50 text-success-700' : 'bg-warning-50 text-warning-700'}`}>
                           {u.customerCompletedAt ? '고객 조치 완료' : `고객 조치 대기${u.dueDate ? ` · ${u.dueDate}까지` : ''}`}

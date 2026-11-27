@@ -69,6 +69,18 @@ ra=$(su postgres -c "psql -At -d $DB -c \"select has_function_privilege('authent
 if [ "$a $w $rb $b $ra" = "6 0 falsefalsefalse 6 truetruetrue" ]; then out="$out
 PASS  확인 SQL(0033): 1~6 '좋음' · 읽기 전용 · 되돌리기 → 앱이 부를 수 없음 · 표도 못 읽음 → 0033 다시 → 다시 '좋음' · 부를 수 있음"; else out="$out
 FAIL  확인 SQL(0033): 좋음 $a/6 · 오류 $w · 되돌린 뒤 [$rb] · 다시 넣은 뒤 좋음 $b/6 · [$ra]"; fi
+# D-685 0034 확인(verify_after_0034.sql) — 전부 넣은 DB: 1~4 '좋음' · 오류 0 → 되돌리기 → false · false → 0034 다시 → 다시 '좋음' · 넣은 때는 처음 그대로
+v34() { su postgres -c "psql -At -F '|' -d $DB -c \"\$(cat supabase/manual/verify_after_0034.sql)\"" 2>&1; }
+s34() { su postgres -c "psql -At -d $DB -c \"select public.portal_result_receipts_since()::text\"" 2>&1; }
+a=$(v34 | grep -cE '^[1-4]\|.*\|좋음$'); w=$(v34 | grep -c ERROR); s1=$(s34)
+r=$(psqlq < supabase/manual/rollback_0034.sql 2>&1 | grep -cE '^ *f *\| *f *$')
+rb=$(su postgres -c "psql -At -d $DB -c \"select has_function_privilege('authenticated', 'public.portal_mark_item_seen(uuid,text,uuid)', 'execute')::text || has_function_privilege('authenticated', 'public.portal_result_receipts_since()', 'execute')::text\"" 2>&1)
+sleep 1
+psqlq < supabase/migrations/20261128000034_result_receipts.sql > /dev/null 2>&1
+b=$(v34 | grep -cE '^[1-4]\|.*\|좋음$'); s2=$(s34)
+if [ "$a $w $r $rb $b" = "4 0 1 falsefalse 4" ] && [ -n "$s1" ] && [ "$s1" = "$s2" ]; then out="$out
+PASS  확인 SQL(0034): 1~4 '좋음' · 읽기 전용 · 되돌리기 → 고객이 기록을 못 남김 → 0034 다시 → 다시 '좋음' · 넣은 때는 처음 그대로($s1)"; else out="$out
+FAIL  확인 SQL(0034): 좋음 $a/4 · 오류 $w · 되돌리기 줄 $r · 되돌린 뒤 [$rb] · 다시 넣은 뒤 좋음 $b/4 · 넣은 때 [$s1] → [$s2]"; fi
 echo "$out"
 pass=$(echo "$out" | grep -c '^PASS'); bad=$(echo "$out" | grep -cE '^FAIL|ERROR')
 echo "통과 $pass · 실패 $bad"

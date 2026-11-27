@@ -8,6 +8,7 @@
  *  3) 후속 업무 — 가입 안내 3일 · 연결 뒤 첫 방문 없음 3일 · 보고서 안 열어 봄 3일 · 경과 보고 14일 공백 · 30일 안 오심 ·
  *     (D-682) 계약 고객인데 월말 7일 전까지 이번 달 보고가 없음.
  *     (D-684) 계약 끝나는 날 30일 전 ~ 끝난 뒤 30일인데 그 사이 연간 보고가 없음 → '재계약 전 연간 보고'(그때는 보고 공백 · 월말 보고 줄을 같이 띄우지 않는다).
+ *     (D-685) 공유한 결과 자료(공유 서류 · 결과 글)를 7일 넘게 아무 계정도 안 열어 봄 → 한 업체 한 줄(기록을 남기기 전에 공유한 것은 세지 않는다).
  *  4) (D-682) 월간 보고 · 연간 보고(계약일부터 또는 최근 12개월) — 연간은 '함께 한 기록' 숫자 · '다음 1년 검토해 볼 것'(먼저 제안할 것 · 꺼진 채).
  *     계약일이 비어 있으면 계약 기간을 짐작하지 않는다(그 기간은 고를 수 없고 최근 12개월만).
  *     같은 일은 같은 열쇠(key) — 새 보고서 · 새 연결 · 새 안내가 생기면 새 열쇠(새 주기).
@@ -415,7 +416,19 @@ export function portalUsage(input: { links: readonly PortalLinkLite[]; homeSeen:
   return { state: daysBetween(last, today) >= DORMANT_DAYS ? 'dormant' : 'active', lastVisit: last, firstVisit: first }
 }
 
-export type PortalFollowRule = 'invite_pending' | 'first_visit' | 'report_unseen' | 'report_gap' | 'monthly_review' | 'renewal_report' | 'dormant'
+export type PortalFollowRule = 'invite_pending' | 'first_visit' | 'report_unseen' | 'result_unseen' | 'report_gap' | 'monthly_review' | 'renewal_report' | 'dormant'
+
+/** D-685 공유한 결과 자료를 며칠 안 열어 보시면 챙길지 */
+export const RESULT_UNSEEN_DAYS = 7
+
+/** D-685 공유한 결과 자료 한 개(공유 서류 · 결과 글) — 후속 규칙에 쓰는 칸만 */
+export interface SharedResultLite {
+  id: string
+  kind: 'document' | 'result'
+  linkId: string
+  title: string
+  sharedAt: string
+}
 
 /** D-684 이 날 수 안에 낸 연간 보고가 있으면 재계약 전 보고를 낸 것으로 본다(끝나는 날 기준 앞 60일부터) */
 export const RENEWAL_REPORT_LOOKBACK = 60
@@ -460,6 +473,10 @@ export function portalFollowUps(
     contracted?: boolean
     /** D-684 계약 끝나는 날(적어 둔 것만 · 모르면 없음) */
     contractEndsAt?: string
+    /** D-685 이 업체에 공유한 결과 자료 · 누구라도 열어 본 것 id · 기록을 남기기 시작한 때(없으면 이 규칙을 건너뛴다) */
+    results?: readonly SharedResultLite[]
+    resultSeen?: ReadonlySet<string>
+    resultsSince?: string | null
   },
   today: string,
 ): PortalFollowUp[] {
@@ -492,6 +509,28 @@ export function portalFollowUps(
       out.push({ key: `${input.clientId}:unseen:${latest.id}`, rule: 'report_unseen', clientId: input.clientId, days: n, text: `보고서 ${n}일째 안 열어 보셨어요 — 안내 문구를 다시 보내 보세요` })
     }
   }
+  // D-685 공유한 결과 자료를 7일 넘게 아무도 안 열어 봄 — 활성 연결에 공유한 것 · 기록을 남기기 시작한 뒤 공유한 것만 · 한 업체 한 줄
+  if (known && input.resultsSince && input.results?.length && active.length) {
+    const activeIds = new Set(active.map((l) => l.id))
+    // 시각 글자 모양(+00:00 · Z · 소수점)이 달라도 같은 때로 견준다
+    const since = Date.parse(input.resultsSince)
+    const unseen = input.results
+      .filter((r) => activeIds.has(r.linkId) && Date.parse(r.sharedAt) >= since && !input.resultSeen?.has(r.id))
+      .map((r) => ({ ...r, age: daysBetween(dayOf(r.sharedAt), today) }))
+      .filter((r) => r.age >= RESULT_UNSEEN_DAYS)
+      .sort((a, b) => b.age - a.age || a.id.localeCompare(b.id))
+    if (unseen.length) {
+      const top = unseen[0]
+      const name = top.title.length > 18 ? `${top.title.slice(0, 18).trimEnd()}…` : top.title
+      out.push({
+        key: `${input.clientId}:result:${top.id}`,
+        rule: 'result_unseen',
+        clientId: input.clientId,
+        days: top.age,
+        text: unseen.length === 1 ? `공유한 '${name}' 을 ${top.age}일째 안 열어 보셨어요 — 안내 문구를 다시 보내 보세요` : `공유한 결과 자료 ${unseen.length}개를 안 열어 보셨어요(${top.age}일째) — 안내 문구를 다시 보내 보세요`,
+      })
+    }
+  }
   if (input.activeWork && active.length) {
     const since = latest ? dayOf(latest.publishedAt) : active.map((l) => dayOf(l.linkedAt)).filter(Boolean).sort()[0] ?? ''
     const n = since ? daysBetween(since, today) : 0
@@ -519,7 +558,7 @@ export function portalFollowUps(
       out.push({ key: `${input.clientId}:monthly:${month}`, rule: 'monthly_review', clientId: input.clientId, days: daysBetween(`${month}-01`, today), text: `${Number(month.slice(5, 7))}월 보고를 아직 안 보냈어요 — 월간 보고를 만들어 보세요` })
     }
   }
-  const order: Record<PortalFollowRule, number> = { report_unseen: 0, renewal_report: 1, report_gap: 2, monthly_review: 3, first_visit: 4, invite_pending: 5, dormant: 6 }
+  const order: Record<PortalFollowRule, number> = { report_unseen: 0, result_unseen: 1, renewal_report: 2, report_gap: 3, monthly_review: 4, first_visit: 5, invite_pending: 6, dormant: 7 }
   // 재계약 줄은 끝나는 날이 가까운 것(남은 날이 적은 것)이 먼저 · 그 밖은 오래된 것이 먼저
   return out.sort((a, b) => order[a.rule] - order[b.rule] || (a.rule === 'renewal_report' ? a.days - b.days : b.days - a.days))
 }

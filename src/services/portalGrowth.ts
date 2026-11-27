@@ -47,7 +47,8 @@ export interface PortalReport {
 
 export interface PortalReceipt {
   linkId: string
-  itemKind: 'home' | 'report'
+  /** D-685 document = 공유 서류를 연 때 · result = 결과 글이 보인 때(0034) */
+  itemKind: 'home' | 'report' | 'document' | 'result'
   itemId: string
   itemVersion: number
   firstSeenAt: string
@@ -136,10 +137,15 @@ function reportFromRow(r: Record<string, unknown>): PortalReport {
   }
 }
 
-function receiptFromRow(r: Record<string, unknown>): PortalReceipt {
+const RECEIPT_KINDS: ReadonlyArray<PortalReceipt['itemKind']> = ['home', 'report', 'document', 'result']
+
+function receiptFromRow(r: Record<string, unknown>): PortalReceipt | null {
+  const kind = RECEIPT_KINDS.find((k) => k === str(r.item_kind))
+  // 이 판이 모르는 종류(앞으로 더할 것)는 건너뛴다 — 보고서 열람으로 잘못 세지 않게
+  if (!kind) return null
   return {
     linkId: str(r.portal_client_link_id),
-    itemKind: str(r.item_kind) === 'home' ? 'home' : 'report',
+    itemKind: kind,
     itemId: str(r.item_id),
     itemVersion: Number(r.item_version) || 1,
     firstSeenAt: str(r.first_seen_at),
@@ -253,12 +259,75 @@ export async function listReceipts(workspaceId: string | null, clientId?: string
   if (clientId) q = q.eq('operations_client_id', clientId)
   const { data, error } = await q.order('last_seen_at', { ascending: false }).limit(2000)
   if (error) throw error
-  return (data ?? []).map((r) => receiptFromRow(r as Record<string, unknown>))
+  return (data ?? []).map((r) => receiptFromRow(r as Record<string, unknown>)).filter((x): x is PortalReceipt => x !== null)
 }
 
 /** 작업공간 전체 기록을 업체별로(오늘 화면) — 연결 id → 업체 id 는 부르는 쪽이 연결 목록으로 잇는다 */
 export async function listWorkspaceReceipts(workspaceId: string | null): Promise<PortalReceipt[]> {
   return listReceipts(workspaceId)
+}
+
+/**
+ * D-685 공유 서류 · 결과 글 열람 기록을 남기기 시작한 때(0034 를 처음 넣은 때). 0034 가 없거나 되돌렸으면 null —
+ * 그때는 '열어 보심 · 안 여심' 과 '안 열어 보심' 후속 줄을 숨긴다(예전 화면 그대로). 연습 모드도 null(고객 방문 기록이 없다).
+ */
+export async function resultReceiptsSince(): Promise<string | null> {
+  if (isLocal()) return null
+  try {
+    const { data, error } = await getSupabaseClient().rpc('portal_result_receipts_since')
+    if (error || typeof data !== 'string' || !data) return null
+    return data
+  } catch {
+    return null
+  }
+}
+
+/** D-685 고객에게 공유한 결과 자료 — 공유 서류(파일 있음) · 발행한 결과 글. 결과 글의 업체는 연결로 잇는다(부르는 쪽이 연결 목록을 준다) */
+export interface SharedResult {
+  id: string
+  kind: 'document' | 'result'
+  clientId: string
+  linkId: string
+  title: string
+  /** 공유한 때(서류 = 만든 때 · 결과 글 = 발행한 때) */
+  sharedAt: string
+}
+
+export async function listSharedResults(workspaceId: string | null, links: ReadonlyArray<{ id: string; operationsClientId: string }>, clientId?: string): Promise<SharedResult[]> {
+  if (isLocal() || !workspaceId) return []
+  const sb = getSupabaseClient()
+  let dq = sb
+    .from('portal_documents')
+    .select('id, operations_client_id, portal_client_link_id, title, created_at, storage_path')
+    .eq('workspace_id', workspaceId)
+    .eq('visibility', 'shared_with_customer')
+  if (clientId) dq = dq.eq('operations_client_id', clientId)
+  const linkIds = clientId ? links.filter((l) => l.operationsClientId === clientId).map((l) => l.id) : null
+  let uq = sb
+    .from('portal_updates')
+    .select('id, portal_client_link_id, title, published_at')
+    .eq('workspace_id', workspaceId)
+    .eq('category', 'result')
+    .eq('status', 'published')
+  if (linkIds) {
+    if (!linkIds.length) uq = uq.eq('portal_client_link_id', '00000000-0000-0000-0000-000000000000')
+    else uq = uq.in('portal_client_link_id', linkIds)
+  }
+  const [docs, ups] = await Promise.all([dq.limit(2000), uq.limit(2000)])
+  if (docs.error) throw docs.error
+  if (ups.error) throw ups.error
+  const clientOf = new Map(links.map((l) => [l.id, l.operationsClientId]))
+  const out: SharedResult[] = []
+  for (const r of (docs.data ?? []) as Record<string, unknown>[]) {
+    if (!str(r.storage_path)) continue
+    out.push({ id: str(r.id), kind: 'document', clientId: str(r.operations_client_id), linkId: str(r.portal_client_link_id), title: str(r.title), sharedAt: str(r.created_at) })
+  }
+  for (const r of (ups.data ?? []) as Record<string, unknown>[]) {
+    const c = clientOf.get(str(r.portal_client_link_id))
+    if (!c) continue
+    out.push({ id: str(r.id), kind: 'result', clientId: c, linkId: str(r.portal_client_link_id), title: str(r.title), sharedAt: str(r.published_at) })
+  }
+  return out
 }
 
 /** 이 업체에 연결된 고객 계정의 이메일(연결 id → 이메일) — 직원은 고객 프로필 표를 못 읽어 서버 함수로만. 연습 모드는 빈 칸 */

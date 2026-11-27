@@ -3,6 +3,7 @@
  * 가입 안내 뒤 연결 없음 3일 · 30일 안 오심. 있을 때만 단추 하나 → 판(업체마다 한 줄 · [열기] → 그 업체 고객 플랫폼 탭).
  * 내부에만 뜬다 — 고객에게 저절로 보내지 않는다. 조건이 풀리면(열어 봄 · 새 보고서 · 첫 방문) 저절로 빠진다.
  * 0033 을 아직 넣지 않았거나(읽기 실패) 연습 모드면 아무것도 그리지 않는다(연습 모드에는 고객 방문 기록이 없다).
+ * D-685 0034 가 있으면 '공유한 결과 자료 7일째 안 열어 보심' 줄도(없으면 그 줄만 빠진다).
  */
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -14,7 +15,7 @@ import type { PortalClientLink } from '../../types/bridge'
 import { BottomSheet } from '../ui/primitives'
 import { getDataModeConfig } from '../../data/dataMode'
 import { listLinks } from '../../services/customerBridgeService'
-import { listPublishedReports, listWorkspaceReceipts, type PortalReceipt } from '../../services/portalGrowth'
+import { listPublishedReports, listSharedResults, listWorkspaceReceipts, resultReceiptsSince, type PortalReceipt, type SharedResult } from '../../services/portalGrowth'
 import { currentTermEnd } from '../../services/contractRenewal'
 import { followUpReportKind, hasActiveWork, portalFollowUps, type PortalFollowUp, type PortalReportKind, type PortalSeen } from '../../services/portalGrowthRules'
 
@@ -24,6 +25,9 @@ interface Loaded {
   links: PortalClientLink[]
   reports: { id: string; clientId: string; status: 'published' | 'superseded' | 'withdrawn'; publishedAt: string; kind?: PortalReportKind }[]
   receipts: PortalReceipt[]
+  /** D-685 공유한 결과 자료 · 기록을 남기기 시작한 때(0034 없으면 null · 빈 목록) */
+  results: SharedResult[]
+  resultsSince: string | null
 }
 
 export function usePortalFollowUps(workspaceId: string | null, clients: readonly ClientOpsRecord[], today: string): PortalFollowUp[] {
@@ -31,8 +35,12 @@ export function usePortalFollowUps(workspaceId: string | null, clients: readonly
   useEffect(() => {
     if (getDataModeConfig().mode === 'local' || !workspaceId) return
     let alive = true
-    Promise.all([listLinks(workspaceId), listPublishedReports(workspaceId), listWorkspaceReceipts(workspaceId)])
-      .then(([links, reports, receipts]) => alive && setData({ links, reports, receipts }))
+    Promise.all([listLinks(workspaceId), listPublishedReports(workspaceId), listWorkspaceReceipts(workspaceId), resultReceiptsSince()])
+      .then(async ([links, reports, receipts, resultsSince]) => {
+        // D-685 결과 자료는 0034 가 있을 때만 읽는다(못 읽어도 다른 줄은 그대로)
+        const results = resultsSince ? await listSharedResults(workspaceId, links).catch(() => []) : []
+        if (alive) setData({ links, reports, receipts, results, resultsSince })
+      })
       .catch(() => alive && setData(null))
     return () => {
       alive = false
@@ -44,9 +52,11 @@ export function usePortalFollowUps(workspaceId: string | null, clients: readonly
     for (const l of data.links) byClient.set(l.operationsClientId, [...(byClient.get(l.operationsClientId) ?? []), l])
     const homeSeen = new Map<string, PortalSeen>()
     const reportSeen = new Set<string>()
+    const resultSeen = new Set<string>()
     for (const r of data.receipts) {
       if (r.itemKind === 'home') homeSeen.set(r.linkId, { first: r.firstSeenAt, last: r.lastSeenAt })
-      else reportSeen.add(r.itemId)
+      else if (r.itemKind === 'report') reportSeen.add(r.itemId)
+      else resultSeen.add(r.itemId)
     }
     const out: PortalFollowUp[] = []
     for (const c of clients) {
@@ -65,6 +75,9 @@ export function usePortalFollowUps(workspaceId: string | null, clients: readonly
             activeWork: hasActiveWork(c),
             contracted: contractStageOf(c.status) === 'signed',
             contractEndsAt: currentTermEnd(c.contract, today),
+            results: data.results.filter((r) => r.clientId === c.id),
+            resultSeen,
+            resultsSince: data.resultsSince,
           },
           today,
         ),

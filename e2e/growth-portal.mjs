@@ -19,6 +19,8 @@
  *   W14 (D-682) 월간 보고 발행 → 고객 홈 같은 이름 · 이번 달 보고를 낸 업체는 월말 보고 줄 0 · W2d 월말 7일 안이면 계약 고객마다 '이번 달 보고' 줄
  *   W15 (D-683) 대표 설정 [고객 화면] → 고르기 · 계정마다 대표가 보는 최근 보고서 = 고객 실제 화면 · 보고서 단추 안 눌림 · 기록 0 · 잠재고객 연결 전 화면 · 팀장은 막힘
  *   W16 (D-684) 계약 끝나는 날 20일 전 · 연간 보고 없음 → 오늘 '재계약 전 연간 보고' 줄(월말 줄 대신) · [열기] → 보고서 창 연간 · 계약일부터 · 안부 '재계약' 줄
+ *   W17 (D-685) 공유 서류 · 결과 글 — 10일 전 공유(기록 전 공유 하나는 안 셈) → 오늘 '공유한 결과 자료 2개를 안 열어 보셨어요' → 고객 '결과' 탭 1초 → 결과 글 열람 · [열기] → 서류 열람(서버) →
+ *       OS 탭 '열어 보심' · '열람 기록 전 공유' · 오늘 줄 빠짐 · 대표 · 다른 회사 고객은 기록 못 남김 · 0034 되돌리기 → 줄 숨음 · 고객 화면 그대로 → 다시
  *   W13 JS 오류 0(두 앱)
  *
  *   node e2e/growth-portal.mjs [스크린샷 폴더]   (pg_ctlcluster 16 main start 먼저 · 홈페이지 저장소 ../mirae-ai-lab-homepage)
@@ -156,6 +158,8 @@ function makeRoute(app) {
       return u ? r.fulfill(json(userObj(u))) : r.fulfill(json({ msg: 'no' }, 401))
     }
     if (p === '/auth/v1/logout') return r.fulfill({ status: 204, body: '' })
+    // D-685 서명 주소(공유 서류 [열기]) — 파일 대신 빈 응답. 그 밖의 저장소 요청은 예전처럼 빈 목록
+    if (p.startsWith('/storage/v1/object/sign/') && req.method() === 'POST') return r.fulfill(json({ signedURL: `${p.slice('/storage/v1'.length)}?token=e2e` }))
     if (p.startsWith('/storage/v1/')) return r.fulfill(json([]))
     // 홈페이지 회원 프로필 · 역할은 홈페이지 쪽 표(이 시험 DB 밖) — 가입을 마친 회원으로
     if (app === 'hp' && p === '/rest/v1/profiles') {
@@ -554,6 +558,75 @@ try {
   await careRow.waitFor({ timeout: 8000 }).catch(() => {})
   check("W16c 오늘 '안부 챙길 계약 고객' — 바다상사 재계약 줄(20일 남음)", (await careRow.getAttribute('data-reason').catch(() => '')) === 'renewal' && ((await careRow.innerText().catch(() => '')) ?? '').includes('20일 남음'), (await careFold.innerText().catch(() => '칸 없음'))?.slice(0, 300))
   await shot(op, 'os-06-today-care-renewal')
+
+  // ---------- W17 (D-685) 공유 서류 · 결과 글 열람 ----------
+  const ago = (d) => new Date(Date.now() - d * 86_400_000).toISOString()
+  sql(`
+create or replace function public.portal_result_receipts_since() returns timestamptz language sql immutable as $f$ select '${ago(30)}'::timestamptz $f$;
+update public.portal_client_links set updated_at = now() where id = '${LA1}';
+insert into public.portal_documents (workspace_id, portal_client_link_id, operations_client_id, document_type, title, storage_path, file_name, source, visibility, status, created_at)
+values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '예전 공유 자료', '${OWNER_WS}/clients/growth-a/old.pdf', 'old.pdf', 'internal', 'shared_with_customer', 'verified', '${ago(40)}'),
+       ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '벤처인증 확인서', '${OWNER_WS}/clients/growth-a/venture.pdf', 'venture.pdf', 'internal', 'shared_with_customer', 'verified', '${ago(10)}');
+insert into public.portal_updates (workspace_id, portal_client_link_id, category, title, body, status, published_at)
+values ('${OWNER_WS}', '${LA1}', 'result', '벤처인증을 받으셨어요', '확인서를 공유했습니다.', 'published', '${ago(9)}');
+`)
+  const docNew = sql(`select id from public.portal_documents where title = '벤처인증 확인서' and portal_client_link_id = '${LA1}'`)
+  const resNew = sql(`select id from public.portal_updates where title = '벤처인증을 받으셨어요' and portal_client_link_id = '${LA1}'`)
+  await osGo(op, '/')
+  let rules4 = []
+  const chip4 = op.getByTestId('today-portal-open')
+  await chip4.waitFor({ timeout: 10000 }).catch(() => {})
+  if (await chip4.count()) {
+    await chip4.click()
+    await op.getByTestId('today-portal-sheet').waitFor({ timeout: 5000 }).catch(() => {})
+    rules4 = await op.getByTestId('today-portal-row').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-rule')}|${e.textContent}`))
+    await op.keyboard.press('Escape')
+  }
+  check("W17a 오늘 — 한빛정밀 '공유한 결과 자료 2개를 안 열어 보셨어요(10일째)'(기록 전 공유 하나는 안 셈)", rules4.some((r) => r.startsWith('result_unseen|') && r.includes('한빛정밀') && r.includes('결과 자료 2개') && r.includes('10일째')), rules4)
+  await osGo(op, '/ops/clients/growth-a?tab=portal')
+  await op.getByTestId('portal-reports').waitFor({ timeout: 10000 }).catch(() => {})
+  const st0 = await op.getByTestId('result-seen').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')).sort().join(','))
+  check("W17b OS 탭 — 공유 서류 · 결과 글에 '아직 안 여심(n일째)' 둘 · '열람 기록 전 공유' 하나", st0 === 'before,unseen,unseen', st0)
+  // 대표 · 다른 회사 고객은 기록을 못 남김(서버)
+  const fakeO = await rest(OWNER, 'portal_mark_item_seen', { p_link_id: LA1, p_kind: 'document', p_item_id: docNew })
+  const fakeB = await rest(CB1, 'portal_mark_item_seen', { p_link_id: LA1, p_kind: 'result', p_item_id: resNew })
+  check('W17c 대표 · 다른 회사 고객(B1)이 A1 연결로 기록 남기기 막힘 · 기록 0', fakeO.status !== 200 && fakeB.status !== 200 && sql(`select count(*) from public.portal_receipts where item_kind in ('document', 'result')`) === '0', { o: fakeO.status, b: fakeB.status })
+  // 고객 A1 — 결과 탭 1초 → 결과 글 · [열기] → 서류
+  await hpGo(a1.page, `/my-projects/${LA1}?tab=results`)
+  await a1.page.waitForTimeout(1800)
+  check("W17d 고객 '결과' 탭이 1초 넘게 보이면 결과 글 열람 한 줄(서버) · 서류는 아직 0", receipts(CA1, 'result') === '1' && receipts(CA1, 'document') === '0', { r: receipts(CA1, 'result'), d: receipts(CA1, 'document') })
+  const openBtn = a1.page.locator('li').filter({ hasText: '벤처인증 확인서' }).getByRole('button', { name: '열기' })
+  await openBtn.click()
+  await a1.page.waitForTimeout(1200)
+  check('W17e [열기] → 공유 서류 열람 한 줄(서버) · 예전 공유는 안 연 채 0', receipts(CA1, 'document') === '1' && sql(`select count(*) from public.portal_receipts where item_kind = 'document' and item_id = '${docNew}'`) === '1')
+  await shot(a1.page, 'hp-05-results-tab')
+  await osGo(op, '/ops/clients/growth-a?tab=portal')
+  await op.getByTestId('portal-reports').waitFor({ timeout: 10000 }).catch(() => {})
+  const st1 = await op.getByTestId('result-seen').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-state')}|${e.textContent}`))
+  check("W17f OS 탭 — 둘 다 '열어 보심 m/d' · 예전 공유는 '열람 기록 전 공유'", st1.filter((x) => x.startsWith('seen|') && x.includes('열어 보심')).length === 2 && st1.filter((x) => x.startsWith('before|')).length === 1, st1)
+  await shot(op, 'os-07-result-seen')
+  await osGo(op, '/')
+  let rules5 = []
+  if (await op.getByTestId('today-portal-open').count()) {
+    await op.getByTestId('today-portal-open').click()
+    await op.getByTestId('today-portal-sheet').waitFor({ timeout: 5000 }).catch(() => {})
+    rules5 = await op.getByTestId('today-portal-row').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-rule')}|${e.textContent}`))
+    await op.keyboard.press('Escape')
+  }
+  check('W17g 열어 보시면 오늘 줄이 저절로 빠짐', !rules5.some((r) => r.startsWith('result_unseen|') && r.includes('한빛정밀')), rules5)
+  // 0034 되돌리기 → 새 줄 숨음 · 고객 화면은 그대로 열림 → 다시 넣기 → 돌아옴(넣은 때는 그대로)
+  execSync(`su postgres -c "psql -q -d ${DB}"`, { input: execSync('cat supabase/manual/rollback_0034.sql') })
+  await osGo(op, '/ops/clients/growth-a?tab=portal')
+  await op.getByTestId('portal-reports').waitFor({ timeout: 10000 }).catch(() => {})
+  const offLines = await op.getByTestId('result-seen').count()
+  await hpGo(a1.page, `/my-projects/${LA1}?tab=results`)
+  await a1.page.waitForTimeout(1200)
+  const hpOk = ((await a1.page.locator('body').innerText()) ?? '').includes('벤처인증 확인서')
+  check('W17h 0034 되돌리기 → OS 새 줄 0 · 고객 결과 탭은 그대로 열림(오류 0)', offLines === 0 && hpOk && (await op.getByTestId('portal-reports').count()) === 1, { offLines, hpOk })
+  execSync(`su postgres -c "psql -q -d ${DB}"`, { input: execSync('cat supabase/migrations/20261128000034_result_receipts.sql') })
+  await osGo(op, '/ops/clients/growth-a?tab=portal')
+  await op.getByTestId('portal-reports').waitFor({ timeout: 10000 }).catch(() => {})
+  check('W17i 0034 다시 → 열어 보심 줄 돌아옴(기록 그대로 · 넣은 때 그대로)', (await op.getByTestId('result-seen').count()) === 3 && sql(`select public.portal_result_receipts_since() < now() - interval '29 days'`) === 't')
 
   check('W13 JS 오류 0(두 앱)', errors.length === 0, errors)
 } catch (e) {

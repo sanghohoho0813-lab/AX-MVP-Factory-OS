@@ -40,7 +40,7 @@
 | 칸 | 뜻 |
 |---|---|
 | `portal_client_link_id` · `profile_id` | 어느 연결의 어느 계정 |
-| `item_kind` | `home`(고객 화면 방문) · `report`(보고서 열람) |
+| `item_kind` | `home`(고객 화면 방문) · `report`(보고서 열람) · **D-685(0034)** `document`(공유 서류를 [열기]로 연 때) · `result`(결과 글이 '결과' 탭에서 1초 넘게 보인 때) |
 | `item_id` · `item_version` | 무엇의 몇 판 — `unique(link, profile, kind, item, version)` 계정 · 판마다 한 줄 |
 | `first_seen_at` · `last_seen_at` · `seen_count` | 처음 · 최근 · 횟수(1분 안에 다시 와도 횟수 그대로) |
 | `acknowledged_at` | [확인했어요] 누른 때 — 다시 눌러도 처음 때 그대로 |
@@ -57,6 +57,8 @@
 | `portal_mark_report_seen(p_link_id, p_report_id)` | `{seen_at, acknowledged_at}` — 화면 끝이 1초 넘게 보인 뒤에 부른다 | 계정 · 판마다 한 줄 |
 | `portal_acknowledge_report(p_link_id, p_report_id)` | `{seen_at, acknowledged_at}` | 확인 시각(처음 한 번) |
 | `portal_mark_home()` | 활성 연결 수 — 고객 화면에 들어올 때 | 연결마다 방문 한 줄 |
+| `portal_mark_item_seen(p_link_id, p_kind, p_item_id)` (0034) | `{seen_at}` — `p_kind` = `document`(공유 · 파일 있는 서류를 연 뒤) · `result`(발행한 결과 글이 1초 보인 뒤). 그 연결(활성)의 고객 · **그 연결에 공유한 것만** — 남의 것 · 내부만 · 요청만 · 파일 없는 공유 · 초안 · 진행 소식 · 멈춘 연결은 `P0002` · 모르는 종류 `22023` | 계정 · 자료마다 한 줄(1분 안 반복은 횟수 그대로) |
+| `portal_result_receipts_since()` (0034 · 읽기만) | 이 기록을 남기기 시작한 때(0034 를 처음 넣은 때 · 다시 실행해도 그대로) — 그 전에 공유한 자료는 '안 열어 봄' 으로 세지 않는다 | 없음 |
 
 ## 4. 내부 함수(OS 가 부른다)
 
@@ -88,3 +90,13 @@
 - 초안의 '내부 글'(직원이 적은 다음 단계)은 꺼진 채 — 켠 줄만 발행된다. 수수료 · 메모 · 업무 일기는 초안 재료가 아니다.
 - 자금 줄은 한 사업 한 줄 · '입금 확인' 과 '선정(아직 입금 전)' 을 글로 나누고 **합계를 만들지 않는다.**
 - 안내 문구에는 보고서 주소만 — 금액 · 서류 이름 · 내부 id 0. 보내는 것은 사람(복사) — 앱은 외부로 보내지 않는다.
+
+## 7. 결과 자료 열람(D-685 · 0034) — 더한 것만
+
+- 표는 그대로(`portal_receipts`) — 종류 검사만 `home · report` → `home · report · document · result` 로 넓힘(예전 줄은 모두 그대로 맞는다 · 한 문장).
+- 직원은 기록을 만들 수 없다(그 연결의 고객이 아니면 `not found`). 내부 미리보기 · 대표 '고객 화면 보기' 는 이 함수를 부르지 않는다.
+- OS: 업체 › 고객 플랫폼 탭의 공유 서류 · 결과 글 줄에 '· 열어 보심 m/d(· n번)' / '· 아직 안 여심(n일째)' / '· 열람 기록 전 공유'.
+  후속 규칙 `result_unseen` — 활성 연결에 공유한 것 · 기록 시작 뒤 공유한 것만 · 7일 넘게 아무 계정도 안 염 → 한 업체 한 줄(오늘 '고객 화면 챙길 것' · 탭 빨간 줄). 열면 저절로 빠짐.
+- 꺼짐: `portal_result_receipts_since` 를 못 부르면(0034 전 · 되돌림) 새 줄 · 규칙만 숨김. 홈페이지는 기록 실패를 조용히 넘긴다(화면 그대로).
+- 되돌리기 `supabase/manual/rollback_0034.sql` = 함수 2개 실행 권한만 거둔다(기록 · 넓힌 검사 · 함수 본문 그대로). 확인 `verify_after_0034.sql` 1~4 '좋음'.
+
