@@ -12,7 +12,7 @@ import type { ReactNode } from 'react'
 import { ExternalLink, PlayCircle } from 'lucide-react'
 import { Panel } from '../../components/ui/Panel'
 import { HintTip } from '../../components/ui/fold'
-import { ViewAsSwitch, useViewTargets } from '../../components/layout/ViewAsSwitch'
+import { ViewAsSwitch, useHasViewChoices } from '../../components/layout/ViewAsSwitch'
 import { DeviceSwitch } from '../../components/layout/DeviceView'
 import { useDeviceView } from '../../lib/deviceView'
 import { brand } from '../../brand/brand.config'
@@ -39,7 +39,7 @@ export function AccountViewRow({ label, hint, children, testId }: { label: strin
 }
 
 export function AccountViewPanel({ children, portal = true }: { children?: ReactNode; portal?: boolean }) {
-  const views = useViewTargets()
+  const views = useHasViewChoices()
   const device = useDeviceView()
   const tutorial = useTutorial()
   const guideHover = useGuideHoverOn()
@@ -47,7 +47,7 @@ export function AccountViewPanel({ children, portal = true }: { children?: React
     <Panel title="계정 · 보기">
       <div data-testid="settings-account-view" className="flex flex-col">
         {views && (
-          <AccountViewRow label="보는 화면" hint="다시 로그인하지 않고 팀장 화면을 그대로 봅니다." testId="settings-view-as">
+          <AccountViewRow label="보는 화면" hint="다시 로그인하지 않고 팀장 화면 · 고객 화면(My MIRAE)을 그대로 봅니다." testId="settings-view-as">
             <ViewAsSwitch stacked />
           </AccountViewRow>
         )}

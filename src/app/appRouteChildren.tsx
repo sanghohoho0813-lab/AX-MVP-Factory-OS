@@ -48,6 +48,8 @@ const TodayOpsPage = lazy(() =>
 )
 const OperationsHubPage = lazy(() => import('../pages/OperationsHubPage').then((m) => ({ default: m.OperationsHubPage })))
 const OperationsClientDetailPage = lazy(() => import('../pages/OperationsClientDetailPage').then((m) => ({ default: m.OperationsClientDetailPage })))
+// D-683 고객 화면 보기(대표만 — 화면 안에서 막는다)
+const CustomerViewPage = lazy(() => import('../pages/CustomerViewPage').then((m) => ({ default: m.CustomerViewPage })))
 const OpsCalendarPage = lazy(() => import('../pages/OpsCalendarPage').then((m) => ({ default: m.OpsCalendarPage })))
 const OpsDecidePage = lazy(() => import('../pages/OpsDecidePage').then((m) => ({ default: m.OpsDecidePage })))
 const AgentSettlementPage = lazy(() => import('../pages/AgentSettlementPage').then((m) => ({ default: m.AgentSettlementPage })))
@@ -492,6 +494,7 @@ export const appRouteChildren = [
       { path: 'sales/strategy', element: <StrategyLibraryPage /> },
       { path: 'sales/new', element: <SalesIntakePage /> },
       { path: 'ops/clients/:clientId', element: <OperationsClientDetailPage /> },
+      { path: 'customer-view', element: <CustomerViewPage /> },
       // 컨설팅 작업실 — 특허 × 벤처 × MVP 단계 엔진
       { path: 'studio', element: <ConsultingStudioPage /> },
       // D-245: 명세서 점검(규칙 · AI 없음) — /studio 밑이라 팀장 화면에는 없다

@@ -14,7 +14,7 @@ import { useAuth } from '../../auth/AuthProvider'
 import { createWorkspace } from '../../auth/workspaceService'
 import { useCurrentUser } from './useCurrentUser'
 import { AccountSwitchItems } from './AccountSwitch'
-import { ViewAsSwitch, useViewTargets } from './ViewAsSwitch'
+import { ViewAsSwitch, useHasViewChoices } from './ViewAsSwitch'
 import { TutorialMenuItem } from '../tutorial/TutorialButton'
 
 const ROLE_LABEL: Record<string, string> = { owner: '소유자', admin: '관리자', editor: '편집자', viewer: '뷰어' }
@@ -167,11 +167,11 @@ export function SupabaseUserMenu() {
 
 /** D-558 사용자 메뉴 안 '보는 화면' — 대표 계정(팀장 화면 볼 권한이 있을 때)에만 */
 function ViewAsMenuRow() {
-  const t = useViewTargets()
-  if (!t) return null
+  // D-683 팀장 보기가 없어도 대표면 [고객 화면] 이 있다
+  if (!useHasViewChoices()) return null
   return (
     <div className="flex flex-col gap-1.5 border-b border-slate-100 px-3 py-2.5" data-testid="usermenu-viewas">
-      <p className="t-meta break-keep text-slate-500">보는 화면 — 누르면 그 사람이 보는 화면으로(다시 로그인 없이)</p>
+      <p className="t-meta break-keep text-slate-500">보는 화면 — 누르면 그 사람이 보는 화면으로(다시 로그인 없이 · 고객 화면은 고객사가 My MIRAE 에서 보는 그대로)</p>
       <ViewAsSwitch stacked />
     </div>
   )

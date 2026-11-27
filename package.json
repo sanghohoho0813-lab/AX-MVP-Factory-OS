@@ -176,7 +176,8 @@
     "qa:clientconflict": "node e2e/client-conflict.mjs",
     "test:growth": "vite build --config vite.growth.config.mjs && node .growth-out/growth.mjs",
     "qa:growth": "node e2e/growth.mjs",
-    "qa:growthportal": "node e2e/growth-portal.mjs"
+    "qa:growthportal": "node e2e/growth-portal.mjs",
+    "qa:customerview": "node e2e/customerview.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.7",

@@ -17,6 +17,7 @@
  *   W11 되돌리기(rollback_0033) — 홈페이지 · OS 모두 예전 화면 그대로(보고서 칸만 숨음) → 0033 다시 → 돌아옴
  *   W12 390 — 홈 · 보고서 화면 넘침 0 · 단추 44px
  *   W14 (D-682) 월간 보고 발행 → 고객 홈 같은 이름 · 이번 달 보고를 낸 업체는 월말 보고 줄 0 · W2d 월말 7일 안이면 계약 고객마다 '이번 달 보고' 줄
+ *   W15 (D-683) 대표 설정 [고객 화면] → 고르기 · 계정마다 대표가 보는 최근 보고서 = 고객 실제 화면 · 보고서 단추 안 눌림 · 기록 0 · 잠재고객 연결 전 화면 · 팀장은 막힘
  *   W13 JS 오류 0(두 앱)
  *
  *   node e2e/growth-portal.mjs [스크린샷 폴더]   (pg_ctlcluster 16 main start 먼저 · 홈페이지 저장소 ../mirae-ai-lab-homepage)
@@ -53,7 +54,9 @@ const OWNER = { id: '0e000000-0000-4000-8000-0000000000a1', email: 'owner@e2e.kr
 const CA1 = { id: '0e000000-0000-4000-8000-00000000a0a1', email: 'ceo@hanbit.kr', password: 'a1' }
 const CA2 = { id: '0e000000-0000-4000-8000-00000000a0a2', email: 'staff@hanbit.kr', password: 'a2' }
 const CB1 = { id: '0e000000-0000-4000-8000-00000000b0b1', email: 'ceo@bada.kr', password: 'b1' }
-const USERS = [OWNER, CA1, CA2, CB1]
+// D-683 내부 팀장(0019 pilot_provision 그대로) — 고객 화면 보기가 막히는지
+const PILOT = { id: '0e000000-0000-4000-8000-0000000000b1', email: 'pilot@e2e.kr', password: 'pilot-pass' }
+const USERS = [OWNER, CA1, CA2, CB1, PILOT]
 const OWNER_WS = '0e0000aa-0000-4000-8000-00000000000a'
 const SECRETS = ['채무', '수수료', '300만원']
 
@@ -71,7 +74,8 @@ insert into public.operations_clients (id, workspace_id, company_name, status, p
        'incorporation', jsonb_build_object('status', 'done', 'completedAt', '${year}-02-10T03:00:00Z'),
        'venture', jsonb_build_object('status', 'in_progress', 'nextStep', '대표 개인 채무 확인 뒤 진행(내부)'),
        'patent', jsonb_build_object('status', 'waiting_client'))), '${year}-01-05', now()),
-  ('growth-b', '${OWNER_WS}', '바다상사', 'active', '{}'::jsonb, '${year}-01-06', now());
+  ('growth-b', '${OWNER_WS}', '바다상사', 'active', '{}'::jsonb, '${year}-01-06', now()),
+  ('growth-c', '${OWNER_WS}', '새봄식품', 'waiting', '{}'::jsonb, '${year}-02-01', now());
 select set_config('request.jwt.claim.sub', '${OWNER.id}', false);
 set role authenticated;
 insert into public.portal_client_links (workspace_id, operations_client_id, profile_id, consultant_name) values
@@ -446,6 +450,66 @@ try {
   const ackH = (await m.page.getByTestId('report-ack').boundingBox())?.height ?? 0
   check('W12b 390 보고서 — 넘침 0 · [확인했어요] 44px 이상', (await overflowX(m.page)) <= 0 && ackH >= 44, { o: await overflowX(m.page), ackH })
   await shot(m.page, 'hp-m-02-report', true)
+
+  // ---------- W15 (D-683) 대표가 보는 '고객 화면' = 고객이 실제로 보는 화면 · 기록 0 · 대표만 ----------
+  const recOf = async (pg) => pg.getByTestId(pg === op ? 'cv-recent-item' : 'growth-recent-item').evaluateAll((els) => els.map((e) => `${(e.querySelector('span span') ?? e).textContent?.trim().slice(0, 40)}|${e.getAttribute('data-state')}`))
+  // 고객 두 계정이 먼저 자기 홈을 연다(그 순간의 고객 화면) → 그 뒤 기록을 재고 → 대표가 같은 계정으로 본다
+  const theirsOf = {}
+  for (const u of [CA1, CA2]) {
+    const ctxU = u === CA1 ? a1 : a2
+    await hpGo(ctxU.page, '/my-projects')
+    await ctxU.page.getByTestId('growth-recent').waitFor({ timeout: 10000 }).catch(() => {})
+    theirsOf[u.id] = await recOf(ctxU.page)
+  }
+  await new Promise((r) => setTimeout(r, 1500))
+  const before = sql(`select count(*) || ':' || coalesce(sum(seen_count), 0) from public.portal_receipts`)
+  await osGo(op, '/settings')
+  const cvSw = op.locator('[data-testid="view-as-switch"] [data-view="customer"]').first()
+  check("W15a 대표 설정 '보는 화면' — 대표 · 팀장 · [고객 화면] 셋", (await cvSw.count()) === 1 && (await op.locator('[data-testid="view-as-switch"] [data-view="pilot"]').count()) >= 1)
+  await cvSw.click()
+  await op.getByTestId('cv-picker').waitFor({ timeout: 10000 })
+  const groups = await op.getByTestId('cv-group').allInnerTexts()
+  check('W15b 고르기 — 계약 고객 · 잠재고객(새봄식품 들어감)', groups.length === 2 && /잠재고객 [1-9]/.test(groups[1]), groups)
+  for (const [u, link] of [[CA1, LA1], [CA2, LA2]]) {
+    await osGo(op, `/customer-view?client=growth-a&as=${link}`)
+    await op.getByTestId('cv-frame').waitFor({ timeout: 10000 })
+    await op.getByTestId('cv-recent').waitFor({ timeout: 10000 }).catch(() => {})
+    const mine = await recOf(op)
+    const theirs = theirsOf[u.id]
+    check(`W15c ${u === CA1 ? 'A1' : 'A2'} 계정으로 — 대표가 보는 최근 보고서(제목 · 새/확인 전/확인함) = 고객 실제 화면`, mine.length > 0 && JSON.stringify(mine) === JSON.stringify(theirs), { mine, theirs })
+  }
+  await op.getByTestId('cv-recent-item').first().click()
+  await op.getByTestId('cv-report-body').waitFor({ timeout: 10000 })
+  await op.waitForTimeout(1500)
+  const cvText = (await op.getByTestId('cv-frame').innerText()) ?? ''
+  check('W15d 대표 보고서 화면 — [확인했어요] 안 눌림 · 내부 글 · 수수료 · 안쪽 말 0', (await op.getByTestId('cv-ack').isDisabled()) && !SECRETS.some((x) => cvText.includes(x)) && !cvText.includes('고객 업로드됨'), cvText.slice(0, 200))
+  // 고객 화면 쪽 방문 · 열람 기록은 고객이 들어올 때만 — 대표가 본 것은 0
+  check('W15e 대표가 고객 화면 · 보고서를 열어도 열람 · 방문 기록 0(서버)', sql(`select count(*) || ':' || coalesce(sum(seen_count), 0) from public.portal_receipts`) === before, { before, after: sql(`select count(*) || ':' || coalesce(sum(seen_count), 0) from public.portal_receipts`) })
+  await shot(op, 'os-03-customer-view-report', true)
+  await osGo(op, '/customer-view?client=growth-c')
+  await op.getByTestId('cv-frame').waitFor({ timeout: 10000 })
+  check("W15f 잠재고객(연결 전) — 고객이 보는 '연결된 프로젝트 없음' · 안내 한 줄", (await op.getByTestId('cv-frame').getAttribute('data-linked')) === '0' && (await op.getByTestId('cv-unlinked').count()) === 1 && (await op.getByTestId('cv-unlinked-note').count()) === 1)
+  await op.getByTestId('cv-back-owner').click()
+  await op.waitForURL((u) => new URL(u).pathname === '/', { timeout: 8000 }).catch(() => {})
+  check('W15g [대표로 돌아가기] → 오늘', new URL(op.url()).pathname === '/')
+  // 내부 팀장 — 같은 주소로 와도 막힘 · 보는 화면에 [고객 화면] 0
+  const pc = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  await pc.route(`https://${REF}.supabase.co/**`, makeRoute('os'))
+  const pp = await pc.newPage()
+  pp.on('pageerror', (e) => errors.push(`os-pilot: ${String(e)}`))
+  await pp.goto(`${OS}/login`, { waitUntil: 'networkidle' })
+  await pp.getByLabel('이메일').fill(PILOT.email)
+  await pp.getByLabel('비밀번호').fill(PILOT.password)
+  await pp.getByRole('button', { name: /^로그인/ }).click()
+  await pp.waitForURL((x) => !x.pathname.startsWith('/login'), { timeout: 15000 }).catch(() => {})
+  await pp.goto(`${OS}/customer-view?client=growth-a`, { waitUntil: 'networkidle' })
+  await pp.waitForTimeout(800)
+  const pState = await pp.getByTestId('cv-page').getAttribute('data-state').catch(() => '')
+  const pText = (await pp.locator('body').innerText()) ?? ''
+  check("W15h 내부 팀장 — /customer-view 막힘('대표 계정에서만') · 대표 업체 이름 0", pState === 'blocked' && !pText.includes('한빛정밀'), { pState, t: pText.slice(0, 120) })
+  await pp.goto(`${OS}/settings`, { waitUntil: 'networkidle' })
+  check("W15i 내부 팀장 설정 — '보는 화면' [고객 화면] 0", (await pp.locator('[data-view="customer"]').count()) === 0)
+  await pc.close()
 
   check('W13 JS 오류 0(두 앱)', errors.length === 0, errors)
 } catch (e) {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { localDateOf, todayLocalDate } from '../../lib/appClock'
 import { Link } from 'react-router-dom'
+import { useCustomerViewAllowed } from '../../pages/customerViewAccess'
 import { CheckCircle2, ClipboardCopy, ExternalLink, Eye, Link2, MessageSquareReply, Pause, Play, Plus, Send, Share2, Sparkles, Unlink, Upload } from 'lucide-react'
 import { InlineConfirm } from '../ui/InlineConfirm'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
@@ -101,6 +102,7 @@ export function PortalTab({
   const [accounts, setAccounts] = useState<Map<string, string>>(new Map())
   const readOnly = useViewingPilot() !== null
   const pilot = useIsPilot()
+  const cvAllowed = useCustomerViewAllowed()
   const today = todayLocalDate()
 
   const link = links.find((l) => l.status === 'active') ?? links[0] ?? null
@@ -350,6 +352,11 @@ export function PortalTab({
                   이 고객은 아직 {brand.customerPlatformUrl.replace('https://', '')} 계정과 연결되지 않았습니다. 고객이 가입한 이메일을 넣고 연결하면 고객 화면(My MIRAE)이 열립니다.
                 </p>
                 {/* D-681 가입 안내 — 문구 복사 → [보냈어요] 로 날짜를 남긴다(이메일이 같다고 저절로 잇지 않는다 — 연결은 담당자가) */}
+                {cvAllowed && (
+                  <Link to={`/customer-view?client=${encodeURIComponent(record.id)}`} className="tap t-sub inline-flex items-center gap-1 self-start font-semibold text-brand-700 hover:underline" data-testid="portal-cv-unlinked">
+                    <Eye aria-hidden="true" className="size-4" /> 이 고객이 지금 보는 화면
+                  </Link>
+                )}
                 <p className="t-sub flex flex-wrap items-center gap-2" data-testid="portal-invite" data-state={record.portalInvite?.at ? 'sent' : 'none'}>
                   {record.portalInvite?.at && <span className="text-slate-700">가입 안내 보냄 {record.portalInvite.at.slice(5).replace('-', '/')} · {daysBetween(record.portalInvite.at, today)}일째</span>}
                   {!readOnly && (
@@ -733,6 +740,12 @@ export function PortalTab({
 
       {/* 고객 화면 미리보기 */}
       <Modal open={preview !== null} title="고객 화면 미리보기 (고객이 보는 것과 동일)" size="lg" onClose={() => setPreview(null)}>
+        {/* D-683 홈 · 프로젝트 탭 · 보고서까지 고객이 보는 그대로(대표만) */}
+        {cvAllowed && (
+          <Link to={`/customer-view?client=${encodeURIComponent(record.id)}`} className="tap t-sub mb-3 inline-flex items-center gap-1 font-semibold text-brand-700 hover:underline" data-testid="portal-cv-full">
+            <Eye aria-hidden="true" className="size-4" /> 전체 화면으로 보기(홈 · 프로젝트 · 보고서)
+          </Link>
+        )}
         {preview?.project && (
           <div className="rounded-(--radius-panel) border border-slate-200 bg-slate-50 p-4">
             <p className="text-[0.875rem] font-semibold tracking-wide text-slate-400 uppercase">{brand.customerPortalLabel} · 내 프로젝트</p>

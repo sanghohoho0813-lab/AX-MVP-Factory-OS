@@ -4,9 +4,12 @@
  * 대표 계정으로 들어왔을 때만 보인다(서버 0020 의 my_pilot_views 가 준 목록). 다시 로그인하지 않는다 —
  * 대표가 팀장 작업공간의 구성원(편집자)이라 작업공간만 바꿔 연다. 팀장 화면에서는 메뉴 · 화면 · 이름 칸이 팀장이 보는 그대로.
  * 바꾸면 화면을 새로 연다(보기 무대의 PC · 휴대폰 화면도 함께 — 같은 저장소 값을 읽는다).
+ * D-683 [고객 화면] — 고객사가 My MIRAE 에 로그인하면 보는 화면(/customer-view). 대표(full)만 · 팀장 보기가 없어도 보인다 · 작업공간은 그대로.
  */
 import { useContext } from 'react'
-import { ChevronDown, UserRound, UsersRound } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { ChevronDown, Eye, UserRound, UsersRound } from 'lucide-react'
+import { useCustomerViewAllowed } from '../../pages/customerViewAccess'
 import { useDismissable } from '../../lib/useDismissable'
 import { AuthContext } from '../../auth/authContext'
 import { switchWorkspaceThenGo } from '../../auth/workspaceStorage'
@@ -44,10 +47,29 @@ export function useViewTargets() {
   return { own, views: auth.pilotViews, current, go }
 }
 
+/** D-683 고객 화면 — 지금 그 화면인지 · 오가기 */
+function useCustomerViewEntry() {
+  const allowed = useCustomerViewAllowed()
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  if (!allowed) return null
+  const on = pathname.startsWith('/customer-view')
+  return { on, open: () => { if (!on) navigate('/customer-view') }, leave: () => { if (on) navigate('/') } }
+}
+
+/** 보는 화면 줄을 보일지 — 팀장 보기가 있거나 고객 화면을 볼 수 있으면(대표) */
+export function useHasViewChoices(): boolean {
+  const t = useViewTargets()
+  const cv = useCustomerViewAllowed()
+  return t !== null || cv
+}
+
 export function ViewAsSwitch({ stacked = false }: { stacked?: boolean }) {
   const t = useViewTargets()
-  if (!t) return null
-  const onOwn = !t.views.some((v) => v.workspaceId === t.current)
+  const cv = useCustomerViewEntry()
+  if (!t && !cv) return null
+  const onCustomer = cv?.on === true
+  const onOwn = !onCustomer && !(t?.views ?? []).some((v) => v.workspaceId === t?.current)
   const pill = (on: boolean) =>
     `inline-flex h-full min-w-0 items-center justify-center gap-1.5 rounded-[calc(var(--radius-control)-2px)] px-2.5 text-[0.875rem] font-semibold whitespace-nowrap ${on ? 'bg-navy-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`
   return (
@@ -57,19 +79,26 @@ export function ViewAsSwitch({ stacked = false }: { stacked?: boolean }) {
       data-testid="view-as-switch"
       className={`inline-flex shrink-0 items-center rounded-(--radius-control) border border-slate-200 bg-white p-0.5 ${stacked ? 'h-11 w-full' : 'h-10'}`}
     >
-      <button type="button" role="radio" aria-checked={onOwn} data-view="owner" onClick={() => t.go(t.own?.workspaceId)} className={`${pill(onOwn)} ${stacked ? 'flex-1' : ''}`}>
+      <button type="button" role="radio" aria-checked={onOwn} data-view="owner" onClick={() => { cv?.leave(); t?.go(t.own?.workspaceId) }} className={`${pill(onOwn)} ${stacked ? 'flex-1' : ''}`}>
         <UserRound aria-hidden="true" className="size-4" />
         {brand.ownerTitle}
       </button>
-      {t.views.map((v) => {
-        const on = v.workspaceId === t.current
+      {(t?.views ?? []).map((v) => {
+        const on = !onCustomer && v.workspaceId === t?.current
         return (
-          <button key={v.workspaceId} type="button" role="radio" aria-checked={on} data-view="pilot" onClick={() => t.go(v.workspaceId)} className={`${pill(on)} ${stacked ? 'flex-1' : ''}`}>
+          <button key={v.workspaceId} type="button" role="radio" aria-checked={on} data-view="pilot" onClick={() => t?.go(v.workspaceId)} className={`${pill(on)} ${stacked ? 'flex-1' : ''}`}>
             <UsersRound aria-hidden="true" className="size-4" />
             {whoOf(v)}
           </button>
         )
       })}
+      {/* D-683 고객 화면 — 대표 작업공간에서만(팀장 화면을 보는 중이면 대표로 돌아온 뒤) */}
+      {cv && (
+        <button type="button" role="radio" aria-checked={onCustomer} data-view="customer" data-guide="fn-customer-view" onClick={cv.open} className={`${pill(onCustomer)} ${stacked ? 'flex-1' : ''}`}>
+          <Eye aria-hidden="true" className="size-4" />
+          고객 화면
+        </button>
+      )}
     </div>
   )
 }
