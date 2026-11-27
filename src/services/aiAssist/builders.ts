@@ -178,7 +178,7 @@ export function todayBundle(i: TodayInput): AssistBundle {
         // D-244: 규칙이 만든 글도 한 번 더 거른다(뒤에 자유 글이 섞여도 연락처가 나가지 않게)
         { name: '영업 — 챙길 곳', rows: i.salesRisks.slice(0, 15).map((s) => ({ ref: book.client(s.record), 업체: s.record.companyName, 이유: safeText(s.reason, personNames(s.record), 120), 할일: safeText(s.action, personNames(s.record), 80) })) },
         { name: '영업 — 다시 연락할 곳', rows: i.recontacts.slice(0, 12).map((s) => ({ ref: book.client(s.record), 업체: s.record.companyName, 이유: safeText(s.reasons.join(' · '), personNames(s.record), 160), 조용한날: s.days })) },
-        { name: '안부 챙길 계약 고객', rows: i.care.slice(0, 12).map((c) => ({ ref: clientRef(c.clientId), 업체: c.companyName, 이유: c.reason === 'anniversary' ? '계약 1주년' : `${c.quietDays}일 조용`, 급함: c.urgent ? '급함' : '' })) },
+        { name: '안부 챙길 계약 고객', rows: i.care.slice(0, 12).map((c) => ({ ref: clientRef(c.clientId), 업체: c.companyName, 이유: c.reason === 'renewal' ? `재계약(계약 끝 ${c.renewal?.endsAt ?? ''})` : c.reason === 'anniversary' ? '계약 1주년' : `${c.quietDays}일 조용`, 급함: c.urgent ? '급함' : '' })) },
         ...(i.charges && i.charges.length ? [{ name: '3일 안 정기 결제', rows: i.charges.map((c) => ({ 결제: safeText(c.name, [], 60), 날짜: c.date, 금액: c.amount })) }] : []),
         // D-288 직접 질문 재료 — 맨 뒤(자료가 넘치면 여기부터 줄어든다)
         ...(i.journal ? memoSections(i.journal, byId, i.today, book) : []),

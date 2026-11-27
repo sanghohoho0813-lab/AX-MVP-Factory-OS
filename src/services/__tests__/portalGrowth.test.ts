@@ -5,6 +5,8 @@
  *  USE: 사용 상태(연결 전 · 가입 안내 · 안 오심 · 사용 중 · 30일 · 멈춤 · 끊음)
  *  RULE: 후속 업무(3일 · 14일 · 30일 · 새 주기 = 새 열쇠 · 풀리면 빠짐 · 연습 모드 방문 규칙 건너뜀)
  *  OFF: 0033 없음 · 되돌림(실행 권한 없음) 알아보기 — 다른 오류는 '꺼짐' 으로 숨기지 않음
+ *  REN: (D-684) 계약 끝나는 날 · 재계약 — 예전 기록 '' · 1년 · 2년 · 윤년 · 30일 창 · 7일 급함 · 1주년과 겹치지 않음 · 연락 = 7일 뒤 ·
+ *       [재계약했어요] 새 기간 · 두 번 눌러도 한 번 · 문구 · 재계약 전 연간 보고 줄(보고 공백 · 월말 줄 대신) · [열기] 종류 · 계약 완료 기간
  */
 import { normalizeClientOps } from '../clientOpsService'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -29,6 +31,10 @@ import {
   type PortalSeen,
 } from '../portalGrowthRules'
 import { growthErrorText, isGrowthOff, reportCustomerUrl } from '../portalGrowth'
+import { contractEndText, currentTermEnd, endAfterYears, renewalDefaultEnd, renewalState, renewalYears, withRenewal } from '../contractRenewal'
+import { careList, careMessage, careSnoozeUntil, withCareContactFor } from '../clientCare'
+import { followUpReportKind, periodLabelFor } from '../portalGrowthRules'
+import { withContractClose } from '../salesContract'
 
 let passed = 0
 let failed = 0
@@ -183,6 +189,62 @@ check('RULE-m3 월말 8일 전이면 아직 0 · 계약 전 고객 0 · 활성 �
   !mfu({ reports: [], activeWork: false }, '2026-11-22').some((x) => x.rule === 'monthly_review') && !mfu({ reports: [], activeWork: false, contracted: false }).some((x) => x.rule === 'monthly_review') && !mfu({ reports: [], activeWork: false, links: [L('l1', 'paused')] }).some((x) => x.rule === 'monthly_review'))
 check('RULE-m4 보고 공백 줄이 이미 있으면 월말 줄은 안 띄움(같은 일 두 번 0)', (() => { const r = mfu({ reports: [rep('r0', '2026-10-30T03:00:00Z')], reportSeen: new Set(['r0']) }); return r.some((x) => x.rule === 'report_gap') && !r.some((x) => x.rule === 'monthly_review') })())
 check('RULE-m5 2월 · 12월 말일 계산(2/23 = 5일 전 → 뜸 · 12/24 = 7일 전 → 0)', mfu({ reports: [], activeWork: false }, '2026-02-23').some((x) => x.rule === 'monthly_review' && x.key.endsWith('2026-02')) && !mfu({ reports: [], activeWork: false }, '2026-12-24').some((x) => x.rule === 'monthly_review'))
+
+// ---------------- D-684 계약 끝나는 날 · 재계약 ----------------
+const C = (over: Record<string, unknown> = {}) => ({ signedAt: '2025-12-28', kind: 'cash', cashAmount: 5_000_000, policies: [], note: '', ...over })
+const signedRec = (contract: Record<string, unknown>, over: Partial<ClientOpsRecord> = {}) => base({ status: 'active', contract, ...over } as unknown as Partial<ClientOpsRecord>)
+check('REN-01 예전 기록(끝나는 날 칸 없음) → "" · 틀린 값도 "" · 재계약 줄 0', base().contract.endsAt === '' && base().contract.termFrom === '' && signedRec(C({ endsAt: '12월쯤' })).contract.endsAt === '' && !careList([signedRec(C())], today).some((i) => i.reason === 'renewal'))
+check('REN-02 1년 계약 = 하루 전(2026-01-15 → 2027-01-14) · 2년 · 윤년 2/29 → 평년 2/28 · 틀린 값 ""',
+  endAfterYears('2026-01-15', 1) === '2027-01-14' && endAfterYears('2026-01-15', 2) === '2028-01-14' && endAfterYears('2024-02-29', 1) === '2025-02-28' && endAfterYears('2024-03-01', 1) === '2025-02-28' && endAfterYears('', 1) === '' && endAfterYears('2026-01-15', 0) === '',
+  [endAfterYears('2024-02-29', 1), endAfterYears('2024-03-01', 1)])
+const renAt = (ends: string, t: string) => renewalState({ endsAt: ends }, t)
+check('REN-03 30일 창 — 31일 전 0 · 30일 전 뜸 · 7일 전 급함 · 끝난 뒤 30일까지 · 31일 지나면 0',
+  !renAt('2026-12-28', '2026-11-27')?.due && renAt('2026-12-27', '2026-11-27')?.due === true && renAt('2026-12-27', '2026-11-27')?.urgent === false &&
+  renAt('2026-12-04', '2026-11-27')?.urgent === true && renAt('2026-10-28', '2026-11-27')?.due === true && !renAt('2026-10-27', '2026-11-27')?.due)
+const r30 = signedRec(C({ endsAt: '2026-12-20' }))
+const items30 = careList([r30], today)
+check('REN-04 안부 목록에 재계약 줄 — "계약 끝 12/20(23일 남음) — 성과 보고 드리고 재계약 이야기"', items30.length === 1 && items30[0].reason === 'renewal' && items30[0].text === '계약 끝 12/20(23일 남음) — 성과 보고 드리고 재계약 이야기' && items30[0].urgent === false, items30)
+const rAnn = signedRec(C({ signedAt: '2025-12-21', endsAt: '2026-12-20' }))
+check('REN-05 1주년(12/21)과 끝나는 날(12/20)이 붙어 있으면 한 줄(재계약) — 1주년 줄을 따로 띄우지 않음', careList([rAnn], today).map((i) => i.reason).join() === 'renewal')
+const r2y = signedRec(C({ signedAt: '2025-12-10', endsAt: '2027-12-09' }))
+const ann2 = careList([r2y], today)
+check('REN-06 2년 계약의 1주년 — 재계약 이야기 빼고 "성과 보고서 드리기"', ann2.length === 1 && ann2[0].reason === 'anniversary' && ann2[0].text.endsWith('— 성과 보고서 드리기'), ann2.map((i) => i.text))
+check('REN-07 재계약 줄 [연락했어요] → 7일 뒤 다시(연락 기록) · 그 사이 0 · 7일 뒤 다시 뜸', (() => {
+  const it = items30[0]
+  const n = withCareContactFor(r30, it, today, '2026-11-27T03:00:00Z')
+  return n.care?.lastContactAt === today && n.care?.snoozeUntil === '2026-12-04' && careSnoozeUntil(it, today) === '2026-12-04' && careList([n], '2026-12-03').length === 0 && careList([n], '2026-12-04')[0]?.reason === 'renewal'
+})())
+check('REN-08 끝나기 3일 남았는데 [다음에] — 7일 뒤(끝난 뒤 30일 안)', careSnoozeUntil(careList([signedRec(C({ endsAt: '2026-11-30' }))], today)[0], today) === '2026-12-04')
+const reN = withRenewal(r30, '2027-12-20', today, '2026-11-27T03:00:00Z')
+check('REN-09 [재계약했어요] → 새 기간 12/21 ~ 2027-12-20 · 계약일 그대로 · 활동 기록 한 줄 · 오늘 연락 · 목록에서 빠짐',
+  reN.contract.endsAt === '2027-12-20' && reN.contract.termFrom === '2026-12-21' && reN.contract.signedAt === '2025-12-28' && reN.activity[0]?.kind === 'contract' && reN.activity[0]?.text === '재계약 — 2026-12-21 ~ 2027-12-20' && reN.care?.lastContactAt === today && careList([reN], today).length === 0,
+  [reN.contract, reN.activity[0]])
+check('REN-10 같은 재계약을 두 번 눌러도 한 번 · 앞보다 이른 날은 안 바뀜', withRenewal(reN, '2027-12-20', today) === reN && withRenewal(r30, '2026-12-01', today) === r30)
+check('REN-11 재계약 먼저 고를 끝 — 지금이 딱 2년이면 2년 · 아니면 1년', renewalYears(C({ signedAt: '2025-01-01', endsAt: '2026-12-31' })) === 2 && renewalDefaultEnd(C({ signedAt: '2025-01-01', endsAt: '2026-12-31' })) === '2028-12-31' && renewalYears(C({ endsAt: '2026-12-20' })) === 1 && renewalDefaultEnd(C({ endsAt: '2026-12-20' })) === '2027-12-20')
+const msgRen = careMessage(r30, items30[0], today, '미래에이아이랩 홍길동 대표')
+check('REN-12 재계약 문구 — 끝나는 날 · 다음 계약 기간 · 수수료 · 메모 0', msgRen.includes('12/20에 마무리됩니다') && msgRen.includes('다음 계약 기간') && !msgRen.includes('300만원') && !/수수료|성공보수/.test(msgRen), msgRen)
+check('REN-13 계약 칸 한 줄 — 60일 밖 "~까지" · 60일 안 남은 날 · 지나면 끝남', contractEndText({ endsAt: '2027-12-20' }, today)?.tone === 'plain' && contractEndText({ endsAt: '2026-12-20' }, today)?.text === '2026-12-20까지 · 23일 남음' && contractEndText({ endsAt: '2026-11-20' }, today)?.tone === 'ended' && contractEndText({ endsAt: '' }, today) === null)
+check('REN-14 재계약한 업체의 연간 보고 — 새 기간이 시작되면 그날부터 · 칩 "이번 계약부터" / 미리 재계약해 아직이면 계약일부터(칩 "계약일부터" · 고를 수 있음)',
+  contractStart(reN, '2026-12-22') === '2026-12-21' && periodLabelFor('contract', reN, '2026-12-22') === '이번 계약부터' &&
+  contractStart(reN, today) === '2025-12-28' && periodLabelFor('contract', reN, today) === '계약일부터' && periodUsable('contract', reN, today) && periodLabelFor('contract', r30, today) === '계약일부터')
+check('REN-14b 미리 재계약해도 끝나는 계약의 연간 보고는 챙김 — 지금 계약 끝 = 새 기간 하루 전', currentTermEnd(reN.contract, today) === '2026-12-20' && currentTermEnd(reN.contract, '2026-12-21') === '2027-12-20' && currentTermEnd(r30.contract, today) === '2026-12-20')
+const rfu = (over: Partial<Parameters<typeof portalFollowUps>[0]> = {}, t = today) =>
+  portalFollowUps({ clientId: 'c1', links: [L('l1', 'active', '2026-10-01T00:00:00Z')], homeSeen: seen({ l1: { first: '2026-10-02T00:00:00Z', last: '2026-11-24T00:00:00Z' } }), reports: [{ ...rep('r0', '2026-10-30T03:00:00Z'), kind: 'progress' as const }], reportSeen: new Set(['r0']), activeWork: true, contracted: true, contractEndsAt: '2026-12-20', ...over }, t)
+const fRen = rfu()
+check('REN-15 재계약 전 연간 보고 줄 — 끝나는 날 30일 안 · 연간 보고 없음 → 한 줄 · 보고 공백 · 월말 줄은 대신 빠짐',
+  fRen.some((x) => x.rule === 'renewal_report' && x.key === 'c1:renewal:2026-12-20' && x.text === '계약 끝 12/20(23일 남음) — 재계약 전에 연간 보고를 보내 보세요') && !fRen.some((x) => x.rule === 'report_gap' || x.rule === 'monthly_review'), fRen)
+check('REN-16 끝나는 날 60일 앞부터 낸 연간 보고가 있으면 0 · 그보다 오래된 연간 보고는 안 셈',
+  !rfu({ reports: [{ ...rep('ra', '2026-11-01T03:00:00Z'), kind: 'annual' }], reportSeen: new Set(['ra']) }).some((x) => x.rule === 'renewal_report') &&
+  rfu({ reports: [{ ...rep('ra', '2026-10-01T03:00:00Z'), kind: 'annual' }], reportSeen: new Set(['ra']) }).some((x) => x.rule === 'renewal_report'))
+check('REN-17 계약 전 · 활성 계정 없음 · 끝나는 날 모름 · 31일 앞 → 0 (그때는 예전 줄 그대로)',
+  !rfu({ contracted: false }).some((x) => x.rule === 'renewal_report') && !rfu({ links: [L('l1', 'paused')] }).some((x) => x.rule === 'renewal_report') && !rfu({ contractEndsAt: '' }).some((x) => x.rule === 'renewal_report') &&
+  !rfu({ contractEndsAt: '2026-12-28' }).some((x) => x.rule === 'renewal_report') && rfu({ contractEndsAt: '2026-12-28' }).some((x) => x.rule === 'report_gap'))
+check('REN-18 [열기] 에서 바로 만들 종류 — 월말 → 월간 · 재계약 → 연간 · 보고 공백 → 경과 · 그 밖 탭만', followUpReportKind('monthly_review') === 'monthly' && followUpReportKind('renewal_report') === 'annual' && followUpReportKind('report_gap') === 'progress' && followUpReportKind('first_visit') === null && followUpReportKind('report_unseen') === null)
+const closeDraft = { signedAt: '2026-11-27', dueDate: '2026-12-04', kind: 'cash' as const, lines: [{ label: '계약금', amount: 1_000_000 }], agentName: '', agentRatePct: null, monthlyPremium: null, services: [] }
+const pre = base({ status: 'prospect' } as Partial<ClientOpsRecord>)
+check('REN-19 계약 완료 — 기간 고르면 끝나는 날(1년 = 2027-11-26) · 안 고르면 "" (짐작 0)',
+  withContractClose(pre, { ...closeDraft, termYears: 1 }, '2026-11-27T03:00:00Z').contract.endsAt === '2027-11-26' && withContractClose(pre, closeDraft, '2026-11-27T03:00:00Z').contract.endsAt === '')
+check('REN-20 이미 끝나는 날이 있는 업체의 추가 계약 — 기간을 안 고르면 그대로', withContractClose(signedRec(C({ endsAt: '2027-03-01' })), closeDraft, '2026-11-27T03:00:00Z').contract.endsAt === '2027-03-01')
 
 console.log(`\nportalGrowth: ${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

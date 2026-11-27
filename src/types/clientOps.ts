@@ -417,10 +417,14 @@ export interface ContractInfo {
   policies: InsurancePolicy[]
   /** 계약 조건 메모 */
   note: string
+  /** D-684 계약 끝나는 날 (YYYY-MM-DD). 모르면 '' — 짐작해서 채우지 않는다 */
+  endsAt?: string
+  /** D-684 지금 계약 기간이 시작한 날 — 재계약하면 앞 계약이 끝난 다음 날. 처음 계약이면 '' (= 계약일) */
+  termFrom?: string
 }
 
 export function emptyContract(): ContractInfo {
-  return { signedAt: '', kind: '', cashAmount: null, policies: [], note: '' }
+  return { signedAt: '', kind: '', cashAmount: null, policies: [], note: '', endsAt: '', termFrom: '' }
 }
 
 /* ------------------------------------------------------------------ */

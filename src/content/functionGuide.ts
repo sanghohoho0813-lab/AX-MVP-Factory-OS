@@ -369,6 +369,14 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     next: '월간 보고 · 연간 보고(계약일부터)도 같은 창에서 골라요. 다음은 계약 끝나는 날 알림이에요.',
     hiddenForPilot: true,
   },
+  'fn-care-renewed': {
+    label: '재계약했어요',
+    menu: 'today',
+    what: '계약 끝나는 날이 30일 안으로 다가온 업체에서, 재계약이 정해지면 새 계약이 언제까지인지 적어요.',
+    why: '재계약을 적어 두지 않으면 끝난 계약처럼 계속 알림이 뜨고, 다음 재계약 때도 놓치기 때문이에요.',
+    effect: '계약 칸의 끝나는 날이 새 날로 바뀌고 활동 기록에 한 줄 남아요. 이 줄은 목록에서 빠져요.',
+    next: '다음 계약이 끝나기 30일 전에 다시 알려 드려요.',
+  },
   'fn-customer-view': {
     label: '고객 화면',
     menu: 'settings',

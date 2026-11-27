@@ -23,6 +23,7 @@ import { withActivity } from './clientOpsActivity'
 import { withContract, withService } from './clientOpsService'
 import { withSalesStage } from './salesPipeline'
 import { addDaysLocal } from './clientOpsNextAction'
+import { endAfterYears } from './contractRenewal'
 
 export interface ContractCloseLine {
   label: string
@@ -45,6 +46,8 @@ export interface ContractCloseDraft {
   services: ServiceKey[]
   /** D-213: 이미 계약한 상품이라 이번 추가 계약에서 뺀 것(같은 돈이 두 번 잡히지 않게) */
   skipped?: string[]
+  /** D-684 계약 기간(년) — 고르면 계약일부터 그만큼 뒤 하루 전이 끝나는 날. 0 · 없음 = 정하지 않음(있던 끝나는 날 그대로) */
+  termYears?: number
 }
 
 /** 고른 상품 한 줄 — 금액은 만원 */
@@ -209,6 +212,8 @@ export function withContractClose(record: ClientOpsRecord, d: ContractCloseDraft
     // 계약 카드가 '수금 계획이 계약금액보다 많습니다' 라고 잘못 알렸다
     cashAmount: wantsCash ? (wasSigned && addedSum > 0 ? (next.contract.cashAmount ?? 0) + addedSum : (next.contract.cashAmount ?? (total > 0 ? total : null))) : next.contract.cashAmount,
     policies,
+    // D-684 계약 기간을 골랐을 때만 끝나는 날(고르지 않으면 있던 값 그대로 · 짐작 0)
+    ...(d.termYears && endAfterYears(signedAt, d.termYears) ? { endsAt: endAfterYears(signedAt, d.termYears) } : {}),
   })
 
   // 업무 시작

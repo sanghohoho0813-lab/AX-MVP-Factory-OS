@@ -25,6 +25,14 @@ export const WHATS_NEW_MAX = 10
 
 export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
   {
+    id: 'contract-renewal',
+    date: '2026-11-27',
+    title: '계약 끝나는 날을 적어 두면 — 재계약할 때를 30일 전에 알려 드려요',
+    how: "업체 › 계약 [계약 고치기] 에서 '계약 끝나는 날' 을 적거나 [1년 계약] 을 누르세요. 끝나기 30일 전부터 오늘 '안부 챙길 계약 고객' 에 한 줄이 뜨고, [재계약 문구] 로 연락한 뒤 [재계약했어요] 를 누르면 새 계약 기간이 적혀요.",
+    path: '/ops/clients',
+    cta: '고객 관리 열기',
+  },
+  {
     id: 'client-case',
     date: '2026-11-27',
     title: '고객 사례를 글에 쓸 때 — 이름은 가리고, 허락받은 고객은 기록으로',
@@ -93,12 +101,6 @@ export const WHATS_NEW: ReadonlyArray<WhatsNewItem> = [
     path: '/marketing',
     cta: '마케팅 열기',
     marketing: true,
-  },
-  {
-    id: 'chat-bubbles',
-    date: '2026-11-18',
-    title: '대화창이 카카오톡처럼 바뀌었어요 — 내 말은 오른쪽, 답은 왼쪽',
-    how: '물어보면 내 말이 오른쪽 말풍선으로 올라가고, 답은 왼쪽에 쌓여요. 답이 여러 개(1 · 2 · 3)면 접힌 채로 와요 — 궁금한 것만 눌러 펼치세요. 예전 답은 대화창 위쪽 [지난 대화] 에서 다시 볼 수 있어요.',
   },
 ]
 

@@ -112,6 +112,20 @@ export function ContractCloseSheet({
           </div>
         </fieldset>
 
+        {/* D-684 계약 기간 — 고르면 끝나는 날이 계약 칸에 들어가 끝나기 30일 전 재계약 줄이 뜬다(고르지 않아도 된다) */}
+        <fieldset data-testid="contract-close-term">
+          <legend className="t-sub font-medium text-slate-700">
+            계약 기간 <span className="font-normal text-slate-500">{record.contract.endsAt ? `(지금 ${record.contract.endsAt}까지)` : '(있으면)'}</span>
+          </legend>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {[0, 1, 2].map((n) => (
+              <button key={n} type="button" aria-pressed={(d.termYears ?? 0) === n} data-years={n} onClick={() => setD({ ...d, termYears: n })} className={chip((d.termYears ?? 0) === n)}>
+                {n === 0 ? (record.contract.endsAt ? '그대로' : '정하지 않음') : `${n}년`}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
         <fieldset className="flex flex-col gap-2">
           <legend className="t-sub font-medium text-slate-700">받을 돈 (수금 항목)</legend>
           {d.lines.map((l, i) => (

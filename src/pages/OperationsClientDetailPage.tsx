@@ -103,6 +103,7 @@ import {
   statusForStage,
 } from '../types/clientOps'
 import { contractAgeShort, doneWorks, summarizeContract } from '../services/contractSummary'
+import { renewalState, renewalWhen } from '../services/contractRenewal'
 import { Fold, FoldAllButton, HintTip, openFold, useFold } from '../components/ui/fold'
 import { hintFor } from '../content/sectionHints'
 import type {
@@ -628,7 +629,10 @@ function ClientDetailContent({ workspaceId, userId }: { workspaceId: string | nu
   const contractLine = useMemo(() => {
     if (!record) return ''
     const c = summarizeContract(record.contract, today)
-    return [c.kindLabel, c.moneyText, c.ageText].filter((v) => v !== '').join(' · ')
+    // D-684 끝나는 날이 60일 안이거나 지났으면 접힌 줄에도(그 밖에는 펼쳐야 보임)
+    const ends = renewalState(record.contract, today)
+    const endsLine = ends && ends.daysLeft <= 60 ? `계약 끝 ${Number(ends.endsAt.slice(5, 7))}/${Number(ends.endsAt.slice(8, 10))}(${renewalWhen(ends.daysLeft)})` : ''
+    return [c.kindLabel, c.moneyText, c.ageText, endsLine].filter((v) => v !== '').join(' · ')
   }, [record, today])
 
   /** 다음 행동이 늦었는지 — 늦었을 때만 색을 쓴다 */

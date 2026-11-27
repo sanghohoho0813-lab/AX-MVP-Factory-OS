@@ -18,7 +18,6 @@ import { generateId } from '../../storage/localStore'
 import { brand } from '../../brand/brand.config'
 import { copyText } from '../../services/grants/grantView'
 import {
-  DRAFT_PERIOD_LABEL,
   REPORT_KINDS_MAIN,
   REPORT_KINDS_NOW,
   REPORT_KIND_LABEL,
@@ -26,6 +25,7 @@ import {
   defaultPeriod,
   draftPayload,
   draftPeriod,
+  periodLabelFor,
   periodUsable,
   periodsFor,
   reportNoticeText,
@@ -62,6 +62,7 @@ export function PortalReportSheet({
   correcting,
   linked,
   seenReportIds,
+  initialKind,
   onClose,
   onPublished,
 }: {
@@ -78,16 +79,19 @@ export function PortalReportSheet({
   linked: boolean
   /** 고객 계정 누구라도 열어 본 보고서 id — 연간 '함께 한 기록' 숫자(연습 모드는 빈 칸) */
   seenReportIds?: ReadonlySet<string>
+  /** D-684 오늘 '고객 화면 챙길 것' [열기] 에서 온 종류(월말 → 월간 · 재계약 → 연간 · 보고 공백 → 경과) */
+  initialKind?: PortalReportKind | null
   onClose: () => void
   onPublished: (r: { id: string; version: number; created: boolean }) => void
 }) {
   const { showToast } = useToast()
-  const [kind, setKind] = useState<PortalReportKind>(correcting?.kind ?? 'progress')
+  const firstKind: PortalReportKind = correcting?.kind ?? initialKind ?? 'progress'
+  const [kind, setKind] = useState<PortalReportKind>(firstKind)
   const lastEnd = useMemo(
     () => reports.filter((r) => r.status === 'published' && r.periodEnd).map((r) => r.periodEnd as string).sort().at(-1) ?? null,
     [reports],
   )
-  const [period, setPeriod] = useState<DraftPeriodKey>(() => defaultPeriod(correcting?.kind ?? 'progress', record, today, lastEnd))
+  const [period, setPeriod] = useState<DraftPeriodKey>(() => defaultPeriod(firstKind, record, today, lastEnd))
   const [moreKinds, setMoreKinds] = useState(false)
   const [making, setMaking] = useState(false)
   const { ent } = useEntitlements()
@@ -246,7 +250,7 @@ export function PortalReportSheet({
                     return (
                       <button key={p} type="button" aria-pressed={period === p} disabled={!usable} onClick={() => setPeriod(p)} data-testid="report-period" data-period={p}
                         className={`tap t-sub min-h-10 rounded-full border px-3.5 font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${period === p ? 'border-brand-600 bg-white text-brand-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>
-                        {period === p && <Check aria-hidden="true" className="mr-1 inline size-4 align-[-3px]" />}{DRAFT_PERIOD_LABEL[p]}
+                        {period === p && <Check aria-hidden="true" className="mr-1 inline size-4 align-[-3px]" />}{periodLabelFor(p, record, today)}
                       </button>
                     )
                   })}

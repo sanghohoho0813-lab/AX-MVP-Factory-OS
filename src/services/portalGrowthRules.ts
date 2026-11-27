@@ -7,6 +7,7 @@
  *  2) 고객 화면 사용 상태 — 연결 전 · 가입 안내함 · 연결됨(안 오심) · 사용 중 · 오래 안 오심 · 잠시 멈춤 · 끊음.
  *  3) 후속 업무 — 가입 안내 3일 · 연결 뒤 첫 방문 없음 3일 · 보고서 안 열어 봄 3일 · 경과 보고 14일 공백 · 30일 안 오심 ·
  *     (D-682) 계약 고객인데 월말 7일 전까지 이번 달 보고가 없음.
+ *     (D-684) 계약 끝나는 날 30일 전 ~ 끝난 뒤 30일인데 그 사이 연간 보고가 없음 → '재계약 전 연간 보고'(그때는 보고 공백 · 월말 보고 줄을 같이 띄우지 않는다).
  *  4) (D-682) 월간 보고 · 연간 보고(계약일부터 또는 최근 12개월) — 연간은 '함께 한 기록' 숫자 · '다음 1년 검토해 볼 것'(먼저 제안할 것 · 꺼진 채).
  *     계약일이 비어 있으면 계약 기간을 짐작하지 않는다(그 기간은 고를 수 없고 최근 12개월만).
  *     같은 일은 같은 열쇠(key) — 새 보고서 · 새 연결 · 새 안내가 생기면 새 열쇠(새 주기).
@@ -18,6 +19,7 @@ import { SERVICES, SERVICE_STATUS_LABEL } from '../content/clientOpsCatalog'
 import { buildClientReport, reportFrom, wonShort } from './clientReport'
 import { documentsWithExpiry } from './clientOpsAlerts'
 import { localDateOf } from '../lib/appClock'
+import { RENEWAL_AFTER, RENEWAL_AHEAD, renewalWhen, termStart } from './contractRenewal'
 
 export type PortalReportKind = 'consult_summary' | 'progress' | 'interim' | 'final' | 'monthly' | 'annual'
 
@@ -55,16 +57,24 @@ export function periodsFor(kind: PortalReportKind): DraftPeriodKey[] {
   return ['2w', '1m', 'since_last', 'year']
 }
 
-/** 계약일(한국 날짜) — 비어 있으면 '' (짐작하지 않는다) */
-export function contractStart(record: Pick<ClientOpsRecord, 'contract'>): string {
-  const d = (record.contract?.signedAt ?? '').slice(0, 10)
-  return DAY.test(d) ? d : ''
+/**
+ * 계약일(한국 날짜) — 비어 있으면 '' (짐작하지 않는다).
+ * D-684 재계약했으면 이번 계약 기간이 시작한 날 — 끝나기 전에 미리 재계약해 새 기간이 아직이면(today 기준) 지금 돌고 있는 기간.
+ */
+export function contractStart(record: Pick<ClientOpsRecord, 'contract'>, today?: string): string {
+  return termStart(record.contract, today)
+}
+
+/** 기간 칩 이름 — D-684 재계약해 새 기간이 시작된 업체의 '계약일부터' 는 '이번 계약부터' */
+export function periodLabelFor(key: DraftPeriodKey, record: Pick<ClientOpsRecord, 'contract'>, today?: string): string {
+  if (key === 'contract' && contractStart(record, today) !== '' && contractStart(record, today) === (record.contract?.termFrom ?? '').slice(0, 10)) return '이번 계약부터'
+  return DRAFT_PERIOD_LABEL[key]
 }
 
 /** 이 기간을 고를 수 있는지 — 계약일이 없으면 '계약일부터' 는 못 고른다 */
 export function periodUsable(key: DraftPeriodKey, record: Pick<ClientOpsRecord, 'contract'>, today: string): boolean {
   if (key !== 'contract') return true
-  const s = contractStart(record)
+  const s = contractStart(record, today)
   return !!s && s <= today
 }
 
@@ -153,7 +163,7 @@ export function draftPeriod(key: DraftPeriodKey, record: Pick<ClientOpsRecord, '
   }
   // 계약일이 없으면 짐작하지 않는다 — 최근 12개월로(화면은 '계약일부터' 를 못 고르게 막는다)
   if (key === 'contract') {
-    const s = contractStart(record)
+    const s = contractStart(record, today)
     return s && s <= today ? { from: s, to } : { from: reportFrom(record, 'last12', today), to }
   }
   if (key === '2w') return { from: shiftDay(today, -13), to }
@@ -366,6 +376,8 @@ export interface PortalReportLite {
   id: string
   status: 'published' | 'superseded' | 'withdrawn'
   publishedAt: string
+  /** D-684 종류(재계약 전 연간 보고를 냈는지 본다) — 모르면 없음 */
+  kind?: PortalReportKind
   periodEnd?: string | null
   title?: string
 }
@@ -403,7 +415,18 @@ export function portalUsage(input: { links: readonly PortalLinkLite[]; homeSeen:
   return { state: daysBetween(last, today) >= DORMANT_DAYS ? 'dormant' : 'active', lastVisit: last, firstVisit: first }
 }
 
-export type PortalFollowRule = 'invite_pending' | 'first_visit' | 'report_unseen' | 'report_gap' | 'monthly_review' | 'dormant'
+export type PortalFollowRule = 'invite_pending' | 'first_visit' | 'report_unseen' | 'report_gap' | 'monthly_review' | 'renewal_report' | 'dormant'
+
+/** D-684 이 날 수 안에 낸 연간 보고가 있으면 재계약 전 보고를 낸 것으로 본다(끝나는 날 기준 앞 60일부터) */
+export const RENEWAL_REPORT_LOOKBACK = 60
+
+/** 줄마다 [열기] 에서 바로 만들 보고서 종류 — 없으면 탭만 연다 */
+export function followUpReportKind(rule: PortalFollowRule): PortalReportKind | null {
+  if (rule === 'monthly_review') return 'monthly'
+  if (rule === 'renewal_report') return 'annual'
+  if (rule === 'report_gap') return 'progress'
+  return null
+}
 
 /** 월말 며칠 전부터 '이번 달 보고' 를 챙길지 */
 export const MONTHLY_REVIEW_DAYS = 7
@@ -435,6 +458,8 @@ export function portalFollowUps(
     visitsKnown?: boolean
     /** D-682 계약 고객인지(월말 보고 챙기기는 계약 고객만) */
     contracted?: boolean
+    /** D-684 계약 끝나는 날(적어 둔 것만 · 모르면 없음) */
+    contractEndsAt?: string
   },
   today: string,
 ): PortalFollowUp[] {
@@ -474,8 +499,19 @@ export function portalFollowUps(
       out.push({ key: `${input.clientId}:gap:${latest?.id ?? 'none'}`, rule: 'report_gap', clientId: input.clientId, days: n, text: latest ? `경과 보고 ${n}일째 없음 — 보고서를 만들어 보세요` : `연결 ${n}일째 · 아직 보고서가 없어요` })
     }
   }
+  // D-684 재계약 전 연간 보고 — 계약 고객 · 활성 계정 · 끝나는 날 30일 전 ~ 끝난 뒤 30일 · 그 앞 60일 안 낸 연간 보고 0
+  //   이 줄이 있으면 보고 공백 · 월말 보고 줄은 빼고 이것 하나(보고서를 만들라는 줄을 한 업체에 둘 띄우지 않는다)
+  const ends = (input.contractEndsAt ?? '').slice(0, 10)
+  if (input.contracted && active.length && DAY.test(ends)) {
+    const left = daysBetween(today, ends)
+    const from = shiftDay(ends, -RENEWAL_REPORT_LOOKBACK)
+    if (left <= RENEWAL_AHEAD && left >= -RENEWAL_AFTER && !published.some((r) => r.kind === 'annual' && dayOf(r.publishedAt) >= from)) {
+      for (let i = out.length - 1; i >= 0; i -= 1) if (out[i].rule === 'report_gap') out.splice(i, 1)
+      out.push({ key: `${input.clientId}:renewal:${ends}`, rule: 'renewal_report', clientId: input.clientId, days: left, text: `계약 끝 ${md(ends)}(${renewalWhen(left)}) — 재계약 전에 연간 보고를 보내 보세요` })
+    }
+  }
   // D-682 월말 보고 — 계약 고객 · 활성 계정 · 월말 7일 전부터 · 이번 달 낸 보고서 0 · 보고 공백 줄이 이미 있으면 하나만(같은 일을 두 번 띄우지 않는다)
-  if (input.contracted && active.length && !out.some((f) => f.rule === 'report_gap')) {
+  if (input.contracted && active.length && !out.some((f) => f.rule === 'report_gap' || f.rule === 'renewal_report')) {
     const month = today.slice(0, 7)
     const monthEnd = shiftDay(`${shiftDay(`${month}-28`, 4).slice(0, 7)}-01`, -1)
     const left = daysBetween(today, monthEnd)
@@ -483,8 +519,9 @@ export function portalFollowUps(
       out.push({ key: `${input.clientId}:monthly:${month}`, rule: 'monthly_review', clientId: input.clientId, days: daysBetween(`${month}-01`, today), text: `${Number(month.slice(5, 7))}월 보고를 아직 안 보냈어요 — 월간 보고를 만들어 보세요` })
     }
   }
-  const order: Record<PortalFollowRule, number> = { report_unseen: 0, report_gap: 1, monthly_review: 2, first_visit: 3, invite_pending: 4, dormant: 5 }
-  return out.sort((a, b) => order[a.rule] - order[b.rule] || b.days - a.days)
+  const order: Record<PortalFollowRule, number> = { report_unseen: 0, renewal_report: 1, report_gap: 2, monthly_review: 3, first_visit: 4, invite_pending: 5, dormant: 6 }
+  // 재계약 줄은 끝나는 날이 가까운 것(남은 날이 적은 것)이 먼저 · 그 밖은 오래된 것이 먼저
+  return out.sort((a, b) => order[a.rule] - order[b.rule] || (a.rule === 'renewal_report' ? a.days - b.days : b.days - a.days))
 }
 
 /** 업체에 지금 진행 중인 업무가 있는지(경과 보고 공백을 셀지) */

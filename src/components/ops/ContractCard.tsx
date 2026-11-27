@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react'
-import { CalendarCheck2, ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from 'lucide-react'
+import { CalendarCheck2, Check, ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   CONTRACT_KIND_HINT,
   CONTRACT_KIND_LABEL,
@@ -21,6 +21,7 @@ import {
 } from '../../types/clientOps'
 import { monthlyPremiumTotal, summarizeContract } from '../../services/contractSummary'
 import { contractGap } from '../../services/salesContract'
+import { contractEndText, endAfterYears, endBeforeStart, termStart } from '../../services/contractRenewal'
 import { formatKrw, wonOf } from '../../lib/format'
 import { BottomSheet } from '../ui/primitives'
 import { Button } from '../ui/Button'
@@ -77,6 +78,8 @@ export function ContractCard({
   const s = summarizeContract(c, today)
   const premium = monthlyPremiumTotal(c)
   const gap = contractGap(record)
+  // D-684 끝나는 날 — 적어 둔 것만(짐작 0) · 60일 안이면 남은 날 · 지났으면 '끝남'
+  const ends = contractEndText(c, today)
 
   return (
     <section data-testid="contract-card" className={hideTitle ? '' : 'rounded-(--radius-panel) border border-slate-200 bg-white p-4 sm:p-5'}>
@@ -114,6 +117,15 @@ export function ContractCard({
             )}
             {s.kindLabel !== '' && (
               <span className="t-sub rounded-full border border-slate-200 px-2 py-0.5 font-medium text-slate-700">{s.kindLabel}</span>
+            )}
+            {ends && (
+              <span
+                data-testid="contract-ends"
+                data-tone={ends.tone}
+                className={`t-sub tabular-nums ${ends.tone === 'ended' ? 'font-semibold text-danger-700' : ends.tone === 'soon' ? 'font-semibold text-warning-800' : 'text-slate-600'}`}
+              >
+                {ends.text}
+              </span>
             )}
           </div>
 
@@ -216,6 +228,10 @@ function ContractSheet({
   onClose: () => void
 }) {
   const [signedAt, setSignedAt] = useState(contract.signedAt)
+  // D-684 끝나는 날(선택) — [1년] [2년] 은 이번 기간 시작(재계약했으면 그날 · 아니면 계약일)부터
+  const [endsAt, setEndsAt] = useState(contract.endsAt ?? '')
+  const start = termStart({ signedAt, termFrom: contract.termFrom })
+  const endWrong = endBeforeStart(start, endsAt)
   const [kind, setKind] = useState<ContractKind | ''>(contract.kind)
   const [cash, setCash] = useState(contract.cashAmount === null ? '' : String(contract.cashAmount))
   const [note, setNote] = useState(contract.note)
@@ -230,14 +246,16 @@ function ContractSheet({
 
   const [busy, setBusy] = useState(false)
   const save = async () => {
-    if (busy) return
+    if (busy || endWrong) return
     setBusy(true)
     await onSave({
+      ...contract,
       signedAt: signedAt.trim(),
       kind,
       cashAmount: wantsCash ? amountOf(cash) : null,
       policies: wantsInsurance ? policies.filter((p) => p.insurer.trim() !== '' || p.productName.trim() !== '' || p.monthlyPremium !== null) : [],
       note: note.trim(),
+      endsAt: /^\d{4}-\d{2}-\d{2}$/.test(endsAt) ? endsAt : '',
     })
     setBusy(false)
   }
@@ -249,7 +267,7 @@ function ContractSheet({
       footer={
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>취소</Button>
-          <Button variant="primary" onClick={() => void save()} disabled={busy}>
+          <Button variant="primary" onClick={() => void save()} disabled={busy || endWrong}>
             {busy ? '저장 중…' : '저장'}
           </Button>
         </div>
@@ -265,6 +283,52 @@ function ContractSheet({
             className="t-body mt-1 h-12 w-full rounded-(--radius-control) border border-slate-300 px-3"
           />
         </label>
+
+        {/* D-684 끝나는 날 — 적어 두면 끝나기 30일 전 오늘 '안부 챙길 계약 고객' 에 재계약 줄이 뜬다 */}
+        <div data-testid="contract-ends-field">
+          <label className="block">
+            <span className="t-sub font-medium text-slate-700">계약 끝나는 날 <span className="font-normal text-slate-500">(있으면)</span></span>
+            <input
+              type="date"
+              aria-label="계약 끝나는 날"
+              value={endsAt}
+              onChange={(e) => setEndsAt(e.target.value)}
+              className="t-body mt-1 h-12 w-full rounded-(--radius-control) border border-slate-300 px-3"
+            />
+          </label>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {[1, 2].map((n) => {
+              const v = endAfterYears(start, n)
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  disabled={!v}
+                  aria-pressed={v !== '' && endsAt === v}
+                  data-testid="contract-ends-years"
+                  data-years={n}
+                  onClick={() => setEndsAt(v)}
+                  className={`tap t-sub min-h-10 rounded-full border px-3.5 font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${v !== '' && endsAt === v ? 'border-brand-600 bg-white text-brand-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+                >
+                  {v !== '' && endsAt === v && <Check aria-hidden="true" className="mr-1 inline size-4 align-[-3px]" />}
+                  {n}년 계약
+                </button>
+              )
+            })}
+            {endsAt !== '' && (
+              <button type="button" onClick={() => setEndsAt('')} data-testid="contract-ends-clear" className="tap t-sub min-h-10 rounded-full border border-slate-300 bg-white px-3.5 font-semibold text-slate-700 hover:bg-slate-50">
+                비우기
+              </button>
+            )}
+          </div>
+          {endWrong ? (
+            <p className="t-sub mt-1 break-keep text-danger-700" data-testid="contract-ends-wrong">끝나는 날이 {contract.termFrom ? '이번 계약 시작일' : '계약일'}({start})보다 앞이에요.</p>
+          ) : !start ? (
+            <p className="t-meta mt-1 break-keep text-slate-500">계약일을 먼저 적으면 [1년 계약] · [2년 계약] 으로 바로 채워요.</p>
+          ) : contract.termFrom ? (
+            <p className="t-meta mt-1 break-keep text-slate-500">재계약 — 이번 계약은 {contract.termFrom}부터예요.</p>
+          ) : null}
+        </div>
 
         <div>
           <span className="t-sub font-medium text-slate-700">어떤 방식으로 계약했나요?</span>

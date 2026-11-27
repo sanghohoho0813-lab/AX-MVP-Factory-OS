@@ -15,13 +15,14 @@ import { BottomSheet } from '../ui/primitives'
 import { getDataModeConfig } from '../../data/dataMode'
 import { listLinks } from '../../services/customerBridgeService'
 import { listPublishedReports, listWorkspaceReceipts, type PortalReceipt } from '../../services/portalGrowth'
-import { hasActiveWork, portalFollowUps, type PortalFollowUp, type PortalSeen } from '../../services/portalGrowthRules'
+import { currentTermEnd } from '../../services/contractRenewal'
+import { followUpReportKind, hasActiveWork, portalFollowUps, type PortalFollowUp, type PortalReportKind, type PortalSeen } from '../../services/portalGrowthRules'
 
 const SHOW = 5
 
 interface Loaded {
   links: PortalClientLink[]
-  reports: { id: string; clientId: string; status: 'published' | 'superseded' | 'withdrawn'; publishedAt: string }[]
+  reports: { id: string; clientId: string; status: 'published' | 'superseded' | 'withdrawn'; publishedAt: string; kind?: PortalReportKind }[]
   receipts: PortalReceipt[]
 }
 
@@ -63,6 +64,7 @@ export function usePortalFollowUps(workspaceId: string | null, clients: readonly
             reportSeen,
             activeWork: hasActiveWork(c),
             contracted: contractStageOf(c.status) === 'signed',
+            contractEndsAt: currentTermEnd(c.contract, today),
           },
           today,
         ),
@@ -104,6 +106,12 @@ export function TodayPortal({ clients, workspaceId, today, chip = false }: { cli
   )
 }
 
+/** [열기] — 그 업체 고객 플랫폼 탭. 보고서를 만들라는 줄(월말 · 재계약 · 보고 공백)이면 그 종류로 보고서 창까지 바로(D-684) */
+function openPath(f: PortalFollowUp): string {
+  const kind = followUpReportKind(f.rule)
+  return `/ops/clients/${encodeURIComponent(f.clientId)}?tab=portal${kind ? `&make=${kind}` : ''}`
+}
+
 function PortalSheet({ items, names, onClose }: { items: PortalFollowUp[]; names: ReadonlyMap<string, string>; onClose: () => void }) {
   const [all, setAll] = useState(false)
   const shown = all ? items : items.slice(0, SHOW)
@@ -116,7 +124,7 @@ function PortalSheet({ items, names, onClose }: { items: PortalFollowUp[]; names
               <span className="t-body block font-semibold break-keep text-slate-900 [overflow-wrap:anywhere]">{names.get(f.clientId) ?? '(이름 없음)'}</span>
               <span className="t-sub block break-keep text-danger-700">{f.text}</span>
             </span>
-            <Link to={`/ops/clients/${encodeURIComponent(f.clientId)}?tab=portal`} onClick={onClose} className="tap t-sub inline-flex min-h-10 shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50">
+            <Link to={openPath(f)} onClick={onClose} data-testid="today-portal-go" className="tap t-sub inline-flex min-h-10 shrink-0 items-center gap-1 rounded-(--radius-control) border border-slate-300 bg-white px-3 font-semibold text-slate-800 hover:bg-slate-50">
               열기 <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
           </li>

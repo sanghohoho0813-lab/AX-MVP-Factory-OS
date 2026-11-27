@@ -96,7 +96,8 @@ export function summarizeContract(contract: ContractInfo, today: string = todayL
       contract.kind !== '' ||
       contract.cashAmount !== null ||
       contract.policies.length > 0 ||
-      contract.note.trim() !== '',
+      contract.note.trim() !== '' ||
+      (contract.endsAt ?? '') !== '',
     signedAt: contract.signedAt.trim(),
     ageText: contractAgeText(contract.signedAt, today),
     kindLabel: contract.kind === '' ? '' : CONTRACT_KIND_LABEL[contract.kind],

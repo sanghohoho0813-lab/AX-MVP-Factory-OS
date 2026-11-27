@@ -226,12 +226,12 @@ export async function listClientReports(workspaceId: string | null, clientId: st
 }
 
 /** 작업공간 전체 — 발행 중인 보고서(오늘 화면 후속 업무용 · 가벼운 칸만) */
-export async function listPublishedReports(workspaceId: string | null): Promise<Pick<PortalReport, 'id' | 'clientId' | 'status' | 'publishedAt' | 'title' | 'periodEnd'>[]> {
+export async function listPublishedReports(workspaceId: string | null): Promise<Pick<PortalReport, 'id' | 'clientId' | 'status' | 'publishedAt' | 'title' | 'periodEnd' | 'kind'>[]> {
   if (isLocal()) return local.reports().filter((r) => r.status === 'published')
   if (!workspaceId) return []
   const { data, error } = await getSupabaseClient()
     .from('portal_reports')
-    .select('id, operations_client_id, status, published_at, title, period_end')
+    .select('id, operations_client_id, status, published_at, title, period_end, kind')
     .eq('workspace_id', workspaceId)
     .eq('status', 'published')
     .order('published_at', { ascending: false })
@@ -239,7 +239,7 @@ export async function listPublishedReports(workspaceId: string | null): Promise<
   if (error) throw error
   return (data ?? []).map((r) => {
     const x = r as Record<string, unknown>
-    return { id: str(x.id), clientId: str(x.operations_client_id), status: 'published' as const, publishedAt: str(x.published_at), title: str(x.title), periodEnd: nul(x.period_end) }
+    return { id: str(x.id), clientId: str(x.operations_client_id), status: 'published' as const, publishedAt: str(x.published_at), title: str(x.title), periodEnd: nul(x.period_end), kind: str(x.kind, 'progress') as PortalReportKind }
   })
 }
 

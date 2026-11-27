@@ -18,6 +18,7 @@
  *   W12 390 — 홈 · 보고서 화면 넘침 0 · 단추 44px
  *   W14 (D-682) 월간 보고 발행 → 고객 홈 같은 이름 · 이번 달 보고를 낸 업체는 월말 보고 줄 0 · W2d 월말 7일 안이면 계약 고객마다 '이번 달 보고' 줄
  *   W15 (D-683) 대표 설정 [고객 화면] → 고르기 · 계정마다 대표가 보는 최근 보고서 = 고객 실제 화면 · 보고서 단추 안 눌림 · 기록 0 · 잠재고객 연결 전 화면 · 팀장은 막힘
+ *   W16 (D-684) 계약 끝나는 날 20일 전 · 연간 보고 없음 → 오늘 '재계약 전 연간 보고' 줄(월말 줄 대신) · [열기] → 보고서 창 연간 · 계약일부터 · 안부 '재계약' 줄
  *   W13 JS 오류 0(두 앱)
  *
  *   node e2e/growth-portal.mjs [스크린샷 폴더]   (pg_ctlcluster 16 main start 먼저 · 홈페이지 저장소 ../mirae-ai-lab-homepage)
@@ -510,6 +511,36 @@ try {
   await pp.goto(`${OS}/settings`, { waitUntil: 'networkidle' })
   check("W15i 내부 팀장 설정 — '보는 화면' [고객 화면] 0", (await pp.locator('[data-view="customer"]').count()) === 0)
   await pc.close()
+
+  // ---------- W16 (D-684) 재계약 전 연간 보고 ----------
+  const kst = (n) => new Date(Date.now() + 9 * 3_600_000 + n * 86_400_000).toISOString().slice(0, 10)
+  const ENDS = kst(20)
+  sql(`update public.operations_clients set payload = payload || jsonb_build_object('contract', jsonb_build_object('signedAt', '${kst(-345)}', 'kind', '', 'cashAmount', null, 'policies', '[]'::jsonb, 'note', '', 'endsAt', '${ENDS}', 'termFrom', '')) where id = 'growth-b'`)
+  await osGo(op, '/')
+  const chip3 = op.getByTestId('today-portal-open')
+  await chip3.waitFor({ timeout: 10000 }).catch(() => {})
+  let rules3 = []
+  if (await chip3.count()) {
+    await chip3.click()
+    await op.getByTestId('today-portal-sheet').waitFor({ timeout: 5000 }).catch(() => {})
+    rules3 = await op.getByTestId('today-portal-row').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-rule')}|${e.textContent}`))
+  }
+  const md = `${Number(ENDS.slice(5, 7))}/${Number(ENDS.slice(8, 10))}`
+  check(`W16a 오늘 '고객 화면 챙길 것' — 바다상사 '계약 끝 ${md}(20일 남음) — 재계약 전에 연간 보고' · 바다상사 월말 · 보고 공백 줄은 대신 빠짐`,
+    rules3.some((r) => r.startsWith('renewal_report|') && r.includes('바다상사') && r.includes(`계약 끝 ${md}(20일 남음)`)) && !rules3.some((r) => /^(monthly_review|report_gap)\|/.test(r) && r.includes('바다상사')), rules3)
+  const renRow = op.locator('[data-testid="today-portal-row"][data-rule="renewal_report"]').filter({ hasText: '바다상사' })
+  await renRow.getByTestId('today-portal-go').click()
+  await op.getByTestId('report-sheet').waitFor({ timeout: 15000 }).catch(() => {})
+  await op.waitForTimeout(500)
+  const k3 = await op.locator('[data-testid="report-kind"][aria-pressed="true"]').getAttribute('data-kind').catch(() => '')
+  const p3 = await op.locator('[data-testid="report-period"][aria-pressed="true"]').getAttribute('data-period').catch(() => '')
+  check('W16b [열기] → 바다상사 고객 플랫폼 탭 · 보고서 창이 연간 · 계약일부터로 바로 · 주소 값(make) 지움', op.url().includes('/ops/clients/growth-b') && op.url().includes('tab=portal') && !op.url().includes('make=') && k3 === 'annual' && p3 === 'contract', { url: op.url(), k3, p3 })
+  await shot(op, 'os-05-renewal-annual')
+  await op.keyboard.press('Escape')
+  await osGo(op, '/')
+  const careRow = op.locator('[data-testid="care-row"][data-client="growth-b"]')
+  await careRow.waitFor({ timeout: 8000 }).catch(() => {})
+  check("W16c 오늘 '안부 챙길 계약 고객' — 바다상사 재계약 줄(20일 남음)", (await careRow.getAttribute('data-reason').catch(() => '')) === 'renewal' && ((await careRow.innerText().catch(() => '')) ?? '').includes('20일 남음'))
 
   check('W13 JS 오류 0(두 앱)', errors.length === 0, errors)
 } catch (e) {

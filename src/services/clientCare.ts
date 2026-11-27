@@ -7,6 +7,9 @@
  *   1주년 — 계약일이 해마다 돌아오는 날이 30일 안(지난 7일까지 포함)이면 성과 보고서 드리고 재계약 이야기할 때.
  *     그 날 30일 전부터 [연락했어요] 를 눌렀으면 챙긴 것으로 본다.
  *   [다음에] — 정한 날까지 목록에서 뺀다.
+ *   D-684 재계약 — 계약 끝나는 날을 적어 두면 끝나기 30일 전 ~ 끝난 뒤 30일 '재계약 챙길 때'(7일 안이면 급함).
+ *     1주년보다 먼저 본다(같은 때 두 줄을 띄우지 않는다). [연락했어요] 는 7일 뒤 다시 · [재계약했어요] 로 끝(contractRenewal).
+ *     끝나는 날이 1주년보다 한참 뒤인 계약(2년 계약 등)의 1주년 줄은 '재계약 이야기' 를 빼고 성과 보고서만.
  *
  * 규칙 계산이다 — 외부 호출 · LLM 0. 저장은 업체 기록 payload 의 `care` 하나(DB 변경 없음).
  */
@@ -18,13 +21,17 @@ import { withActivity } from './clientOpsActivity'
 import { brand } from '../brand/brand.config'
 import { localDateOf, nowDate } from '../lib/appClock'
 import { koCompare } from '../lib/koCompare'
+import { RENEWAL_AFTER, RENEWAL_AHEAD, addDay, renewalState, renewalText } from './contractRenewal'
 
 export const CARE_QUIET_DAYS = 30
 export const CARE_URGENT_DAYS = 60
 export const CARE_ANNIVERSARY_AHEAD = 30
 export const CARE_ANNIVERSARY_AFTER = 7
 
-export type CareReason = 'quiet' | 'anniversary'
+export type CareReason = 'quiet' | 'anniversary' | 'renewal'
+
+/** D-684 재계약 줄에서 [연락했어요] · [다음에] 를 누르면 며칠 뒤 다시 보일지 */
+export const CARE_RENEWAL_SNOOZE = 7
 
 export interface CareItem {
   clientId: string
@@ -40,6 +47,8 @@ export interface CareItem {
   lastTouchWhat: string
   /** 1주년일 때: 그 날 · 몇 해째 · 남은 날(지났으면 음수) */
   anniversary?: { date: string; years: number; daysLeft: number }
+  /** D-684 재계약일 때: 끝나는 날 · 남은 날(지났으면 음수) */
+  renewal?: { endsAt: string; daysLeft: number }
   /** 한 줄 설명 */
   text: string
 }
@@ -123,6 +132,10 @@ export function careItemFor(record: ClientOpsRecord, today: string): CareItem | 
   const quietDays = touch.date ? Math.max(0, daysBetween(touch.date, today)) : 0
   const base = { clientId: record.id, companyName: record.companyName, lastTouch: touch.date, lastTouchWhat: touch.what, quietDays }
 
+  // D-684 재계약 — 끝나는 날이 30일 안(끝난 뒤 30일까지)이면 이것 하나(1주년 줄과 겹치지 않게 먼저)
+  const ren = renewalState(record.contract, today)
+  if (ren?.due) return { ...base, reason: 'renewal', urgent: ren.urgent, renewal: { endsAt: ren.endsAt, daysLeft: ren.daysLeft }, text: renewalText(ren) }
+
   const ann = nextAnniversary(record.contract.signedAt, today)
   if (ann && ann.daysLeft <= CARE_ANNIVERSARY_AHEAD) {
     const contacted = dayOf(record.care?.lastContactAt)
@@ -134,7 +147,8 @@ export function careItemFor(record: ClientOpsRecord, today: string): CareItem | 
         reason: 'anniversary',
         urgent: ann.daysLeft <= 7,
         anniversary: ann,
-        text: `계약 ${ann.years}주년 ${Number(ann.date.slice(5, 7))}/${Number(ann.date.slice(8, 10))}(${when}) — 성과 보고서 드리고 재계약 이야기`,
+        // D-684 계약이 1주년 뒤로 한참 이어지면(2년 계약 등) 재계약 이야기는 빼고 성과 보고서만
+        text: `계약 ${ann.years}주년 ${Number(ann.date.slice(5, 7))}/${Number(ann.date.slice(8, 10))}(${when}) — ${ren && ren.endsAt > addDay(ann.date, RENEWAL_AHEAD) ? '성과 보고서 드리기' : '성과 보고서 드리고 재계약 이야기'}`,
       }
     }
   }
@@ -152,8 +166,8 @@ export function careItemFor(record: ClientOpsRecord, today: string): CareItem | 
 /** 챙길 계약 고객 — 급한 것 먼저, 그다음 1주년(가까운 순), 그다음 조용함(오래된 순) */
 export function careList(records: ClientOpsRecord[], today: string): CareItem[] {
   const items = records.map((r) => careItemFor(r, today)).filter((x): x is CareItem => x !== null)
-  const kind = (i: CareItem) => (i.reason === 'anniversary' ? 0 : 1)
-  const score = (i: CareItem) => (i.reason === 'anniversary' ? (i.anniversary?.daysLeft ?? 0) : -i.quietDays)
+  const kind = (i: CareItem) => (i.reason === 'renewal' ? 0 : i.reason === 'anniversary' ? 1 : 2)
+  const score = (i: CareItem) => (i.reason === 'renewal' ? (i.renewal?.daysLeft ?? 0) : i.reason === 'anniversary' ? (i.anniversary?.daysLeft ?? 0) : -i.quietDays)
   return items.sort((a, b) => Number(b.urgent) - Number(a.urgent) || kind(a) - kind(b) || score(a) - score(b) || koCompare(a.companyName, b.companyName))
 }
 
@@ -164,11 +178,27 @@ export function withCareContact(record: ClientOpsRecord, today: string, at: stri
 }
 
 /**
+ * D-684 줄의 [연락했어요] — 안부 · 1주년은 오늘 챙긴 것으로 끝. 재계약은 연락만으로 끝나지 않으니 7일 뒤 다시 보인다
+ * (재계약이 정해지면 [재계약했어요] — contractRenewal.withRenewal).
+ */
+export function withCareContactFor(record: ClientOpsRecord, item: CareItem, today: string, at: string = nowDate().toISOString()): ClientOpsRecord {
+  const next = withCareContact(record, today, at)
+  return item.reason === 'renewal' ? withCareSnooze(next, careSnoozeUntil(item, today)) : next
+}
+
+/**
  * [다음에] 를 누르면 언제까지 뺄지 — 보통 2주.
  * 1주년은 그 날이 지나 7일까지만 목록에 있으므로 그보다 늦게 미루면 그해 1주년을 통째로 놓친다 → 1주년 마지막 날까지만.
  */
 export function careSnoozeUntil(item: CareItem, today: string): string {
   const twoWeeks = addDays(today, 14)
+  // D-684 재계약은 7일 뒤 다시 — 끝난 뒤 30일(목록에서 빠지는 날)을 넘기지 않는다
+  if (item.reason === 'renewal' && item.renewal) {
+    const week = addDays(today, CARE_RENEWAL_SNOOZE)
+    const last = addDays(item.renewal.endsAt, RENEWAL_AFTER)
+    const until = last < week ? last : week
+    return until > today ? until : addDays(today, 1)
+  }
   if (item.reason !== 'anniversary' || !item.anniversary) return twoWeeks
   const last = addDays(item.anniversary.date, CARE_ANNIVERSARY_AFTER)
   const until = last < twoWeeks ? last : twoWeeks
@@ -192,7 +222,9 @@ export function careMessage(record: ClientOpsRecord, item: CareItem, today: stri
   const me = sender?.trim() || `${brand.brandNameKo} ${brand.ownerName} ${brand.ownerTitle}`
   const r = buildClientReport(record, today, item.reason === 'anniversary' ? 'last12' : 'contract')
   const lines = [`안녕하세요, ${who}. ${me}입니다.`]
-  if (item.reason === 'anniversary' && item.anniversary) {
+  if (item.reason === 'renewal' && item.renewal) {
+    lines.push(`함께한 계약이 ${md(item.renewal.endsAt)}에 마무리${item.renewal.daysLeft >= 0 ? '됩니다' : '되었습니다'}. 그동안 믿고 맡겨 주셔서 감사합니다.`)
+  } else if (item.reason === 'anniversary' && item.anniversary) {
     lines.push(`벌써 함께한 지 ${item.anniversary.years}년이 ${item.anniversary.daysLeft > 0 ? '되어 갑니다' : '되었습니다'}. 늘 믿고 맡겨 주셔서 감사합니다.`)
   } else {
     lines.push('요즘 사업은 어떠신지 안부 여쭙니다.')
@@ -204,9 +236,11 @@ export function careMessage(record: ClientOpsRecord, item: CareItem, today: stri
   const next = r.next[0]
   if (next) lines.push(`다음으로 ${md(next.date)} ${next.text} 챙기고 있습니다.`)
   lines.push(
-    item.reason === 'anniversary'
-      ? '그동안의 성과를 한 장으로 정리해 드리고, 앞으로 1년 챙길 것도 함께 말씀드리고 싶습니다. 편하신 때 30분 뵐 수 있을까요?'
-      : '필요하신 것 있으시면 편하게 말씀 주세요. 감사합니다.',
+    item.reason === 'renewal'
+      ? '그동안의 성과를 한 장으로 정리해 드리고, 다음 계약 기간에 이어서 챙길 것도 말씀드리고 싶습니다. 편하신 때 30분 뵐 수 있을까요?'
+      : item.reason === 'anniversary'
+        ? '그동안의 성과를 한 장으로 정리해 드리고, 앞으로 1년 챙길 것도 함께 말씀드리고 싶습니다. 편하신 때 30분 뵐 수 있을까요?'
+        : '필요하신 것 있으시면 편하게 말씀 주세요. 감사합니다.',
   )
   return lines.join('\n')
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { localDateOf, todayLocalDate } from '../../lib/appClock'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useCustomerViewAllowed } from '../../pages/customerViewAccess'
 import { CheckCircle2, ClipboardCopy, ExternalLink, Eye, Link2, MessageSquareReply, Pause, Play, Plus, Send, Share2, Sparkles, Unlink, Upload } from 'lucide-react'
 import { InlineConfirm } from '../ui/InlineConfirm'
@@ -49,7 +49,8 @@ import { brand } from '../../brand/brand.config'
 import { useIsPilot, useViewingPilot } from '../../auth/osAccess'
 import { copyText } from '../../services/grants/grantView'
 import { isGrowthOff, listClientReports, listLinkAccounts, listReceipts, type PortalReceipt, type PortalReport } from '../../services/portalGrowth'
-import { PORTAL_USAGE_LABEL, hasActiveWork, portalFollowUps, portalInviteText, portalUsage, daysBetween, type PortalSeen } from '../../services/portalGrowthRules'
+import { PORTAL_USAGE_LABEL, REPORT_KINDS_NOW, hasActiveWork, portalFollowUps, portalInviteText, portalUsage, daysBetween, type PortalReportKind, type PortalSeen } from '../../services/portalGrowthRules'
+import { currentTermEnd } from '../../services/contractRenewal'
 import { PortalReportsCard } from './PortalReportsCard'
 import { PortalReportSheet } from './PortalReportSheet'
 
@@ -95,7 +96,7 @@ export function PortalTab({
   const [answerDraft, setAnswerDraft] = useState<Record<string, string>>({})
   // D-681 고객성장관리 — 보고서 · 고객 열람 기록(0033). off = 아직 안 켬(그 칸만 숨기고 나머지는 예전 그대로)
   const [growth, setGrowth] = useState<{ off: boolean; reports: PortalReport[]; receipts: PortalReceipt[] }>({ off: true, reports: [], receipts: [] })
-  const [reportSheet, setReportSheet] = useState<{ correcting: PortalReport | null } | null>(null)
+  const [reportSheet, setReportSheet] = useState<{ correcting: PortalReport | null; kind?: PortalReportKind } | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   // 끊기 한 번 더 묻는 중인 연결 id · 연결된 계정 이메일(연결 id → 이메일 — 0033 서버 함수)
   const [revoking, setRevoking] = useState('')
@@ -153,6 +154,20 @@ export function PortalTab({
   useEffect(() => {
     void load()
   }, [load])
+
+  // D-684 오늘 '고객 화면 챙길 것' [열기](?make=monthly · annual · progress) — 다 읽은 뒤 그 종류로 보고서 창을 한 번 연다 · 주소 값은 지운다
+  const [searchParams, setSearchParams] = useSearchParams()
+  const makeParam = searchParams.get('make')
+  useEffect(() => {
+    if (!makeParam || loading) return
+    const kind = REPORT_KINDS_NOW.find((k) => k === makeParam)
+    if (kind && !growth.off && !readOnly) setReportSheet({ correcting: null, kind })
+    setSearchParams((p) => {
+      const n = new URLSearchParams(p)
+      n.delete('make')
+      return n
+    }, { replace: true })
+  }, [makeParam, loading, growth.off, readOnly, setSearchParams])
 
   /** 됐으면 true. 도는 동안에는 같은 단추를 다시 못 누른다(D-120 — 두 번 눌러 두 번 요청되던 것) */
   const [running, setRunning] = useState(false)
@@ -217,11 +232,12 @@ export function PortalTab({
               invitedAt: record.portalInvite?.at ?? null,
               links: linkLites,
               homeSeen,
-              reports: growth.reports.map((r) => ({ id: r.id, status: r.status, publishedAt: r.publishedAt })),
+              reports: growth.reports.map((r) => ({ id: r.id, status: r.status, publishedAt: r.publishedAt, kind: r.kind })),
               reportSeen: new Set(growth.receipts.filter((r) => r.itemKind === 'report').map((r) => r.itemId)),
               activeWork: hasActiveWork(record),
               visitsKnown: !isLocal,
               contracted: contractStageOf(record.status) === 'signed',
+              contractEndsAt: currentTermEnd(record.contract, today),
             },
             today,
           ),
@@ -716,6 +732,7 @@ export function PortalTab({
           correcting={reportSheet.correcting}
           linked={links.some((l) => l.status === 'active')}
           seenReportIds={new Set(growth.receipts.filter((r) => r.itemKind === 'report').map((r) => r.itemId))}
+          initialKind={reportSheet.kind ?? null}
           onClose={() => setReportSheet(null)}
           onPublished={() => void load()}
         />

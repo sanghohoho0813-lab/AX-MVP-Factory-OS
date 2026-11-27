@@ -186,6 +186,9 @@ function normalizeContract(raw: unknown): ContractInfo {
         }))
       : [],
     note: typeof c.note === 'string' ? c.note : '',
+    // D-684 끝나는 날 · 이번 기간 시작 — 이 칸이 없던 기록은 '' (모름)
+    endsAt: typeof c.endsAt === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.endsAt) ? c.endsAt : '',
+    termFrom: typeof c.termFrom === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.termFrom) ? c.termFrom : '',
   }
 }
 
@@ -1203,6 +1206,8 @@ export function withContract(record: ClientOpsRecord, next: ContractInfo): Clien
   if (prev.kind !== next.kind && next.kind !== '') changed.push(`방식 ${CONTRACT_KIND_LABEL[next.kind]}`)
   if (prev.cashAmount !== next.cashAmount && next.cashAmount !== null) changed.push(`현금 ${next.cashAmount.toLocaleString('ko-KR')}원`)
   if (prev.policies.length !== next.policies.length) changed.push(`보험 ${next.policies.length}건`)
+  // D-684 끝나는 날 — 적거나 바꾼 것만(지운 것은 아래 '내용 수정' 한 줄)
+  if ((prev.endsAt ?? '') !== (next.endsAt ?? '') && (next.endsAt ?? '') !== '') changed.push(`끝나는 날 ${next.endsAt}`)
 
   const out: ClientOpsRecord = { ...record, contract: next }
   // 위 네 가지에 안 걸리는 수정(금액을 지움 · 보험 내용만 고침 · 메모)도 바뀐 건 바뀐 것이다
