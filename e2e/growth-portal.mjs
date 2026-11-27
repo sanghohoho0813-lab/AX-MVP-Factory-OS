@@ -502,8 +502,14 @@ try {
   await pp.getByLabel('이메일').fill(PILOT.email)
   await pp.getByLabel('비밀번호').fill(PILOT.password)
   await pp.getByRole('button', { name: /^로그인/ }).click()
-  await pp.waitForURL((x) => !x.pathname.startsWith('/login'), { timeout: 15000 }).catch(() => {})
-  await pp.goto(`${OS}/customer-view?client=growth-a`, { waitUntil: 'networkidle' })
+  await pp.waitForURL((x) => !x.pathname.startsWith('/login'), { timeout: 30000 }).catch(() => {})
+  // 로그인 뒤 앱이 첫 화면으로 옮기는 중에 주소를 바꾸면 그 이동이 끊긴다(ERR_ABORTED) — 첫 화면이 다 뜬 뒤에 · 끊기면 한 번 더
+  await pp.waitForLoadState('networkidle').catch(() => {})
+  await pp.waitForTimeout(800)
+  await pp.goto(`${OS}/customer-view?client=growth-a`, { waitUntil: 'networkidle' }).catch(async () => {
+    await pp.waitForTimeout(1500)
+    await pp.goto(`${OS}/customer-view?client=growth-a`, { waitUntil: 'networkidle' })
+  })
   // 화면 조각이 늦게 올 수 있다 — 막힘 화면이 뜰 때까지(최대 15초)
   await pp.getByTestId('cv-page').waitFor({ timeout: 15000 }).catch(() => {})
   await pp.waitForTimeout(300)
