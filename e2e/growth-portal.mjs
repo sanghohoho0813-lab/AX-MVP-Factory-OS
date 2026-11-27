@@ -504,7 +504,9 @@ try {
   await pp.getByRole('button', { name: /^로그인/ }).click()
   await pp.waitForURL((x) => !x.pathname.startsWith('/login'), { timeout: 15000 }).catch(() => {})
   await pp.goto(`${OS}/customer-view?client=growth-a`, { waitUntil: 'networkidle' })
-  await pp.waitForTimeout(800)
+  // 화면 조각이 늦게 올 수 있다 — 막힘 화면이 뜰 때까지(최대 15초)
+  await pp.getByTestId('cv-page').waitFor({ timeout: 15000 }).catch(() => {})
+  await pp.waitForTimeout(300)
   const pState = await pp.getByTestId('cv-page').getAttribute('data-state').catch(() => '')
   const pText = (await pp.locator('body').innerText()) ?? ''
   check("W15h 내부 팀장 — /customer-view 막힘('대표 계정에서만') · 대표 업체 이름 0", pState === 'blocked' && !pText.includes('한빛정밀'), { pState, t: pText.slice(0, 120) })
@@ -539,8 +541,13 @@ try {
   await op.keyboard.press('Escape')
   await osGo(op, '/')
   const careRow = op.locator('[data-testid="care-row"][data-client="growth-b"]')
+  // '안부 챙길 계약 고객' 은 접힌 채 시작한다(숫자만) — 펼친다
+  const careFold = op.getByTestId('today-care')
+  await careFold.waitFor({ timeout: 10000 }).catch(() => {})
+  if (!(await careRow.isVisible().catch(() => false))) await careFold.locator('button').first().click().catch(() => {})
   await careRow.waitFor({ timeout: 8000 }).catch(() => {})
-  check("W16c 오늘 '안부 챙길 계약 고객' — 바다상사 재계약 줄(20일 남음)", (await careRow.getAttribute('data-reason').catch(() => '')) === 'renewal' && ((await careRow.innerText().catch(() => '')) ?? '').includes('20일 남음'))
+  check("W16c 오늘 '안부 챙길 계약 고객' — 바다상사 재계약 줄(20일 남음)", (await careRow.getAttribute('data-reason').catch(() => '')) === 'renewal' && ((await careRow.innerText().catch(() => '')) ?? '').includes('20일 남음'), (await careFold.innerText().catch(() => '칸 없음'))?.slice(0, 300))
+  await shot(op, 'os-06-today-care-renewal')
 
   check('W13 JS 오류 0(두 앱)', errors.length === 0, errors)
 } catch (e) {
