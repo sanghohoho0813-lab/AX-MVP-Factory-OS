@@ -11074,3 +11074,14 @@ AFTER:
 홈페이지: `src/lib/customerPortal.ts`(더하기만) · `MyProjectsPage` · `MyProjectDetailPage` · `MyReportPage`(새로) · `main.tsx`(주소 하나) · `docs/CUSTOMER_DATA_CONTRACT.md` · `CUSTOMER_PORTAL_ROUTES.md`.
 
 **찾았지만 이번에 하지 않은 것**: 연락 공백(21일) 규칙 · 월간/연간 보고 단추 · 결과물 열람 기록 · 고객 화면 지원사업/다음 과제 추천 · 후속 업무를 서버에 쌓기 · 알림톡/메일 발송(승인 필요) — `CUSTOMER_GROWTH_IMPLEMENTATION_PLAN.md` 2절 차례.
+
+### D-681 점검(같은 날)
+
+- 빠른 점검: 타입 검사 · 린트(오류 0) · 빌드 · `test:all` 끝남 코드 0(새 단위 41/0 — 세계 시각 · 한국 시각 둘 다) · `qa:wording` 6/0. 홈페이지 `tsc -b` · `vite build` 통과.
+- DB: `test-0033` 80 확인 · 실패 0 · 확인 SQL → 되돌리기 → 다시 넣기 통과 · `qa:db` 1,024/0.
+- 새 e2e: `qa:growth`(연습 모드 내부 화면) 30/0 · `qa:growthportal`(진짜 RLS · OS + 홈페이지) 42/0.
+- 걸린 화면 · 권한 회귀: `qa:pilot` 513/0 · `qa:isolation` 24/0 · `qa:files` 38/0 · `qa:real` 188/0 · `qa:detail` 530/0 · `qa:modules` 894/0.
+- 시험에서 찾아 고친 것: 계정 둘인 회사에서 멈춘 계정을 다시 켤 단추가 사라짐 → 계정마다 한 줄 · 계정 이름 '(계정)' → `portal_link_accounts` ·
+  되돌려도 OS 보고서 칸이 남을 수 있음 → 표 읽기 권한도 거둠 · 휴대폰 긴 줄 잘림 · 고객 보고서 화면 가운데 몰림(사진).
+- **확인하지 못한 것**: 운영 DB · 운영 사이트(승인 전) · 실제 사파리 · 홈페이지 자체 회귀 묶음(공개 화면 4곳 · 로그인 전 주소 3곳만 임시로 봄). 자세히 `docs/CUSTOMER_GROWTH_QA.md`.
+
