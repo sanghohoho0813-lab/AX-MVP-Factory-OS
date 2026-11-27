@@ -587,6 +587,9 @@ values ('${OWNER_WS}', '${LA1}', 'result', '벤처인증을 받으셨어요', '�
   await op.getByTestId('portal-reports').waitFor({ timeout: 10000 }).catch(() => {})
   const st0 = await op.getByTestId('result-seen').evaluateAll((els) => els.map((e) => e.getAttribute('data-state')).sort().join(','))
   check("W17b OS 탭 — 공유 서류 · 결과 글에 '아직 안 여심(n일째)' 둘 · '열람 기록 전 공유' 하나", st0 === 'before,unseen,unseen', st0)
+  await op.getByTestId('result-seen').first().scrollIntoViewIfNeeded().catch(() => {})
+  await op.waitForTimeout(300)
+  await shot(op, 'os-06b-result-unseen')
   // 대표 · 다른 회사 고객은 기록을 못 남김(서버)
   const fakeO = await rest(OWNER, 'portal_mark_item_seen', { p_link_id: LA1, p_kind: 'document', p_item_id: docNew })
   const fakeB = await rest(CB1, 'portal_mark_item_seen', { p_link_id: LA1, p_kind: 'result', p_item_id: resNew })
@@ -604,6 +607,8 @@ values ('${OWNER_WS}', '${LA1}', 'result', '벤처인증을 받으셨어요', '�
   await op.getByTestId('portal-reports').waitFor({ timeout: 10000 }).catch(() => {})
   const st1 = await op.getByTestId('result-seen').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-state')}|${e.textContent}`))
   check("W17f OS 탭 — 둘 다 '열어 보심 m/d' · 예전 공유는 '열람 기록 전 공유'", st1.filter((x) => x.startsWith('seen|') && x.includes('열어 보심')).length === 2 && st1.filter((x) => x.startsWith('before|')).length === 1, st1)
+  await op.getByTestId('result-seen').first().scrollIntoViewIfNeeded().catch(() => {})
+  await op.waitForTimeout(300)
   await shot(op, 'os-07-result-seen')
   await osGo(op, '/')
   let rules5 = []
