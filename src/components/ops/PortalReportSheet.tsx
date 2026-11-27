@@ -1,7 +1,8 @@
 /**
  * D-681 고객 화면 보고서 만들기 · 정정 — 업체 상세 › 고객 플랫폼 탭.
  *
- *   1) 종류(경과 · 상담 요약 · 중간 · 최종) + 기간(최근 2주 · 1개월 · 지난 보고 이후 · 올해) → [초안 만들기]
+ *   1) 종류(경과 · 월간 · 상담 요약 · 연간 + [그 밖에] 중간 · 최종) + 종류마다 기간 → [초안 만들기]
+ *      월간: 이번 달 · 지난달 / 연간: 계약일부터(계약일이 없으면 못 고름 — 짐작하지 않음) · 최근 12개월 · '다음 1년 검토해 볼 것' 은 맞춤 추천과 같은 판정(D-682)
  *   2) 내부 기록에서 뽑은 줄을 켜고 끄고 고친다(직원이 적은 '다음 단계' 같은 내부 글은 꺼진 채) · 담당자 한마디 · [고객 화면으로 보기]
  *   3) [고객 화면에 발행] → 한 번 더 묻고 → 발행(같은 창에서 두 번 눌러도 한 건) → 안내 문구 복사
  * 정정은 예전 판을 불러와 같은 화면에서 고친 뒤 '무엇을 고쳤는지' 한 줄과 함께 새 판으로 — 예전 판은 지우지 않는다.
@@ -18,11 +19,15 @@ import { brand } from '../../brand/brand.config'
 import { copyText } from '../../services/grants/grantView'
 import {
   DRAFT_PERIOD_LABEL,
+  REPORT_KINDS_MAIN,
   REPORT_KINDS_NOW,
   REPORT_KIND_LABEL,
   buildReportDraft,
+  defaultPeriod,
   draftPayload,
   draftPeriod,
+  periodUsable,
+  periodsFor,
   reportNoticeText,
   type DraftPeriodKey,
   type PortalDocLite,
@@ -32,8 +37,8 @@ import {
 } from '../../services/portalGrowthRules'
 import { growthErrorText, publishReport, reportCustomerUrl, type PortalReport } from '../../services/portalGrowth'
 import { PortalReportView } from './PortalReportView'
-
-const PERIODS: DraftPeriodKey[] = ['2w', '1m', 'since_last', 'year']
+import { featureUsable, useEntitlements } from '../../lib/entitlementsStore'
+import { localDateOf } from '../../lib/appClock'
 
 function fromReport(r: PortalReport): ReportDraft {
   return {
@@ -56,6 +61,7 @@ export function PortalReportSheet({
   reports,
   correcting,
   linked,
+  seenReportIds,
   onClose,
   onPublished,
 }: {
@@ -70,6 +76,8 @@ export function PortalReportSheet({
   correcting?: PortalReport | null
   /** 고객 계정이 연결돼 있는지(없어도 발행은 된다 — 연결되면 그때부터 보인다) */
   linked: boolean
+  /** 고객 계정 누구라도 열어 본 보고서 id — 연간 '함께 한 기록' 숫자(연습 모드는 빈 칸) */
+  seenReportIds?: ReadonlySet<string>
   onClose: () => void
   onPublished: (r: { id: string; version: number; created: boolean }) => void
 }) {
@@ -79,7 +87,14 @@ export function PortalReportSheet({
     () => reports.filter((r) => r.status === 'published' && r.periodEnd).map((r) => r.periodEnd as string).sort().at(-1) ?? null,
     [reports],
   )
-  const [period, setPeriod] = useState<DraftPeriodKey>(lastEnd ? 'since_last' : '2w')
+  const [period, setPeriod] = useState<DraftPeriodKey>(() => defaultPeriod(correcting?.kind ?? 'progress', record, today, lastEnd))
+  const [moreKinds, setMoreKinds] = useState(false)
+  const [making, setMaking] = useState(false)
+  const { ent } = useEntitlements()
+  const pickKind = (k: PortalReportKind) => {
+    setKind(k)
+    setPeriod(defaultPeriod(k, record, today, lastEnd))
+  }
   const [draft, setDraft] = useState<ReportDraft | null>(correcting ? fromReport(correcting) : null)
   const [correction, setCorrection] = useState('')
   const [view, setView] = useState<'edit' | 'preview'>('edit')
@@ -90,9 +105,25 @@ export function PortalReportSheet({
   // 이 창에서 만든 발행 번호 — 두 번 눌러도 · 실패 뒤 다시 눌러도 같은 번호(서버가 한 건으로)
   const clientKey = useRef(`rep-${generateId()}`).current
 
-  const makeDraft = () => {
+  const makeDraft = async () => {
+    if (making) return
     const range = draftPeriod(period, record, today, lastEnd)
-    setDraft(buildReportDraft({ record, today, kind, period: range, docs, updates }))
+    let picks: { key: string; label: string }[] = []
+    let history: { reports: number; reportsSeen: number } | undefined
+    if (kind === 'annual') {
+      setMaking(true)
+      // 다음 1년 검토 — 맞춤 추천 '먼저 제안할 것' 과 같은 판정 · 같은 순서(D-618 판정은 한 곳). 실패해도 초안은 나온다
+      try {
+        const { buildInsights, topPicks } = await import('../../services/clientInsights')
+        picks = topPicks(buildInsights(record, today, [], (k) => featureUsable(ent, k)), 3).map((i) => ({ key: i.key, label: i.label }))
+      } catch {
+        picks = []
+      }
+      const inRange = reports.filter((r) => r.status === 'published' && localDateOf(r.publishedAt) >= range.from && localDateOf(r.publishedAt) <= range.to)
+      history = { reports: inRange.length, reportsSeen: inRange.filter((r) => seenReportIds?.has(r.id)).length }
+      setMaking(false)
+    }
+    setDraft(buildReportDraft({ record, today, kind, period: range, docs, updates, picks, history }))
     setView('edit')
   }
 
@@ -156,8 +187,8 @@ export function PortalReportSheet({
       </div>
     )
   ) : (
-    <Button variant="primary" onClick={makeDraft} data-testid="report-make-draft">
-      <FilePlus2 aria-hidden="true" className="size-4" /> 초안 만들기
+    <Button variant="primary" onClick={() => void makeDraft()} disabled={making || !periodUsable(period, record, today)} data-testid="report-make-draft">
+      <FilePlus2 aria-hidden="true" className="size-4" /> {making ? '만드는 중…' : '초안 만들기'}
     </Button>
   )
 
@@ -193,25 +224,36 @@ export function PortalReportSheet({
             <fieldset className="flex flex-col gap-2">
               <legend className="t-sub font-semibold text-slate-700">무엇을 보낼까요?</legend>
               <div className="flex flex-wrap gap-1.5">
-                {REPORT_KINDS_NOW.map((k) => (
-                  <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)} data-testid="report-kind" data-kind={k}
+                {REPORT_KINDS_NOW.filter((k, i) => i < REPORT_KINDS_MAIN || moreKinds || kind === k).map((k) => (
+                  <button key={k} type="button" aria-pressed={kind === k} onClick={() => pickKind(k)} data-testid="report-kind" data-kind={k}
                     className={`tap t-sub min-h-10 rounded-full border px-3.5 font-semibold ${kind === k ? 'border-brand-600 bg-white text-brand-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>
-                    {REPORT_KIND_LABEL[k]}
+                    {kind === k && <Check aria-hidden="true" className="mr-1 inline size-4 align-[-3px]" />}{REPORT_KIND_LABEL[k]}
                   </button>
                 ))}
+                {!moreKinds && !REPORT_KINDS_NOW.slice(REPORT_KINDS_MAIN).includes(kind) && (
+                  <button type="button" onClick={() => setMoreKinds(true)} className="tap t-sub min-h-10 px-2 font-semibold text-brand-700 hover:underline" data-testid="report-kind-more">
+                    그 밖에(중간 · 최종)
+                  </button>
+                )}
               </div>
             </fieldset>
             {kind !== 'consult_summary' && (
               <fieldset className="flex flex-col gap-2">
                 <legend className="t-sub font-semibold text-slate-700">어느 기간을?</legend>
                 <div className="flex flex-wrap gap-1.5">
-                  {PERIODS.filter((p) => p !== 'since_last' || lastEnd).map((p) => (
-                    <button key={p} type="button" aria-pressed={period === p} onClick={() => setPeriod(p)} data-testid="report-period" data-period={p}
-                      className={`tap t-sub min-h-10 rounded-full border px-3.5 font-semibold ${period === p ? 'border-brand-600 bg-white text-brand-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>
-                      {DRAFT_PERIOD_LABEL[p]}
-                    </button>
-                  ))}
+                  {periodsFor(kind).filter((p) => p !== 'since_last' || lastEnd).map((p) => {
+                    const usable = periodUsable(p, record, today)
+                    return (
+                      <button key={p} type="button" aria-pressed={period === p} disabled={!usable} onClick={() => setPeriod(p)} data-testid="report-period" data-period={p}
+                        className={`tap t-sub min-h-10 rounded-full border px-3.5 font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${period === p ? 'border-brand-600 bg-white text-brand-700' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}>
+                        {period === p && <Check aria-hidden="true" className="mr-1 inline size-4 align-[-3px]" />}{DRAFT_PERIOD_LABEL[p]}
+                      </button>
+                    )
+                  })}
                 </div>
+                {kind === 'annual' && !periodUsable('contract', record, today) && (
+                  <p className="t-sub break-keep text-slate-600" data-testid="report-contract-missing">계약일이 비어 있어 최근 12개월로 정리해요. 업체 › 계약에 계약일을 적으면 계약일부터 정리할 수 있어요.</p>
+                )}
               </fieldset>
             )}
             <p className="t-sub break-keep text-slate-600">업체 기록(업무 · 서류 · 지원사업 · 요청한 자료)에서 고객이 봐도 되는 줄만 뽑아요. 수수료 · 메모 · 업무 일기는 넣지 않아요.</p>

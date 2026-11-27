@@ -5,7 +5,10 @@
  *     성과 계산은 기존 성과 보고서(buildClientReport)와 같은 규칙 — 선정 금액과 실제 입금은 한 사업 한 줄로 · 합치지 않고 따로 적는다.
  *     업무 '다음 단계' 처럼 직원이 손으로 적은 글은 내부 글일 수 있어 기본으로 꺼 둔다(켜면 들어간다).
  *  2) 고객 화면 사용 상태 — 연결 전 · 가입 안내함 · 연결됨(안 오심) · 사용 중 · 오래 안 오심 · 잠시 멈춤 · 끊음.
- *  3) 후속 업무 — 가입 안내 3일 · 연결 뒤 첫 방문 없음 3일 · 보고서 안 열어 봄 3일 · 경과 보고 14일 공백 · 30일 안 오심.
+ *  3) 후속 업무 — 가입 안내 3일 · 연결 뒤 첫 방문 없음 3일 · 보고서 안 열어 봄 3일 · 경과 보고 14일 공백 · 30일 안 오심 ·
+ *     (D-682) 계약 고객인데 월말 7일 전까지 이번 달 보고가 없음.
+ *  4) (D-682) 월간 보고 · 연간 보고(계약일부터 또는 최근 12개월) — 연간은 '함께 한 기록' 숫자 · '다음 1년 검토해 볼 것'(먼저 제안할 것 · 꺼진 채).
+ *     계약일이 비어 있으면 계약 기간을 짐작하지 않는다(그 기간은 고를 수 없고 최근 12개월만).
  *     같은 일은 같은 열쇠(key) — 새 보고서 · 새 연결 · 새 안내가 생기면 새 열쇠(새 주기).
  * 날짜는 한국 날짜(YYYY-MM-DD) 글자로 견준다.
  */
@@ -23,14 +26,16 @@ export const REPORT_KIND_LABEL: Record<PortalReportKind, string> = {
   progress: '경과 보고',
   interim: '중간 보고',
   final: '최종 보고',
-  monthly: '월간 성장 리포트',
-  annual: '연간 리뷰',
+  // 홈페이지(My MIRAE)와 같은 이름 — 두 화면이 다른 말을 쓰지 않게(D-682)
+  monthly: '월간 보고',
+  annual: '연간 보고',
 }
 
-/** 지금 화면에서 고르는 종류(월간 · 연간은 다음 단계) */
-export const REPORT_KINDS_NOW: PortalReportKind[] = ['progress', 'consult_summary', 'interim', 'final']
+/** 보고서 창에서 고르는 종류 — 앞 넷은 늘 보이고, 중간 · 최종은 [그 밖에] 안(D-682 월간 · 연간 더함) */
+export const REPORT_KINDS_NOW: PortalReportKind[] = ['progress', 'monthly', 'consult_summary', 'annual', 'interim', 'final']
+export const REPORT_KINDS_MAIN = 4
 
-export type DraftPeriodKey = '2w' | '1m' | 'since_last' | 'year' | 'last12' | 'contract'
+export type DraftPeriodKey = '2w' | '1m' | 'since_last' | 'year' | 'last12' | 'contract' | 'this_month' | 'last_month'
 
 export const DRAFT_PERIOD_LABEL: Record<DraftPeriodKey, string> = {
   '2w': '최근 2주',
@@ -38,11 +43,40 @@ export const DRAFT_PERIOD_LABEL: Record<DraftPeriodKey, string> = {
   since_last: '지난 보고 이후',
   year: '올해',
   last12: '최근 12개월',
-  contract: '계약 뒤 전체',
+  contract: '계약일부터',
+  this_month: '이번 달',
+  last_month: '지난달',
+}
+
+/** 종류마다 고를 수 있는 기간 */
+export function periodsFor(kind: PortalReportKind): DraftPeriodKey[] {
+  if (kind === 'monthly') return ['this_month', 'last_month']
+  if (kind === 'annual') return ['contract', 'last12']
+  return ['2w', '1m', 'since_last', 'year']
+}
+
+/** 계약일(한국 날짜) — 비어 있으면 '' (짐작하지 않는다) */
+export function contractStart(record: Pick<ClientOpsRecord, 'contract'>): string {
+  const d = (record.contract?.signedAt ?? '').slice(0, 10)
+  return DAY.test(d) ? d : ''
+}
+
+/** 이 기간을 고를 수 있는지 — 계약일이 없으면 '계약일부터' 는 못 고른다 */
+export function periodUsable(key: DraftPeriodKey, record: Pick<ClientOpsRecord, 'contract'>, today: string): boolean {
+  if (key !== 'contract') return true
+  const s = contractStart(record)
+  return !!s && s <= today
+}
+
+/** 종류를 고르면 먼저 고를 기간 — 월간: 1~7일이면 지난달 · 연간: 계약일이 있으면 계약일부터 · 그 밖: 지난 보고가 있으면 그 뒤로 */
+export function defaultPeriod(kind: PortalReportKind, record: Pick<ClientOpsRecord, 'contract'>, today: string, lastReportEnd?: string | null): DraftPeriodKey {
+  if (kind === 'monthly') return Number(today.slice(8, 10)) <= 7 ? 'last_month' : 'this_month'
+  if (kind === 'annual') return periodUsable('contract', record, today) ? 'contract' : 'last12'
+  return lastReportEnd ? 'since_last' : '2w'
 }
 
 export interface DraftSource {
-  type: 'service' | 'document' | 'portal_document' | 'portal_update' | 'funding' | 'tool' | 'manual'
+  type: 'service' | 'document' | 'portal_document' | 'portal_update' | 'funding' | 'tool' | 'manual' | 'insight' | 'history'
   id: string
   at?: string
 }
@@ -112,6 +146,16 @@ const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`
 /** 기간 — 끝은 늘 오늘(한국 날짜). '지난 보고 이후' 는 지난 보고 끝 다음 날부터(없으면 최근 1개월) */
 export function draftPeriod(key: DraftPeriodKey, record: Pick<ClientOpsRecord, 'contract' | 'createdAt'>, today: string, lastReportEnd?: string | null): { from: string; to: string } {
   const to = today
+  if (key === 'this_month') return { from: `${today.slice(0, 7)}-01`, to }
+  if (key === 'last_month') {
+    const end = shiftDay(`${today.slice(0, 7)}-01`, -1)
+    return { from: `${end.slice(0, 7)}-01`, to: end }
+  }
+  // 계약일이 없으면 짐작하지 않는다 — 최근 12개월로(화면은 '계약일부터' 를 못 고르게 막는다)
+  if (key === 'contract') {
+    const s = contractStart(record)
+    return s && s <= today ? { from: s, to } : { from: reportFrom(record, 'last12', today), to }
+  }
   if (key === '2w') return { from: shiftDay(today, -13), to }
   if (key === '1m' || (key === 'since_last' && !(lastReportEnd && DAY.test(lastReportEnd)))) {
     const [y, m, d] = today.split('-').map(Number)
@@ -151,6 +195,10 @@ export function buildReportDraft(input: {
   period: { from: string; to: string }
   docs?: readonly PortalDocLite[]
   updates?: readonly PortalUpdateLite[]
+  /** 연간 — '다음 1년 검토해 볼 것'(맞춤 추천 '먼저 제안할 것' 과 같은 판정 · 부르는 쪽이 계산해 넘긴다) */
+  picks?: readonly { key: string; label: string }[]
+  /** 연간 — 이 기간에 이 업체와 주고받은 것(보낸 보고서 · 그중 열어 본 것) */
+  history?: { reports: number; reportsSeen: number }
 }): ReportDraft {
   const { record, today, kind, period } = input
   const docs = input.docs ?? []
@@ -220,6 +268,19 @@ export function buildReportDraft(input: {
     add('agreed', '함께 정한 다음 일', [], true)
     add('ask', '대표님께 부탁드릴 것', ask, true)
     add('next', '다음 일정', next.slice(0, NEXT_MAX))
+  } else if (kind === 'annual') {
+    // 1년 정리 — 끝낸 일 · 진행 · 자금 · 함께 한 기록(숫자만) · 다음 1년 검토해 볼 것(직원이 켜야 나감) · 남은 것(직원이 채움)
+    const verified = docs.filter((d) => d.status === 'verified' && inRange(dayOf(d.verifiedAt))).length
+    const rec: DraftLine[] = []
+    if (input.history && input.history.reports > 0) rec.push(line(`보내 드린 보고서 ${input.history.reports}편${input.history.reportsSeen ? ` · 열어 보신 것 ${input.history.reportsSeen}편` : ''}`, { source: { type: 'history', id: 'reports' } }))
+    if (verified > 0) rec.push(line(`확인을 마친 자료 ${verified}개`, { source: { type: 'history', id: 'documents' } }))
+    const review = (input.picks ?? []).slice(0, 3).map((p) => line(`${p.label} — 함께 검토해 볼 만해요`, { on: false, source: { type: 'insight', id: p.key } }))
+    add('done', '함께 한 일', done, true)
+    add('now', '지금 진행 중', now)
+    add('money', '확보한 자금', money)
+    add('record', '함께 한 기록', rec)
+    add('review', '다음 1년 검토해 볼 것', review, true)
+    add('limits', '남은 것 · 유의할 점', [], true)
   } else if (kind === 'final') {
     add('done', '전달한 결과', done, true)
     add('money', '확보한 자금', money)
@@ -238,12 +299,20 @@ export function buildReportDraft(input: {
   const nowN = now.filter((l) => !l.internal).length
   const askN = ask.length
   const range = `${md(period.from)} ~ ${md(period.to)}`
+  const fullRange = `${period.from.slice(0, 4)}.${md(period.from)} ~ ${period.to.slice(0, 4)}.${md(period.to)}`
   const summary =
     kind === 'consult_summary'
       ? `${md(today)} 상담에서 이야기 나눈 내용과 다음 일을 정리했어요.`
-      : `이번 기간(${range})에 끝낸 일 ${doneN}건 · 진행 중 ${nowN}건이에요.${askN ? ` 대표님께 부탁드릴 것이 ${askN}건 있어요.` : ''}`
-  const monthTitle = `${Number(today.slice(5, 7))}월`
-  const title = kind === 'consult_summary' ? `${md(today)} ${REPORT_KIND_LABEL[kind]}` : `${monthTitle} ${REPORT_KIND_LABEL[kind]} (${range})`
+      : kind === 'annual'
+        ? `${fullRange} 동안 함께 끝낸 일 ${doneN}건 · 지금 진행 중 ${nowN}건${money.length ? ` · 확보한 자금 ${money.length}건` : ''}이에요.`
+        : `이번 기간(${range})에 끝낸 일 ${doneN}건 · 진행 중 ${nowN}건이에요.${askN ? ` 대표님께 부탁드릴 것이 ${askN}건 있어요.` : ''}`
+  // 월간 · 연간은 기간이 곧 이름 — 지난달 보고는 그 달 이름으로
+  const monthTitle = `${Number((kind === 'monthly' ? period.from : today).slice(5, 7))}월`
+  const title =
+    kind === 'consult_summary' ? `${md(today)} ${REPORT_KIND_LABEL[kind]}`
+      : kind === 'monthly' ? `${monthTitle} 월간 보고`
+        : kind === 'annual' ? `연간 보고 (${fullRange})`
+          : `${monthTitle} ${REPORT_KIND_LABEL[kind]} (${range})`
 
   return { kind, title, periodStart: period.from, periodEnd: period.to, summary, staffNote: '', sections }
 }
@@ -334,7 +403,10 @@ export function portalUsage(input: { links: readonly PortalLinkLite[]; homeSeen:
   return { state: daysBetween(last, today) >= DORMANT_DAYS ? 'dormant' : 'active', lastVisit: last, firstVisit: first }
 }
 
-export type PortalFollowRule = 'invite_pending' | 'first_visit' | 'report_unseen' | 'report_gap' | 'dormant'
+export type PortalFollowRule = 'invite_pending' | 'first_visit' | 'report_unseen' | 'report_gap' | 'monthly_review' | 'dormant'
+
+/** 월말 며칠 전부터 '이번 달 보고' 를 챙길지 */
+export const MONTHLY_REVIEW_DAYS = 7
 
 export interface PortalFollowUp {
   /** 같은 일 = 같은 열쇠(새 보고서 · 새 연결 · 새 안내는 새 열쇠) */
@@ -361,6 +433,8 @@ export function portalFollowUps(
     activeWork: boolean
     /** 고객 방문 기록을 알 수 있는지(연습 모드는 고객 계정이 없어 모른다 — 방문 · 열람 규칙을 건너뛴다) */
     visitsKnown?: boolean
+    /** D-682 계약 고객인지(월말 보고 챙기기는 계약 고객만) */
+    contracted?: boolean
   },
   today: string,
 ): PortalFollowUp[] {
@@ -400,7 +474,16 @@ export function portalFollowUps(
       out.push({ key: `${input.clientId}:gap:${latest?.id ?? 'none'}`, rule: 'report_gap', clientId: input.clientId, days: n, text: latest ? `경과 보고 ${n}일째 없음 — 보고서를 만들어 보세요` : `연결 ${n}일째 · 아직 보고서가 없어요` })
     }
   }
-  const order: Record<PortalFollowRule, number> = { report_unseen: 0, report_gap: 1, first_visit: 2, invite_pending: 3, dormant: 4 }
+  // D-682 월말 보고 — 계약 고객 · 활성 계정 · 월말 7일 전부터 · 이번 달 낸 보고서 0 · 보고 공백 줄이 이미 있으면 하나만(같은 일을 두 번 띄우지 않는다)
+  if (input.contracted && active.length && !out.some((f) => f.rule === 'report_gap')) {
+    const month = today.slice(0, 7)
+    const monthEnd = shiftDay(`${shiftDay(`${month}-28`, 4).slice(0, 7)}-01`, -1)
+    const left = daysBetween(today, monthEnd)
+    if (left < MONTHLY_REVIEW_DAYS && !published.some((r) => dayOf(r.publishedAt).startsWith(month))) {
+      out.push({ key: `${input.clientId}:monthly:${month}`, rule: 'monthly_review', clientId: input.clientId, days: daysBetween(`${month}-01`, today), text: `${Number(month.slice(5, 7))}월 보고를 아직 안 보냈어요 — 월간 보고를 만들어 보세요` })
+    }
+  }
+  const order: Record<PortalFollowRule, number> = { report_unseen: 0, report_gap: 1, monthly_review: 2, first_visit: 3, invite_pending: 4, dormant: 5 }
   return out.sort((a, b) => order[a.rule] - order[b.rule] || b.days - a.days)
 }
 

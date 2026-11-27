@@ -11,11 +11,16 @@ import type { ClientOpsRecord } from '../../types/clientOps'
 import {
   ASK_MAX,
   NEXT_MAX,
+  REPORT_KIND_LABEL,
   buildReportDraft,
+  contractStart,
   daysBetween,
+  defaultPeriod,
   draftPayload,
   draftPeriod,
   hasActiveWork,
+  periodUsable,
+  periodsFor,
   portalFollowUps,
   portalInviteText,
   portalUsage,
@@ -144,6 +149,40 @@ check('OFF-a 함수 없음(PGRST202) · 표 없음(42P01) · 실행 권한 · �
 check('OFF-b 다른 오류(로그인 만료 · 남의 업체 · 다른 함수 권한)는 꺼짐으로 숨기지 않음',
   !isGrowthOff({ code: 'PGRST301', message: 'JWT expired' }) && !isGrowthOff({ code: '42501', message: 'not allowed' }) && !isGrowthOff({ code: '42501', message: 'permission denied for function staff_find_customer_profile' }))
 check('OFF-c 사람 말 — 한국어 글은 그대로 · 권한 · 없음은 정해진 글', growthErrorText({ message: '이미 정정했거나 내린 보고서입니다' }, 'x') === '이미 정정했거나 내린 보고서입니다' && growthErrorText({ code: '42501', message: 'not allowed' }, 'x').includes('권한') && growthErrorText({ code: 'P0002', message: 'not found' }, 'x').includes('찾지 못했어요') && growthErrorText(new Error('TypeError: x'), '기본') === '기본')
+
+// ---------------- D-682 월간 · 연간 보고 · 월말 보고 챙기기 ----------------
+const signed = base({ contract: { signedAt: '2026-03-15', kind: '', cashAmount: null, policies: [], note: '' } } as Partial<ClientOpsRecord>)
+check('MON-01 이름이 홈페이지와 같음(월간 보고 · 연간 보고)', REPORT_KIND_LABEL.monthly === '월간 보고' && REPORT_KIND_LABEL.annual === '연간 보고')
+check('MON-02 종류마다 기간 — 월간: 이번 달 · 지난달 / 연간: 계약일부터 · 최근 12개월 / 경과: 예전 넷', periodsFor('monthly').join() === 'this_month,last_month' && periodsFor('annual').join() === 'contract,last12' && periodsFor('progress').join() === '2w,1m,since_last,year')
+check('MON-03 이번 달 = 1일 ~ 오늘 · 지난달 = 전달 1일 ~ 말일(3월 → 2월 28일 · 1월 → 전해 12월)',
+  JSON.stringify(draftPeriod('this_month', base(), today)) === JSON.stringify({ from: '2026-11-01', to: today }) &&
+  JSON.stringify(draftPeriod('last_month', base(), '2026-03-05')) === JSON.stringify({ from: '2026-02-01', to: '2026-02-28' }) &&
+  JSON.stringify(draftPeriod('last_month', base(), '2026-01-03')) === JSON.stringify({ from: '2025-12-01', to: '2025-12-31' }))
+check('MON-04 월간 먼저 고를 기간 — 1~7일은 지난달 · 그 뒤는 이번 달', defaultPeriod('monthly', base(), '2026-12-03') === 'last_month' && defaultPeriod('monthly', base(), '2026-12-08') === 'this_month')
+check('ANN-01 계약일 = 서명일 · 비면 빈 칸(짐작 0)', contractStart(signed) === '2026-03-15' && contractStart(base()) === '')
+check('ANN-02 계약일이 없으면 "계약일부터" 못 고름 · 먼저 고를 기간 = 최근 12개월 · 그래도 부르면 최근 12개월(만든 날로 짐작 0)',
+  !periodUsable('contract', base(), today) && defaultPeriod('annual', base(), today) === 'last12' && draftPeriod('contract', base(), today).from === draftPeriod('last12', base(), today).from && draftPeriod('contract', base(), today).from !== '2026-01-05')
+check('ANN-03 계약일이 있으면 계약일부터 · 앞날 계약일은 못 고름', periodUsable('contract', signed, today) && draftPeriod('contract', signed, today).from === '2026-03-15' && defaultPeriod('annual', signed, today) === 'contract' && !periodUsable('contract', base({ contract: { signedAt: '2027-01-01', kind: '', cashAmount: null, policies: [], note: '' } } as Partial<ClientOpsRecord>), today))
+const yearRec = { ...rec, contract: signed.contract }
+const ann = buildReportDraft({ record: yearRec, today, kind: 'annual', period: draftPeriod('contract', yearRec, today), docs, updates, picks: [{ key: 'employment', label: '고용지원금' }, { key: 'lab', label: '기업부설연구소' }, { key: 'policy', label: '정책자금' }, { key: 'x', label: '넷째' }], history: { reports: 5, reportsSeen: 3 } })
+const annKeys = ann.sections.map((x) => x.key).join(',')
+const annSec = (k: string) => ann.sections.find((x) => x.key === k)
+check('ANN-04 연간 칸 차례 — 함께 한 일 · 진행 · 자금 · 함께 한 기록 · 다음 1년 검토 · 남은 것', annKeys === 'done,now,money,record,review,limits', annKeys)
+check('ANN-05 함께 한 기록 = 숫자만(보낸 보고서 5편 · 열어 보신 것 3편 · 확인 마친 자료 1개)', (annSec('record')?.lines ?? []).map((l) => l.text).join('|') === '보내 드린 보고서 5편 · 열어 보신 것 3편|확인을 마친 자료 1개', annSec('record')?.lines.map((l) => l.text))
+check('ANN-06 다음 1년 검토 — 먼저 제안할 것 3개까지 · 모두 꺼진 채(직원이 켜야 나감) · 금액 0 · 출처 = 판정 열쇠', (annSec('review')?.lines.length ?? 0) === 3 && annSec('review')!.lines.every((l) => !l.on && !/만원|억|원\b/.test(l.text) && l.source?.type === 'insight') && annSec('review')!.lines[0].text.startsWith('고용지원금'))
+check('ANN-07 발행 모양 — 꺼진 검토 줄 · 빈 "남은 것" 칸은 안 나감', !JSON.stringify(draftPayload(ann).sections).includes('함께 검토해 볼 만해요') && !draftPayload(ann).sections.some((x) => x.key === 'limits'))
+check('ANN-08 제목 · 요약 — 해까지 쓴 기간 · 자금은 건수만(합계 0)', ann.title === '연간 보고 (2026.3/15 ~ 2026.11/27)' && ann.summary.includes('확보한 자금 2건') && !/만원/.test(ann.summary), [ann.title, ann.summary])
+check('ANN-09 수수료 · 메모 · 내부 글은 연간에도 0', !JSON.stringify(draftPayload(ann)).includes('300만원') && !JSON.stringify(draftPayload(ann)).includes('채무'))
+const mon = buildReportDraft({ record: rec, today: '2026-12-03', kind: 'monthly', period: draftPeriod('last_month', rec, '2026-12-03'), docs, updates })
+check('MON-05 지난달 월간 보고 — 이름은 그 달(11월 월간 보고) · 경과 보고와 같은 칸', mon.title === '11월 월간 보고' && mon.sections.map((x) => x.key).join(',').startsWith('now,done') && mon.periodEnd === '2026-11-30', [mon.title, mon.periodEnd])
+const mfu = (over: Partial<Parameters<typeof portalFollowUps>[0]> = {}, t = '2026-11-25') =>
+  portalFollowUps({ clientId: 'c1', links: [L('l1', 'active', '2026-11-01T00:00:00Z')], homeSeen: seen({ l1: { first: '2026-11-02T00:00:00Z', last: '2026-11-24T00:00:00Z' } }), reports: [rep('r1', '2026-11-20T03:00:00Z')], reportSeen: new Set(['r1']), activeWork: true, contracted: true, ...over }, t)
+check('RULE-m1 월말 5일 전 · 이번 달 보고 있음 → 0', !mfu().some((x) => x.rule === 'monthly_review'))
+check('RULE-m2 이번 달 보고 없음(지난달 것뿐) · 월말 5일 전 → "11월 보고를 아직 안 보냈어요" · 열쇠에 그 달', mfu({ reports: [rep('r0', '2026-10-30T03:00:00Z')], reportSeen: new Set(['r0']), activeWork: false }).find((x) => x.rule === 'monthly_review')?.key === 'c1:monthly:2026-11')
+check('RULE-m3 월말 8일 전이면 아직 0 · 계약 전 고객 0 · 활성 계정 없으면 0',
+  !mfu({ reports: [], activeWork: false }, '2026-11-22').some((x) => x.rule === 'monthly_review') && !mfu({ reports: [], activeWork: false, contracted: false }).some((x) => x.rule === 'monthly_review') && !mfu({ reports: [], activeWork: false, links: [L('l1', 'paused')] }).some((x) => x.rule === 'monthly_review'))
+check('RULE-m4 보고 공백 줄이 이미 있으면 월말 줄은 안 띄움(같은 일 두 번 0)', (() => { const r = mfu({ reports: [rep('r0', '2026-10-30T03:00:00Z')], reportSeen: new Set(['r0']) }); return r.some((x) => x.rule === 'report_gap') && !r.some((x) => x.rule === 'monthly_review') })())
+check('RULE-m5 2월 · 12월 말일 계산(2/23 = 5일 전 → 뜸 · 12/24 = 7일 전 → 0)', mfu({ reports: [], activeWork: false }, '2026-02-23').some((x) => x.rule === 'monthly_review' && x.key.endsWith('2026-02')) && !mfu({ reports: [], activeWork: false }, '2026-12-24').some((x) => x.rule === 'monthly_review'))
 
 console.log(`\nportalGrowth: ${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

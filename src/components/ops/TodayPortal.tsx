@@ -9,6 +9,7 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { ArrowRight, UserRoundCheck } from 'lucide-react'
 import type { ClientOpsRecord } from '../../types/clientOps'
+import { contractStageOf } from '../../types/clientOps'
 import type { PortalClientLink } from '../../types/bridge'
 import { BottomSheet } from '../ui/primitives'
 import { getDataModeConfig } from '../../data/dataMode'
@@ -61,6 +62,7 @@ export function usePortalFollowUps(workspaceId: string | null, clients: readonly
             reports: data.reports.filter((r) => r.clientId === c.id),
             reportSeen,
             activeWork: hasActiveWork(c),
+            contracted: contractStageOf(c.status) === 'signed',
           },
           today,
         ),

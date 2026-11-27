@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { CheckCircle2, ClipboardCopy, ExternalLink, Eye, Link2, MessageSquareReply, Pause, Play, Plus, Send, Share2, Sparkles, Unlink, Upload } from 'lucide-react'
 import { InlineConfirm } from '../ui/InlineConfirm'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
+import { contractStageOf } from '../../types/clientOps'
 import { withDocument } from '../../services/clientOpsService'
 import { filePortalDocument } from '../../services/docShelf'
 import type { CustomerEvent, PortalClientLink, PortalDocument, PortalProjection, PortalRequest, PortalUpdate } from '../../types/bridge'
@@ -218,6 +219,7 @@ export function PortalTab({
               reportSeen: new Set(growth.receipts.filter((r) => r.itemKind === 'report').map((r) => r.itemId)),
               activeWork: hasActiveWork(record),
               visitsKnown: !isLocal,
+              contracted: contractStageOf(record.status) === 'signed',
             },
             today,
           ),
@@ -706,6 +708,7 @@ export function PortalTab({
           reports={growth.reports}
           correcting={reportSheet.correcting}
           linked={links.some((l) => l.status === 'active')}
+          seenReportIds={new Set(growth.receipts.filter((r) => r.itemKind === 'report').map((r) => r.itemId))}
           onClose={() => setReportSheet(null)}
           onPublished={() => void load()}
         />

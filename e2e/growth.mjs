@@ -12,6 +12,7 @@
  *   G9 [정정] — 고친 곳 한 줄 없으면 발행 꺼짐 → 적으면 2판 · 예전 판은 목록에서 접힘('정정 전 판 1개') · 저장소에 두 판 다 남음
  *   G10 [내리기] → 까닭 → 고객 화면에서 내림 · 줄은 지우지 않음(내림 표시 · 까닭은 내부에만)
  *   G11 잠시 멈춤 → 다시 켜기 · 끊기는 한 번 더 묻기(취소하면 그대로)
+ *   G15 종류 넷 + [그 밖에] · 월간(이번 달/지난달 · 제목 'n월 월간 보고') · G16 연간(계약일부터 · 다음 1년 검토 꺼진 채 · 미리보기에 안 나감) · G17 계약일 없으면 최근 12개월(짐작 0)
  *   G12 오늘 화면 — 연습 모드에는 '고객 화면 챙길 것' 칩 0(방문 기록이 없어 거짓 알림을 만들지 않음)
  *   G13 390 — 탭 · 보고서 창 넘침 0 · 단추 40px 이상
  *   G14 JS 오류 0
@@ -188,6 +189,53 @@ await page.getByTestId('portal-revoke').click()
 check('G11b 끊기는 한 번 더 묻기', (await page.getByTestId('portal-revoke-confirm').count()) === 1)
 await page.getByTestId('portal-revoke-confirm').getByRole('button', { name: '취소' }).click()
 check('G11c 취소하면 그대로(연결됨)', (await usage.getAttribute('data-state')) === 'linked_unvisited')
+
+// G15~G17 (D-682) 월간 · 연간 보고
+const kst = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
+await page.getByTestId('report-create').click()
+await page.getByTestId('report-sheet').waitFor()
+check('G15a 종류 칩 넷(경과 · 월간 · 상담 요약 · 연간) + [그 밖에]', (await page.getByTestId('report-kind').count()) === 4 && (await page.getByTestId('report-kind-more').count()) === 1, await page.getByTestId('report-kind').allInnerTexts())
+await page.locator('[data-testid="report-kind"][data-kind="monthly"]').click()
+const monPeriods = await page.getByTestId('report-period').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-period')}:${e.getAttribute('aria-pressed')}`))
+const wantMon = Number(kst.slice(8, 10)) <= 7 ? 'last_month' : 'this_month'
+check('G15b 월간 — 기간 둘(이번 달 · 지난달) · 1~7일은 지난달 · 그 뒤는 이번 달이 먼저', monPeriods.length === 2 && monPeriods.includes(`${wantMon}:true`), monPeriods)
+await page.getByTestId('report-make-draft').click()
+await page.waitForFunction(() => document.querySelector('[data-testid="report-sheet"]')?.getAttribute('data-step') === 'edit')
+const monTitle = await page.getByTestId('report-title').inputValue()
+check("G15c 월간 초안 제목 'n월 월간 보고'", /^\d{1,2}월 월간 보고$/.test(monTitle), monTitle)
+await page.keyboard.press('Escape')
+await page.getByTestId('report-sheet').waitFor({ state: 'detached' }).catch(() => {})
+await page.getByTestId('report-create').click()
+await page.locator('[data-testid="report-kind"][data-kind="annual"]').click()
+const annPeriods = await page.getByTestId('report-period').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-period')}:${e.getAttribute('aria-pressed')}:${e.hasAttribute('disabled')}`))
+check('G16a 연간 — 계약일이 있으면 "계약일부터" 가 먼저 · 최근 12개월도', annPeriods.join() === 'contract:true:false,last12:false:false', annPeriods)
+await page.getByTestId('report-make-draft').click()
+await page.waitForFunction(() => document.querySelector('[data-testid="report-sheet"]')?.getAttribute('data-step') === 'edit', null, { timeout: 15000 })
+const annTitle = await page.getByTestId('report-title').inputValue()
+const annKeys = await page.getByTestId('report-section').evaluateAll((els) => els.map((e) => e.getAttribute('data-key')))
+const reviewOn = await page.locator('[data-testid="report-section"][data-key="review"] [data-testid="report-line"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-on')))
+check('G16b 연간 초안 — 제목에 계약일부터의 기간 · 칸(함께 한 일 · 다음 1년 검토 · 남은 것)', annTitle.startsWith('연간 보고 (2025.3/15 ~') && annKeys[0] === 'done' && annKeys.includes('review') && annKeys.at(-1) === 'limits', { annTitle, annKeys })
+check('G16c 다음 1년 검토 줄은 맞춤 추천 판정에서 · 모두 꺼진 채', reviewOn.length >= 1 && reviewOn.every((x) => x === '0'), reviewOn)
+await shot(page, 'growth-09-annual-edit')
+await page.getByTestId('report-preview-toggle').click()
+const annPv = (await page.getByTestId('report-preview').innerText()) ?? ''
+check('G16d 고객 화면으로 보기 — 꺼진 검토 줄 · 빈 "남은 것" 칸 0 · 수수료 0', !annPv.includes('함께 검토해 볼 만해요') && !annPv.includes('남은 것') && !annPv.includes('300만원'), annPv.slice(0, 300))
+await page.keyboard.press('Escape')
+await page.getByTestId('report-sheet').waitFor({ state: 'detached' }).catch(() => {})
+// 계약일을 비우면 — 계약일부터는 못 고름 · 최근 12개월 · 안내 한 줄(짐작 0)
+await page.evaluate(() => {
+  const k = 'axmvp.v1.operations_clients'
+  const all = JSON.parse(localStorage.getItem(k) || '[]')
+  for (const c of all) if (c.id === 'cli_hansol') c.contract = { ...(c.contract || {}), signedAt: '' }
+  localStorage.setItem(k, JSON.stringify(all))
+})
+await page.goto(TAB, { waitUntil: 'networkidle' })
+await page.getByTestId('report-create').click()
+await page.locator('[data-testid="report-kind"][data-kind="annual"]').click()
+const annNo = await page.getByTestId('report-period').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-period')}:${e.getAttribute('aria-pressed')}:${e.hasAttribute('disabled')}`))
+check('G17 계약일이 없으면 "계약일부터" 꺼짐 · 최근 12개월 · 안내 한 줄', annNo.join() === 'contract:false:true,last12:true:false' && (await page.getByTestId('report-contract-missing').count()) === 1, annNo)
+await shot(page, 'growth-10-annual-nocontract')
+await page.keyboard.press('Escape')
 
 // G12 오늘 화면 — 연습 모드 칩 0
 await page.goto(BASE + '/', { waitUntil: 'networkidle' })

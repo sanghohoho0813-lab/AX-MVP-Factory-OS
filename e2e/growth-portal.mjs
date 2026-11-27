@@ -16,6 +16,7 @@
  *   W10 연결 멈춤 — 그 계정은 그 순간부터 프로젝트 · 보고서 0(서버) → 다시 켜면 돌아옴
  *   W11 되돌리기(rollback_0033) — 홈페이지 · OS 모두 예전 화면 그대로(보고서 칸만 숨음) → 0033 다시 → 돌아옴
  *   W12 390 — 홈 · 보고서 화면 넘침 0 · 단추 44px
+ *   W14 (D-682) 월간 보고 발행 → 고객 홈 같은 이름 · 이번 달 보고를 낸 업체는 월말 보고 줄 0 · W2d 월말 7일 안이면 계약 고객마다 '이번 달 보고' 줄
  *   W13 JS 오류 0(두 앱)
  *
  *   node e2e/growth-portal.mjs [스크린샷 폴더]   (pg_ctlcluster 16 main start 먼저 · 홈페이지 저장소 ../mirae-ai-lab-homepage)
@@ -228,7 +229,16 @@ try {
     const rows = op.getByTestId('today-portal-row')
     await rows.first().waitFor({ timeout: 5000 }).catch(() => {})
     const rules = await rows.evaluateAll((els) => els.map((e) => e.getAttribute('data-rule')))
-    check('W2b 판 — 첫 방문 없음 한 줄(한빛정밀) · 다른 업체 0', rules.length === 1 && rules[0] === 'first_visit' && ((await rows.first().innerText()) ?? '').includes('한빛정밀'), rules)
+    // D-682 월말 7일 전부터는 계약 고객마다 '이번 달 보고' 줄도 뜬다(이 시험 날짜에 따라) — 첫 방문 없음은 늘 한빛정밀 하나
+    const rowTexts = await rows.allInnerTexts()
+    const kstDay = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
+    const monthEnd = new Date(Date.UTC(Number(kstDay.slice(0, 4)), Number(kstDay.slice(5, 7)), 0)).toISOString().slice(0, 10)
+    const inWindow = (Date.parse(monthEnd) - Date.parse(kstDay)) / 86400000 < 7
+    const firstVisit = rules.filter((r) => r === 'first_visit').length
+    const monthly = rules.filter((r) => r === 'monthly_review').length
+    check('W2b 판 — 첫 방문 없음은 한빛정밀 한 줄 · 그 밖은 월말 보고 줄만', firstVisit === 1 && rowTexts.some((t) => t.includes('한빛정밀') && t.includes('안 오셨어요')) && rules.every((r) => r === 'first_visit' || r === 'monthly_review'), rules)
+    check(`W2d 월말 보고 줄 — ${inWindow ? '월말 7일 안: 계약 고객 둘(보고 0) 모두' : '월말 7일 밖: 0'}`, inWindow ? monthly === 2 && rowTexts.some((t) => t.includes('바다상사') && t.includes('보고를 아직')) : monthly === 0, { rules, kstDay })
+    await op.waitForTimeout(500) // 판이 다 열린 뒤에 찍는다(열리는 중간이면 반투명)
     await shot(op, 'os-01-today-portal')
     await op.keyboard.press('Escape')
   }
@@ -390,6 +400,33 @@ try {
   await osGo(op, '/ops/clients/growth-a?tab=portal')
   await op.getByTestId('portal-reports').waitFor({ timeout: 10000 }).catch(() => {})
   check('W11d 0033 다시 → OS 보고서 칸 · 기록 그대로 돌아옴', (await op.getByTestId('portal-reports').count()) === 1 && (await op.getByTestId('report-row').count()) >= 1)
+
+  // ---------- W14 (D-682) 월간 보고 → 고객 화면 이름 · 대표 오늘 줄 ----------
+  await op.getByTestId('report-create').click()
+  await op.locator('[data-testid="report-kind"][data-kind="monthly"]').click()
+  await op.getByTestId('report-make-draft').click()
+  await op.waitForFunction(() => document.querySelector('[data-testid="report-sheet"]')?.getAttribute('data-step') === 'edit')
+  const monTitle = await op.getByTestId('report-title').inputValue()
+  await op.getByTestId('report-publish').click()
+  await op.getByTestId('report-publish-go').click()
+  await op.getByTestId('report-done').waitFor({ timeout: 15000 })
+  await op.getByTestId('report-done-close').click()
+  check("W14a 월간 보고 발행 — 서버 종류 monthly · 제목 'n월 월간 보고'", sql(`select kind || '|' || title from public.portal_reports where operations_client_id = 'growth-a' and status = 'published' order by published_at desc limit 1`) === `monthly|${monTitle}` && /^\d{1,2}월 월간 보고$/.test(monTitle), monTitle)
+  await hpGo(a1.page, '/my-projects')
+  await a1.page.getByTestId('growth-recent').waitFor({ timeout: 10000 })
+  const recent0 = (await a1.page.getByTestId('growth-recent-item').first().innerText()) ?? ''
+  check("W14b 고객 홈 최근 보고서 — 같은 이름 '월간 보고'(OS · 홈페이지 같은 말)", recent0.includes(monTitle) && recent0.includes('월간 보고'), recent0)
+  await osGo(op, '/')
+  const chip2 = op.getByTestId('today-portal-open')
+  let rules2 = []
+  if (await chip2.count()) {
+    await chip2.click()
+    rules2 = await op.getByTestId('today-portal-row').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-rule')}|${e.textContent}`))
+    await op.keyboard.press('Escape')
+  }
+  check('W14c 이번 달 보고를 낸 한빛정밀은 월말 보고 줄 0(바다상사만 남을 수 있음)', !rules2.some((r) => r.startsWith('monthly_review') && r.includes('한빛정밀')), rules2)
+  await osGo(op, '/ops/clients/growth-a?tab=portal')
+  await op.getByTestId('portal-reports').waitFor({ timeout: 10000 })
 
   // ---------- W12 390 ----------
   const m = await hpContext(CA2, { width: 390, height: 844 }, { deviceScaleFactor: 2, isMobile: true, hasTouch: true })
