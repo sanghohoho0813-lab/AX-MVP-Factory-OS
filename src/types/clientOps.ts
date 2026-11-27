@@ -903,6 +903,11 @@ export interface ClientOpsRecord {
    * 번호 · 전화 · 매출 · 금액은 허락과 상관없이 넣지 않는다(services/marketing/clientCase). payload 에 함께 저장(DB 변경 없음).
    */
   caseConsent?: { at: string }
+  /**
+   * D-681 고객 화면(My MIRAE) 가입 안내를 보낸 날(YYYY-MM-DD) — 연결 전 '가입 안내함' 상태 · 3일 뒤 후속 업무.
+   * 연결이 생기면 더 쓰지 않는다(기록은 남김). payload 에 함께 저장(DB 변경 없음).
+   */
+  portalInvite?: { at: string }
   /** 보관 처리 시각 (보관하면 목록·경고에서 빠진다) */
   archivedAt: string | null
   createdAt: string

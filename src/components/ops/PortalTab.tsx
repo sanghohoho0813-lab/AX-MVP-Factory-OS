@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { localDateOf } from '../../lib/appClock'
+import { localDateOf, todayLocalDate } from '../../lib/appClock'
 import { Link } from 'react-router-dom'
-import { CheckCircle2, ExternalLink, Eye, Link2, MessageSquareReply, Plus, Send, Share2, Sparkles, Upload } from 'lucide-react'
+import { CheckCircle2, ClipboardCopy, ExternalLink, Eye, Link2, MessageSquareReply, Pause, Play, Plus, Send, Share2, Sparkles, Unlink, Upload } from 'lucide-react'
 import { InlineConfirm } from '../ui/InlineConfirm'
 import type { ClientOpsRecord, DocumentKey } from '../../types/clientOps'
 import { withDocument } from '../../services/clientOpsService'
@@ -44,6 +44,12 @@ import { DOCUMENTS } from '../../content/clientOpsCatalog'
 import { DELETED_DOC_LABEL, documentMetaOf } from '../../services/clientOpsDocuments'
 import { getDataModeConfig } from '../../data/dataMode'
 import { brand } from '../../brand/brand.config'
+import { useIsPilot, useViewingPilot } from '../../auth/osAccess'
+import { copyText } from '../../services/grants/grantView'
+import { isGrowthOff, listClientReports, listLinkAccounts, listReceipts, type PortalReceipt, type PortalReport } from '../../services/portalGrowth'
+import { PORTAL_USAGE_LABEL, hasActiveWork, portalFollowUps, portalInviteText, portalUsage, daysBetween, type PortalSeen } from '../../services/portalGrowthRules'
+import { PortalReportsCard } from './PortalReportsCard'
+import { PortalReportSheet } from './PortalReportSheet'
 
 function isNotReadyError(cause: unknown): boolean {
   const o = cause as { message?: unknown; code?: unknown; details?: unknown } | null
@@ -85,8 +91,19 @@ export function PortalTab({
   const [linkBusy, setLinkBusy] = useState(false)
   const [docForm, setDocForm] = useState<{ open: boolean; key: string; title: string; note: string }>({ open: false, key: 'businessRegistration', title: '사업자등록증', note: '' })
   const [answerDraft, setAnswerDraft] = useState<Record<string, string>>({})
+  // D-681 고객성장관리 — 보고서 · 고객 열람 기록(0033). off = 아직 안 켬(그 칸만 숨기고 나머지는 예전 그대로)
+  const [growth, setGrowth] = useState<{ off: boolean; reports: PortalReport[]; receipts: PortalReceipt[] }>({ off: true, reports: [], receipts: [] })
+  const [reportSheet, setReportSheet] = useState<{ correcting: PortalReport | null } | null>(null)
+  const [inviteOpen, setInviteOpen] = useState(false)
+  // 끊기 한 번 더 묻는 중인 연결 id · 연결된 계정 이메일(연결 id → 이메일 — 0033 서버 함수)
+  const [revoking, setRevoking] = useState('')
+  const [accounts, setAccounts] = useState<Map<string, string>>(new Map())
+  const readOnly = useViewingPilot() !== null
+  const pilot = useIsPilot()
+  const today = todayLocalDate()
 
   const link = links.find((l) => l.status === 'active') ?? links[0] ?? null
+  const emailOf = (l: PortalClientLink) => l.profileEmail || accounts.get(l.id) || ''
 
   const load = useCallback(async () => {
     try {
@@ -109,6 +126,19 @@ export function PortalTab({
         setUpdates([]); setRequests([]); setDocuments([])
       }
       setNotReady(false)
+      // 보고서 · 열람 기록 — 따로 읽는다(0033 이 없어도 이 탭의 나머지는 예전 그대로)
+      try {
+        const [reps, rcs, accs] = await Promise.all([
+          listClientReports(workspaceId, record.id),
+          listReceipts(workspaceId, record.id),
+          listLinkAccounts(workspaceId, record.id).catch(() => new Map<string, string>()),
+        ])
+        setGrowth({ off: false, reports: reps, receipts: rcs })
+        setAccounts(accs)
+      } catch (cause) {
+        setGrowth({ off: true, reports: [], receipts: [] })
+        if (!isGrowthOff(cause)) showToast('보고서 기록을 읽지 못했어요 — 잠시 뒤 다시 열어 주세요.')
+      }
     } catch (cause) {
       if (isNotReadyError(cause)) setNotReady(true)
       else showToast(cause instanceof Error ? cause.message : '불러오지 못했습니다.')
@@ -167,6 +197,46 @@ export function PortalTab({
     }
   }
 
+  const homeSeen = useMemo(() => {
+    const m = new Map<string, PortalSeen>()
+    for (const r of growth.receipts) if (r.itemKind === 'home') m.set(r.linkId, { first: r.firstSeenAt, last: r.lastSeenAt })
+    return m
+  }, [growth.receipts])
+  const linkLites = useMemo(() => links.map((l) => ({ id: l.id, status: l.status, linkedAt: l.linkedAt, profileEmail: l.profileEmail })), [links])
+  const usage = portalUsage({ links: linkLites, homeSeen, invitedAt: record.portalInvite?.at ?? null }, today)
+  const followUps = useMemo(
+    () =>
+      growth.off
+        ? []
+        : portalFollowUps(
+            {
+              clientId: record.id,
+              invitedAt: record.portalInvite?.at ?? null,
+              links: linkLites,
+              homeSeen,
+              reports: growth.reports.map((r) => ({ id: r.id, status: r.status, publishedAt: r.publishedAt })),
+              reportSeen: new Set(growth.receipts.filter((r) => r.itemKind === 'report').map((r) => r.itemId)),
+              activeWork: hasActiveWork(record),
+              visitsKnown: !isLocal,
+            },
+            today,
+          ),
+    [growth, linkLites, homeSeen, record, today, isLocal],
+  )
+  const inviteText = portalInviteText({
+    who: record.representativeName ? `${record.representativeName} 대표님` : `${record.companyName} 담당자님`,
+    signupUrl: `${brand.customerPlatformUrl}/signup?next=${encodeURIComponent(brand.customerProjectsPath)}`,
+    email: record.contactEmail || undefined,
+  })
+  const markInvited = async () => {
+    if (!onRecordChange) return
+    const fresh = latest?.() ?? record
+    if (await onRecordChange({ ...fresh, portalInvite: { at: today } })) {
+      setInviteOpen(false)
+      showToast('가입 안내를 보냈다고 적었어요. 3일 지나도 연결이 없으면 다시 알려 드려요.')
+    }
+  }
+
   const docOptions = useMemo(() => DOCUMENTS.filter((d) => d.needsFile), [])
   const openRequests = requests.filter((r) => r.status === 'open' || r.status === 'answered')
   const published = updates.filter((u) => u.status === 'published')
@@ -198,8 +268,15 @@ export function PortalTab({
               <p className="mt-1 text-[0.9375rem] text-slate-500">확인 중…</p>
             ) : link ? (
               <div className="mt-1 text-[0.9375rem] text-slate-600">
-                <p>
-                  <span className="font-semibold text-success-700">연결됨</span> · {link.profileEmail || '(계정)'} · 연결일 {localDateOf(link.linkedAt)}
+                <p data-testid="portal-usage" data-state={growth.off ? 'off' : usage.state}>
+                  <span className={`font-semibold ${link.status === 'active' ? 'text-success-700' : 'text-danger-700'}`}>{link.status === 'active' ? '연결됨' : link.status === 'paused' ? '잠시 멈춤' : '연결 끊음'}</span> · {emailOf(link) || '(계정)'} · 연결일 {localDateOf(link.linkedAt)}
+                  {!growth.off && link.status === 'active' && (
+                    <span className="ml-1 text-slate-700">
+                      · {PORTAL_USAGE_LABEL[usage.state]}
+                      {usage.lastVisit ? ` · 최근 방문 ${usage.lastVisit.slice(5).replace('-', '/')}` : ''}
+                      {usage.state === 'linked_unvisited' ? ` · ${daysBetween(localDateOf(link.linkedAt), today)}일째` : ''}
+                    </span>
+                  )}
                   {isLocal && <span className="ml-2 rounded-full bg-highlight-100 px-2 py-0.5 t-meta font-semibold text-highlight-700">연습용</span>}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -225,11 +302,61 @@ export function PortalTab({
                     />
                   </label>
                 </div>
+                {/* D-681 계정마다 한 줄 — 열어 두기 · 잠시 멈춤 · 끊기. 서버가 그 순간부터 막는다(0006 portal_link_owned 는 active 만) */}
+                <ul className="mt-2 flex flex-col gap-1.5" data-testid="portal-accounts">
+                  {links.map((l) => {
+                    const seen = homeSeen.get(l.id)
+                    return (
+                      <li key={l.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-(--radius-control) border border-slate-200 px-3 py-2" data-testid="portal-account" data-status={l.status} data-email={emailOf(l)}>
+                        <span className="t-sub min-w-0 flex-1 break-all text-slate-800">
+                          {emailOf(l) || '고객 계정'}
+                          <span className={`ml-1.5 font-semibold ${l.status === 'active' ? 'text-success-700' : 'text-danger-700'}`}>{l.status === 'active' ? '연결됨' : l.status === 'paused' ? '잠시 멈춤' : '연결 끊음'}</span>
+                          {!growth.off && !isLocal && l.status === 'active' && (
+                            <span className="ml-1.5 text-slate-500">{seen ? `최근 방문 ${localDateOf(seen.last).slice(5).replace('-', '/')}` : '아직 안 오심'}</span>
+                          )}
+                        </span>
+                        {!readOnly && !pilot && (
+                          revoking === l.id ? (
+                            <span className="flex flex-wrap items-center gap-2" data-testid="portal-revoke-confirm">
+                              <span className="t-sub text-danger-700">이 계정은 고객 화면을 더는 못 봐요. 끊을까요?</span>
+                              <Button size="sm" variant="danger" disabled={running} onClick={() => void run(() => updateLink(l, { status: 'revoked' }), '연결을 끊었어요. 기록은 남아 있어요.').then(() => setRevoking(''))} data-testid="portal-revoke-go">끊기</Button>
+                              <Button size="sm" variant="ghost" onClick={() => setRevoking('')}>취소</Button>
+                            </span>
+                          ) : l.status === 'active' ? (
+                            <span className="flex flex-wrap gap-1.5">
+                              <Button size="sm" variant="ghost" disabled={running} onClick={() => void run(() => updateLink(l, { status: 'paused' }), '잠시 멈췄어요. 이 계정은 다시 켤 때까지 못 봐요.')} data-testid="portal-pause">
+                                <Pause aria-hidden="true" className="size-4" /> 잠시 멈춤
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => setRevoking(l.id)} data-testid="portal-revoke">
+                                <Unlink aria-hidden="true" className="size-4" /> 연결 끊기
+                              </Button>
+                            </span>
+                          ) : (
+                            <Button size="sm" variant="secondary" disabled={running} onClick={() => void run(() => updateLink(l, { status: 'active' }), '다시 열었어요. 이 계정이 다시 볼 수 있어요.')} data-testid="portal-resume">
+                              <Play aria-hidden="true" className="size-4" /> 다시 켜기
+                            </Button>
+                          )
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
               </div>
             ) : (
-              <p className="mt-1 text-[0.9375rem] break-keep text-slate-600">
-                이 고객은 아직 {brand.customerPlatformUrl.replace('https://', '')} 계정과 연결되지 않았습니다. 고객이 가입한 이메일을 넣고 연결하면 고객 화면(My MIRAE)이 열립니다.
-              </p>
+              <div className="mt-1 flex flex-col gap-1.5">
+                <p className="text-[0.9375rem] break-keep text-slate-600">
+                  이 고객은 아직 {brand.customerPlatformUrl.replace('https://', '')} 계정과 연결되지 않았습니다. 고객이 가입한 이메일을 넣고 연결하면 고객 화면(My MIRAE)이 열립니다.
+                </p>
+                {/* D-681 가입 안내 — 문구 복사 → [보냈어요] 로 날짜를 남긴다(이메일이 같다고 저절로 잇지 않는다 — 연결은 담당자가) */}
+                <p className="t-sub flex flex-wrap items-center gap-2" data-testid="portal-invite" data-state={record.portalInvite?.at ? 'sent' : 'none'}>
+                  {record.portalInvite?.at && <span className="text-slate-700">가입 안내 보냄 {record.portalInvite.at.slice(5).replace('-', '/')} · {daysBetween(record.portalInvite.at, today)}일째</span>}
+                  {!readOnly && (
+                    <Button size="sm" variant="secondary" onClick={() => setInviteOpen(true)} data-testid="portal-invite-open">
+                      <ClipboardCopy aria-hidden="true" className="size-4" /> 가입 안내 문구
+                    </Button>
+                  )}
+                </p>
+              </div>
             )}
           </div>
           {link ? (
@@ -267,7 +394,29 @@ export function PortalTab({
             에서 봅니다. 여기 "고객 화면 보기"는 고객이 보는 것과 같은 내용을 내 계정으로 읽은 것입니다. 고객 로그인을 대신하지는 않습니다.
           </p>
         )}
+        {/* D-681 챙길 것 — 보고서 안 열어 봄 · 보고 공백 · 첫 방문 없음 · 가입 안내 뒤 연결 없음(내부에만 · 저절로 보내지 않음) */}
+        {followUps.length > 0 && (
+          <ul className="mt-3 flex flex-col gap-1 border-t border-slate-100 pt-3" data-testid="portal-followups">
+            {followUps.map((f) => (
+              <li key={f.key} className="t-sub break-keep text-danger-700" data-testid="portal-followup" data-rule={f.rule}>· {f.text}</li>
+            ))}
+          </ul>
+        )}
       </section>
+
+      {/* D-681 고객에게 보낸 보고서 — 연결 전에도 발행해 둘 수 있다(연결되면 그때부터 보임) */}
+      {!growth.off && !loading && (
+        <PortalReportsCard
+          record={record}
+          links={links.map((l) => ({ ...l, profileEmail: emailOf(l) }))}
+          reports={growth.reports}
+          receipts={growth.receipts}
+          readOnly={readOnly}
+          onCreate={() => setReportSheet({ correcting: null })}
+          onCorrect={(r) => setReportSheet({ correcting: r })}
+          onChanged={() => void load()}
+        />
+      )}
 
       {link && (
         <>
@@ -545,6 +694,38 @@ export function PortalTab({
           안내 (선택)
           <input value={docForm.note} onChange={(e) => setDocForm((f) => ({ ...f, note: e.target.value }))} placeholder="예: 최근 3개월 이내 발급분" className="mt-1 w-full rounded-(--radius-control) border border-slate-300 px-3 py-2 text-[1rem]" />
         </label>
+      </Modal>
+
+      {reportSheet && (
+        <PortalReportSheet
+          record={latest?.() ?? record}
+          workspaceId={workspaceId}
+          today={today}
+          docs={documents.map((d) => ({ id: d.id, title: d.title, status: d.status, verifiedAt: d.verifiedAt }))}
+          updates={updates.map((u) => ({ id: u.id, title: u.title, status: u.status, actionRequired: u.customerActionRequired, actionLabel: u.customerActionLabel, completedAt: u.customerCompletedAt }))}
+          reports={growth.reports}
+          correcting={reportSheet.correcting}
+          linked={links.some((l) => l.status === 'active')}
+          onClose={() => setReportSheet(null)}
+          onPublished={() => void load()}
+        />
+      )}
+
+      <Modal
+        open={inviteOpen}
+        title="고객 화면 가입 안내"
+        onClose={() => setInviteOpen(false)}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => void copyText(inviteText).then((ok) => showToast(ok ? '문구를 복사했어요.' : '복사하지 못했어요 — 글을 직접 골라 복사해 주세요.'))} data-testid="portal-invite-copy">
+              <ClipboardCopy aria-hidden="true" className="size-4" /> 문구 복사
+            </Button>
+            {onRecordChange && <Button variant="primary" onClick={() => void markInvited()} data-testid="portal-invite-sent">보냈어요</Button>}
+          </>
+        }
+      >
+        <p className="t-sub mb-2 break-keep text-slate-600">카톡 · 문자로 보내 주세요(자동으로 보내지 않아요). 고객이 가입하면 그 이메일로 위에서 [연결] 을 눌러 주세요.</p>
+        <textarea readOnly value={inviteText} rows={9} className="t-sub w-full rounded-(--radius-control) border border-slate-300 bg-white px-3 py-2 text-slate-800" data-testid="portal-invite-text" />
       </Modal>
 
       {/* 고객 화면 미리보기 */}

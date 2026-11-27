@@ -93,9 +93,13 @@ export function reportFrom(record: Pick<ClientOpsRecord, 'contract' | 'createdAt
 
 const serviceLabel = (key: ServiceKey) => SERVICES.find((s) => s.key === key)?.label ?? String(key)
 
-export function buildClientReport(record: ClientOpsRecord, today: string, period: ReportPeriod = 'year'): ClientReport {
-  const from = reportFrom(record, period, today)
-  const to = today
+/**
+ * D-681 range — 고객 화면 경과 보고처럼 '최근 2주 · 지난 보고 이후' 같은 기간을 직접 줄 때(없으면 예전 그대로 period 로).
+ * 성과 계산 규칙(선정 · 입금 한 줄 · 도구 목록 · 서류 수)은 같은 것을 쓴다 — 보고서마다 규칙이 갈리지 않게.
+ */
+export function buildClientReport(record: ClientOpsRecord, today: string, period: ReportPeriod = 'year', range?: { from: string; to: string }): ClientReport {
+  const from = range?.from ?? reportFrom(record, period, today)
+  const to = range?.to ?? today
   const inRange = (d: string) => !!d && d >= from && d <= to
 
   // 확보한 자금 — 선정(그 기간에 결과) · 실제 입금(그 기간에 입금)

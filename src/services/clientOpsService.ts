@@ -609,6 +609,9 @@ export function normalizeClientOps(value: Partial<ClientOpsRecord> & LegacyShape
     ...normalizeNotices(value.notices),
     ...normalizeUploadHint(value.uploadHint),
     ...normalizeCaseConsent(value.caseConsent),
+    ...(value.portalInvite && typeof value.portalInvite === 'object' && /^\d{4}-\d{2}-\d{2}$/.test(String((value.portalInvite as { at?: unknown }).at ?? ''))
+      ? { portalInvite: { at: String((value.portalInvite as { at: string }).at) } }
+      : {}),
     // D-181: 컨설턴트 고객만 표시가 남는다 — 예전 기록 · 다른 값은 중소기업 대표님 고객(칸 없음)
     ...(value.clientType === 'consultant' ? { clientType: 'consultant' as const } : {}),
     ...normalizeProvisional(value.provisional),

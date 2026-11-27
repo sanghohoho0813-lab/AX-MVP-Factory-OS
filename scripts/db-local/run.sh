@@ -58,6 +58,17 @@ psqlq < supabase/migrations/20261126000032_view_always.sql > /dev/null 2>&1; t2=
 if [ "$a" = "5" ] && [ "$t" = "t" ] && echo "$n1" | grep -q '최 팀장 작업공간' && [ "$n2" = "0곳" ] && [ "$e" = "1" ] && [ "$t2" = "t" ]; then out="$out
 PASS  확인 SQL(0032): 1~5 '좋음' · 켜면 6번에 그 작업공간 이름 → 되돌리기 → '0곳' · 앱이 못 켬 → 다시 실행 → 다시 켤 수 있음"; else out="$out
 FAIL  확인 SQL(0032): 좋음 $a/5 · 켜기 [$t] · 켠 뒤 [$n1] · 되돌린 뒤 [$n2] · 막힘 $e · 다시 [$t2]"; fi
+# D-681 0033 확인(verify_after_0033.sql) — 전부 넣은 DB: 1~6 '좋음' → 되돌리기 → 앱이 부를 수 없음(false · false · false) → 0033 다시 → 다시 '좋음' · 부를 수 있음
+v33() { su postgres -c "psql -At -F '|' -d $DB -c \"\$(cat supabase/manual/verify_after_0033.sql)\"" 2>&1; }
+a=$(v33 | grep -cE '^[1-6]\|.*\|좋음$'); w=$(v33 | grep -c ERROR)
+r=$(psqlq < supabase/manual/rollback_0033.sql 2>&1 | grep -E '^ *f *\| *f *\| *f' | wc -l)
+rb=$(su postgres -c "psql -At -d $DB -c \"select has_function_privilege('authenticated', 'public.portal_growth_summary()', 'execute')::text || has_function_privilege('authenticated', 'public.portal_withdraw_report(uuid,text)', 'execute')::text || has_table_privilege('authenticated', 'public.portal_reports', 'select')::text\"" 2>&1)
+psqlq < supabase/migrations/20261127000033_customer_growth.sql > /dev/null 2>&1
+b=$(v33 | grep -cE '^[1-6]\|.*\|좋음$')
+ra=$(su postgres -c "psql -At -d $DB -c \"select has_function_privilege('authenticated', 'public.portal_growth_summary()', 'execute')::text || has_function_privilege('authenticated', 'public.portal_withdraw_report(uuid,text)', 'execute')::text || has_table_privilege('authenticated', 'public.portal_reports', 'select')::text\"" 2>&1)
+if [ "$a $w $rb $b $ra" = "6 0 falsefalsefalse 6 truetruetrue" ]; then out="$out
+PASS  확인 SQL(0033): 1~6 '좋음' · 읽기 전용 · 되돌리기 → 앱이 부를 수 없음 · 표도 못 읽음 → 0033 다시 → 다시 '좋음' · 부를 수 있음"; else out="$out
+FAIL  확인 SQL(0033): 좋음 $a/6 · 오류 $w · 되돌린 뒤 [$rb] · 다시 넣은 뒤 좋음 $b/6 · [$ra]"; fi
 echo "$out"
 pass=$(echo "$out" | grep -c '^PASS'); bad=$(echo "$out" | grep -cE '^FAIL|ERROR')
 echo "통과 $pass · 실패 $bad"

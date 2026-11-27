@@ -58,6 +58,8 @@ export const STORAGE_KEYS = {
   portalUpdates: `${KEY_PREFIX}.${DATA_NS}.portal_updates`,
   portalRequests: `${KEY_PREFIX}.${DATA_NS}.portal_requests`,
   portalDocuments: `${KEY_PREFIX}.${DATA_NS}.portal_documents`,
+  /** D-681 연습용(로컬) — 고객에게 발행한 보고서 */
+  portalReports: `${KEY_PREFIX}.${DATA_NS}.portal_reports`,
   customServices: `${KEY_PREFIX}.${DATA_NS}.custom_services`,
   // 컨설팅 작업실 (특허 × 벤처 × MVP) — local 모드 어댑터
   consultingProjects: `${KEY_PREFIX}.${DATA_NS}.consulting_projects`,

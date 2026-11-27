@@ -19,6 +19,7 @@ import { TodayCharges } from '../components/money/TodayCharges'
 import { TodayCare } from '../components/ops/TodayCare'
 import { TodayNotices } from '../components/ops/TodayNotices'
 import { TodayUploads } from '../components/ops/TodayUploads'
+import { TodayPortal } from '../components/ops/TodayPortal'
 import { uploadInboxRows, useUploadInbox } from '../components/ops/useUploadInbox'
 import { NOTICE_KIND_WORD, outboundNotices } from '../services/outbound'
 import { TodayDecisions } from '../components/ops/DecisionList'
@@ -828,6 +829,8 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
             {!loading && !noticesInKpis && <TodayNotices clients={clients} today={today} workspaceId={workspaceId} onSaved={onNoticeSaved} openSignal={noticeSignal} />}
             {/* D-657 고객이 올린 서류(올리기 링크) — 보낼 안내 옆에 나란히. 있을 때만 */}
             {!loading && !noticesInKpis && <TodayUploads clients={clients} inbox={uploadInbox} />}
+            {/* D-681 고객 화면(My MIRAE) 챙길 것 — 보고서 안 열어 봄 · 보고 공백 · 첫 방문 없음. 있을 때만 */}
+            {!loading && !noticesInKpis && <TodayPortal clients={clients} workspaceId={workspaceId} today={today} />}
           </h1>
           <p className="t-sub hidden font-medium text-slate-500 sm:block">
             <time dateTime={now.toISOString()}>{timeText}</time> · {greeting(now.getHours())}
@@ -917,6 +920,7 @@ function CommandCenter({ workspaceId, userId }: { workspaceId: string | null; us
                         !loading && noticesInKpis ? (
                           <>
                             <TodayUploads chip clients={clients} inbox={uploadInbox} />
+                            <TodayPortal chip clients={clients} workspaceId={workspaceId} today={today} />
                             <TodayNotices chip clients={clients} today={today} workspaceId={workspaceId} onSaved={onNoticeSaved} openSignal={noticeSignal} />
                           </>
                         ) : null

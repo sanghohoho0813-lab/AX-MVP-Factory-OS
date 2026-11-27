@@ -223,6 +223,7 @@ const FIELD_LABEL: Record<string, string> = {
   notices: '보낸 안내',
   uploadHint: '서류 올리기 링크',
   caseConsent: '사례 공개 허락',
+  portalInvite: '고객 화면 가입 안내',
   archivedAt: '보관',
 }
 
