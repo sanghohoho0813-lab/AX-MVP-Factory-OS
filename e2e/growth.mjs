@@ -238,6 +238,26 @@ await shot(page, 'growth-10-annual-nocontract')
 await page.keyboard.press('Escape')
 
 // G18 (D-689) 고객에게 추천 — 연습 모드: 후보(맞는 공고 · 먼저 제안할 것) 판 · 직접 적기 · 금액 막힘 · 올리기 · 3개까지 · 내리기
+// D-691 맞는 공고 후보 길도 — 견본 공고 한 건(업종 소프트웨어 · 접수 중 · 금액 글 있음)을 넣어 둔다
+const RECO_END = await page.evaluate(() => {
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const now = new Date()
+  const st = new Date(now)
+  st.setDate(st.getDate() - 3)
+  const en = new Date(now)
+  en.setDate(en.getDate() + 10)
+  localStorage.setItem('axmvp.module.grants.notices', JSON.stringify([{
+    id: 'gn_reco', clientId: '', createdAt: now.toISOString(), updatedAt: now.toISOString(),
+    data: {
+      title: '중소기업 수출 준비 지원(견본)', agency: '산업통상자원부', operator: '수출지원기관', category: 'money',
+      applyStart: ymd(st), applyEnd: ymd(en), deadlineKind: 'date', amountText: '기업당 최대 5,000만원',
+      target: '중소기업', summary: '수출 준비 비용을 지원합니다.', url: 'https://www.bizinfo.go.kr/web/notice/reco',
+      // 조건이 하나도 없는 공고는 '전국 공통' 이라 후보(맞음 · 확인 필요)가 아니다 — 이 업체 업종(소프트웨어) 조건 하나
+      rules: { industries: ['소프트웨어'] }, source: 'manual', published: false,
+    },
+  }]))
+  return ymd(en)
+})
 await page.goto(TAB, { waitUntil: 'networkidle' })
 await page.getByTestId('portal-recos').waitFor({ timeout: 10000 }).catch(() => {})
 check("G18a 고객 플랫폼 탭 '고객에게 추천 0/3' · 빈 안내", (await page.getByTestId('portal-recos').getAttribute('data-count').catch(() => null)) === '0' && (await page.getByTestId('reco-empty').count()) === 1)
@@ -248,13 +268,32 @@ const pickText = (await page.getByTestId('reco-pick').innerText().catch(() => ''
 const cands = await page.getByTestId('reco-candidate').count()
 await shot(page, 'growth-11-reco-pick')
 check("G18b [추천 고르기] — '맞는 공고' · '먼저 제안할 것' 두 묶음 · [직접 적기] · 후보 글에 금액 0", pickText.includes('맞는 공고') && pickText.includes('먼저 제안할 것') && (await page.getByTestId('reco-manual').count()) === 1 && !/만원|억원/.test(pickText), { cands, pickText: pickText.slice(0, 300) })
+const grantCand = page.locator('[data-testid="reco-candidate"][data-key="grant:gn_reco"]')
+check("G18g (D-691) '맞는 공고' 에 견본 공고가 후보로 — 금액 글(5,000만원)은 후보에 없음 · 먼저 제안할 것보다 앞", (await grantCand.count()) === 1 && !/5,000만원|만원/.test(await grantCand.innerText()) && (await page.getByTestId('reco-candidate').first().getAttribute('data-key')) === 'grant:gn_reco', await grantCand.innerText().catch(() => ''))
 if (cands > 0) {
+  const firstIsGrant = (await page.getByTestId('reco-candidate').first().getAttribute('data-key')) === 'grant:gn_reco'
   await page.getByTestId('reco-candidate').first().click()
+  {
+    const g = {
+      title: await page.getByTestId('reco-edit-title').inputValue().catch(() => ''),
+      reason: await page.getByTestId('reco-edit-reason').inputValue().catch(() => ''),
+      deadline: await page.getByTestId('reco-edit-deadline').inputValue().catch(() => ''),
+      url: await page.getByTestId('reco-edit-url').inputValue().catch(() => ''),
+    }
+    check('G18h (D-691) 공고 후보를 누르면 — 제목 · 근거(금액 0) · 마감일 · 공고 주소가 채워진 채 · [올리기] 켜짐', firstIsGrant && g.title === '중소기업 수출 준비 지원(견본)' && g.reason.length > 0 && !/만원|억/.test(g.reason) && g.deadline === RECO_END && g.url === 'https://www.bizinfo.go.kr/web/notice/reco' && (await page.getByTestId('reco-show-go').isEnabled()), g)
+  }
   await page.getByTestId('reco-edit').waitFor({ timeout: 5000 }).catch(() => {})
   const t0 = await page.getByTestId('reco-edit-title').inputValue().catch(() => '')
   check('G18c 후보를 누르면 제목 · 근거가 채워진 고치기 칸 · 미리 보기', t0.length > 0 && (await page.getByTestId('reco-preview').count()) === 1, t0)
   await page.getByTestId('reco-show-go').click()
   await page.waitForTimeout(700)
+  const gSaved = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.portal_recos') || '[]').find((r) => r.sourceRef?.type === 'grant') ?? null)
+  check('G18i (D-691) 올린 공고 추천 — 종류 지원사업 · 마감일 · 주소 · 출처(공고 번호)가 그대로 · 판에 마감 글', gSaved?.kind === 'grant' && gSaved?.deadline === RECO_END && gSaved?.linkUrl === 'https://www.bizinfo.go.kr/web/notice/reco' && gSaved?.sourceRef?.id === 'gn_reco' && /마감/.test(await page.getByTestId('reco-row').first().innerText()), gSaved)
+  await page.getByTestId('reco-pick-open').click()
+  await page.getByTestId('reco-pick').waitFor({ timeout: 8000 }).catch(() => {})
+  check('G18j (D-691) 다시 고르기 — 이미 올린 공고는 눌리지 않음(같은 출처 두 번 0)', (await grantCand.getAttribute('data-shown')) === '1' && !(await grantCand.isEnabled()))
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
 } else {
   check('G18c (후보 없음 — 이 견본 업체에 맞는 후보가 없을 때) 빈 안내', (await page.getByTestId('reco-no-grants').count()) + (await page.getByTestId('reco-no-tasks').count()) >= 1)
   await page.keyboard.press('Escape')
