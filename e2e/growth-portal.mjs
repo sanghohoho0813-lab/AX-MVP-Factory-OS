@@ -932,6 +932,7 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '노무 검토 결과', '${O
   await osGo(op, '/ops/clients/growth-a?tab=portal')
   await op.getByTestId('portal-growth-failed').waitFor({ timeout: 10000 }).catch(() => {})
   const w21a = { line: await op.getByTestId('portal-growth-failed').count(), reports: await op.getByTestId('portal-reports').count(), recos: await op.getByTestId('portal-recos').count() }
+  await op.getByTestId('portal-growth-failed').scrollIntoViewIfNeeded().catch(() => {})
   await shot(op, 'os-16-growth-failed')
   check('W21a 보고서 기록을 못 읽으면 — 판이 사라지지 않고 "읽지 못했어요 · [다시 읽기]" 한 줄(꺼진 기능과 다름)', w21a.line === 1 && w21a.reports === 0, w21a)
   await op.unroute('**/rest/v1/portal_reports*', cut)
