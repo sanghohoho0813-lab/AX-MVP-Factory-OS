@@ -651,6 +651,12 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '세무 검토 결과', '${O
   // D-688 같은 말 — 할 일에 '새 결과 자료' 가 있는데 카드가 '확인할 일 없음' 이라고 하지 않는다
   const pill18 = (await a1.page.getByTestId('project-new-pill').innerText().catch(() => '')) ?? ''
   const card18 = (await a1.page.getByTestId('project-card').first().innerText().catch(() => '')) ?? ''
+  // 휴대폰(390) — 카드 알약이 넘치지 않는지 · 사진
+  await a1.page.setViewportSize({ width: 390, height: 844 })
+  await a1.page.waitForTimeout(400)
+  const over18 = await a1.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  await shot(a1.page, 'hp-06b-home-new-390', true)
+  await a1.page.setViewportSize({ width: 1440, height: 900 })
   await shot(a1.page, 'hp-06-home-new-result')
   // 대표 '고객 화면 보기' — A1 계정은 같은 표시 · A2 계정은 없음(계정마다) · 기록 0
   const before18 = sql(`select count(*) from public.portal_receipts where item_kind in ('document', 'result')`)
@@ -658,6 +664,8 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '세무 검토 결과', '${O
   await op.getByTestId('cv-home').waitFor({ timeout: 10000 }).catch(() => {})
   const cvTodo = await op.getByTestId('cv-todo-item').allInnerTexts()
   const cvPill = (await op.getByTestId('cv-new-pill').innerText().catch(() => '')) ?? ''
+  await op.getByTestId('cv-project-card').scrollIntoViewIfNeeded().catch(() => {})
+  await shot(op, 'os-08-cv-new-pill')
   await osGo(op, `/customer-view?client=growth-a&as=${LA2}`)
   await op.getByTestId('cv-home').waitFor({ timeout: 10000 }).catch(() => {})
   const cvTodo2 = await op.getByTestId('cv-todo-item').allInnerTexts()
@@ -669,6 +677,8 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '세무 검토 결과', '${O
   const badge = (await a1.page.getByTestId('project-tab-results-new').innerText().catch(() => '')) ?? ''
   const pills = await a1.page.getByTestId('result-new').count()
   const sum18 = (await a1.page.getByTestId('project-summary').innerText().catch(() => '')) ?? ''
+  await a1.page.getByTestId('project-summary').scrollIntoViewIfNeeded().catch(() => {})
+  await shot(a1.page, 'hp-07b-project-summary')
   check("W18c 할 일 → '결과' 탭 · 탭 '새 1' · '새' 알약 하나(새로 공유한 서류에만)", a1.page.url().includes('tab=results') && badge === '새 1' && pills === 1 && (await a1.page.locator('li').filter({ hasText: '세무 검토 결과' }).getByTestId('result-new').count()) === 1, { url: a1.page.url(), badge, pills })
   await shot(a1.page, 'hp-07-results-new')
   await a1.page.locator('li').filter({ hasText: '세무 검토 결과' }).getByRole('button', { name: '열기' }).click()
@@ -680,10 +690,10 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '세무 검토 결과', '${O
   check("W18e 홈으로 돌아오면 '새 결과 자료' 할 일 · 카드 표시 0", !todoR2.some((t) => t.includes('새 결과 자료')) && (await a1.page.getByTestId('project-results-new').count()) === 0, todoR2)
   const card18b = (await a1.page.getByTestId('project-card').first().innerText().catch(() => '')) ?? ''
   check(
-    "W18h 같은 말(D-688) — 새 자료가 있으면 카드 '새로 온 자료 1'(확인할 일 없음 0) · 프로젝트 맨 위 '새로 온 자료가 1개 있습니다 · 새 결과 자료 1개' · 대표 고객 화면 보기 카드도 같게 · 열고 나면 다시 '확인할 일 없음'",
-    pill18 === '새로 온 자료 1' && !card18.includes('확인할 일 없음') && sum18.includes('새로 온 자료가 1개 있습니다') && sum18.includes('새 결과 자료 1개') && cvPill === '새로 온 자료 1' &&
+    "W18h 같은 말(D-688) — 새 자료가 있으면 카드 '새로 온 자료 1'(확인할 일 없음 0 · 390 넘침 0) · 프로젝트 맨 위 '새로 온 자료가 1개 있습니다 · 새 결과 자료 1개' · 대표 고객 화면 보기 카드도 같게 · 열고 나면 다시 '확인할 일 없음'",
+    pill18 === '새로 온 자료 1' && !card18.includes('확인할 일 없음') && over18 <= 0 && sum18.includes('새로 온 자료가 1개 있습니다') && sum18.includes('새 결과 자료 1개') && cvPill === '새로 온 자료 1' &&
       (await a1.page.getByTestId('project-new-pill').count()) === 0 && card18b.includes('확인할 일 없음'),
-    { pill18, card18, sum18, cvPill, card18b },
+    { pill18, card18, over18, sum18, cvPill, card18b },
   )
   // 0035 되돌리기 → 새 자료가 있어도 표시만 숨음(화면 그대로 · 오류 0) → 다시
   sql(`insert into public.portal_documents (workspace_id, portal_client_link_id, operations_client_id, document_type, title, storage_path, file_name, source, visibility, status)
