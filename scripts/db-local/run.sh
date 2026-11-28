@@ -91,6 +91,17 @@ b=$(v35 | grep -cE '^[1-3]\|.*\|좋음$')
 if [ "$a $w $r $rb $b" = "3 0 1 falsefalse 3" ]; then out="$out
 PASS  확인 SQL(0035): 1~3 '좋음' · 읽기 전용 · 되돌리기 → 고객이 새 결과 자료를 못 읽음 → 0035 다시 → 다시 '좋음'"; else out="$out
 FAIL  확인 SQL(0035): 좋음 $a/3 · 오류 $w · 되돌리기 줄 $r · 되돌린 뒤 [$rb] · 다시 넣은 뒤 좋음 $b/3"; fi
+# D-689 0036 확인(verify_after_0036.sql) — 전부 넣은 DB: 1~6 '좋음' · 오류 0 → 되돌리기 → false · false · false → 0036 다시 → 다시 '좋음' · 올린 추천 · 관심 기록 그대로
+v36() { su postgres -c "psql -At -F '|' -d $DB -c \"\$(cat supabase/manual/verify_after_0036.sql)\"" 2>&1; }
+cnt36() { su postgres -c "psql -At -d $DB -c \"select (select count(*) from public.portal_recommendations)::text || ':' || (select count(*) from public.portal_recommendation_interest)::text\"" 2>&1; }
+a=$(v36 | grep -cE '^[1-6]\|.*\|좋음$'); w=$(v36 | grep -c ERROR); n1=$(cnt36)
+r=$(psqlq < supabase/manual/rollback_0036.sql 2>&1 | grep -cE '^ *f *\| *f *\| *f *$')
+rb=$(su postgres -c "psql -At -d $DB -c \"select has_function_privilege('authenticated', 'public.portal_recommendations(uuid)', 'execute')::text || has_function_privilege('authenticated', 'public.portal_show_recommendation(uuid,text,text,text,text,text,date,text,jsonb)', 'execute')::text || has_table_privilege('authenticated', 'public.portal_recommendation_interest', 'select')::text\"" 2>&1)
+psqlq < supabase/migrations/20261128000036_recommendations.sql > /dev/null 2>&1
+b=$(v36 | grep -cE '^[1-6]\|.*\|좋음$'); n2=$(cnt36)
+if [ "$a $w $r $rb $b" = "6 0 1 falsefalsefalse 6" ] && [ "$n1" = "$n2" ]; then out="$out
+PASS  확인 SQL(0036): 1~6 '좋음' · 읽기 전용 · 되돌리기 → 고객 · 직원 함수 · 표 읽기 권한 거둠 → 0036 다시 → 다시 '좋음' · 추천 · 관심 기록 그대로($n2)"; else out="$out
+FAIL  확인 SQL(0036): 좋음 $a/6 · 오류 $w · 되돌리기 줄 $r · 되돌린 뒤 [$rb] · 다시 넣은 뒤 좋음 $b/6 · 기록 $n1 → $n2"; fi
 echo "$out"
 pass=$(echo "$out" | grep -c '^PASS'); bad=$(echo "$out" | grep -cE '^FAIL|ERROR')
 echo "통과 $pass · 실패 $bad"

@@ -14,7 +14,7 @@ psqlq() { su postgres -c "psql -q -v ON_ERROR_STOP=1 -d $DB"; }
 su postgres -c "dropdb --if-exists $DB; createdb $DB"
 psqlq < $DIR/supabase-shim.sql > /dev/null
 for f in supabase/migrations/*.sql; do
-  case "$f" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_view_always.sql|*_intake_links.sql|*_self_signup.sql|*_signup_approval.sql|*_upload_links.sql|*_customer_growth.sql|*_result_receipts.sql|*_result_new.sql) continue ;; esac
+  case "$f" in *_os_access_pilot.sql|*_owner_views_pilot.sql|*_owner_ai_workspace.sql|*_customer_audience.sql|*_support_messages.sql|*_view_consent.sql|*_view_always.sql|*_intake_links.sql|*_self_signup.sql|*_signup_approval.sql|*_upload_links.sql|*_customer_growth.sql|*_result_receipts.sql|*_result_new.sql|*_recommendations.sql) continue ;; esac
   psqlq < "$f" > /dev/null
 done
 
@@ -91,6 +91,9 @@ psqlq < supabase/migrations/20261128000034_result_receipts.sql > /dev/null
 
 # 0035 — D-686 고객 화면 '새 결과 자료'(0034 뒤)
 psqlq < supabase/migrations/20261128000035_result_new.sql > /dev/null
+
+# 0036 — D-689 고객 화면 '담당자가 추천해요'(0033 뒤)
+psqlq < supabase/migrations/20261128000036_recommendations.sql > /dev/null
 
 # PostgREST 가 붙을 역할(로컬 시험용 비밀번호)
 psqlq > /dev/null <<'SQL'

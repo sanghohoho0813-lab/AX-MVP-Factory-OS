@@ -1,9 +1,11 @@
 // D-662 운영 DB 에 한 번에 넣는 묶음 만들기 — 0026 ~ 0031 여섯 마이그레이션을 차례대로 · 한 거래로.
 // D-687 같은 방식으로 고객성장관리 묶음 — 0033 ~ 0035 세 마이그레이션(보고서 · 결과 자료 열람 · 고객 '새 결과 자료').
+// D-689 0036(담당자가 고른 추천)까지 넣은 0033 ~ 0036 묶음 — 0033 ~ 0035 묶음은 그대로 두고 하나 더(이미 그것을 넣었어도 이것을 다시 넣으면 된다).
 //
 //   node scripts/make-ops-bundle.mjs          → supabase/manual/apply_0026_0031_all.sql · check_applied_0026_0031.sql ·
-//                                               apply_0033_0035_all.sql · check_applied_0033_0035.sql 을 새로 쓴다
-//   node scripts/make-ops-bundle.mjs --check  → 지금 있는 네 파일이 마이그레이션 원문과 같은지(다르면 끝 코드 1 — qa:db 가 돌린다)
+//                                               apply_0033_0035_all.sql · check_applied_0033_0035.sql ·
+//                                               apply_0033_0036_all.sql · check_applied_0033_0036.sql 을 새로 쓴다
+//   node scripts/make-ops-bundle.mjs --check  → 지금 있는 여섯 파일이 마이그레이션 원문과 같은지(다르면 끝 코드 1 — qa:db 가 돌린다)
 //
 // 왜: 대표가 SQL Editor 에 여섯 파일 + 확인 파일을 번갈아 열두 번쯤 붙여 넣어야 했다(안내서 §13 ~ §16) — 그래서 하나도 못 넣었다.
 // 묶음은 손으로 고치지 않는다 — 마이그레이션 원문에서 'begin;' · 'commit;' 두 줄만 빼고 그대로 잇는다(그래야 전부 또는 전무).
@@ -32,6 +34,12 @@ const GROWTH_LIST = [
   { no: '0035', file: '20261128000035_result_new.sql', what: "고객 화면 '새 결과 자료'(D-686)", effect: "고객 홈 '지금 할 일' · 카드 · '결과' 탭에 '새 결과 자료' — 넣은 때 뒤에 공유한 것만." },
 ]
 
+/** D-689 위 셋 + 0036(담당자가 고른 추천) — 대표가 실제로 붙일 한 장 */
+const GROWTH_LIST_36 = [
+  ...GROWTH_LIST,
+  { no: '0036', file: '20261128000036_recommendations.sql', what: "고객 화면 '담당자가 추천해요'(D-689)", effect: "업체 › 고객 플랫폼 탭에 '고객에게 추천' 칸이 생긴다 — 담당자가 고른 것만(3개까지) 고객 홈에 보이고, 고객이 [관심 있어요] 를 누르면 오늘 화면에 '연락드리기' 한 줄(올리기 전에는 아무것도 안 보임)." },
+]
+
 /** 묶음마다 머리 글이 조금씩 다르다(예전 묶음은 한 글자도 바꾸지 않게 그대로) */
 const BUNDLES = [
   {
@@ -57,6 +65,18 @@ const BUNDLES = [
     verify: 'verify_after_0033 · 0034 · 0035.sql · 안내서 docs/CUSTOMER_GROWTH_RELEASE.md §2',
     rollback: 'rollback_0035 → 0034 → 0033.sql 차례로',
     checkMore: 'verify_after_0033 · 0034 · 0035.sql',
+  },
+  {
+    list: GROWTH_LIST_36,
+    apply: 'supabase/manual/apply_0033_0036_all.sql',
+    check: 'supabase/manual/check_applied_0033_0036.sql',
+    range: '0033 ~ 0036',
+    n: '네',
+    d: 'D-689',
+    prereq: '0006 · 0016 · 0023 · 0026(운영에는 2026-11-26 0032 까지 들어가 있음 — D-674 · D-675)',
+    verify: 'verify_after_0033 · 0034 · 0035 · 0036.sql · 안내서 docs/CUSTOMER_GROWTH_RELEASE.md §2',
+    rollback: 'rollback_0036 → 0035 → 0034 → 0033.sql 차례로',
+    checkMore: 'verify_after_0033 · 0034 · 0035 · 0036.sql',
   },
 ]
 
