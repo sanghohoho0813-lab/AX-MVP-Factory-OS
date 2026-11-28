@@ -529,7 +529,9 @@ const waitIdle = (page, timeout = 30000) => page.waitForFunction(() => document.
   await page.getByTestId('spec-restart-yes').click()
   await page.waitForFunction((id) => !location.search.includes(id), id1, { timeout: 10000 }).catch(() => {})
   await page.getByTestId('spec-board').waitFor()
-  await page.getByTestId('spec-talk-option').first().waitFor({ timeout: 15000 }).catch(() => {})
+  // 두 점검이 함께 돌 때처럼 느리면 첫 질문이 15초를 넘길 수 있다(2026-11-28 한 번) — 기준(질문 1개)은 그대로, 그려질 때까지만 더 기다린다
+  await page.getByTestId('spec-talk-option').first().waitFor({ timeout: 40000 }).catch(() => {})
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="spec-talk-round"]').length >= 1, null, { timeout: 20000 }).catch(() => {})
   await waitIdle(page)
   const u2 = new URL(page.url())
   check('D6 [새로 쓰기] → 다른 명세서(같은 회사) · 다시 기획 대화 첫 질문부터', !!u2.searchParams.get('draft') && u2.searchParams.get('draft') !== id1 && u2.searchParams.get('client') === CLIENT && (await page.getByTestId('spec-talk-round').count()) === 1, page.url())
