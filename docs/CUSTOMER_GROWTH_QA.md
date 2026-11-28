@@ -176,7 +176,7 @@
 | `qa:growthportal`(W20b 문의 = 서버 · W20f 390 점검 판 · W21a~e 끊김 [다시 읽기] · 고객 화면 오류 글 한국어) | **102 / 0**(W22 고객 화면 390 은 아래 마지막 점검에서) |
 | 손댄 화면 둘레 `qa:mkweek` · `qa:mkpack` · `qa:threads` · `qa:shorts` · `qa:customerview` · `qa:renewal` | 62 · 77 · 107 · 56 · 18 · 22 — 실패 0 |
 | 점검 목록 밖 묶음(새 코드) `qa:themes` · `shell` · `tools` · `cert` · `pvhome` · `aihome` · `modfirst` · `uxhome` · `speccheck` · `mkquick` · `nextstep` | 9 테마 ✅ · 68 · 241 · 155 · 18 · 23 · 21 · 60 · 40 · 39 · 12 — 실패 0(`nextstep` 은 시험의 낡은 흉내를 고친 뒤 — 아래) |
-| 홈페이지 자체 회귀(빠른 점검 · 새 코드) `pages` · `films` · `api` | 374 · 182 · 7 — 실패 0 |
+| 홈페이지 자체 회귀(새 코드) `pages` · `films` · `api` · `menu` · `a11y` | 374 · 182 · 7 · 404 · 26 — 실패 0 |
 | 받는 양(`qa:weight`) | 스레드 화면 압축 605 → 606KB(+1KB) · 나머지 같음 |
 | 1주일치 글(1만 7천 자) × 고객 300곳 이름 찾기 | 한 번 30ms(글이 바뀔 때만) |
 
