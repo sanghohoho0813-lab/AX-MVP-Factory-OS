@@ -23,6 +23,7 @@ import { PACK_AI_PARTS, PACK_LABEL, makePack, packPartLabel, packText, sectionTe
 import { AiConfirm } from '../../../components/ai/AiConfirm'
 import { mkText } from '../../../services/marketing/persona'
 import { plainLabel } from '../../../services/marketing/plainWords'
+import { useClientCase } from '../ClientCase'
 
 const SECTION_LOOK: Record<PackSectionId, { icon: LucideIcon; chip: string }> = {
   titles: { icon: Type, chip: 'bg-violet-100 text-violet-700' },
@@ -47,7 +48,7 @@ export function PackView({
   ownerAi,
   savedIdeaHref,
   onBack,
-  onCopy,
+  onCopy: copyOut,
   onSave,
   briefSlot,
   whySlot,
@@ -119,6 +120,10 @@ export function PackView({
     nav.scrollTo({ left: Math.max(0, chip.offsetLeft - (nav.clientWidth - chip.offsetWidth) / 2), behavior: 'smooth' })
   }, [current])
   const aiIds = new Set(Object.keys(saved?.sections ?? {}))
+  // D-691 고객 이름 확인(LINK-4) — 직접 고른 주제 · 묶음 글에 내 고객 이름 · 번호가 있으면 짚고, 복사는 가린 채로(clean)
+  const allText = useMemo(() => `${source.topic}\n${packText(pack)}`, [source.topic, pack])
+  const cc = useClientCase({ testPrefix: 'mk-pack', today: todayLocalDate(), fields: { pack: allText }, readOnly, output: true })
+  const onCopy = (t: string, what: string) => copyOut(cc.clean(t), what)
 
   return (
     <div className="flex flex-col gap-4" data-testid="mk-pack" data-key={source.key}>
@@ -128,6 +133,7 @@ export function PackView({
         </button>
       </div>
       {guide}
+      {cc.guard('output')}
 
       {/* D-603 대표 "유튜브 화면도 박스 너무 많아 — 스레드 · 릴스처럼" — 머리 · AI · 칸 고르기 · 다른 채널 · 고른 칸 · 채널 설계 기준 · 다음엔 이것이
           따로따로 떨어진 판 일곱 개 → 큰 판 하나 안에 가는 가로선으로 나눈다(같은 내용 · 같은 시험 이름) */}

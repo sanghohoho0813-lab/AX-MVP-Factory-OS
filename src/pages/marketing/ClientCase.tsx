@@ -56,9 +56,16 @@ export interface ClientCaseApi {
   /** 사실 목록 칸의 [내 고객 사례 넣기] */
   open: () => void
   /** 고객 이름 확인 줄 — 이름이 없으면 null. at = 어디에 그리나(시험 이름) */
-  guard: (at: 'start' | 'edit') => ReactNode
+  guard: (at: 'start' | 'edit' | 'output') => ReactNode
   /** 사례 넣기 판(열려 있을 때만) */
   sheet: ReactNode
+  /**
+   * D-691 밖으로 나가는 글(복사 · 내려받기) — 허락받지 않은 고객 이름은 가리고 번호는 지운다.
+   * 허락받은 이름 · [고객 이름 아님] 으로 넘긴 낱말은 그대로. 이름이 없으면 글 그대로.
+   */
+  clean: (text: string) => string
+  /** 지금 짚은 것 수(허락받은 것 빼고) — 0 이면 clean 은 글을 바꾸지 않는다 */
+  pending: number
 }
 
 const SHOWN = 5
@@ -76,15 +83,21 @@ export function useClientCase({
   openFor,
   onOpened,
   readOnly = false,
+  output = false,
 }: {
   testPrefix: string
   today: string
   /** 이름을 찾는 칸들 — 주제 · 사실 · 공개 글(열쇠는 화면의 초안 칸 이름) */
   fields: Record<string, string>
-  /** 가린 글로 바꾸기(바뀐 칸만) */
-  onFields: (next: Record<string, string>) => void
+  /** 가린 글로 바꾸기(바뀐 칸만) — 결과 글 보기(output)에는 없다 */
+  onFields?: (next: Record<string, string>) => void
   /** 가린 한 줄을 사실 목록에 — topic 은 주제 칸이 비어 있을 때 넣을 주제 */
-  onInsert: (line: string, topic: string) => void
+  onInsert?: (line: string, topic: string) => void
+  /**
+   * D-691 결과 글 보기(1주일치 · 유튜브 묶음) — 고칠 칸이 없다. [가리기] 대신 복사 · 내려받기가 clean() 으로 가린 채 나가고,
+   * 확인 줄은 그 말을 한 줄 더 한다([허락받았어요] · [고객 이름 아님] 은 그대로).
+   */
+  output?: boolean
   /** 주소 ?case=<업체> 로 들어왔을 때 그 업체로 판을 연다 */
   openFor?: string | null
   /** openFor 를 썼다(주소에서 지우라고) */
@@ -133,9 +146,13 @@ export function useClientCase({
       const masked = maskClientNames(v, index, { skip: others })
       if (masked !== v) next[k] = masked
     }
-    if (Object.keys(next).length) onFields(next)
+    if (Object.keys(next).length) onFields?.(next)
     showToast(h.kind === 'number' ? '번호를 지웠어요.' : '이름을 가렸어요.')
   }
+
+  const pending = hits.filter((h) => !h.consent).length
+  // 짚은 칸 밖의 글이 들어와도 같은 규칙으로(가릴 것이 없으면 글 그대로)
+  const clean = useCallback((t: string) => (index.matchers.length ? maskClientNames(t, index, { keepConsented: true, skip }) : t), [index, skip])
 
   const setConsent = useCallback(
     async (h: NameHit, on: boolean) => {
@@ -158,14 +175,19 @@ export function useClientCase({
     [busy, clients, showToast, today, ws],
   )
 
-  const guard = (at: 'start' | 'edit'): ReactNode => {
+  const guard = (at: 'start' | 'edit' | 'output'): ReactNode => {
     if (!hits.length) return null
     return (
-      <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid={`${testPrefix}-case-guard`} data-at={at} data-count={hits.length}>
+      <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid={`${testPrefix}-case-guard`} data-at={at} data-count={hits.length} data-pending={pending}>
         <p className="t-sub flex items-center gap-1.5 font-bold text-slate-900">
           <UserRoundSearch aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
           고객 이름 확인
         </p>
+        {output && pending > 0 && (
+          <p className="t-sub break-keep text-slate-700" data-testid={`${testPrefix}-case-output`}>
+            복사 · 내려받기에는 가린 채로 나가요.
+          </p>
+        )}
         <ul className="flex flex-col gap-2">
           {(allHits ? hits : hits.slice(0, GUARD_SHOWN)).map((h) => {
             const key = hitKey(h)
@@ -192,9 +214,11 @@ export function useClientCase({
                       {hitText(h)}
                     </span>
                     <span className="ml-auto flex flex-wrap items-center gap-1.5">
-                      <button type="button" className={btnLine} onClick={() => hide(h)} data-testid={`${testPrefix}-case-hide`} data-guide="fn-mk-case-hide">
-                        <EyeOff aria-hidden="true" className="size-4" /> {h.kind === 'number' ? '지우기' : '가리기'}
-                      </button>
+                      {!output && (
+                        <button type="button" className={btnLine} onClick={() => hide(h)} data-testid={`${testPrefix}-case-hide`} data-guide="fn-mk-case-hide">
+                          <EyeOff aria-hidden="true" className="size-4" /> {h.kind === 'number' ? '지우기' : '가리기'}
+                        </button>
+                      )}
                       {h.kind !== 'number' && !h.consent && !readOnly && (
                         <button type="button" className={btnLine} onClick={() => setAsking(key)} data-testid={`${testPrefix}-case-consent`}>
                           허락받았어요
@@ -229,6 +253,8 @@ export function useClientCase({
   return {
     open: () => setSheet({ id: null }),
     guard,
+    clean,
+    pending,
     sheet: sheet ? (
       <CaseSheet
         clients={clients}
@@ -237,7 +263,7 @@ export function useClientCase({
         testPrefix={testPrefix}
         onClose={() => setSheet(null)}
         onInsert={(line, topic) => {
-          onInsert(line, topic)
+          onInsert?.(line, topic)
           setSheet(null)
           showToast('사실 목록에 넣었어요 — 이 사례로 글을 써요.')
         }}

@@ -26,6 +26,7 @@ import { weekItemId } from '../../../services/marketing/weekCollect'
 import { listThreadPosts } from '../../../services/marketing/threads'
 import { listShortPosts } from '../../../services/marketing/shorts'
 import { plainLabel } from '../../../services/marketing/plainWords'
+import { useClientCase } from '../ClientCase'
 
 const when = (iso: string) => {
   const d = new Date(iso)
@@ -59,7 +60,7 @@ export function WeekView({
   savedLongHref,
   onBack,
   guide,
-  onCopy,
+  onCopy: copyOut,
   onSaveLong,
 }: {
   /** D-348 짝 셋 — 본업(고정 키워드) × 미끼(이번 주 AI 흐름) */
@@ -141,7 +142,11 @@ export function WeekView({
       setSaving(false)
     }
   }
-  const text = () => weekText(week)
+  // D-691 고객 이름 확인(LINK-4) — 1주일치 글에 내 고객 이름 · 번호가 있으면 짚고, 복사 · 내려받기는 가린 채로(clean)
+  const allText = useMemo(() => weekText(week), [week])
+  const cc = useClientCase({ testPrefix: 'mk-week', today, fields: { week: allText }, readOnly, output: true })
+  const onCopy = (t: string, what: string) => copyOut(cc.clean(t), what)
+  const text = () => cc.clean(allText)
   const shortsMain = week.shorts.filter((s) => s.slot.n > 0)
   const shortsSpare = week.shorts.filter((s) => s.slot.n === 0)
   const threadsMain = week.threads.filter((x) => x.slot.day > 0)
@@ -219,6 +224,7 @@ export function WeekView({
         </button>
       </div>
       {guide}
+      {cc.guard('output')}
 
       {/* D-356 대표 "1주일치 쓰면 밑으로 쫙 풀려 눈에 안 들어온다 — 프로젝트 박스 하나, 들어가면 롱폼 · 릴스 · 스레드 딱딱 나눠서".
           프로젝트 머리(기간 · 만든 날 · 짝 셋 · AI 진행) 한 장 + 아래 탭 넷(한 번에 하나만) */}
@@ -512,7 +518,7 @@ export function WeekView({
           전체 복사 · 점수 <span className={`font-bold ${lint.ready === lint.total ? 'text-success-700' : lint.bad ? 'text-danger-700' : 'text-warning-800'}`}>{lint.avg}점</span>
         </summary>
       <div className="flex flex-wrap items-center gap-2 pt-2">
-        <Button size="sm" variant="secondary" onClick={() => onCopy(text(), '1주일치 전체')} data-testid="mk-week-copy-all" data-guide="fn-mk-week-copy">
+        <Button size="sm" variant="secondary" onClick={() => copyOut(text(), '1주일치 전체')} data-testid="mk-week-copy-all" data-guide="fn-mk-week-copy">
           <ClipboardCopy aria-hidden="true" className="size-4" /> 전체 복사
         </Button>
         <Button size="sm" variant="secondary" onClick={() => download(`week-content-${start}.txt`, text())} data-testid="mk-week-download" data-guide="fn-mk-week-copy">
