@@ -27,6 +27,7 @@
  *       → A2 따로 · B1 0 · 대표 · B1 위조 막힘 · 오늘 '관심 있다고 하셨어요' 맨 앞 → [열기] → [연락했어요] → 빠짐 · 대표 고객 화면 보기 계정마다(기록 0) · 0036 되돌리기 → 다시 · 390
  *   W20 (D-690) 설정 › 시스템 켜짐 점검 — 넷 켜짐 · 첫 주 숫자 = 서버 · 0035 · 0036 되돌리면 그 둘만 꺼짐 + 할 일 한 줄 · 기록 0 · 다시 켜짐 · 팀장 0 · (D-691) 390 넘침 0
  *   W21 (D-691) 잠깐 끊김 — 보고서 · 추천 판이 사라지지 않고 '읽지 못했어요 · [다시 읽기]' → 돌아오면 다시 · 고객 화면 오류 글은 한국어(영어 원문 0)
+ *   W22 (D-691) 고객 화면 390 — 홈 · 결과 탭 · 보고서 옆 넘침 0
  *   W13 JS 오류 0(두 앱)
  *
  *   node e2e/growth-portal.mjs [스크린샷 폴더]   (pg_ctlcluster 16 main start 먼저 · 홈페이지 저장소 ../mirae-ai-lab-homepage)
@@ -957,6 +958,19 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '노무 검토 결과', '${O
   await shot(a1.page, 'hp-10-load-failed')
   check('W21e 고객 화면 — 목록을 못 읽으면 "인터넷 연결이 불안정해요" · 영어 원문 0 · [다시 시도]', hpErr.includes('인터넷 연결이 불안정해요') && !/TypeError|Failed to fetch|FetchError|fetch/i.test(hpErr) && hpErr.includes('다시 시도'), hpErr.slice(0, 200))
   await a1.page.unroute('**/rest/v1/rpc/portal_my_projects*', cutRpc)
+
+  // W22 (D-691) 고객 화면을 휴대폰 크기(390)로 — 홈 · 결과 탭 · 보고서 한 편: 옆 넘침 0(예전엔 PC 크로미움으로만 봄)
+  const vpA1 = a1.page.viewportSize()
+  await a1.page.setViewportSize({ width: 390, height: 844 })
+  const m22 = {}
+  for (const [k, p] of [['home', '/my-projects'], ['results', `/my-projects/${LA1}?tab=results`], ['report', `/my-projects/reports/${R1}?link=${LA1}`]]) {
+    await hpGo(a1.page, p)
+    await a1.page.waitForTimeout(600)
+    m22[k] = { over: await overflowX(a1.page), text: ((await a1.page.locator('main').innerText().catch(() => '')) ?? '').length }
+    await shot(a1.page, `hp-11-m-${k}`, true)
+  }
+  check('W22 고객 화면 390 — 홈 · 결과 탭 · 보고서: 옆 넘침 0 · 내용이 그려짐', Object.values(m22).every((x) => x.over <= 0 && x.text > 20), m22)
+  if (vpA1) await a1.page.setViewportSize(vpA1)
 
   check('W13 JS 오류 0(두 앱)', errors.length === 0, errors)
 } catch (e) {
