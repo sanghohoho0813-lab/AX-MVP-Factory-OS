@@ -318,7 +318,19 @@ function RecoPickSheet({
           </label>
           <label className="flex flex-col gap-1">
             <span className="t-sub font-semibold text-slate-700">근거 한 줄(금액 · 점수 없이)</span>
-            <input value={draft.reason} maxLength={RECO_REASON_MAX} onChange={(e) => setDraft({ ...draft, reason: e.target.value })} placeholder="예: 지역 · 업력 조건이 맞아요" className="t-body min-h-11 rounded-(--radius-control) border border-slate-300 px-3" data-testid="reco-edit-reason" />
+            {/* D-691 160자까지라 휴대폰 한 줄 칸에서는 앞이 안 보였다 — 세 줄 글칸(줄바꿈은 고객 화면에서 띄어쓰기로) */}
+            <textarea
+              value={draft.reason}
+              maxLength={RECO_REASON_MAX}
+              rows={3}
+              onChange={(e) => setDraft({ ...draft, reason: e.target.value.replace(/\s*\n+\s*/g, ' ') })}
+              placeholder="예: 지역 · 업력 조건이 맞아요"
+              className="t-body min-h-11 resize-y rounded-(--radius-control) border border-slate-300 px-3 py-2 break-keep"
+              data-testid="reco-edit-reason"
+            />
+            <span className="t-meta self-end text-slate-500 tabular-nums" data-testid="reco-edit-reason-count">
+              {draft.reason.length}/{RECO_REASON_MAX}
+            </span>
           </label>
           <div className="flex flex-wrap gap-3">
             <label className="flex min-w-0 flex-1 basis-40 flex-col gap-1">

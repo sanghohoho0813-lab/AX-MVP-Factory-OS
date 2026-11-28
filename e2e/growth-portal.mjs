@@ -25,7 +25,7 @@
  *   W18h (D-688) 같은 말 — 새 자료가 있으면 카드 · 프로젝트 맨 위가 '확인할 일 없음' 대신 '새로 온 자료' · 대표 고객 화면 보기도 같게
  *   W19 (D-689) 담당자가 고른 추천 — OS [추천 고르기] › [직접 적기] · 금액 막힘 · 올리기 · 3개까지(서버도) · 내리기 → 고객 홈 '담당자가 추천해요' · [자세히] · [관심 있어요]
  *       → A2 따로 · B1 0 · 대표 · B1 위조 막힘 · 오늘 '관심 있다고 하셨어요' 맨 앞 → [열기] → [연락했어요] → 빠짐 · 대표 고객 화면 보기 계정마다(기록 0) · 0036 되돌리기 → 다시 · 390
- *   W20 (D-690) 설정 › 시스템 켜짐 점검 — 넷 켜짐 · 첫 주 숫자 = 서버 · 0035 · 0036 되돌리면 그 둘만 꺼짐 + 할 일 한 줄 · 기록 0 · 다시 켜짐 · 팀장 0
+ *   W20 (D-690) 설정 › 시스템 켜짐 점검 — 넷 켜짐 · 첫 주 숫자 = 서버 · 0035 · 0036 되돌리면 그 둘만 꺼짐 + 할 일 한 줄 · 기록 0 · 다시 켜짐 · 팀장 0 · (D-691) 390 넘침 0
  *   W13 JS 오류 0(두 앱)
  *
  *   node e2e/growth-portal.mjs [스크린샷 폴더]   (pg_ctlcluster 16 main start 먼저 · 홈페이지 저장소 ../mirae-ai-lab-homepage)
@@ -886,6 +886,22 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '노무 검토 결과', '${O
   execSync(`su postgres -c "psql -q -d ${DB}"`, { input: execSync('cat supabase/migrations/20261128000035_result_new.sql') })
   execSync(`su postgres -c "psql -q -d ${DB}"`, { input: execSync('cat supabase/migrations/20261128000036_recommendations.sql') })
   check('W20d 다시 넣고 [점검하기] → 넷 다시 켜짐', (await runStatus()) === '0033:on,0034:on,0035:on,0036:on')
+  // W20f (D-691) 휴대폰 폭(390)에서도 — 줄이 넘치거나 짜부라지지 않는다
+  const vp20 = op.viewportSize()
+  await op.setViewportSize({ width: 390, height: 844 })
+  const st20m = await runStatus()
+  await op.getByTestId('growth-firstweek').scrollIntoViewIfNeeded().catch(() => {})
+  const m20 = await op.evaluate(() => {
+    const rows = [...document.querySelectorAll('[data-testid="growth-status-row"], [data-testid="growth-firstweek-step"]')]
+    const wide = rows.filter((r) => r.getBoundingClientRect().right > window.innerWidth + 1).length
+    const squeezed = rows.flatMap((r) => [...r.querySelectorAll('span')]).filter((x) => (x.textContent ?? '').trim().length > 3 && (x.getBoundingClientRect().width < 40 || x.scrollWidth > x.clientWidth + 1)).length
+    const btn = Math.round(document.querySelector('[data-testid="growth-status-run"]')?.getBoundingClientRect().height ?? 0)
+    const minFont = Math.min(...rows.flatMap((r) => [...r.querySelectorAll('span')]).filter((x) => (x.textContent ?? '').trim()).map((x) => parseFloat(getComputedStyle(x).fontSize)))
+    return { over: document.documentElement.scrollWidth - window.innerWidth, wide, squeezed, btn, minFont, rows: rows.length }
+  })
+  await shot(op, 'os-15-growth-status-390', true)
+  check('W20f 390 — 점검 판 넘침 0 · 줄 10개(기능 4 + 첫 주 6) · 짜부라진 글 0 · [점검하기] 40px 이상 · 글자 14px 이상', st20m === '0033:on,0034:on,0035:on,0036:on' && m20.over <= 0 && m20.wide === 0 && m20.squeezed === 0 && m20.btn >= 40 && m20.minFont >= 14 && m20.rows === 10, m20)
+  if (vp20) await op.setViewportSize(vp20)
   // 내부 팀장 — 설정 › 시스템에 이 판 0
   const pc2 = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
   await pc2.route(`https://${REF}.supabase.co/**`, makeRoute('os'))

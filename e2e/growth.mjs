@@ -14,7 +14,7 @@
  *   G11 잠시 멈춤 → 다시 켜기 · 끊기는 한 번 더 묻기(취소하면 그대로)
  *   G15 종류 넷 + [그 밖에] · 월간(이번 달/지난달 · 제목 'n월 월간 보고') · G16 연간(계약일부터 · 다음 1년 검토 꺼진 채 · 미리보기에 안 나감) · G17 계약일 없으면 최근 12개월(짐작 0)
  *   G12 오늘 화면 — 연습 모드에는 '고객 화면 챙길 것' 칩 0(방문 기록이 없어 거짓 알림을 만들지 않음)
- *   G13 390 — 탭 · 보고서 창 넘침 0 · 단추 40px 이상
+ *   G13 390 — 탭 · 보고서 창 넘침 0 · 단추 40px 이상 · (D-691) '고객에게 추천' 판 · 고르기 창 · 가장 긴 제목 · 근거 · 올린 줄
  *   G14 JS 오류 0
  */
 import { mkdirSync } from 'node:fs'
@@ -327,6 +327,60 @@ check('G13c 390 보고서 창 — 40px 아래 단추 0', small.length === 0, sma
 const clipped = await mp.evaluate(() => [...document.querySelectorAll('[data-testid="report-line-text"]')].filter((t) => t.scrollWidth > t.clientWidth + 1 || t.scrollHeight > t.clientHeight + 2).map((t) => t.value.slice(0, 20)))
 check('G13d 390 보고서 줄 — 긴 줄도 잘림 0(칸이 늘어남)', clipped.length === 0, clipped)
 await shot(mp, 'growth-08-m-sheet')
+// G13e~h (D-691) 390 '고객에게 추천' — 판 · 고르기 창 · 직접 적기(가장 긴 제목 80 · 근거 160) · 올린 줄
+await mp.keyboard.press('Escape')
+await mp.waitForTimeout(300)
+const dlgCheck = () =>
+  mp.evaluate(() => {
+    const d = document.querySelector('[role="dialog"]')
+    if (!d) return { over: -1, small: [] }
+    let over = 0
+    for (const el of d.querySelectorAll('*')) {
+      const r = el.getBoundingClientRect()
+      if (r.width > 0 && r.right > window.innerWidth + 1) over = Math.max(over, Math.round(r.right - window.innerWidth))
+    }
+    const small = [...d.querySelectorAll('button, input, textarea, select')]
+      .filter((b) => b.offsetParent !== null && b.getBoundingClientRect().height > 0 && b.getBoundingClientRect().height < 40 && !b.closest('[data-tiny-ok]'))
+      .map((b) => (b.textContent || b.getAttribute('aria-label') || b.getAttribute('data-testid') || '').trim().slice(0, 20))
+    return { over, small }
+  })
+await mp.getByTestId('portal-recos').scrollIntoViewIfNeeded()
+const card0 = await mp.getByTestId('portal-recos').evaluate((box) => {
+  const r = box.getBoundingClientRect()
+  const small = [...box.querySelectorAll('button')].filter((b) => b.offsetParent !== null && b.getBoundingClientRect().height < 40).map((b) => (b.textContent ?? '').trim().slice(0, 20))
+  return { right: Math.round(r.right), small }
+})
+check("G13e 390 '고객에게 추천' 판 — 넘침 0 · 40px 아래 단추 0", (await mp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0 && card0.right <= 390 && card0.small.length === 0, card0)
+await mp.getByTestId('reco-pick-open').click()
+await mp.getByTestId('reco-pick').waitFor({ timeout: 8000 })
+await mp.waitForTimeout(600)
+const pick390 = await dlgCheck()
+await shot(mp, 'growth-13-m-reco-pick')
+check('G13f 390 [추천 고르기] 창 — 넘침 0 · 40px 아래 단추 0', pick390.over === 0 && pick390.small.length === 0, pick390)
+await mp.getByTestId('reco-manual').click()
+const LONG_T = '중소기업 디지털 전환 지원사업과 스마트공장 고도화 · 수출 바우처까지 한 번에 검토하는 올해 상반기 준비 일정 정리'.slice(0, 80)
+const LONG_R = '지난해 매출이 늘었고 해외 거래처 문의가 이어지고 있어 수출 쪽 지원을 먼저 보고, 생산 설비 교체 계획이 있어 스마트공장 고도화도 함께 검토해 볼 만해요. 서류는 담당자가 정리해 드려요 — 필요한 것만 따로 부탁드릴게요'.slice(0, 160)
+await mp.getByTestId('reco-edit-title').fill(LONG_T)
+await mp.getByTestId('reco-edit-reason').fill(LONG_R)
+await mp.waitForTimeout(300)
+const edit390 = await dlgCheck()
+const prevClip = await mp.getByTestId('reco-preview').evaluate((box) => [...box.querySelectorAll('*')].filter((e) => e.children.length === 0 && (e.textContent ?? '').trim() && (e.scrollWidth > e.clientWidth + 1)).length)
+await shot(mp, 'growth-14-m-reco-edit')
+check('G13g 390 직접 적기 — 가장 긴 제목(80) · 근거(160)도 창 넘침 0 · 미리 보기 잘림 0 · 40px 아래 칸 0 · [올리기] 켜짐', edit390.over === 0 && edit390.small.length === 0 && prevClip === 0 && (await mp.getByTestId('reco-show-go').isEnabled()), { edit390, prevClip, t: LONG_T.length, r: LONG_R.length })
+await mp.getByTestId('reco-show-go').click()
+await mp.waitForTimeout(700)
+await mp.getByTestId('portal-recos').scrollIntoViewIfNeeded()
+const row390 = await mp.getByTestId('portal-recos').evaluate((box) => {
+  const rows = [...box.querySelectorAll('[data-testid="reco-row"]')]
+  return {
+    rows: rows.length,
+    wide: rows.filter((r) => r.getBoundingClientRect().right > window.innerWidth + 1).length,
+    clipped: rows.flatMap((r) => [...r.querySelectorAll('*')]).filter((e) => e.children.length === 0 && (e.textContent ?? '').trim().length > 3 && e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).textOverflow !== 'ellipsis').length,
+    small: [...box.querySelectorAll('button')].filter((b) => b.offsetParent !== null && b.getBoundingClientRect().height < 40).map((b) => (b.textContent ?? '').trim().slice(0, 20)),
+  }
+})
+await shot(mp, 'growth-15-m-reco-row', true)
+check('G13h 390 올린 줄(긴 제목) — 줄 넘침 0 · 글 잘림 0 · 40px 아래 단추 0 · 옆 넘침 0', row390.rows >= 1 && row390.wide === 0 && row390.clipped === 0 && row390.small.length === 0 && (await mp.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0, row390)
 await m.close()
 
 check('G14 JS 오류 0', errs.length === 0, errs)
