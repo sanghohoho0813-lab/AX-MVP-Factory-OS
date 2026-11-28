@@ -23,8 +23,8 @@ import type { PortalClientLink, PortalProjection } from '../types/bridge'
 import { CUSTOMER_STAGE_LABEL, CUSTOMER_STAGE_ORDER } from '../config/serviceCatalog'
 import { listClients } from '../services/clientOpsService'
 import { listLinks, previewProjection } from '../services/customerBridgeService'
-import { isGrowthOff, listClientReports, listLinkAccounts, listReceipts, type PortalReceipt, type PortalReport } from '../services/portalGrowth'
-import { REPORT_KIND_LABEL } from '../services/portalGrowthRules'
+import { isGrowthOff, listClientReports, listLinkAccounts, listReceipts, listSharedResults, resultReceiptsSince, type PortalReceipt, type PortalReport, type SharedResult } from '../services/portalGrowth'
+import { REPORT_KIND_LABEL, newResultIds } from '../services/portalGrowthRules'
 
 /* 고객 화면(홈페이지 src/lib/customerPortal.ts)의 말 — OS 안쪽 말(요청함 · 고객 업로드됨 …)과 다르다 */
 const MY = {
@@ -59,6 +59,9 @@ interface Loaded {
   reports: PortalReport[] | null
   receipts: PortalReceipt[]
   projection: PortalProjection | null
+  /** D-686 공유한 결과 자료 · 기록을 남기기 시작한 때(0034 없으면 null → '새 결과 자료' 표시 없음 — 고객 화면도 그렇다) */
+  results: SharedResult[]
+  resultsSince: string | null
 }
 
 export function CustomerViewPage() {
@@ -125,7 +128,9 @@ export function CustomerViewPage() {
       }
       const active = links.find((l) => l.status === 'active') ?? null
       const projection = active ? await previewProjection(workspaceId, active, record.companyName).catch(() => null) : null
-      if (alive) setLoaded({ links, emails, reports, receipts, projection })
+      const resultsSince = await resultReceiptsSince()
+      const results = resultsSince ? await listSharedResults(workspaceId, links.map((l) => ({ id: l.id, operationsClientId: l.operationsClientId })), record.id).catch(() => []) : []
+      if (alive) setLoaded({ links, emails, reports, receipts, projection, results, resultsSince })
     })()
     return () => {
       alive = false
@@ -184,6 +189,8 @@ export function CustomerViewPage() {
       : null
   const seenFor = (rid: string) => (chosen ? loaded?.receipts.find((r) => r.itemKind === 'report' && r.itemId === rid && r.linkId === chosen.id) ?? null : null)
   const reports = (loaded?.reports ?? []).filter((r) => r.status === 'published')
+  // D-686 이 계정에 '새 결과 자료'(고객 화면과 같은 규칙 · 기록 0)
+  const newResults = chosen && loaded ? newResultIds(loaded.results, loaded.receipts, chosen.id, loaded.resultsSince) : new Set<string>()
 
   return (
     <div className="mx-auto w-full max-w-5xl p-1 sm:p-4" data-testid="cv-page" data-state="view">
@@ -218,9 +225,9 @@ export function CustomerViewPage() {
             {view === 'report' ? (
               <ReportView report={reports.find((r) => r.id === reportId) ?? null} company={record.companyName} consultant={chosen?.consultantName || projection?.project?.consultant_name || ''} seen={seenFor(reportId)} onBack={() => go({ view: 'project', tab: 'reports', report: null })} />
             ) : view === 'project' && projection?.project ? (
-              <ProjectView p={projection} reports={loaded.reports === null ? null : reports} seenFor={seenFor} tab={tab} onTab={(t) => go({ tab: t })} onHome={() => go({ view: null, tab: null })} onReport={(id) => go({ view: 'report', report: id })} />
+              <ProjectView p={projection} reports={loaded.reports === null ? null : reports} seenFor={seenFor} newResults={newResults} tab={tab} onTab={(t) => go({ tab: t })} onHome={() => go({ view: null, tab: null })} onReport={(id) => go({ view: 'report', report: id })} />
             ) : (
-              <HomeView p={projection} email={chosen ? emailOf(chosen) : record.contactEmail} reports={loaded.reports === null ? null : reports} seenFor={seenFor} onProject={(t) => go({ view: 'project', tab: t ?? null })} onReport={(id) => go({ view: 'report', report: id })} />
+              <HomeView p={projection} email={chosen ? emailOf(chosen) : record.contactEmail} reports={loaded.reports === null ? null : reports} seenFor={seenFor} newResults={newResults} onProject={(t) => go({ view: 'project', tab: t ?? null })} onReport={(id) => go({ view: 'report', report: id })} />
             )}
           </Frame>
         </>
@@ -334,11 +341,13 @@ const stateCls = { new: 'bg-danger-50 text-danger-700', seen: 'bg-slate-100 text
 /* 성장 홈(/my-projects)                                                 */
 /* ------------------------------------------------------------------ */
 
-function HomeView({ p, email, reports, seenFor, onProject, onReport }: {
+function HomeView({ p, email, reports, seenFor, newResults, onProject, onReport }: {
   p: PortalProjection | null
   email: string
   reports: PortalReport[] | null
   seenFor: (id: string) => PortalReceipt | null
+  /** D-686 이 계정의 '새 결과 자료' id */
+  newResults: ReadonlySet<string>
   onProject: (tab?: Tab) => void
   onReport: (id: string) => void
 }) {
@@ -364,6 +373,7 @@ function HomeView({ p, email, reports, seenFor, onProject, onReport }: {
   const list = reports ?? []
   const todo: { key: string; label: string; sub: string; go: () => void }[] = [
     ...list.filter((r) => !seenFor(r.id)).map((r) => ({ key: `r:${r.id}`, label: `새 보고서 · ${r.title}`, sub: `${pr.name} · ${kdate(r.publishedAt)}`, go: () => onReport(r.id) })),
+    ...(newResults.size ? [{ key: 'res', label: `새 결과 자료 ${newResults.size}개`, sub: pr.name, go: () => onProject('results') }] : []),
     ...(reqDocs ? [{ key: 'd', label: `서류 ${reqDocs}개 올려 주세요`, sub: pr.name, go: () => onProject('todo') }] : []),
     ...(actions ? [{ key: 'a', label: `해야 할 일 ${actions}건`, sub: pr.name, go: () => onProject('todo') }] : []),
   ]
@@ -429,6 +439,7 @@ function HomeView({ p, email, reports, seenFor, onProject, onReport }: {
           <span>요청받은 서류 {p.documents.filter((d) => d.status === 'requested').length}</span>
           <span>내 요청 {p.requests.filter((r) => r.status === 'open' || r.status === 'answered').length}</span>
           {reports !== null && <span>보고서 {list.length}{unseen ? ` · 새 보고서 ${unseen}` : ''}</span>}
+          {newResults.size > 0 && <span data-testid="cv-results-new">새 결과 자료 {newResults.size}</span>}
         </div>
       </button>
     </div>
@@ -439,10 +450,11 @@ function HomeView({ p, email, reports, seenFor, onProject, onReport }: {
 /* 프로젝트 상세(/my-projects/:linkId)                                     */
 /* ------------------------------------------------------------------ */
 
-function ProjectView({ p, reports, seenFor, tab, onTab, onHome, onReport }: {
+function ProjectView({ p, reports, seenFor, newResults, tab, onTab, onHome, onReport }: {
   p: PortalProjection
   reports: PortalReport[] | null
   seenFor: (id: string) => PortalReceipt | null
+  newResults: ReadonlySet<string>
   tab: Tab
   onTab: (t: Tab) => void
   onHome: () => void
@@ -472,6 +484,7 @@ function ProjectView({ p, reports, seenFor, tab, onTab, onHome, onReport }: {
             {t.label}
             {t.key === 'todo' && todoCount > 0 && <span className="ml-1 rounded-full bg-warning-500 px-1.5 text-[0.75rem] text-white">{todoCount}</span>}
             {t.key === 'reports' && unseen > 0 && <span className="ml-1 rounded-full bg-danger-500 px-1.5 text-[0.75rem] text-white">새 {unseen}</span>}
+            {t.key === 'results' && newResults.size > 0 && <span className="ml-1 rounded-full bg-danger-500 px-1.5 text-[0.75rem] text-white" data-testid="cv-tab-results-new">새 {newResults.size}</span>}
           </button>
         ))}
       </div>
@@ -575,8 +588,8 @@ function ProjectView({ p, reports, seenFor, tab, onTab, onHome, onReport }: {
           if (shared.length === 0 && results.length === 0) return <Empty text="아직 공개된 결과자료가 없습니다. 담당자가 결과를 공유하면 여기에 나타납니다." />
           return (
             <>
-              {results.map((u) => <Card key={u.id}><p className="t-meta text-slate-400">{kdate(u.published_at)}</p><p className="mt-1 text-base font-black text-slate-900">{u.title}</p></Card>)}
-              {shared.length > 0 && <Card><p className="text-base font-black text-slate-900">공유된 자료</p><DocList docs={shared} /></Card>}
+              {results.map((u) => <Card key={u.id}><p className="t-meta text-slate-400">{kdate(u.published_at)}{newResults.has(u.id) && <NewPill />}</p><p className="mt-1 text-base font-black text-slate-900">{u.title}</p></Card>)}
+              {shared.length > 0 && <Card><p className="text-base font-black text-slate-900">공유된 자료</p><DocList docs={shared} newIds={newResults} /></Card>}
             </>
           )
         })()}
@@ -585,13 +598,18 @@ function ProjectView({ p, reports, seenFor, tab, onTab, onHome, onReport }: {
   )
 }
 
-function DocList({ docs }: { docs: PortalProjection['documents'] }) {
+/** D-686 고객 화면의 '새' 알약(빨강 — 고객 화면과 같은 모양) */
+function NewPill() {
+  return <span className="ml-2 rounded-full bg-danger-500 px-2 py-0.5 text-[0.75rem] font-black text-white" data-testid="cv-result-new">새</span>
+}
+
+function DocList({ docs, newIds }: { docs: PortalProjection['documents']; newIds?: ReadonlySet<string> }) {
   return (
     <ul className="mt-2 divide-y divide-slate-100">
       {docs.map((d) => (
         <li key={d.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="t-sub font-bold text-slate-900">{d.title} <span className="t-meta ml-1 rounded-full bg-slate-100 px-2 py-0.5 font-black text-slate-600">{MY.doc[d.status] ?? d.status}</span></p>
+            <p className="t-sub font-bold text-slate-900">{d.title} <span className="t-meta ml-1 rounded-full bg-slate-100 px-2 py-0.5 font-black text-slate-600">{MY.doc[d.status] ?? d.status}</span>{newIds?.has(d.id) && <NewPill />}</p>
             <p className="t-meta mt-0.5 text-slate-500">{d.file_name ? `${d.file_name} · ` : ''}{d.requested_at ? `요청일 ${kdate(d.requested_at)}` : ''}</p>
           </div>
           {(d.status === 'requested' || d.status === 'rejected') && <Nope>{d.status === 'rejected' ? '다시 올리기' : '파일 올리기'}</Nope>}

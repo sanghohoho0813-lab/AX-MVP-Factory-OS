@@ -9,6 +9,7 @@
  *       [재계약했어요] 새 기간 · 두 번 눌러도 한 번 · 문구 · 재계약 전 연간 보고 줄(보고 공백 · 월말 줄 대신) · [열기] 종류 · 계약 완료 기간
  *  RES: (D-685) 공유한 결과 자료 7일 안 열어 봄 — 6일 0 · 7일 한 줄 · 여럿이면 한 줄 n개 · 누구라도 열면 빠짐 · 기록 전 공유는 안 셈 · 멈춘 연결 0 ·
  *       0034 없으면(since 없음) 0 · 연습 모드 0 · 시각 모양 달라도 · 차례 · [열기] 는 탭만 · 열람 종류 읽기(모르는 종류 건너뜀)
+ *  NEW: (D-686) 고객 화면 '새 결과 자료'(대표 고객 화면 보기 = 서버 0035 와 같은 규칙) — 그 계정 연결만 · 기록 전 공유 아님 · 그 계정이 열면 빠짐 · 다른 계정이 연 것은 안 셈
  */
 import { normalizeClientOps } from '../clientOpsService'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -35,7 +36,7 @@ import {
 import { growthErrorText, isGrowthOff, reportCustomerUrl } from '../portalGrowth'
 import { contractEndText, currentTermEnd, endAfterYears, renewalDefaultEnd, renewalState, renewalYears, withRenewal } from '../contractRenewal'
 import { careList, careMessage, careSnoozeUntil, withCareContactFor } from '../clientCare'
-import { RESULT_UNSEEN_DAYS, followUpReportKind, periodLabelFor, type SharedResultLite } from '../portalGrowthRules'
+import { RESULT_UNSEEN_DAYS, followUpReportKind, newResultIds, periodLabelFor, type SharedResultLite } from '../portalGrowthRules'
 import { withContractClose } from '../salesContract'
 
 let passed = 0
@@ -270,6 +271,13 @@ check('RES-08 긴 제목은 18자에서 … · 차례는 보고서 안 열어 �
   return r[0].rule === 'report_unseen' && r[1].rule === 'result_unseen' && r[1].text.includes("'2026년 하반기 기업부설연구소…'")
 })())
 check('RES-09 [열기] 는 탭만(보고서 창 아님)', followUpReportKind('result_unseen') === null)
+
+// ---------------- D-686 고객 화면 '새 결과 자료' ----------------
+const NR = [sr('d1', '2026-11-20T03:00:00Z', 'document', 'l1'), sr('u1', '2026-11-21T03:00:00Z', 'result', 'l1'), sr('d0', '2026-10-20T03:00:00Z', 'document', 'l1'), sr('d2', '2026-11-22T03:00:00Z', 'document', 'l2')]
+check('NEW-01 그 계정 연결에 공유 · 기록 시작 뒤 · 아직 안 연 것만(기록 전 공유 · 다른 연결 빼고)', [...newResultIds(NR, [], 'l1', SINCE)].sort().join() === 'd1,u1')
+check('NEW-02 그 계정이 연 것은 빠짐 · 다른 계정(l2)이 연 것은 안 셈 · 종류가 엇갈린 기록은 안 셈',
+  [...newResultIds(NR, [{ linkId: 'l1', itemKind: 'document', itemId: 'd1' }, { linkId: 'l2', itemKind: 'result', itemId: 'u1' }, { linkId: 'l1', itemKind: 'document', itemId: 'u1' }], 'l1', SINCE)].join() === 'u1')
+check('NEW-03 0034 없음(since 없음) · 연결 없음 → 0', newResultIds(NR, [], 'l1', null).size === 0 && newResultIds(NR, [], '', SINCE).size === 0)
 
 console.log(`\nportalGrowth: ${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

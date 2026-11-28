@@ -10,6 +10,7 @@
 | 내부 OS | 작업 브랜치 `claude/ax-mvp-factory-os-stage-1-dcf98c` | main 병합 전(승인 뒤 fast-forward) |
 | 홈페이지 | 기능 브랜치 `claude/customer-growth-portal-p0` | main 병합 전(승인 뒤) |
 | DB 0034(D-685 결과 자료 열람) | `supabase/migrations/20261128000034_result_receipts.sql` | **아직 안 넣음** — 0033 뒤에 |
+| DB 0035(D-686 고객 '새 결과 자료') | `supabase/migrations/20261128000035_result_new.sql` | **아직 안 넣음** — 0034 뒤에 |
 
 **순서가 바뀌어도 안전하다**: 두 앱 모두 0033 이 없으면 새 칸을 숨기고 예전 화면 그대로 둔다(qa:growthportal W11 이 진짜 DB 로 확인).
 0033 을 먼저 넣어도 예전 앱은 새 함수를 부르지 않으니 아무것도 안 바뀐다.
@@ -21,6 +22,7 @@
 3. 같은 곳에 `supabase/manual/verify_after_0033.sql` 실행(읽기만) → 1~6번 줄이 모두 **'좋음'**. 7 · 8번은 안내(처음엔 0).
 3-2. (D-685) 이어서 `supabase/migrations/20261128000034_result_receipts.sql` 통째로 → `supabase/manual/verify_after_0034.sql`(읽기만) 1~4 '좋음'. 0034 는 0033 이 없으면 아무것도 바꾸지 않고 멈춘다.
    0034 를 넣은 때부터 공유하는 결과 자료만 '안 열어 봄' 으로 센다(그 전에 공유한 것은 '열람 기록 전 공유').
+3-3. (D-686) 이어서 `supabase/migrations/20261128000035_result_new.sql` 통째로 → `supabase/manual/verify_after_0035.sql`(읽기만) 1~3 '좋음'. 0035 는 0034 가 없으면 멈춘다.
 4. 내부 OS main 병합(fast-forward) → Production. 홈페이지 기능 브랜치 main 병합 → Production.
 5. 확인: 대표 계정으로 업체 상세 › 고객 플랫폼 탭에 '고객에게 보낸 보고서' 칸이 보이면 켜진 것.
 
@@ -31,6 +33,7 @@
   두 앱은 그 순간부터 새 칸을 숨기고 예전 화면 그대로(앱을 되돌릴 필요 없음).
 - 다시 켜기 = 0033 파일 통째로 다시 실행(기록은 그대로 돌아온다 — W11d).
 - (D-685) 결과 자료 열람만 끄기: `supabase/manual/rollback_0034.sql` → 마지막 줄 `false | false`. 다시 켜기 = 0034 파일 다시(넣은 때 · 기록 그대로 — W17h · i).
+- (D-686) 고객 '새 결과 자료' 표시만 끄기: `supabase/manual/rollback_0035.sql` → `false | false`. 다시 켜기 = 0035 파일 다시(W18f · g).
 - 앱 코드까지 되돌려야 하면: OS 는 main 의 D-681 커밋을 되돌리는 새 커밋(강제 push 금지) · 홈페이지도 같은 방식.
 
 ## 4. 대표 · 팀장의 하루(쓰는 법)

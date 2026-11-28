@@ -563,6 +563,27 @@ export function portalFollowUps(
   return out.sort((a, b) => order[a.rule] - order[b.rule] || (a.rule === 'renewal_report' ? a.days - b.days : b.days - a.days))
 }
 
+/**
+ * D-686 고객 화면의 '새 결과 자료' — 그 계정(연결)에 공유한 것 가운데 기록을 남기기 시작한 뒤 공유했고 그 계정이 아직 안 연 것.
+ * 서버 함수(0035 portal_results_state · portal_result_summary)와 같은 규칙 — 대표의 '고객 화면 보기'(D-683)가 고객 화면과 같게 그리려고 쓴다.
+ */
+export function newResultIds(
+  results: readonly SharedResultLite[],
+  seen: readonly { linkId: string; itemKind: string; itemId: string }[],
+  linkId: string,
+  since: string | null,
+): Set<string> {
+  const out = new Set<string>()
+  if (!since || !linkId) return out
+  const from = Date.parse(since)
+  for (const r of results) {
+    if (r.linkId !== linkId || !(Date.parse(r.sharedAt) >= from)) continue
+    if (seen.some((x) => x.linkId === linkId && x.itemKind === r.kind && x.itemId === r.id)) continue
+    out.add(r.id)
+  }
+  return out
+}
+
 /** 업체에 지금 진행 중인 업무가 있는지(경과 보고 공백을 셀지) */
 export function hasActiveWork(record: Pick<ClientOpsRecord, 'services' | 'archivedAt'>): boolean {
   if (record.archivedAt) return false

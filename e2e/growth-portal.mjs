@@ -21,6 +21,7 @@
  *   W16 (D-684) 계약 끝나는 날 20일 전 · 연간 보고 없음 → 오늘 '재계약 전 연간 보고' 줄(월말 줄 대신) · [열기] → 보고서 창 연간 · 계약일부터 · 안부 '재계약' 줄
  *   W17 (D-685) 공유 서류 · 결과 글 — 10일 전 공유(기록 전 공유 하나는 안 셈) → 오늘 '공유한 결과 자료 2개를 안 열어 보셨어요' → 고객 '결과' 탭 1초 → 결과 글 열람 · [열기] → 서류 열람(서버) →
  *       OS 탭 '열어 보심' · '열람 기록 전 공유' · 오늘 줄 빠짐 · 대표 · 다른 회사 고객은 기록 못 남김 · 0034 되돌리기 → 줄 숨음 · 고객 화면 그대로 → 다시
+ *   W18 (D-686) 새로 공유한 서류 → 고객 홈 '지금 할 일' 새 결과 자료 1개 · 카드 · 대표 고객 화면 보기도 같게(계정마다 · 기록 0) → 결과 탭 '새 1' · 알약 → [열기] → 사라짐 → 홈에서도 빠짐 · 0035 되돌리기 → 표시만 숨음 → 다시
  *   W13 JS 오류 0(두 앱)
  *
  *   node e2e/growth-portal.mjs [스크린샷 폴더]   (pg_ctlcluster 16 main start 먼저 · 홈페이지 저장소 ../mirae-ai-lab-homepage)
@@ -632,6 +633,57 @@ values ('${OWNER_WS}', '${LA1}', 'result', '벤처인증을 받으셨어요', '�
   await osGo(op, '/ops/clients/growth-a?tab=portal')
   await op.getByTestId('portal-reports').waitFor({ timeout: 10000 }).catch(() => {})
   check('W17i 0034 다시 → 열어 보심 줄 돌아옴(기록 그대로 · 넣은 때 그대로)', (await op.getByTestId('result-seen').count()) === 3 && sql(`select public.portal_result_receipts_since() < now() - interval '29 days'`) === 't')
+
+  // ---------- W18 (D-686) 고객 화면 '새 결과 자료' ----------
+  // '지금 할 일' 은 3줄까지 — 앞선 시험이 남긴 새 보고서가 자리를 차지하지 않게 A1 이 보고서는 다 본 것으로(시험 DB)
+  sql(`insert into public.portal_receipts (workspace_id, operations_client_id, portal_client_link_id, profile_id, item_kind, item_id, item_version)
+select r.workspace_id, r.operations_client_id, '${LA1}', '${CA1.id}', 'report', r.id, r.version from public.portal_reports r where r.operations_client_id = 'growth-a' and r.status = 'published'
+on conflict do nothing;`)
+  sql(`insert into public.portal_documents (workspace_id, portal_client_link_id, operations_client_id, document_type, title, storage_path, file_name, source, visibility, status)
+values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '세무 검토 결과', '${OWNER_WS}/clients/growth-a/tax.pdf', 'tax.pdf', 'internal', 'shared_with_customer', 'verified');`)
+  const docTax = sql(`select id from public.portal_documents where title = '세무 검토 결과' and portal_client_link_id = '${LA1}'`)
+  await hpGo(a1.page, '/my-projects')
+  await a1.page.getByTestId('growth-todo').waitFor({ timeout: 10000 }).catch(() => {})
+  const todoR = await a1.page.getByTestId('growth-todo-item').allInnerTexts()
+  const cardR = (await a1.page.getByTestId('project-results-new').innerText().catch(() => '')) ?? ''
+  check("W18a 고객 홈 — '지금 할 일' 새 결과 자료 1개 · 카드 '새 결과 자료 1'(이미 연 것 · 기록 전 공유는 안 셈)", todoR.some((t) => t.includes('새 결과 자료 1개')) && cardR.includes('새 결과 자료 1'), { todoR, cardR })
+  await shot(a1.page, 'hp-06-home-new-result')
+  // 대표 '고객 화면 보기' — A1 계정은 같은 표시 · A2 계정은 없음(계정마다) · 기록 0
+  const before18 = sql(`select count(*) from public.portal_receipts where item_kind in ('document', 'result')`)
+  await osGo(op, `/customer-view?client=growth-a&as=${LA1}`)
+  await op.getByTestId('cv-home').waitFor({ timeout: 10000 }).catch(() => {})
+  const cvTodo = await op.getByTestId('cv-todo-item').allInnerTexts()
+  await osGo(op, `/customer-view?client=growth-a&as=${LA2}`)
+  await op.getByTestId('cv-home').waitFor({ timeout: 10000 }).catch(() => {})
+  const cvTodo2 = await op.getByTestId('cv-todo-item').allInnerTexts()
+  check("W18b 대표 고객 화면 보기 — A1 계정 '새 결과 자료 1개'(고객 화면과 같게) · A2 계정은 없음 · 서버 기록 그대로", cvTodo.some((t) => t.includes('새 결과 자료 1개')) && !cvTodo2.some((t) => t.includes('새 결과 자료')) && sql(`select count(*) from public.portal_receipts where item_kind in ('document', 'result')`) === before18, { cvTodo, cvTodo2 })
+  // 고객 — 할 일 누르면 결과 탭 · '새 1' · 알약 하나 → [열기] → 사라짐
+  await a1.page.getByTestId('growth-todo-item').filter({ hasText: '새 결과 자료' }).first().click()
+  await a1.page.waitForURL(/tab=results/, { timeout: 10000 }).catch(() => {})
+  await a1.page.getByTestId('project-tab-results-new').waitFor({ timeout: 10000 }).catch(() => {})
+  const badge = (await a1.page.getByTestId('project-tab-results-new').innerText().catch(() => '')) ?? ''
+  const pills = await a1.page.getByTestId('result-new').count()
+  check("W18c 할 일 → '결과' 탭 · 탭 '새 1' · '새' 알약 하나(새로 공유한 서류에만)", a1.page.url().includes('tab=results') && badge === '새 1' && pills === 1 && (await a1.page.locator('li').filter({ hasText: '세무 검토 결과' }).getByTestId('result-new').count()) === 1, { url: a1.page.url(), badge, pills })
+  await shot(a1.page, 'hp-07-results-new')
+  await a1.page.locator('li').filter({ hasText: '세무 검토 결과' }).getByRole('button', { name: '열기' }).click()
+  await a1.page.waitForTimeout(1200)
+  check("W18d [열기] → 알약 · 탭 '새' 사라짐 · 서버 열람 한 줄", (await a1.page.getByTestId('result-new').count()) === 0 && (await a1.page.getByTestId('project-tab-results-new').count()) === 0 && sql(`select count(*) from public.portal_receipts where item_kind = 'document' and item_id = '${docTax}'`) === '1')
+  await hpGo(a1.page, '/my-projects')
+  await a1.page.getByTestId('project-card').first().waitFor({ timeout: 10000 }).catch(() => {})
+  const todoR2 = await a1.page.getByTestId('growth-todo-item').allInnerTexts()
+  check("W18e 홈으로 돌아오면 '새 결과 자료' 할 일 · 카드 표시 0", !todoR2.some((t) => t.includes('새 결과 자료')) && (await a1.page.getByTestId('project-results-new').count()) === 0, todoR2)
+  // 0035 되돌리기 → 새 자료가 있어도 표시만 숨음(화면 그대로 · 오류 0) → 다시
+  sql(`insert into public.portal_documents (workspace_id, portal_client_link_id, operations_client_id, document_type, title, storage_path, file_name, source, visibility, status)
+values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '노무 검토 결과', '${OWNER_WS}/clients/growth-a/labor.pdf', 'labor.pdf', 'internal', 'shared_with_customer', 'verified');`)
+  execSync(`su postgres -c "psql -q -d ${DB}"`, { input: execSync('cat supabase/manual/rollback_0035.sql') })
+  await hpGo(a1.page, '/my-projects')
+  await a1.page.getByTestId('project-card').first().waitFor({ timeout: 10000 }).catch(() => {})
+  const offTodo = await a1.page.getByTestId('growth-todo-item').allInnerTexts()
+  check("W18f 0035 되돌리기 → '새 결과 자료' 표시만 숨음 · 프로젝트 카드 · 보고서 칸 그대로", !offTodo.some((t) => t.includes('새 결과 자료')) && (await a1.page.getByTestId('project-card').count()) === 1 && (await a1.page.getByTestId('growth-home').getAttribute('data-growth')) === 'on', offTodo)
+  execSync(`su postgres -c "psql -q -d ${DB}"`, { input: execSync('cat supabase/migrations/20261128000035_result_new.sql') })
+  await hpGo(a1.page, '/my-projects')
+  await a1.page.getByTestId('growth-todo').waitFor({ timeout: 10000 }).catch(() => {})
+  check("W18g 0035 다시 → '새 결과 자료 1개' 돌아옴", (await a1.page.getByTestId('growth-todo-item').allInnerTexts()).some((t) => t.includes('새 결과 자료 1개')))
 
   check('W13 JS 오류 0(두 앱)', errors.length === 0, errors)
 } catch (e) {
