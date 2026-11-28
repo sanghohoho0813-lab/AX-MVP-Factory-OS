@@ -22,6 +22,7 @@
  *   W17 (D-685) 공유 서류 · 결과 글 — 10일 전 공유(기록 전 공유 하나는 안 셈) → 오늘 '공유한 결과 자료 2개를 안 열어 보셨어요' → 고객 '결과' 탭 1초 → 결과 글 열람 · [열기] → 서류 열람(서버) →
  *       OS 탭 '열어 보심' · '열람 기록 전 공유' · 오늘 줄 빠짐 · 대표 · 다른 회사 고객은 기록 못 남김 · 0034 되돌리기 → 줄 숨음 · 고객 화면 그대로 → 다시
  *   W18 (D-686) 새로 공유한 서류 → 고객 홈 '지금 할 일' 새 결과 자료 1개 · 카드 · 대표 고객 화면 보기도 같게(계정마다 · 기록 0) → 결과 탭 '새 1' · 알약 → [열기] → 사라짐 → 홈에서도 빠짐 · 0035 되돌리기 → 표시만 숨음 → 다시
+ *   W18h (D-688) 같은 말 — 새 자료가 있으면 카드 · 프로젝트 맨 위가 '확인할 일 없음' 대신 '새로 온 자료' · 대표 고객 화면 보기도 같게
  *   W13 JS 오류 0(두 앱)
  *
  *   node e2e/growth-portal.mjs [스크린샷 폴더]   (pg_ctlcluster 16 main start 먼저 · 홈페이지 저장소 ../mirae-ai-lab-homepage)
@@ -647,12 +648,16 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '세무 검토 결과', '${O
   const todoR = await a1.page.getByTestId('growth-todo-item').allInnerTexts()
   const cardR = (await a1.page.getByTestId('project-results-new').innerText().catch(() => '')) ?? ''
   check("W18a 고객 홈 — '지금 할 일' 새 결과 자료 1개 · 카드 '새 결과 자료 1'(이미 연 것 · 기록 전 공유는 안 셈)", todoR.some((t) => t.includes('새 결과 자료 1개')) && cardR.includes('새 결과 자료 1'), { todoR, cardR })
+  // D-688 같은 말 — 할 일에 '새 결과 자료' 가 있는데 카드가 '확인할 일 없음' 이라고 하지 않는다
+  const pill18 = (await a1.page.getByTestId('project-new-pill').innerText().catch(() => '')) ?? ''
+  const card18 = (await a1.page.getByTestId('project-card').first().innerText().catch(() => '')) ?? ''
   await shot(a1.page, 'hp-06-home-new-result')
   // 대표 '고객 화면 보기' — A1 계정은 같은 표시 · A2 계정은 없음(계정마다) · 기록 0
   const before18 = sql(`select count(*) from public.portal_receipts where item_kind in ('document', 'result')`)
   await osGo(op, `/customer-view?client=growth-a&as=${LA1}`)
   await op.getByTestId('cv-home').waitFor({ timeout: 10000 }).catch(() => {})
   const cvTodo = await op.getByTestId('cv-todo-item').allInnerTexts()
+  const cvPill = (await op.getByTestId('cv-new-pill').innerText().catch(() => '')) ?? ''
   await osGo(op, `/customer-view?client=growth-a&as=${LA2}`)
   await op.getByTestId('cv-home').waitFor({ timeout: 10000 }).catch(() => {})
   const cvTodo2 = await op.getByTestId('cv-todo-item').allInnerTexts()
@@ -663,6 +668,7 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '세무 검토 결과', '${O
   await a1.page.getByTestId('project-tab-results-new').waitFor({ timeout: 10000 }).catch(() => {})
   const badge = (await a1.page.getByTestId('project-tab-results-new').innerText().catch(() => '')) ?? ''
   const pills = await a1.page.getByTestId('result-new').count()
+  const sum18 = (await a1.page.getByTestId('project-summary').innerText().catch(() => '')) ?? ''
   check("W18c 할 일 → '결과' 탭 · 탭 '새 1' · '새' 알약 하나(새로 공유한 서류에만)", a1.page.url().includes('tab=results') && badge === '새 1' && pills === 1 && (await a1.page.locator('li').filter({ hasText: '세무 검토 결과' }).getByTestId('result-new').count()) === 1, { url: a1.page.url(), badge, pills })
   await shot(a1.page, 'hp-07-results-new')
   await a1.page.locator('li').filter({ hasText: '세무 검토 결과' }).getByRole('button', { name: '열기' }).click()
@@ -672,6 +678,13 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '세무 검토 결과', '${O
   await a1.page.getByTestId('project-card').first().waitFor({ timeout: 10000 }).catch(() => {})
   const todoR2 = await a1.page.getByTestId('growth-todo-item').allInnerTexts()
   check("W18e 홈으로 돌아오면 '새 결과 자료' 할 일 · 카드 표시 0", !todoR2.some((t) => t.includes('새 결과 자료')) && (await a1.page.getByTestId('project-results-new').count()) === 0, todoR2)
+  const card18b = (await a1.page.getByTestId('project-card').first().innerText().catch(() => '')) ?? ''
+  check(
+    "W18h 같은 말(D-688) — 새 자료가 있으면 카드 '새로 온 자료 1'(확인할 일 없음 0) · 프로젝트 맨 위 '새로 온 자료가 1개 있습니다 · 새 결과 자료 1개' · 대표 고객 화면 보기 카드도 같게 · 열고 나면 다시 '확인할 일 없음'",
+    pill18 === '새로 온 자료 1' && !card18.includes('확인할 일 없음') && sum18.includes('새로 온 자료가 1개 있습니다') && sum18.includes('새 결과 자료 1개') && cvPill === '새로 온 자료 1' &&
+      (await a1.page.getByTestId('project-new-pill').count()) === 0 && card18b.includes('확인할 일 없음'),
+    { pill18, card18, sum18, cvPill, card18b },
+  )
   // 0035 되돌리기 → 새 자료가 있어도 표시만 숨음(화면 그대로 · 오류 0) → 다시
   sql(`insert into public.portal_documents (workspace_id, portal_client_link_id, operations_client_id, document_type, title, storage_path, file_name, source, visibility, status)
 values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '노무 검토 결과', '${OWNER_WS}/clients/growth-a/labor.pdf', 'labor.pdf', 'internal', 'shared_with_customer', 'verified');`)

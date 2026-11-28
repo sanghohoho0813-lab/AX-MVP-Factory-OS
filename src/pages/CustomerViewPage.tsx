@@ -431,6 +431,8 @@ function HomeView({ p, email, reports, seenFor, newResults, onProject, onReport 
           </div>
           {reqDocs + actions > 0 ? (
             <span className="t-meta rounded-full bg-warning-50 px-3 py-1 font-black text-warning-700">해야 할 일 {reqDocs + actions}</span>
+          ) : unseen + newResults.size > 0 ? (
+            <span className="t-meta rounded-full bg-brand-50 px-3 py-1 font-black text-brand-700" data-testid="cv-new-pill">새로 온 자료 {unseen + newResults.size}</span>
           ) : (
             <span className="t-meta rounded-full bg-success-50 px-3 py-1 font-black text-success-700">확인할 일 없음</span>
           )}
@@ -465,16 +467,18 @@ function ProjectView({ p, reports, seenFor, newResults, tab, onTab, onHome, onRe
   const docs = p.documents.filter((d) => d.status === 'requested' || d.status === 'rejected')
   const todoCount = actions.length + docs.length
   const unseen = (reports ?? []).filter((r) => !seenFor(r.id)).length
+  // 고객 화면과 같게(D-688) — 해야 할 일은 없어도 새로 온 것이 있으면 '확인할 내용이 없습니다' 라고 하지 않는다
+  const newCount = unseen + newResults.size
   const stageIdx = CUSTOMER_STAGE_ORDER.indexOf(pr.stage)
   const cur: Tab = tab === 'reports' && reports === null ? 'todo' : tab
   return (
     <div data-testid="cv-project">
       <PageTitle title={pr.name} subtitle={`${CUSTOMER_STAGE_LABEL[pr.stage]}${pr.consultant_name ? ` · 담당 ${pr.consultant_name}` : ''}${pr.updated_at ? ` · 최근 업데이트 ${kdate(pr.updated_at)}` : ''}`} />
       <button type="button" onClick={onHome} className="tap t-sub inline-flex items-center gap-1 font-semibold text-slate-500 hover:text-slate-900"><ArrowLeft aria-hidden="true" className="size-4" /> 내 프로젝트</button>
-      <div className={`mt-4 rounded-2xl border p-5 ${todoCount > 0 ? 'border-warning-200 bg-warning-50' : 'border-success-200 bg-success-50'}`}>
-        <p className={`text-base font-black ${todoCount > 0 ? 'text-warning-700' : 'text-success-700'}`}>{todoCount > 0 ? `지금 확인할 내용이 ${todoCount}건 있습니다` : '지금 확인할 내용이 없습니다'}</p>
+      <div className={`mt-4 rounded-2xl border p-5 ${todoCount > 0 ? 'border-warning-200 bg-warning-50' : newCount > 0 ? 'border-brand-200 bg-brand-50' : 'border-success-200 bg-success-50'}`} data-testid="cv-project-summary">
+        <p className={`text-base font-black ${todoCount > 0 ? 'text-warning-700' : newCount > 0 ? 'text-brand-700' : 'text-success-700'}`}>{todoCount > 0 ? `지금 확인할 내용이 ${todoCount}건 있습니다` : newCount > 0 ? `새로 온 자료가 ${newCount}개 있습니다` : '지금 확인할 내용이 없습니다'}</p>
         <p className="t-sub mt-1 text-slate-600">
-          {docs.length > 0 && `서류 ${docs.length}개 요청됨 · `}{actions.length > 0 && `해야 할 일 ${actions.length}건 · `}{p.updates.length > 0 ? `진행 업데이트 ${p.updates.length}건` : '아직 업데이트가 없습니다'}
+          {docs.length > 0 && `서류 ${docs.length}개 요청됨 · `}{actions.length > 0 && `해야 할 일 ${actions.length}건 · `}{unseen > 0 && `새 보고서 ${unseen}개 · `}{newResults.size > 0 && `새 결과 자료 ${newResults.size}개 · `}{p.updates.length > 0 ? `진행 업데이트 ${p.updates.length}건` : '아직 업데이트가 없습니다'}
         </p>
       </div>
       <div className="mt-6 mb-5 flex gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1 [scrollbar-width:none]" role="tablist">
