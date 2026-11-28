@@ -30,13 +30,14 @@ import {
   caseTopic,
   consentDayText,
   findClientNames,
+  groupHits,
   hitKey,
   hitText,
   maskClientNames,
   withCaseConsent,
   type CasePartKey,
   type CaseWork,
-  type NameHit,
+  type NameHitGroup,
 } from '../../services/marketing/clientCase'
 import type { ClientOpsRecord } from '../../types/clientOps'
 
@@ -137,10 +138,13 @@ export function useClientCase({
   const index = useMemo(() => buildNameIndex(clients ?? []), [clients])
   const text = Object.values(fields).join('\n')
   const hits = useMemo(() => findClientNames(text, index).filter((h) => !skip.has(hitKey(h))), [text, index, skip])
+  // D-691 같은 업체 · 같은 종류는 모양이 달라도 한 줄('한솔테크(주)' · '한솔테크')
+  const groups = useMemo(() => groupHits(hits), [hits])
 
-  /** 그 자리만 가린다(다른 이름 · 넘긴 것은 그대로) */
-  const hide = (h: NameHit) => {
-    const others = new Set([...skip, ...hits.filter((x) => hitKey(x) !== hitKey(h)).map(hitKey)])
+  /** 그 줄의 이름만 가린다(모양이 달라도 그 업체 그 이름은 모두 · 다른 이름 · 넘긴 것은 그대로) */
+  const hide = (h: NameHitGroup) => {
+    const mine = new Set(h.keys)
+    const others = new Set([...skip, ...hits.map(hitKey).filter((k) => !mine.has(k))])
     const next: Record<string, string> = {}
     for (const [k, v] of Object.entries(fields)) {
       const masked = maskClientNames(v, index, { skip: others })
@@ -150,14 +154,14 @@ export function useClientCase({
     showToast(h.kind === 'number' ? '번호를 지웠어요.' : '이름을 가렸어요.')
   }
 
-  const pending = hits.filter((h) => !h.consent).length
+  const pending = groups.filter((h) => !h.consent).length
   // 짚은 칸 밖의 글이 들어와도 같은 규칙으로(가릴 것이 없으면 글 그대로)
   const clean = useCallback((t: string) => (index.matchers.length ? maskClientNames(t, index, { keepConsented: true, skip }) : t), [index, skip])
 
   const setConsent = useCallback(
-    async (h: NameHit, on: boolean) => {
+    async (h: NameHitGroup, on: boolean) => {
       if (busy) return
-      setBusy(hitKey(h))
+      setBusy(h.keys[0])
       try {
         // 열어 둔 사이 다른 창 · 다른 사람이 이 업체를 고쳤을 수 있다 — 지금 판을 다시 읽고 그 위에 적는다
         const fresh = (await listClients(ws).catch(() => null))?.find((c) => c.id === h.clientId) ?? clients?.find((c) => c.id === h.clientId)
@@ -176,9 +180,9 @@ export function useClientCase({
   )
 
   const guard = (at: 'start' | 'edit' | 'output'): ReactNode => {
-    if (!hits.length) return null
+    if (!groups.length) return null
     return (
-      <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid={`${testPrefix}-case-guard`} data-at={at} data-count={hits.length} data-pending={pending}>
+      <div className="flex flex-col gap-2 rounded-(--radius-control) border border-slate-200 bg-white px-3 py-2.5" data-testid={`${testPrefix}-case-guard`} data-at={at} data-count={groups.length} data-pending={pending}>
         <p className="t-sub flex items-center gap-1.5 font-bold text-slate-900">
           <UserRoundSearch aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
           고객 이름 확인
@@ -189,8 +193,8 @@ export function useClientCase({
           </p>
         )}
         <ul className="flex flex-col gap-2">
-          {(allHits ? hits : hits.slice(0, GUARD_SHOWN)).map((h) => {
-            const key = hitKey(h)
+          {(allHits ? groups : groups.slice(0, GUARD_SHOWN)).map((h) => {
+            const key = h.keys[0]
             const ask = asking === key
             return (
               <li key={key} className="flex flex-wrap items-center gap-x-2 gap-y-1.5" data-testid={`${testPrefix}-case-hit`} data-kind={h.kind} data-consent={h.consent ? '1' : '0'}>
@@ -230,7 +234,7 @@ export function useClientCase({
                         </button>
                       )}
                       {h.kind !== 'number' && !h.consent && (
-                        <button type="button" className={btnText} onClick={() => setSkip((s) => new Set([...s, key]))} title="이 낱말은 고객 이름이 아니에요 — 이 글에서는 더 묻지 않아요." data-testid={`${testPrefix}-case-skip`}>
+                        <button type="button" className={btnText} onClick={() => setSkip((s) => new Set([...s, ...h.keys]))} title="이 낱말은 고객 이름이 아니에요 — 이 글에서는 더 묻지 않아요." data-testid={`${testPrefix}-case-skip`}>
                           고객 이름 아님
                         </button>
                       )}
@@ -241,9 +245,9 @@ export function useClientCase({
             )
           })}
         </ul>
-        {!allHits && hits.length > GUARD_SHOWN && (
+        {!allHits && groups.length > GUARD_SHOWN && (
           <button type="button" onClick={() => setAllHits(true)} className="tap t-sub min-h-10 self-start font-semibold text-brand-700 hover:underline" data-testid={`${testPrefix}-case-hits-more`}>
-            {hits.length - GUARD_SHOWN}개 더 보기
+            {groups.length - GUARD_SHOWN}개 더 보기
           </button>
         )}
       </div>

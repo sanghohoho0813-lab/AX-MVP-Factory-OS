@@ -582,6 +582,17 @@ check('QS9 이번 주 키워드 보관 — 같은 주(일요일까지)만 읽힘
   check('D680-N8 허락받은 고객 — consent 표시 · 날짜 · 허락 전인 이름이 앞에', f8.length === 3 && f8[0].match === '미래산업' && !f8[0].consent && f8[1].consent && f8[1].consentAt === '2026-11-20' && f8[2].consent, JSON.stringify(f8.map((h) => [h.match, h.consent])))
   check('D680-N9 같은 글자는 한 번만 · 빈 글은 0', found('미래산업 미래산업 미래산업').length === 1 && found('  ').length === 0)
   check('D680-N10 확인 줄 글 — 허락 전 · 허락 뒤(날짜) · 번호', cc.hitText(f8[0]).includes('내 고객 이름이에요') && cc.hitText(f8[1]).includes('허락받은 고객이에요(11월 20일)') && cc.hitText(f1.find((h) => h.kind === 'number')!).includes('공개 글에는 넣지 않아요'))
+  // D-691 같은 업체 · 같은 종류는 한 줄
+  const fg = found('(주)미래산업 소식 — 미래산업은 홍길동 대표님과 홍길동 이 함께. 010-1234-5678 · 123-45-67890 · ABC Tech')
+  const gg = cc.groupHits(fg)
+  const coG = gg.find((g) => g.kind === 'company' && g.clientId === 'c1')
+  check('D691-G1 같은 회사의 두 모양("(주)미래산업" · "미래산업")은 한 줄 · 열쇠 둘 · 확인 글에 두 모양', !!coG && coG.matches.join('|') === '(주)미래산업|미래산업' && coG.keys.length === 2 && cc.hitText(coG) === '"(주)미래산업" · "미래산업" — 내 고객 이름이에요.', coG && cc.hitText(coG))
+  check('D691-G2 사람 이름도 모양마다 한 줄로("홍길동 대표님" · "홍길동") · 번호는 서로 다른 번호라 따로(2줄) · 다른 업체는 따로', gg.filter((g) => g.kind === 'person').length === 1 && gg.filter((g) => g.kind === 'number').length === 2 && gg.some((g) => g.clientId === 'c4') && gg.length === 5, JSON.stringify(gg.map((g) => [g.kind, g.matches])))
+  check('D691-G3 허락 전이 앞 — 묶어도 순서 그대로(허락받은 ABC Tech 는 맨 뒤)', gg[gg.length - 1].clientId === 'c4' && gg[gg.length - 1].consent)
+  const ng = cc.groupHits(found('사업자 123-45-67890 · #1234567890 · 전화 010-1234-5678'))
+  check('D691-G5 같은 번호의 두 모양(대시 있음 · 없음)은 한 줄 · 다른 번호(전화)는 따로', ng.length === 2 && ng[0].matches.join('|') === '123-45-67890|1234567890' && ng[1].matches.join('|') === '010-1234-5678', JSON.stringify(ng.map((g) => g.matches)))
+  const skipAll = new Set(coG?.keys ?? [])
+  check('D691-G4 묶은 줄의 열쇠로 넘기면 두 모양 모두 그대로 남는다(가리기에서 빠짐)', cc.maskClientNames('(주)미래산업 · 미래산업', idx, { skip: skipAll }) === '(주)미래산업 · 미래산업' && cc.groupHits([]).length === 0)
 
   // 가리기
   const m1 = cc.maskClientNames('지난달 (주)미래산업이 정책자금을 받았어요. 홍길동 대표님은 걱정하셨죠. 문의 010-1234-5678 로', idx)

@@ -379,14 +379,43 @@ export function maskClientNames(text: string, index: NameIndex, opts: { keepCons
   return out
 }
 
+/** D-691 확인 줄 한 줄 — 같은 업체 · 같은 종류는 모양이 달라도('한솔테크(주)' · '한솔테크') 한 줄로 */
+export interface NameHitGroup extends NameHit {
+  /** 글에서 찾은 모양들(처음 찾은 것이 앞) */
+  matches: string[]
+  /** 그 모양들의 열쇠(가리기 · 넘기기를 한 번에) */
+  keys: string[]
+}
+
+/** 찾은 것 → 확인 줄(업체 · 종류마다 한 줄 · 순서는 찾은 순서 그대로 — 허락 전이 앞) */
+export function groupHits(hits: readonly NameHit[]): NameHitGroup[] {
+  const out: NameHitGroup[] = []
+  const at = new Map<string, NameHitGroup>()
+  for (const h of hits) {
+    // 번호는 숫자가 같을 때만 한 줄('123-45-67890' · '1234567890') — 전화 · 사업자번호처럼 다른 번호는 따로
+    const k = h.kind === 'number' ? `${h.clientId}:number:${digits(h.match)}` : `${h.clientId}:${h.kind}`
+    const g = at.get(k)
+    if (g) {
+      g.matches.push(h.match)
+      g.keys.push(hitKey(h))
+      continue
+    }
+    const ng: NameHitGroup = { ...h, matches: [h.match], keys: [hitKey(h)] }
+    at.set(k, ng)
+    out.push(ng)
+  }
+  return out
+}
+
 /** 찾은 것 하나의 열쇠 — '고객 이름이 아니에요' 로 넘긴 것을 기억할 때 */
 export function hitKey(h: Pick<NameHit, 'clientId' | 'kind' | 'match'>): string {
   return `${h.clientId}:${h.kind}:${h.match.replace(/\s+/g, '')}`
 }
 
 /** 확인 줄에 보일 글 — 허락 전 · 허락 뒤 · 번호(무엇을 하면 되는지는 옆 단추가 말한다 — 짧게) */
-export function hitText(h: NameHit): string {
-  if (h.kind === 'number') return `"${h.match}" — 고객 번호예요. 공개 글에는 넣지 않아요.`
-  if (h.consent) return `"${h.match}" — 허락받은 고객이에요(${consentDayText({ at: h.consentAt })}).`
-  return `"${h.match}" — 내 고객 이름이에요.`
+export function hitText(h: NameHit & { matches?: readonly string[] }): string {
+  const what = (h.matches?.length ? h.matches : [h.match]).map((m) => `"${m}"`).join(' · ')
+  if (h.kind === 'number') return `${what} — 고객 번호예요. 공개 글에는 넣지 않아요.`
+  if (h.consent) return `${what} — 허락받은 고객이에요(${consentDayText({ at: h.consentAt })}).`
+  return `${what} — 내 고객 이름이에요.`
 }
