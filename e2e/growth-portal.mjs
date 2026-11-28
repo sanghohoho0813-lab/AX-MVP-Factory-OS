@@ -26,7 +26,7 @@
  *   W19 (D-689) 담당자가 고른 추천 — OS [추천 고르기] › [직접 적기] · 금액 막힘 · 올리기 · 3개까지(서버도) · 내리기 → 고객 홈 '담당자가 추천해요' · [자세히] · [관심 있어요]
  *       → A2 따로 · B1 0 · 대표 · B1 위조 막힘 · 오늘 '관심 있다고 하셨어요' 맨 앞 → [열기] → [연락했어요] → 빠짐 · 대표 고객 화면 보기 계정마다(기록 0) · 0036 되돌리기 → 다시 · 390
  *   W20 (D-690) 설정 › 시스템 켜짐 점검 — 넷 켜짐 · 첫 주 숫자 = 서버 · 0035 · 0036 되돌리면 그 둘만 꺼짐 + 할 일 한 줄 · 기록 0 · 다시 켜짐 · 팀장 0 · (D-691) 390 넘침 0
- *   W21 (D-691) 잠깐 끊김 — 보고서 · 추천 판이 사라지지 않고 '읽지 못했어요 · [다시 읽기]' → 돌아오면 다시
+ *   W21 (D-691) 잠깐 끊김 — 보고서 · 추천 판이 사라지지 않고 '읽지 못했어요 · [다시 읽기]' → 돌아오면 다시 · 고객 화면 오류 글은 한국어(영어 원문 0)
  *   W13 JS 오류 0(두 앱)
  *
  *   node e2e/growth-portal.mjs [스크린샷 폴더]   (pg_ctlcluster 16 main start 먼저 · 홈페이지 저장소 ../mirae-ai-lab-homepage)
@@ -944,6 +944,14 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '노무 검토 결과', '${O
   await op.getByTestId('reco-retry').click()
   await op.getByTestId('portal-recos').waitFor({ timeout: 10000 }).catch(() => {})
   check('W21d [다시 읽기] → 추천 판이 다시(올린 추천 그대로)', (await op.getByTestId('reco-failed').count()) === 0 && Number(await op.getByTestId('portal-recos').getAttribute('data-count').catch(() => '-1')) >= 0)
+  // W21e 고객 화면(홈페이지) — 프로젝트 목록을 못 읽으면 영어 원문(TypeError · Failed to fetch) 대신 한국어 한 줄 + [다시 시도]
+  const cutRpc = (r) => r.abort('internetdisconnected')
+  await a1.page.route('**/rest/v1/rpc/portal_my_projects*', cutRpc)
+  await hpGo(a1.page, '/my-projects')
+  await a1.page.waitForTimeout(800)
+  const hpErr = (await a1.page.getByTestId('growth-home').innerText().catch(() => '')) ?? ''
+  check('W21e 고객 화면 — 목록을 못 읽으면 "인터넷 연결이 불안정해요" · 영어 원문 0 · [다시 시도]', hpErr.includes('인터넷 연결이 불안정해요') && !/TypeError|Failed to fetch|FetchError|fetch/i.test(hpErr) && hpErr.includes('다시 시도'), hpErr.slice(0, 200))
+  await a1.page.unroute('**/rest/v1/rpc/portal_my_projects*', cutRpc)
 
   check('W13 JS 오류 0(두 앱)', errors.length === 0, errors)
 } catch (e) {
