@@ -41,6 +41,10 @@ page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)))
 const posts = []
 await ctx.route('**/api/ai-assist**', async (r) => {
   const req = r.request()
+  // D-638 끊김(504) 뒤 화면은 같은 번호로 답을 묻는다(GET ?result=) — 서버가 '그 요청은 실패로 끝남' 이라 답하는 경우(모델 목록 답을 돌려주면 2분을 기다린다)
+  if (req.method() === 'GET' && req.url().includes('result=')) {
+    return r.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ ok: false, code: 'provider_error', message: 'AI 서비스가 응답하지 않았어요.' }) })
+  }
   if (req.method() === 'GET') {
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, role: 'owner', providers: [{ id: 'gemini', label: 'Gemini', configured: true, keyName: 'GEMINI_API_KEY', checked: false, models: [{ id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite', note: '', price: null, verified: null, tier: 'cheap' }] }], defaultChoice: { provider: 'gemini', model: 'gemini-3.1-flash-lite' } }) })
   }
