@@ -83,7 +83,8 @@ export function taskCandidates(picks: readonly { key: string; label: string }[],
     return {
       key: refKey(sourceRef),
       kind: 'task' as const,
-      title: cut(p.label, RECO_TITLE_MAX),
+      // 고객 화면에서 '정책자금' 한 낱말보다 무엇을 하자는 것인지 보이게(담당자가 고칠 수 있다)
+      title: cut(/검토$/.test(p.label) ? p.label : `${p.label} 검토`, RECO_TITLE_MAX),
       reason: '회사 기록으로 보면 함께 검토해 볼 만해요 — 자세한 것은 담당자가 안내해 드려요',
       deadline: null,
       linkUrl: null,

@@ -237,6 +237,54 @@ check('G17 계약일이 없으면 "계약일부터" 꺼짐 · 최근 12개월 ·
 await shot(page, 'growth-10-annual-nocontract')
 await page.keyboard.press('Escape')
 
+// G18 (D-689) 고객에게 추천 — 연습 모드: 후보(맞는 공고 · 먼저 제안할 것) 판 · 직접 적기 · 금액 막힘 · 올리기 · 3개까지 · 내리기
+await page.goto(TAB, { waitUntil: 'networkidle' })
+await page.getByTestId('portal-recos').waitFor({ timeout: 10000 }).catch(() => {})
+check("G18a 고객 플랫폼 탭 '고객에게 추천 0/3' · 빈 안내", (await page.getByTestId('portal-recos').getAttribute('data-count').catch(() => null)) === '0' && (await page.getByTestId('reco-empty').count()) === 1)
+await page.getByTestId('reco-pick-open').click()
+await page.getByTestId('reco-pick').waitFor({ timeout: 8000 }).catch(() => {})
+await page.waitForTimeout(800)
+const pickText = (await page.getByTestId('reco-pick').innerText().catch(() => '')) ?? ''
+const cands = await page.getByTestId('reco-candidate').count()
+await shot(page, 'growth-11-reco-pick')
+check("G18b [추천 고르기] — '맞는 공고' · '먼저 제안할 것' 두 묶음 · [직접 적기] · 후보 글에 금액 0", pickText.includes('맞는 공고') && pickText.includes('먼저 제안할 것') && (await page.getByTestId('reco-manual').count()) === 1 && !/만원|억원/.test(pickText), { cands, pickText: pickText.slice(0, 300) })
+if (cands > 0) {
+  await page.getByTestId('reco-candidate').first().click()
+  await page.getByTestId('reco-edit').waitFor({ timeout: 5000 }).catch(() => {})
+  const t0 = await page.getByTestId('reco-edit-title').inputValue().catch(() => '')
+  check('G18c 후보를 누르면 제목 · 근거가 채워진 고치기 칸 · 미리 보기', t0.length > 0 && (await page.getByTestId('reco-preview').count()) === 1, t0)
+  await page.getByTestId('reco-show-go').click()
+  await page.waitForTimeout(700)
+} else {
+  check('G18c (후보 없음 — 이 견본 업체에 맞는 후보가 없을 때) 빈 안내', (await page.getByTestId('reco-no-grants').count()) + (await page.getByTestId('reco-no-tasks').count()) >= 1)
+  await page.keyboard.press('Escape')
+}
+const addLocal = async (title, reason) => {
+  await page.getByTestId('reco-pick-open').click()
+  await page.getByTestId('reco-manual').click()
+  await page.getByTestId('reco-edit-title').fill(title)
+  await page.getByTestId('reco-edit-reason').fill(reason)
+}
+await addLocal('수출 바우처 검토', '평가 90점 이상이면 유리해요')
+const p18 = (await page.getByTestId('reco-edit-problem').innerText().catch(() => '')) ?? ''
+check("G18d 근거에 점수('90점') → '금액 · 점수는 고객 화면에 쓰지 않아요' · [올리기] 꺼짐", p18.includes('점수') && !(await page.getByTestId('reco-show-go').isEnabled()), p18)
+await page.getByTestId('reco-edit-reason').fill('해외 거래처가 있으면 함께 검토해 볼 만해요')
+await page.getByTestId('reco-show-go').click()
+await page.waitForTimeout(700)
+while (Number(await page.getByTestId('portal-recos').getAttribute('data-count')) < 3) {
+  await addLocal(`직원 교육 계획 ${Date.now() % 1000}`, '')
+  await page.getByTestId('reco-show-go').click()
+  await page.waitForTimeout(600)
+}
+await page.getByTestId('portal-recos').scrollIntoViewIfNeeded().catch(() => {})
+await shot(page, 'growth-12-reco-card')
+check('G18e 3/3 — [추천 고르기] 꺼짐 · 3개까지 안내 · 관심 기록 없음(연습 모드)', !(await page.getByTestId('reco-pick-open').isEnabled()) && (await page.getByTestId('reco-full').count()) === 1 && (await page.locator('[data-testid="reco-interest"][data-state="none"]').count()) === 3)
+await page.getByTestId('reco-withdraw').first().click()
+await page.getByTestId('reco-withdraw-go').click()
+await page.waitForTimeout(600)
+const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('axmvp.v1.portal_recos') || '[]').map((r) => r.status).sort().join(','))
+check('G18f [내리기] → 2/3 · 저장소에 줄은 남음(withdrawn) · [추천 고르기] 다시 켜짐', (await page.getByTestId('portal-recos').getAttribute('data-count')) === '2' && stored === 'shown,shown,withdrawn' && (await page.getByTestId('reco-pick-open').isEnabled()), stored)
+
 // G12 오늘 화면 — 연습 모드 칩 0
 await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 await page.waitForTimeout(600)

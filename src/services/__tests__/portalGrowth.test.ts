@@ -301,7 +301,7 @@ check('REC-03 마감 = 날짜 마감만 · 주소 = http(s) 만 · 이미 올린
 check('REC-04 공고 후보 5개까지 · 긴 제목 80자에서 …', grantCandidates(Array.from({ length: 8 }, (_, i) => gm(`g${i}`, 'fit')), new Set()).length === 5 &&
   (() => { const t = grantCandidates([gm('long', 'fit', { title: '가'.repeat(120) })], new Set())[0].title; return t.length === 80 && t.endsWith('…') })())
 const tc = taskCandidates([{ key: 'employment', label: '고용지원금' }, { key: 'labcare', label: '기업부설연구소' }, { key: 'tax', label: '절세 설계' }, { key: 'x', label: '넷째' }], new Set(['insight:labcare']))
-check('REC-05 먼저 제안할 것 후보 — 셋까지 · 다음 과제 · 금액 0 · 이미 올린 것 표시', tc.length === 3 && tc.every((c) => c.kind === 'task' && !/\d/.test(c.reason)) && tc[1].shown && !tc[0].shown && tc[0].sourceRef.type === 'insight')
+check("REC-05 먼저 제안할 것 후보 — 셋까지 · 다음 과제 · '… 검토' 제목(이미 '검토' 로 끝나면 그대로) · 금액 0 · 이미 올린 것 표시", tc.length === 3 && tc[0].title === '고용지원금 검토' && tc[2].title === '절세 설계 검토' && taskCandidates([{ key: 'k', label: '법인전환 검토' }], new Set())[0].title === '법인전환 검토' && tc.every((c) => c.kind === 'task' && !/\d/.test(c.reason)) && tc[1].shown && !tc[0].shown && tc[0].sourceRef.type === 'insight')
 check('REC-06 금액 · 점수 짚기 — 5천만원 · 최대 3 · 80% · 90점 · 1.2억 / 아닌 것: 2027 · 직원 10명 · 1/15',
   ['최대 5천만원 지원', '최대 3', '80% 지원', '평가 90점', '1.2억 융자'].every((t) => amountIn(t) !== null) && ['2027 스마트공장', '직원 10명 이상', '1/15 마감', '연구 인력 2명이면'].every((t) => amountIn(t) === null))
 check('REC-07 올리기 전 확인 — 빈 제목 · 금액 · 이상한 주소 막힘 · 바른 것 통과',

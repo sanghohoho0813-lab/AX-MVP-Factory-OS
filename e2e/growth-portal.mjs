@@ -23,6 +23,8 @@
  *       OS 탭 '열어 보심' · '열람 기록 전 공유' · 오늘 줄 빠짐 · 대표 · 다른 회사 고객은 기록 못 남김 · 0034 되돌리기 → 줄 숨음 · 고객 화면 그대로 → 다시
  *   W18 (D-686) 새로 공유한 서류 → 고객 홈 '지금 할 일' 새 결과 자료 1개 · 카드 · 대표 고객 화면 보기도 같게(계정마다 · 기록 0) → 결과 탭 '새 1' · 알약 → [열기] → 사라짐 → 홈에서도 빠짐 · 0035 되돌리기 → 표시만 숨음 → 다시
  *   W18h (D-688) 같은 말 — 새 자료가 있으면 카드 · 프로젝트 맨 위가 '확인할 일 없음' 대신 '새로 온 자료' · 대표 고객 화면 보기도 같게
+ *   W19 (D-689) 담당자가 고른 추천 — OS [추천 고르기] › [직접 적기] · 금액 막힘 · 올리기 · 3개까지(서버도) · 내리기 → 고객 홈 '담당자가 추천해요' · [자세히] · [관심 있어요]
+ *       → A2 따로 · B1 0 · 대표 · B1 위조 막힘 · 오늘 '관심 있다고 하셨어요' 맨 앞 → [열기] → [연락했어요] → 빠짐 · 대표 고객 화면 보기 계정마다(기록 0) · 0036 되돌리기 → 다시 · 390
  *   W13 JS 오류 0(두 앱)
  *
  *   node e2e/growth-portal.mjs [스크린샷 폴더]   (pg_ctlcluster 16 main start 먼저 · 홈페이지 저장소 ../mirae-ai-lab-homepage)
@@ -707,6 +709,143 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '노무 검토 결과', '${O
   await hpGo(a1.page, '/my-projects')
   await a1.page.getByTestId('growth-todo').waitFor({ timeout: 10000 }).catch(() => {})
   check("W18g 0035 다시 → '새 결과 자료 1개' 돌아옴", (await a1.page.getByTestId('growth-todo-item').allInnerTexts()).some((t) => t.includes('새 결과 자료 1개')))
+
+  // ---------- W19 (D-689) 담당자가 고른 추천 ----------
+  // 앞선 시험이 한빛정밀 안부 연락 날을 적었을 수 있다 — 관심 줄을 보려고 비운다(시험 DB)
+  sql(`update public.operations_clients set payload = payload - 'care' where id = 'growth-a'`)
+  const recoRows = (extra = '') => sql(`select count(*) from public.portal_recommendations where operations_client_id = 'growth-a' ${extra}`)
+  await osGo(op, '/ops/clients/growth-a?tab=portal')
+  await op.getByTestId('portal-recos').waitFor({ timeout: 10000 }).catch(() => {})
+  check("W19a OS 탭 '고객에게 추천 0/3' · 빈 안내 · [추천 고르기]", (await op.getByTestId('portal-recos').getAttribute('data-count').catch(() => null)) === '0' && (await op.getByTestId('reco-empty').count()) === 1 && (await op.getByTestId('reco-pick-open').isEnabled().catch(() => false)))
+  const addManual = async (o) => {
+    await op.getByTestId('reco-pick-open').click()
+    await op.getByTestId('reco-pick').waitFor({ timeout: 8000 })
+    await op.getByTestId('reco-manual').click()
+    await op.getByTestId('reco-edit').waitFor({ timeout: 5000 })
+    await op.getByTestId('reco-edit-title').fill(o.title)
+    await op.getByTestId('reco-edit-reason').fill(o.reason)
+    if (o.deadline) await op.getByTestId('reco-edit-deadline').fill(o.deadline)
+    if (o.url) await op.getByTestId('reco-edit-url').fill(o.url)
+    if (o.kind) await op.locator(`[data-testid="reco-edit-kind"][data-kind="${o.kind}"]`).click()
+  }
+  await addManual({ title: '경기도 스마트공장 구축 지원', reason: '최대 5천만원 지원', deadline: '2027-01-15', url: 'https://www.bizinfo.go.kr/web/notice/1', kind: 'grant' })
+  const prob = (await op.getByTestId('reco-edit-problem').innerText().catch(() => '')) ?? ''
+  const blocked = !(await op.getByTestId('reco-show-go').isEnabled())
+  await op.getByTestId('reco-edit-reason').fill('경기 · 제조업 · 업력 조건이 맞아요')
+  await op.waitForTimeout(200)
+  await shot(op, 'os-09-reco-edit')
+  check("W19b 금액 글('최대 5천만원')이 있으면 '금액 · 점수는 고객 화면에 쓰지 않아요' · [올리기] 꺼짐 → 고치면 켜짐 · 미리 보기에 제목 · 근거 · 마감",
+    prob.includes('금액') && blocked && (await op.getByTestId('reco-show-go').isEnabled()) && ((await op.getByTestId('reco-preview').innerText()) ?? '').includes('1/15 마감'), { prob, blocked })
+  await op.getByTestId('reco-show-go').click()
+  await op.getByTestId('reco-row').first().waitFor({ timeout: 10000 }).catch(() => {})
+  check('W19c [고객 화면에 올리기] → 카드 1/3 · 서버 한 줄(지원사업 · 대표가 올림 · 주소 · 마감)',
+    (await op.getByTestId('portal-recos').getAttribute('data-count')) === '1' && recoRows(`and status = 'shown' and kind = 'grant' and shown_by = '${OWNER.id}' and link_url = 'https://www.bizinfo.go.kr/web/notice/1' and deadline = '2027-01-15'`) === '1')
+  await addManual({ title: '기업부설연구소 설립 검토', reason: '연구 인력 2명이면 함께 검토해 볼 만해요' })
+  await op.getByTestId('reco-show-go').click()
+  await op.waitForTimeout(800)
+  await addManual({ title: '직원 교육 계획 세우기', reason: '' })
+  await op.getByTestId('reco-show-go').click()
+  await op.waitForTimeout(800)
+  check('W19d 셋 올리면 3/3 · [추천 고르기] 꺼짐 · 3개까지 안내 · 서버도 넷째 막음',
+    (await op.getByTestId('portal-recos').getAttribute('data-count')) === '3' && !(await op.getByTestId('reco-pick-open').isEnabled()) && (await op.getByTestId('reco-full').count()) === 1 &&
+      (await rest(OWNER, 'portal_show_recommendation', { p_workspace_id: OWNER_WS, p_client_id: 'growth-a', p_client_key: 'reco-e2e-fourth-01', p_kind: 'task', p_title: '넷째' })).body.includes('3개까지'))
+  // 교육 계획은 내린다(지우지 않음)
+  await op.getByTestId('reco-row').filter({ hasText: '직원 교육 계획' }).getByTestId('reco-withdraw').click()
+  await op.getByTestId('reco-withdraw-go').click()
+  await op.waitForTimeout(900)
+  check('W19e [내리기] 한 번 더 묻고 → 2/3 · 서버 줄은 withdrawn 으로 남음 · [추천 고르기] 다시 켜짐',
+    (await op.getByTestId('portal-recos').getAttribute('data-count')) === '2' && recoRows(`and status = 'withdrawn' and title = '직원 교육 계획 세우기'`) === '1' && (await op.getByTestId('reco-pick-open').isEnabled()))
+  // 고객 A1 — 홈 '담당자가 추천해요' · [자세히] · [관심 있어요]
+  await hpGo(a1.page, '/my-projects')
+  await a1.page.getByTestId('growth-recos').waitFor({ timeout: 10000 }).catch(() => {})
+  const recoText = (await a1.page.getByTestId('growth-recos').innerText().catch(() => '')) ?? ''
+  const href = await a1.page.getByTestId('growth-reco-link').first().getAttribute('href').catch(() => null)
+  const target = await a1.page.getByTestId('growth-reco-link').first().getAttribute('target').catch(() => null)
+  check("W19f 고객 홈 '담당자가 추천해요 2' — 제목 · 근거 · 지원사업 · 1/15 마감 · [자세히] 새 창 · 내린 것 0 · 금액 0",
+    (await a1.page.getByTestId('growth-reco').count()) === 2 && recoText.includes('경기도 스마트공장 구축 지원') && recoText.includes('경기 · 제조업 · 업력 조건이 맞아요') && recoText.includes('1/15 마감') && recoText.includes('기업부설연구소 설립 검토') &&
+      !recoText.includes('직원 교육 계획') && !/만원|억원/.test(recoText) && href === 'https://www.bizinfo.go.kr/web/notice/1' && target === '_blank', { recoText, href, target })
+  await shot(a1.page, 'hp-08-home-reco')
+  await a1.page.getByTestId('growth-reco').filter({ hasText: '스마트공장' }).getByTestId('growth-reco-interest').click()
+  await a1.page.getByTestId('growth-reco-sent').waitFor({ timeout: 8000 }).catch(() => {})
+  const interestRows = () => sql(`select count(*) from public.portal_recommendation_interest where operations_client_id = 'growth-a'`)
+  check("W19g [관심 있어요] → '관심 보냄 · 담당자가 연락드려요' · 서버 한 줄(A1)", (await a1.page.getByTestId('growth-reco-sent').count()) === 1 && interestRows() === '1' && sql(`select count(*) from public.portal_recommendation_interest where profile_id = '${CA1.id}'`) === '1')
+  await hpGo(a1.page, '/my-projects')
+  await a1.page.getByTestId('growth-recos').waitFor({ timeout: 10000 }).catch(() => {})
+  check('W19h 새로 고쳐도 관심 보냄 그대로(서버 기록)', (await a1.page.locator('[data-testid="growth-reco"][data-interested="1"]').count()) === 1)
+  await a1.page.setViewportSize({ width: 390, height: 844 })
+  await a1.page.waitForTimeout(400)
+  const over19 = await overflowX(a1.page)
+  await a1.page.getByTestId('growth-recos').scrollIntoViewIfNeeded().catch(() => {})
+  await shot(a1.page, 'hp-09-home-reco-390')
+  await a1.page.setViewportSize({ width: 1440, height: 900 })
+  // 같은 회사 다른 계정 A2 · 다른 회사 B1 · 대표가 고객 함수로
+  await hpGo(a2.page, '/my-projects')
+  await a2.page.getByTestId('growth-recos').waitFor({ timeout: 10000 }).catch(() => {})
+  await hpGo(b1.page, '/my-projects')
+  await b1.page.getByTestId('project-card').first().waitFor({ timeout: 10000 }).catch(() => {})
+  const recId = sql(`select id from public.portal_recommendations where operations_client_id = 'growth-a' and kind = 'grant' and status = 'shown'`)
+  const fakeB19 = await rest(CB1, 'portal_recommendation_interest', { p_link_id: LA1, p_rec_id: recId })
+  const fakeO19 = await rest(OWNER, 'portal_recommendation_interest', { p_link_id: LA1, p_rec_id: recId })
+  check('W19i 390 넘침 0 · A2 는 같은 추천 2 · 관심은 따로(0) · B1 은 추천 칸 0 · B1 · 대표가 A1 연결로 관심 남기기 막힘 · 서버 관심 1 그대로',
+    over19 <= 0 && (await a2.page.getByTestId('growth-reco').count()) === 2 && (await a2.page.locator('[data-testid="growth-reco"][data-interested="1"]').count()) === 0 && (await b1.page.getByTestId('growth-recos').count()) === 0 &&
+      fakeB19.status !== 200 && fakeO19.status !== 200 && interestRows() === '1', { over19, b: fakeB19.status, o: fakeO19.status })
+  // OS 오늘 — 관심 줄 → 탭 → [연락했어요] → 줄 빠짐
+  await osGo(op, '/')
+  let rules6 = []
+  if (await op.getByTestId('today-portal-open').count()) {
+    await op.getByTestId('today-portal-open').click()
+    await op.getByTestId('today-portal-sheet').waitFor({ timeout: 5000 }).catch(() => {})
+    rules6 = await op.getByTestId('today-portal-row').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-rule')}|${e.textContent}`))
+    await shot(op, 'os-11-today-reco')
+  }
+  check("W19j 오늘 '고객 화면 챙길 것' 맨 앞 — 한빛정밀 \"'경기도 스마트공장 구축…' 추천에 관심 있다고 하셨어요 — 연락드려 주세요\"",
+    rules6[0]?.startsWith('reco_interest|') && rules6[0].includes('한빛정밀') && rules6[0].includes('추천에 관심 있다고 하셨어요'), rules6)
+  const recoGo = op.locator('[data-testid="today-portal-row"][data-rule="reco_interest"]').getByTestId('today-portal-go')
+  if (await recoGo.count()) await recoGo.click()
+  else await osGo(op, '/ops/clients/growth-a?tab=portal')
+  await op.getByTestId('portal-recos').waitFor({ timeout: 10000 }).catch(() => {})
+  const intState = await op.getByTestId('reco-interest').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-state')}|${e.textContent}`))
+  await op.getByTestId('portal-recos').scrollIntoViewIfNeeded().catch(() => {})
+  await shot(op, 'os-10-reco-card')
+  check("W19k [열기] → 그 업체 탭 · 추천 줄에 'ceo@hanbit.kr · 관심 있어요 m/d — 연락드려 주세요'(빨강) · 다른 추천은 '아직 관심 표시 없음'",
+    op.url().includes('tab=portal') && intState.some((x) => x.startsWith('pending|') && x.includes(CA1.email) && x.includes('관심 있어요')) && intState.some((x) => x.startsWith('none|')), intState)
+  await op.getByTestId('reco-contacted').click()
+  await op.waitForTimeout(1200)
+  const careDay = sql(`select payload->'care'->>'lastContactAt' from public.operations_clients where id = 'growth-a'`)
+  await osGo(op, '/')
+  let rules7 = []
+  if (await op.getByTestId('today-portal-open').count()) {
+    await op.getByTestId('today-portal-open').click()
+    await op.getByTestId('today-portal-sheet').waitFor({ timeout: 5000 }).catch(() => {})
+    rules7 = await op.getByTestId('today-portal-row').evaluateAll((els) => els.map((e) => e.getAttribute('data-rule')))
+    await op.keyboard.press('Escape')
+  }
+  check('W19l [연락했어요] → 업체 기록 안부 연락 날 = 오늘 · 오늘 관심 줄 빠짐', /^\d{4}-\d{2}-\d{2}$/.test(careDay) && !rules7.includes('reco_interest'), { careDay, rules7 })
+  // 대표 고객 화면 보기 — 계정마다 · 기록 0
+  const int0 = interestRows()
+  await osGo(op, `/customer-view?client=growth-a&as=${LA1}`)
+  await op.getByTestId('cv-recos').waitFor({ timeout: 10000 }).catch(() => {})
+  const cvA1 = await op.getByTestId('cv-reco').evaluateAll((els) => els.map((e) => e.getAttribute('data-interested')).sort().join(','))
+  await op.getByTestId('cv-recos').scrollIntoViewIfNeeded().catch(() => {})
+  await shot(op, 'os-12-cv-reco')
+  await osGo(op, `/customer-view?client=growth-a&as=${LA2}`)
+  await op.getByTestId('cv-recos').waitFor({ timeout: 10000 }).catch(() => {})
+  const cvA2 = await op.getByTestId('cv-reco').evaluateAll((els) => els.map((e) => e.getAttribute('data-interested')).sort().join(','))
+  check("W19m 대표 고객 화면 보기 — A1 계정은 '관심 보냄' 하나 · A2 계정은 0(고객 화면과 같게) · 서버 기록 그대로", cvA1 === '0,1' && cvA2 === '0,0' && interestRows() === int0, { cvA1, cvA2 })
+  // 0036 되돌리기 → 두 앱 모두 추천 칸만 숨음 · 다시 넣으면 돌아옴(관심 기록 그대로)
+  execSync(`su postgres -c "psql -q -d ${DB}"`, { input: execSync('cat supabase/manual/rollback_0036.sql') })
+  await osGo(op, '/ops/clients/growth-a?tab=portal')
+  await op.getByTestId('portal-reports').waitFor({ timeout: 10000 }).catch(() => {})
+  await op.waitForTimeout(500)
+  const offOs = await op.getByTestId('portal-recos').count()
+  await hpGo(a1.page, '/my-projects')
+  await a1.page.getByTestId('project-card').first().waitFor({ timeout: 10000 }).catch(() => {})
+  const offHp = await a1.page.getByTestId('growth-recos').count()
+  check('W19n 0036 되돌리기 → OS 추천 칸 · 고객 추천 칸만 숨음 · 보고서 칸 · 프로젝트 카드 그대로', offOs === 0 && offHp === 0 && (await op.getByTestId('portal-reports').count()) === 1 && (await a1.page.getByTestId('project-card').count()) === 1, { offOs, offHp })
+  execSync(`su postgres -c "psql -q -d ${DB}"`, { input: execSync('cat supabase/migrations/20261128000036_recommendations.sql') })
+  await hpGo(a1.page, '/my-projects')
+  await a1.page.getByTestId('growth-recos').waitFor({ timeout: 10000 }).catch(() => {})
+  check('W19o 0036 다시 → 추천 2 · A1 관심 보냄 그대로', (await a1.page.getByTestId('growth-reco').count()) === 2 && (await a1.page.locator('[data-testid="growth-reco"][data-interested="1"]').count()) === 1)
 
   check('W13 JS 오류 0(두 앱)', errors.length === 0, errors)
 } catch (e) {
