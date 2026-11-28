@@ -11426,3 +11426,14 @@ BEFORE → AFTER:
 `components/ops/PortalTab.tsx` · `PortalRecoCard.tsx`(다시 읽기 · 근거 글칸) · `services/growthStatus.ts` · `settings/GrowthStatusPanel.tsx` · `customerBridgeService.ts`(`countWorkspaceRequests`) ·
 홈페이지 `src/lib/apiFetch.ts`(`errorText`) · `customerPortal.ts` · `MyProjectsPage.tsx` · `MyProjectDetailPage.tsx` ·
 시험 `threads.test.ts`(D691-G1~G5) · `portalGrowth.test.ts`(GS-02 · GS-04) · `e2e/clientcase.mjs`(W1~W5 · P1~P4 · E3) · `e2e/growth.mjs`(G13e~h) · `e2e/growth-portal.mjs`(W20b · W20f · W21a~e).
+
+### D-691 점검(같은 날)
+
+- **전체 점검(병합 전 QA) b7eca1e — 따로 뗀 작업 사본에서**: 타입 · 린트 · 빌드 · `test:all` · `qa:wording` + e2e 묶음 91개(진짜 DB 줄: qa:db 1,172 확인 · restore · modconflict · clientconflict · pilot 513 · isolation 24 · growthportal 96 · 클라우드 흉내 9 · 화면 줄 70여 개).
+  묶음마다 끝 줄 통과 합계 8,123. 빨강 둘은 제품 문제가 아님 — `qa:tax` 는 실행기가 주소 없이 불러 연결 실패(다시 74 / 0) · `qa:specboard` D6 은 두 점검을 함께 돌릴 때 첫 질문이 15초를 넘겨 한 번 흔들림(다시 102 / 0 · 시험은 기다리는 시간만 늘림 · 기준 그대로).
+- 손댄 것 둘레(새 코드): `qa:clientcase` 47 · `qa:growth` 52 · `qa:growthportal` 104 · `qa:mkweek` 62 · `qa:mkpack` 77 · `qa:threads` 107 · `qa:shorts` 56 · `qa:customerview` 18 · `qa:renewal` 22 · 단위 `threads` 212 · `portalGrowth` 108 — 실패 0.
+- 점검 목록 밖 묶음 11(새 코드): themes · shell 68 · tools 241 · cert 155 · pvhome 18 · aihome 23 · modfirst 21 · uxhome 60 · speccheck 40 · mkquick 39 · nextstep 12 — `nextstep` 은 D-638 뒤 낡은 흉내('답 다시 묻기' 에 모델 목록)를 고친 뒤(예전 코드에서도 같은 자리 멈춤).
+  `e2e:internal`(초기 인수 여정)은 예전 코드와 같은 17줄이 낡음(85 중 68) — 화면이 바뀐 뒤 갱신 안 된 시험이라 손대지 않고 따로 일로 제안.
+- 홈페이지 자체 회귀(새 코드): pages 374 · films 182 · api 7 · menu 404 · a11y 26 — 실패 0. 빌드 통과.
+- 받는 양: 스레드 화면 압축 605 → 606KB 말고 같음. 1주일치 글 1만 7천 자 × 고객 300곳 이름 찾기 30ms.
+- 마지막 커밋으로 전체 점검 한 번 더: 아래 줄에 적는다.
