@@ -954,6 +954,7 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '노무 검토 결과', '${O
   await hpGo(a1.page, '/my-projects')
   await a1.page.waitForTimeout(800)
   const hpErr = (await a1.page.getByTestId('growth-home').innerText().catch(() => '')) ?? ''
+  await shot(a1.page, 'hp-10-load-failed')
   check('W21e 고객 화면 — 목록을 못 읽으면 "인터넷 연결이 불안정해요" · 영어 원문 0 · [다시 시도]', hpErr.includes('인터넷 연결이 불안정해요') && !/TypeError|Failed to fetch|FetchError|fetch/i.test(hpErr) && hpErr.includes('다시 시도'), hpErr.slice(0, 200))
   await a1.page.unroute('**/rest/v1/rpc/portal_my_projects*', cutRpc)
 
