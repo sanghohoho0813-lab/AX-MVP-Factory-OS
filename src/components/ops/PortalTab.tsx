@@ -53,6 +53,8 @@ import { PORTAL_USAGE_LABEL, REPORT_KINDS_NOW, hasActiveWork, portalFollowUps, p
 import { currentTermEnd } from '../../services/contractRenewal'
 import { PortalReportsCard } from './PortalReportsCard'
 import { PortalReportSheet } from './PortalReportSheet'
+import { PortalRecoCard } from './PortalRecoCard'
+import { withCareContact } from '../../services/clientCare'
 
 function isNotReadyError(cause: unknown): boolean {
   const o = cause as { message?: unknown; code?: unknown; details?: unknown } | null
@@ -460,6 +462,18 @@ export function PortalTab({
           onCreate={() => setReportSheet({ correcting: null })}
           onCorrect={(r) => setReportSheet({ correcting: r })}
           onChanged={() => void load()}
+        />
+      )}
+
+      {/* D-689 고객에게 추천 — 담당자가 고른 것만 고객 홈 '담당자가 추천해요' 에(3개까지 · 0036 없으면 안 그림) */}
+      {!growth.off && !loading && (
+        <PortalRecoCard
+          record={record}
+          workspaceId={workspaceId}
+          links={links.map((l) => ({ ...l, profileEmail: emailOf(l) }))}
+          readOnly={readOnly}
+          today={today}
+          onContacted={onRecordChange ? () => onRecordChange(withCareContact(latest?.() ?? record, today)) : undefined}
         />
       )}
 

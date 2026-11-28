@@ -10,6 +10,8 @@
  *  RES: (D-685) 공유한 결과 자료 7일 안 열어 봄 — 6일 0 · 7일 한 줄 · 여럿이면 한 줄 n개 · 누구라도 열면 빠짐 · 기록 전 공유는 안 셈 · 멈춘 연결 0 ·
  *       0034 없으면(since 없음) 0 · 연습 모드 0 · 시각 모양 달라도 · 차례 · [열기] 는 탭만 · 열람 종류 읽기(모르는 종류 건너뜀)
  *  NEW: (D-686) 고객 화면 '새 결과 자료'(대표 고객 화면 보기 = 서버 0035 와 같은 규칙) — 그 계정 연결만 · 기록 전 공유 아님 · 그 계정이 열면 빠짐 · 다른 계정이 연 것은 안 셈
+ *  REC: (D-689) 담당자가 고른 추천 — 공고 후보(맞음 · 확인 필요만 · 닫힌 것 0 · 금액 글 0 · 근거 한 줄 · 마감 · http 주소만) · 먼저 제안할 것 후보(금액 0) ·
+ *       이미 올린 것 표시 · 금액 · 점수 막기 · 마감 글 · 관심 후속 줄(연락한 날 뒤만 · 한 업체 한 줄 · 내린 추천 0 · 맨 앞) · 꺼짐 알아보기
  */
 import { normalizeClientOps } from '../clientOpsService'
 import type { ClientOpsRecord } from '../../types/clientOps'
@@ -38,6 +40,9 @@ import { contractEndText, currentTermEnd, endAfterYears, renewalDefaultEnd, rene
 import { careList, careMessage, careSnoozeUntil, withCareContactFor } from '../clientCare'
 import { RESULT_UNSEEN_DAYS, followUpReportKind, newResultIds, periodLabelFor, type SharedResultLite } from '../portalGrowthRules'
 import { withContractClose } from '../salesContract'
+import { RECO_LIMIT, amountIn, cleanLink, grantCandidates, pendingInterests, recoDeadlineText, recoInputProblem, recoInterestFollowUps, refKey, taskCandidates } from '../portalRecoRules'
+import { isRecoOff, recoErrorText } from '../portalReco'
+import type { GrantMatch } from '../grants/grantMatch'
 
 let passed = 0
 let failed = 0
@@ -278,6 +283,45 @@ check('NEW-01 그 계정 연결에 공유 · 기록 시작 뒤 · 아직 안 연
 check('NEW-02 그 계정이 연 것은 빠짐 · 다른 계정(l2)이 연 것은 안 셈 · 종류가 엇갈린 기록은 안 셈',
   [...newResultIds(NR, [{ linkId: 'l1', itemKind: 'document', itemId: 'd1' }, { linkId: 'l2', itemKind: 'result', itemId: 'u1' }, { linkId: 'l1', itemKind: 'document', itemId: 'u1' }], 'l1', SINCE)].join() === 'u1')
 check('NEW-03 0034 없음(since 없음) · 연결 없음 → 0', newResultIds(NR, [], 'l1', null).size === 0 && newResultIds(NR, [], '', SINCE).size === 0)
+
+// ---------------- D-689 담당자가 고른 추천 ----------------
+const gm = (id: string, verdict: GrantMatch['verdict'], over: { open?: boolean; okLabels?: string[]; unknown?: number; applyEnd?: string; kind?: 'date' | 'always' | 'first_come'; url?: string; title?: string } = {}): GrantMatch =>
+  ({
+    notice: { id, title: over.title ?? `공고 ${id}`, applyEnd: over.applyEnd ?? '2027-01-15', deadlineKind: over.kind ?? 'date', url: over.url ?? 'https://www.bizinfo.go.kr/n/' + id, amountText: '최대 5천만원' },
+    verdict,
+    reasons: (over.okLabels ?? ['지역', '업력', '업종', '규모']).map((label) => ({ key: label, label, state: 'ok', text: '' })),
+    unknownCount: over.unknown ?? 0,
+    deadline: { state: 'later', days: 30, label: 'D-30', urgent: false, open: over.open ?? true },
+  }) as unknown as GrantMatch
+const gc = grantCandidates([gm('a', 'fit'), gm('b', 'check', { unknown: 2 }), gm('c', 'general'), gm('d', 'no'), gm('e', 'fit', { open: false }), gm('f', 'fit', { kind: 'always', url: 'javascript:alert(1)', okLabels: [] })], new Set(['grant:b']))
+check('REC-01 공고 후보 — 맞음 · 확인 필요만 · 닫힌 것 0 · 일반 · 안 맞음 0', gc.map((c) => c.sourceRef.id).join() === 'a,b,f', gc.map((c) => c.sourceRef.id))
+check('REC-02 근거 한 줄 — 맞음: 조건 셋까지 · 확인 필요: 조건 수 · 조건 없으면 기본 말 · 금액 글(최대 5천만원) 0',
+  gc[0].reason === '지역 · 업력 · 업종 조건이 맞아요' && gc[1].reason === '확인할 조건이 2가지 있어요 — 함께 확인해 봐요' && gc[2].reason === '회사 조건에 맞는 공고예요' && gc.every((c) => !/만원|억|원\b/.test(`${c.title} ${c.reason}`)), gc.map((c) => c.reason))
+check('REC-03 마감 = 날짜 마감만 · 주소 = http(s) 만 · 이미 올린 것 표시', gc[0].deadline === '2027-01-15' && gc[2].deadline === null && gc[0].linkUrl === 'https://www.bizinfo.go.kr/n/a' && gc[2].linkUrl === null && gc[1].shown && !gc[0].shown && refKey(gc[1].sourceRef) === 'grant:b')
+check('REC-04 공고 후보 5개까지 · 긴 제목 80자에서 …', grantCandidates(Array.from({ length: 8 }, (_, i) => gm(`g${i}`, 'fit')), new Set()).length === 5 &&
+  (() => { const t = grantCandidates([gm('long', 'fit', { title: '가'.repeat(120) })], new Set())[0].title; return t.length === 80 && t.endsWith('…') })())
+const tc = taskCandidates([{ key: 'employment', label: '고용지원금' }, { key: 'labcare', label: '기업부설연구소' }, { key: 'tax', label: '절세 설계' }, { key: 'x', label: '넷째' }], new Set(['insight:labcare']))
+check('REC-05 먼저 제안할 것 후보 — 셋까지 · 다음 과제 · 금액 0 · 이미 올린 것 표시', tc.length === 3 && tc.every((c) => c.kind === 'task' && !/\d/.test(c.reason)) && tc[1].shown && !tc[0].shown && tc[0].sourceRef.type === 'insight')
+check('REC-06 금액 · 점수 짚기 — 5천만원 · 최대 3 · 80% · 90점 · 1.2억 / 아닌 것: 2027 · 직원 10명 · 1/15',
+  ['최대 5천만원 지원', '최대 3', '80% 지원', '평가 90점', '1.2억 융자'].every((t) => amountIn(t) !== null) && ['2027 스마트공장', '직원 10명 이상', '1/15 마감', '연구 인력 2명이면'].every((t) => amountIn(t) === null))
+check('REC-07 올리기 전 확인 — 빈 제목 · 금액 · 이상한 주소 막힘 · 바른 것 통과',
+  recoInputProblem({ title: ' ', reason: '', linkUrl: '' }) === '제목을 적어 주세요.' && (recoInputProblem({ title: '스마트공장', reason: '최대 5천만원', linkUrl: '' }) ?? '').includes('금액') &&
+  recoInputProblem({ title: '스마트공장', reason: '', linkUrl: 'javascript:x' }) === '주소는 http:// 나 https:// 로 시작해야 해요.' && recoInputProblem({ title: '스마트공장', reason: '지역 조건이 맞아요', linkUrl: 'https://a.kr/x' }) === null &&
+  cleanLink(' https://a.kr/x ') === 'https://a.kr/x' && cleanLink('https://a.kr/x y') === null && RECO_LIMIT === 3)
+check('REC-08 마감 글 — 지남 · 오늘 · 7일 안 · 그 뒤 · 없음', recoDeadlineText('2026-11-20', today) === '마감' && recoDeadlineText(today, today) === '오늘 마감' && recoDeadlineText('2026-12-01', today) === '12/1 마감 · 4일 남음' && recoDeadlineText('2027-01-15', today) === '1/15 마감' && recoDeadlineText(null, today) === '')
+const RC = [{ id: 'r1', title: '2027 스마트공장 지원', status: 'shown' as const }, { id: 'r2', title: '기업부설연구소', status: 'shown' as const }, { id: 'r3', title: '내린 것', status: 'withdrawn' as const }]
+const IN = [{ recId: 'r1', interestedAt: '2026-11-25T02:00:00Z' }, { recId: 'r3', interestedAt: '2026-11-26T02:00:00Z' }]
+check('REC-09 관심 후속 — 올라와 있는 추천만 · 한 줄 · 날 수 · 연락한 날 뒤만',
+  (() => { const f = recoInterestFollowUps({ clientId: 'c1', recos: RC, interests: IN }, today); return f.length === 1 && f[0].rule === 'reco_interest' && f[0].text === "'2027 스마트공장 지원' 추천에 관심 있다고 하셨어요 — 연락드려 주세요" && f[0].days === 2 && f[0].key === 'c1:reco:2026-11-25T02:00:00Z' })() &&
+  recoInterestFollowUps({ clientId: 'c1', recos: RC, interests: IN, lastContactAt: '2026-11-25' }, today).length === 0 &&
+  recoInterestFollowUps({ clientId: 'c1', recos: RC, interests: IN, lastContactAt: '2026-11-24' }, today).length === 1)
+check('REC-10 여럿이면 한 업체 한 줄(추천 n개) · 같은 추천 두 계정이면 한 개로 셈 · 관심 없으면 0',
+  recoInterestFollowUps({ clientId: 'c1', recos: RC, interests: [...IN, { recId: 'r2', interestedAt: '2026-11-26T02:00:00Z' }, { recId: 'r1', interestedAt: '2026-11-26T03:00:00Z' }] }, today)[0]?.text === '추천 2개에 관심 있다고 하셨어요 — 연락드려 주세요' &&
+  recoInterestFollowUps({ clientId: 'c1', recos: RC, interests: [] }, today).length === 0 && pendingInterests(RC, IN, null).map((p) => p.recId).join() === 'r1')
+check('REC-11 0036 없음 · 되돌림 알아보기 — 다른 오류는 꺼짐으로 숨기지 않음 · 서버 한국어 글 그대로',
+  isRecoOff({ message: 'Could not find the function public.portal_show_recommendation' }) && isRecoOff({ message: 'permission denied for function portal_recommendations' }) && isRecoOff({ message: 'permission denied for table portal_recommendation_interest' }) &&
+  !isRecoOff({ message: 'JWT expired' }) && !isRecoOff({ message: 'permission denied for table operations_clients' }) &&
+  recoErrorText({ message: '고객 화면에는 추천을 3개까지 올려요 — 하나를 내린 뒤 올려 주세요.' }, 'x').includes('3개까지') && recoErrorText({ code: '42501', message: 'not allowed' }, 'x') === '이 업체에 추천을 올릴 권한이 없어요.')
 
 console.log(`\nportalGrowth: ${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

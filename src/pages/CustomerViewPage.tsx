@@ -16,7 +16,7 @@ import { ArrowLeft, Check, Eye, Search, UserRound } from 'lucide-react'
 import { AuthContext } from '../auth/authContext'
 import { useCustomerViewAllowed } from './customerViewAccess'
 import { brand } from '../brand/brand.config'
-import { localDateOf, nowIso } from '../lib/appClock'
+import { localDateOf, nowIso, todayLocalDate } from '../lib/appClock'
 import type { ClientOpsRecord } from '../types/clientOps'
 import { contractStageOf } from '../types/clientOps'
 import type { PortalClientLink, PortalProjection } from '../types/bridge'
@@ -25,6 +25,8 @@ import { listClients } from '../services/clientOpsService'
 import { listLinks, previewProjection } from '../services/customerBridgeService'
 import { isGrowthOff, listClientReports, listLinkAccounts, listReceipts, listSharedResults, resultReceiptsSince, type PortalReceipt, type PortalReport, type SharedResult } from '../services/portalGrowth'
 import { REPORT_KIND_LABEL, newResultIds } from '../services/portalGrowthRules'
+import { listClientRecos, listRecoInterests, type PortalReco, type PortalRecoInterest } from '../services/portalReco'
+import { RECO_KIND_LABEL, recoDeadlineText } from '../services/portalRecoRules'
 
 /* 고객 화면(홈페이지 src/lib/customerPortal.ts)의 말 — OS 안쪽 말(요청함 · 고객 업로드됨 …)과 다르다 */
 const MY = {
@@ -62,6 +64,9 @@ interface Loaded {
   /** D-686 공유한 결과 자료 · 기록을 남기기 시작한 때(0034 없으면 null → '새 결과 자료' 표시 없음 — 고객 화면도 그렇다) */
   results: SharedResult[]
   resultsSince: string | null
+  /** D-689 고객 화면에 올라와 있는 추천 · 고객이 누른 [관심 있어요](0036 없으면 빈 목록 — 고객 화면도 그 칸이 없다) */
+  recos: PortalReco[]
+  interests: PortalRecoInterest[]
 }
 
 export function CustomerViewPage() {
@@ -130,7 +135,9 @@ export function CustomerViewPage() {
       const projection = active ? await previewProjection(workspaceId, active, record.companyName).catch(() => null) : null
       const resultsSince = await resultReceiptsSince()
       const results = resultsSince ? await listSharedResults(workspaceId, links.map((l) => ({ id: l.id, operationsClientId: l.operationsClientId })), record.id).catch(() => []) : []
-      if (alive) setLoaded({ links, emails, reports, receipts, projection, results, resultsSince })
+      const [recoAll, interests] = await Promise.all([listClientRecos(workspaceId, record.id).catch(() => []), listRecoInterests(workspaceId, record.id).catch(() => [])])
+      const recos = recoAll.filter((r) => r.status === 'shown')
+      if (alive) setLoaded({ links, emails, reports, receipts, projection, results, resultsSince, recos, interests })
     })()
     return () => {
       alive = false
@@ -227,7 +234,7 @@ export function CustomerViewPage() {
             ) : view === 'project' && projection?.project ? (
               <ProjectView p={projection} reports={loaded.reports === null ? null : reports} seenFor={seenFor} newResults={newResults} tab={tab} onTab={(t) => go({ tab: t })} onHome={() => go({ view: null, tab: null })} onReport={(id) => go({ view: 'report', report: id })} />
             ) : (
-              <HomeView p={projection} email={chosen ? emailOf(chosen) : record.contactEmail} reports={loaded.reports === null ? null : reports} seenFor={seenFor} newResults={newResults} onProject={(t) => go({ view: 'project', tab: t ?? null })} onReport={(id) => go({ view: 'report', report: id })} />
+              <HomeView p={projection} email={chosen ? emailOf(chosen) : record.contactEmail} reports={loaded.reports === null ? null : reports} seenFor={seenFor} newResults={newResults} recos={loaded.recos} interestOf={(id) => (chosen ? loaded.interests.find((i) => i.recId === id && i.linkId === chosen.id)?.interestedAt ?? null : null)} onProject={(t) => go({ view: 'project', tab: t ?? null })} onReport={(id) => go({ view: 'report', report: id })} />
             )}
           </Frame>
         </>
@@ -341,13 +348,16 @@ const stateCls = { new: 'bg-danger-50 text-danger-700', seen: 'bg-slate-100 text
 /* 성장 홈(/my-projects)                                                 */
 /* ------------------------------------------------------------------ */
 
-function HomeView({ p, email, reports, seenFor, newResults, onProject, onReport }: {
+function HomeView({ p, email, reports, seenFor, newResults, recos, interestOf, onProject, onReport }: {
   p: PortalProjection | null
   email: string
   reports: PortalReport[] | null
   seenFor: (id: string) => PortalReceipt | null
   /** D-686 이 계정의 '새 결과 자료' id */
   newResults: ReadonlySet<string>
+  /** D-689 담당자가 추천해요(고객 홈과 같은 칸 · 이 계정이 [관심 있어요] 누른 때) */
+  recos: readonly PortalReco[]
+  interestOf: (recId: string) => string | null
   onProject: (tab?: Tab) => void
   onReport: (id: string) => void
 }) {
@@ -398,6 +408,28 @@ function HomeView({ p, email, reports, seenFor, newResults, onProject, onReport 
             ))}
           </ul>
           {todo.length > 3 && <p className="t-meta mt-1 text-slate-500">그 밖에 {todo.length - 3}건은 프로젝트 화면에서 볼 수 있어요.</p>}
+        </Card>
+      )}
+      {recos.length > 0 && (
+        <Card testid="cv-recos">
+          <p className="text-base font-black text-slate-900">담당자가 추천해요 <span className="text-slate-400">{recos.length}</span></p>
+          <ul className="mt-2 divide-y divide-slate-100">
+            {recos.map((r) => {
+              const at = interestOf(r.id)
+              const dl = recoDeadlineText(r.deadline, todayLocalDate())
+              return (
+                <li key={r.id} className="py-3" data-testid="cv-reco" data-interested={at ? '1' : '0'}>
+                  <p className="t-meta text-slate-500">{RECO_KIND_LABEL[r.kind]}{dl ? ` · ${dl}` : ''}</p>
+                  <p className="text-[0.9375rem] font-bold break-keep text-slate-900 [overflow-wrap:anywhere]">{r.title}</p>
+                  {r.reason && <p className="t-sub break-keep text-slate-600 [overflow-wrap:anywhere]">{r.reason}</p>}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {r.linkUrl && <Nope>자세히</Nope>}
+                    {at ? <span className="t-sub mt-3 font-semibold text-success-700" data-testid="cv-reco-sent">관심 보냄 {kdate(at)} · 담당자가 연락드려요</span> : <Nope>관심 있어요</Nope>}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
         </Card>
       )}
       {list.length > 0 && (

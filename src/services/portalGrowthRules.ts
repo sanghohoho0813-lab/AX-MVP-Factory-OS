@@ -416,7 +416,7 @@ export function portalUsage(input: { links: readonly PortalLinkLite[]; homeSeen:
   return { state: daysBetween(last, today) >= DORMANT_DAYS ? 'dormant' : 'active', lastVisit: last, firstVisit: first }
 }
 
-export type PortalFollowRule = 'invite_pending' | 'first_visit' | 'report_unseen' | 'result_unseen' | 'report_gap' | 'monthly_review' | 'renewal_report' | 'dormant'
+export type PortalFollowRule = 'invite_pending' | 'first_visit' | 'report_unseen' | 'result_unseen' | 'report_gap' | 'monthly_review' | 'renewal_report' | 'dormant' | 'reco_interest'
 
 /** D-685 공유한 결과 자료를 며칠 안 열어 보시면 챙길지 */
 export const RESULT_UNSEEN_DAYS = 7
@@ -558,7 +558,8 @@ export function portalFollowUps(
       out.push({ key: `${input.clientId}:monthly:${month}`, rule: 'monthly_review', clientId: input.clientId, days: daysBetween(`${month}-01`, today), text: `${Number(month.slice(5, 7))}월 보고를 아직 안 보냈어요 — 월간 보고를 만들어 보세요` })
     }
   }
-  const order: Record<PortalFollowRule, number> = { report_unseen: 0, result_unseen: 1, renewal_report: 2, report_gap: 3, monthly_review: 4, first_visit: 5, invite_pending: 6, dormant: 7 }
+  // D-689 reco_interest(관심 있다고 하신 곳)는 portalRecoRules 가 따로 만들어 맨 앞에 둔다
+  const order: Record<PortalFollowRule, number> = { reco_interest: -1, report_unseen: 0, result_unseen: 1, renewal_report: 2, report_gap: 3, monthly_review: 4, first_visit: 5, invite_pending: 6, dormant: 7 }
   // 재계약 줄은 끝나는 날이 가까운 것(남은 날이 적은 것)이 먼저 · 그 밖은 오래된 것이 먼저
   return out.sort((a, b) => order[a.rule] - order[b.rule] || (a.rule === 'renewal_report' ? a.days - b.days : b.days - a.days))
 }

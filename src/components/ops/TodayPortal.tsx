@@ -4,6 +4,7 @@
  * 내부에만 뜬다 — 고객에게 저절로 보내지 않는다. 조건이 풀리면(열어 봄 · 새 보고서 · 첫 방문) 저절로 빠진다.
  * 0033 을 아직 넣지 않았거나(읽기 실패) 연습 모드면 아무것도 그리지 않는다(연습 모드에는 고객 방문 기록이 없다).
  * D-685 0034 가 있으면 '공유한 결과 자료 7일째 안 열어 보심' 줄도(없으면 그 줄만 빠진다).
+ * D-689 0036 이 있으면 '추천에 관심 있다고 하셨어요 — 연락드려 주세요' 줄을 맨 앞에(연락했어요 · 안부 연락 날 뒤의 관심만 · 없으면 그 줄만 빠진다).
  */
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -18,6 +19,8 @@ import { listLinks } from '../../services/customerBridgeService'
 import { listPublishedReports, listSharedResults, listWorkspaceReceipts, resultReceiptsSince, type PortalReceipt, type SharedResult } from '../../services/portalGrowth'
 import { currentTermEnd } from '../../services/contractRenewal'
 import { followUpReportKind, hasActiveWork, portalFollowUps, type PortalFollowUp, type PortalReportKind, type PortalSeen } from '../../services/portalGrowthRules'
+import { listRecoInterests, listShownRecos, type PortalReco, type PortalRecoInterest } from '../../services/portalReco'
+import { recoInterestFollowUps } from '../../services/portalRecoRules'
 
 const SHOW = 5
 
@@ -28,6 +31,9 @@ interface Loaded {
   /** D-685 공유한 결과 자료 · 기록을 남기기 시작한 때(0034 없으면 null · 빈 목록) */
   results: SharedResult[]
   resultsSince: string | null
+  /** D-689 올라와 있는 추천 · 고객이 누른 [관심 있어요](0036 없으면 빈 목록) */
+  recos: PortalReco[]
+  interests: PortalRecoInterest[]
 }
 
 export function usePortalFollowUps(workspaceId: string | null, clients: readonly ClientOpsRecord[], today: string): PortalFollowUp[] {
@@ -39,7 +45,9 @@ export function usePortalFollowUps(workspaceId: string | null, clients: readonly
       .then(async ([links, reports, receipts, resultsSince]) => {
         // D-685 결과 자료는 0034 가 있을 때만 읽는다(못 읽어도 다른 줄은 그대로)
         const results = resultsSince ? await listSharedResults(workspaceId, links).catch(() => []) : []
-        if (alive) setData({ links, reports, receipts, results, resultsSince })
+        // D-689 추천 · 관심은 0036 이 있을 때만(못 읽어도 다른 줄은 그대로)
+        const [recos, interests] = await Promise.all([listShownRecos(workspaceId).catch(() => []), listRecoInterests(workspaceId).catch(() => [])])
+        if (alive) setData({ links, reports, receipts, results, resultsSince, recos, interests })
       })
       .catch(() => alive && setData(null))
     return () => {
@@ -59,8 +67,12 @@ export function usePortalFollowUps(workspaceId: string | null, clients: readonly
       else resultSeen.add(r.itemId)
     }
     const out: PortalFollowUp[] = []
+    const hot: PortalFollowUp[] = []
     for (const c of clients) {
       if (c.archivedAt) continue
+      // D-689 관심 있다고 하신 곳 — 연결 · 안내 여부와 상관없이(관심은 연결된 고객만 누를 수 있다)
+      const recos = data.recos.filter((r) => r.clientId === c.id)
+      if (recos.length) hot.push(...recoInterestFollowUps({ clientId: c.id, recos, interests: data.interests.filter((i) => i.clientId === c.id), lastContactAt: c.care?.lastContactAt ?? null }, today))
       const links = byClient.get(c.id) ?? []
       if (!links.length && !c.portalInvite?.at) continue
       out.push(
@@ -83,7 +95,7 @@ export function usePortalFollowUps(workspaceId: string | null, clients: readonly
         ),
       )
     }
-    return out
+    return [...hot.sort((a, b) => b.days - a.days), ...out]
   }, [data, clients, today])
 }
 

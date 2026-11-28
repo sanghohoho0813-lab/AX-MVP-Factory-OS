@@ -369,6 +369,15 @@ export const FUNCTION_GUIDES: Readonly<Record<string, FunctionGuide>> = {
     next: '월간 보고 · 연간 보고(계약일부터)도 같은 창에서 골라요. 다음은 계약 끝나는 날 알림이에요.',
     hiddenForPilot: true,
   },
+  'fn-portal-reco': {
+    label: '고객에게 추천',
+    menu: 'client-ops',
+    what: '이 업체에 맞는 공고 · 먼저 제안할 것 가운데 담당자가 고른 것만 고객 화면 홈에 올려요(3개까지).',
+    why: '고객이 다음에 무엇을 하면 좋을지 화면에서 먼저 보고, 관심이 있으면 바로 알려 주게 하려고 있어요.',
+    effect: '고객이 [관심 있어요] 를 누르면 오늘 화면에 \'연락드려 주세요\' 한 줄이 떠요. 금액 · 점수는 고객 화면에 싣지 않아요.',
+    next: '내린 추천 · 관심 기록은 지우지 않고 남겨요. 고객별 알림 동의를 받으면 안내까지 한 번에 이어요.',
+    hiddenForPilot: true,
+  },
   'fn-care-renewed': {
     label: '재계약했어요',
     menu: 'today',
