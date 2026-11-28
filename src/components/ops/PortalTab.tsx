@@ -97,7 +97,8 @@ export function PortalTab({
   const [docForm, setDocForm] = useState<{ open: boolean; key: string; title: string; note: string }>({ open: false, key: 'businessRegistration', title: '사업자등록증', note: '' })
   const [answerDraft, setAnswerDraft] = useState<Record<string, string>>({})
   // D-681 고객성장관리 — 보고서 · 고객 열람 기록(0033). off = 아직 안 켬(그 칸만 숨기고 나머지는 예전 그대로)
-  const [growth, setGrowth] = useState<{ off: boolean; reports: PortalReport[]; receipts: PortalReceipt[] }>({ off: true, reports: [], receipts: [] })
+  // failed = 잠깐 끊겨 못 읽음(D-691 — 기능이 꺼진 것과 갈라 [다시 읽기] 한 줄을 보인다)
+  const [growth, setGrowth] = useState<{ off: boolean; failed?: boolean; reports: PortalReport[]; receipts: PortalReceipt[] }>({ off: true, reports: [], receipts: [] })
   const [reportSheet, setReportSheet] = useState<{ correcting: PortalReport | null; kind?: PortalReportKind } | null>(null)
   // D-685 공유한 결과 자료 · 열람 기록을 남기기 시작한 때(0034 없으면 since = null → 새 줄을 그리지 않는다)
   const [resultInfo, setResultInfo] = useState<{ since: string | null; items: SharedResult[] }>({ since: null, items: [] })
@@ -159,8 +160,8 @@ export function PortalTab({
         const items = since ? await listSharedResults(workspaceId, ls.map((l) => ({ id: l.id, operationsClientId: l.operationsClientId })), record.id).catch(() => []) : []
         setResultInfo({ since, items })
       } catch (cause) {
-        setGrowth({ off: true, reports: [], receipts: [] })
-        if (!isGrowthOff(cause)) showToast('보고서 기록을 읽지 못했어요 — 잠시 뒤 다시 열어 주세요.')
+        // 0033 이 없거나 되돌렸으면 예전 그대로(숨김) · 잠깐 끊긴 것이면 [다시 읽기] 한 줄(사라진 것처럼 보이지 않게)
+        setGrowth({ off: true, failed: !isGrowthOff(cause), reports: [], receipts: [] })
       }
     } catch (cause) {
       if (isNotReadyError(cause)) setNotReady(true)
@@ -450,6 +451,16 @@ export function PortalTab({
           </ul>
         )}
       </section>
+
+      {/* D-691 보고서 · 추천 기록을 잠깐 못 읽었을 때 — 판이 사라진 것처럼 보이지 않게 한 줄 + [다시 읽기] */}
+      {growth.failed && !loading && (
+        <section className="flex flex-wrap items-center gap-2 rounded-(--radius-panel) border border-slate-200 bg-white p-4" role="status" data-testid="portal-growth-failed">
+          <p className="t-sub min-w-0 flex-1 basis-56 break-keep text-danger-700">보고서 · 추천 기록을 읽지 못했어요 — 인터넷 연결을 확인하고 다시 읽어 주세요.</p>
+          <Button variant="secondary" size="sm" onClick={() => void load()} data-testid="portal-growth-retry">
+            다시 읽기
+          </Button>
+        </section>
+      )}
 
       {/* D-681 고객에게 보낸 보고서 — 연결 전에도 발행해 둘 수 있다(연결되면 그때부터 보임) */}
       {!growth.off && !loading && (

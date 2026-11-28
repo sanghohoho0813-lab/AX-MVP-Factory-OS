@@ -26,6 +26,7 @@
  *   W19 (D-689) 담당자가 고른 추천 — OS [추천 고르기] › [직접 적기] · 금액 막힘 · 올리기 · 3개까지(서버도) · 내리기 → 고객 홈 '담당자가 추천해요' · [자세히] · [관심 있어요]
  *       → A2 따로 · B1 0 · 대표 · B1 위조 막힘 · 오늘 '관심 있다고 하셨어요' 맨 앞 → [열기] → [연락했어요] → 빠짐 · 대표 고객 화면 보기 계정마다(기록 0) · 0036 되돌리기 → 다시 · 390
  *   W20 (D-690) 설정 › 시스템 켜짐 점검 — 넷 켜짐 · 첫 주 숫자 = 서버 · 0035 · 0036 되돌리면 그 둘만 꺼짐 + 할 일 한 줄 · 기록 0 · 다시 켜짐 · 팀장 0 · (D-691) 390 넘침 0
+ *   W21 (D-691) 잠깐 끊김 — 보고서 · 추천 판이 사라지지 않고 '읽지 못했어요 · [다시 읽기]' → 돌아오면 다시
  *   W13 JS 오류 0(두 앱)
  *
  *   node e2e/growth-portal.mjs [스크린샷 폴더]   (pg_ctlcluster 16 main start 먼저 · 홈페이지 저장소 ../mirae-ai-lab-homepage)
@@ -921,6 +922,28 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '노무 검토 결과', '${O
   await pp2.waitForTimeout(1200)
   check('W20e 내부 팀장 설정 › 시스템 — 켜짐 점검 판 0', (await pp2.getByTestId('growth-status-run').count()) === 0)
   await pc2.close()
+
+  // ---------- W21 (D-691) 잠깐 끊겼을 때 — 보고서 · 추천 판이 '꺼진 것' 처럼 사라지지 않고 한 줄 + [다시 읽기] ----------
+  const cut = (r) => r.abort('internetdisconnected')
+  await op.route('**/rest/v1/portal_reports*', cut)
+  await osGo(op, '/ops/clients/growth-a?tab=portal')
+  await op.getByTestId('portal-growth-failed').waitFor({ timeout: 10000 }).catch(() => {})
+  const w21a = { line: await op.getByTestId('portal-growth-failed').count(), reports: await op.getByTestId('portal-reports').count(), recos: await op.getByTestId('portal-recos').count() }
+  await shot(op, 'os-16-growth-failed')
+  check('W21a 보고서 기록을 못 읽으면 — 판이 사라지지 않고 "읽지 못했어요 · [다시 읽기]" 한 줄(꺼진 기능과 다름)', w21a.line === 1 && w21a.reports === 0, w21a)
+  await op.unroute('**/rest/v1/portal_reports*', cut)
+  await op.getByTestId('portal-growth-retry').click()
+  await op.getByTestId('portal-reports').waitFor({ timeout: 10000 }).catch(() => {})
+  check('W21b 연결이 돌아온 뒤 [다시 읽기] → 보고서 · 추천 판이 다시 · 한 줄은 사라짐', (await op.getByTestId('portal-growth-failed').count()) === 0 && (await op.getByTestId('portal-reports').count()) === 1 && (await op.getByTestId('portal-recos').count()) === 1)
+  await op.route('**/rest/v1/portal_recommendations*', cut)
+  await osGo(op, '/ops/clients/growth-a?tab=portal')
+  await op.getByTestId('reco-failed').waitFor({ timeout: 10000 }).catch(() => {})
+  const w21c = { line: await op.getByTestId('reco-failed').count(), recos: await op.getByTestId('portal-recos').count(), reports: await op.getByTestId('portal-reports').count() }
+  check('W21c 추천 기록만 못 읽으면 — 추천 자리에 한 줄 + [다시 읽기] · 보고서 판은 그대로', w21c.line === 1 && w21c.recos === 0 && w21c.reports === 1, w21c)
+  await op.unroute('**/rest/v1/portal_recommendations*', cut)
+  await op.getByTestId('reco-retry').click()
+  await op.getByTestId('portal-recos').waitFor({ timeout: 10000 }).catch(() => {})
+  check('W21d [다시 읽기] → 추천 판이 다시(올린 추천 그대로)', (await op.getByTestId('reco-failed').count()) === 0 && Number(await op.getByTestId('portal-recos').getAttribute('data-count').catch(() => '-1')) >= 0)
 
   check('W13 JS 오류 0(두 앱)', errors.length === 0, errors)
 } catch (e) {

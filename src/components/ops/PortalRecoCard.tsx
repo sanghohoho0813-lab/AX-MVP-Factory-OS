@@ -70,7 +70,8 @@ export function PortalRecoCard({
   onContacted?: () => Promise<boolean>
 }) {
   const { showToast } = useToast()
-  const [state, setState] = useState<{ off: boolean; recos: PortalReco[]; interests: PortalRecoInterest[] } | null>(null)
+  // failed = 잠깐 끊겨 못 읽음(D-691 — 0036 이 없는 것과 갈라 [다시 읽기] 한 줄)
+  const [state, setState] = useState<{ off: boolean; failed?: boolean; recos: PortalReco[]; interests: PortalRecoInterest[] } | null>(null)
   const [picking, setPicking] = useState(false)
   const [withdrawing, setWithdrawing] = useState('')
   const [busy, setBusy] = useState(false)
@@ -80,15 +81,23 @@ export function PortalRecoCard({
       const [recos, interests] = await Promise.all([listClientRecos(workspaceId, record.id), listRecoInterests(workspaceId, record.id)])
       setState({ off: false, recos, interests })
     } catch (cause) {
-      setState({ off: true, recos: [], interests: [] })
-      if (!isRecoOff(cause)) showToast('추천 기록을 읽지 못했어요 — 잠시 뒤 다시 열어 주세요.')
+      setState({ off: true, failed: !isRecoOff(cause), recos: [], interests: [] })
     }
-  }, [workspaceId, record.id, showToast])
+  }, [workspaceId, record.id])
 
   useEffect(() => {
     void load()
   }, [load])
 
+  if (state?.failed)
+    return (
+      <section className="flex flex-wrap items-center gap-2 rounded-(--radius-panel) border border-slate-200 bg-white p-4" role="status" data-testid="reco-failed">
+        <p className="t-sub min-w-0 flex-1 basis-56 break-keep text-danger-700">고객에게 추천 — 기록을 읽지 못했어요. 인터넷 연결을 확인하고 다시 읽어 주세요.</p>
+        <Button variant="secondary" size="sm" onClick={() => void load()} data-testid="reco-retry">
+          다시 읽기
+        </Button>
+      </section>
+    )
   if (!state || state.off) return null
   const shown = state.recos.filter((r) => r.status === 'shown')
   const full = shown.length >= RECO_LIMIT
