@@ -11330,3 +11330,9 @@ AFTER: 해야 할 일이 있으면 예전 그대로(노랑 '해야 할 일 n'). 
 
 - 해야 할 일 숫자 · 탭 · '지금 할 일' 순서는 바꾸지 않았다(새 자료는 할 일이 아니라 '새로 온 것').
 - 파일: 홈페이지 `src/pages/MyProjectsPage.tsx` · `src/pages/MyProjectDetailPage.tsx` · OS `src/pages/CustomerViewPage.tsx` · 시험 `e2e/growth-portal.mjs` W18h.
+
+### D-687 · D-688 점검(같은 날)
+
+- `ops:bundle --check` 통과(예전 0026~0031 묶음 두 파일은 cmp 로 한 글자도 다르지 않음) · `qa:db` 끝남 코드 0(통과 1,095줄 · 실패 0 — 묶음 연습 17가지 포함).
+- `qa:growthportal` 76 / 0 두 번(W18h · 390 넘침 0) · `qa:customerview` 18 · `qa:wording` 6 · `test:all` · 타입 · 린트 · 빌드 · 홈페이지 `tsc -b` · 빌드 통과.
+- 사진: 고객 홈(390) · 프로젝트 맨 위 · 대표 고객 화면 보기 카드 — 모두 '새로 온 자료 1'.
