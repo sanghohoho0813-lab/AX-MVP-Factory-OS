@@ -11,7 +11,7 @@ import { HelpNote } from '../../components/ui/HelpNote'
 import { AuthContext } from '../../auth/authContext'
 import { getSupabaseClient } from '../../lib/supabase/client'
 import { useCustomerViewAllowed } from '../customerViewAccess'
-import { listLinks } from '../../services/customerBridgeService'
+import { countWorkspaceRequests, listLinks } from '../../services/customerBridgeService'
 import { listPublishedReports, listWorkspaceReceipts } from '../../services/portalGrowth'
 import { listRecoInterests, listShownRecos } from '../../services/portalReco'
 import { GROWTH_FEATURE_LABEL, firstWeekSteps, growthFixText, probeState, type FirstWeekStep, type GrowthFeature } from '../../services/growthStatus'
@@ -59,12 +59,13 @@ export function GrowthStatusPanel() {
         setSteps(null)
         return
       }
-      const [links, receipts, reports, recos, interests] = await Promise.all([
+      const [links, receipts, reports, recos, interests, asks] = await Promise.all([
         listLinks(ws).catch(() => []),
         listWorkspaceReceipts(ws).catch(() => []),
         listPublishedReports(ws).catch(() => []),
         s36 === 'on' ? listShownRecos(ws).catch(() => []) : Promise.resolve([]),
         s36 === 'on' ? listRecoInterests(ws).catch(() => []) : Promise.resolve([]),
+        countWorkspaceRequests(ws).catch(() => null),
       ])
       setSteps(
         firstWeekSteps({
@@ -75,6 +76,7 @@ export function GrowthStatusPanel() {
           reportAcked: new Set(receipts.filter((r) => r.itemKind === 'report' && r.acknowledgedAt).map((r) => r.itemId)),
           recosShown: recos.length,
           interests: interests.length,
+          asks,
         }),
       )
     } finally {

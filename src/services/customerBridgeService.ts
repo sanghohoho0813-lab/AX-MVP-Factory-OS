@@ -750,6 +750,23 @@ export async function listRequests(workspaceId: string | null, linkId: string): 
   return (data ?? []).map((r) => requestFromRow(r as Record<string, unknown>))
 }
 
+/** D-691 작업공간 전체 고객 문의 수(설정 › 시스템 '첫 주 지켜보기') — 읽기만 · 답을 기다리는(open) 수도 */
+export async function countWorkspaceRequests(workspaceId: string | null): Promise<{ total: number; open: number }> {
+  if (isLocal()) {
+    const all = local.requests()
+    return { total: all.length, open: all.filter((r) => r.status === 'open').length }
+  }
+  if (!workspaceId) return { total: 0, open: 0 }
+  const sb = getSupabaseClient()
+  const [t, o] = await Promise.all([
+    sb.from('portal_requests').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId),
+    sb.from('portal_requests').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('status', 'open'),
+  ])
+  if (t.error) throw t.error
+  if (o.error) throw o.error
+  return { total: t.count ?? 0, open: o.count ?? 0 }
+}
+
 export async function answerRequest(request: PortalRequest, answer: string, status: PortalRequestStatus): Promise<PortalRequest> {
   const now = nowIso()
   const next = normalizeRequest({

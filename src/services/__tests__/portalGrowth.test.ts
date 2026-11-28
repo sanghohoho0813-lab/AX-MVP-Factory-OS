@@ -331,9 +331,12 @@ check('GS-01 서버 답 → 켜짐 · 꺼짐 · 모름 — 오류 없음 · 그 
   probeState({ code: 'PGRST205', message: "Could not find the table 'public.portal_recommendations' in the schema cache" }) === 'off' &&
   probeState({ code: '42501', message: 'permission denied for table portal_reports' }) === 'off' && probeState({ code: '42501', message: 'permission denied for function portal_result_receipts_since' }) === 'off' &&
   probeState({ message: 'Failed to fetch' }) === 'unknown' && probeState({ code: 'PGRST301', message: 'JWT expired' }) === 'unknown' && probeState(new TypeError('Load failed')) === 'unknown')
-const FW = firstWeekSteps({ links: [{ id: 'l1', status: 'active' }, { id: 'l2', status: 'active' }, { id: 'l3', status: 'paused' }], visited: new Set(['l1', 'l3']), reports: [{ id: 'r1', status: 'published' }, { id: 'r2', status: 'published' }], reportSeen: new Set(['r1', 'rX']), reportAcked: new Set(), recosShown: 2, interests: 0 })
-check('GS-02 첫 주 — 연결(활성만) 2 · 와 봄 1(멈춘 연결 빼고) · 보고서 2편 · 열어 봄 1편(없는 보고서 id 안 셈) · 확인 0 · 추천 2 · 관심 0 · 차례 그대로',
-  FW.map((s) => `${s.key}:${s.done ? 1 : 0}:${s.value}`).join('|') === 'link:1:2개|visit:1:1개 계정|report:1:2편|seen:1:1편|ack:0:0편|reco:0:추천 2개 · 관심 0', FW)
+const FW = firstWeekSteps({ links: [{ id: 'l1', status: 'active' }, { id: 'l2', status: 'active' }, { id: 'l3', status: 'paused' }], visited: new Set(['l1', 'l3']), reports: [{ id: 'r1', status: 'published' }, { id: 'r2', status: 'published' }], reportSeen: new Set(['r1', 'rX']), reportAcked: new Set(), recosShown: 2, interests: 0, asks: { total: 3, open: 1 } })
+check('GS-02 첫 주 — 연결(활성만) 2 · 와 봄 1(멈춘 연결 빼고) · 보고서 2편 · 열어 봄 1편(없는 보고서 id 안 셈) · 확인 0 · 문의 3(답 기다림 1 · D-691) · 추천 2 · 관심 0 · 차례 그대로',
+  FW.map((s) => `${s.key}:${s.done ? 1 : 0}:${s.value}`).join('|') === 'link:1:2개|visit:1:1개 계정|report:1:2편|seen:1:1편|ack:0:0편|ask:1:3건 · 답 기다림 1|reco:0:추천 2개 · 관심 0', FW)
+const askOf = (asks: { total: number; open: number } | null) => firstWeekSteps({ links: [], visited: new Set(), reports: [], reportSeen: new Set(), reportAcked: new Set(), recosShown: 0, interests: 0, asks }).find((s) => s.key === 'ask')
+check('GS-04 문의 한 줄(D-691) — 0건 · 다 답함(답 기다림 없음) · 못 읽음은 "확인 못 함"(0 으로 보이지 않음)',
+  askOf({ total: 0, open: 0 })?.value === '0건' && askOf({ total: 0, open: 0 })?.done === false && askOf({ total: 2, open: 0 })?.value === '2건' && askOf({ total: 2, open: 0 })?.done === true && askOf(null)?.value === '확인 못 함' && askOf(null)?.done === false)
 check('GS-03 꺼진 것이 있을 때만 할 일 한 줄 — 꺼진 번호 · 묶음 파일 이름 · 다시 실행해도 같음 / 모름만 있으면 null',
   (growthFixText([{ key: '0033', label: '', state: 'on' }, { key: '0036', label: '', state: 'off' }]) ?? '').startsWith('꺼진 것 0036 — ') && (growthFixText([{ key: '0036', label: '', state: 'off' }]) ?? '').includes('apply_0033_0036_all.sql') &&
   growthFixText([{ key: '0033', label: '', state: 'on' }, { key: '0034', label: '', state: 'unknown' }]) === null)

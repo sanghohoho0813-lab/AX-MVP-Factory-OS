@@ -869,11 +869,14 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '노무 검토 결과', '${O
     ack: sql(`select count(distinct rc.item_id) from public.portal_receipts rc join public.portal_reports r on r.id = rc.item_id and r.status = 'published' where rc.workspace_id = '${OWNER_WS}' and rc.item_kind = 'report' and rc.acknowledged_at is not null`),
     recos: sql(`select count(*) from public.portal_recommendations where workspace_id = '${OWNER_WS}' and status = 'shown'`),
     ints: sql(`select count(*) from public.portal_recommendation_interest where workspace_id = '${OWNER_WS}'`),
+    asks: sql(`select count(*) from public.portal_requests where workspace_id = '${OWNER_WS}'`),
+    asksOpen: sql(`select count(*) from public.portal_requests where workspace_id = '${OWNER_WS}' and status = 'open'`),
   }
   await op.getByTestId('growth-status').scrollIntoViewIfNeeded().catch(() => {})
   await shot(op, 'os-13-growth-status', true)
   check('W20a 대표 설정 › 시스템 [점검하기] — 0033 · 0034 · 0035 · 0036 모두 켜짐 · 할 일 줄 0', st20 === '0033:on,0034:on,0035:on,0036:on' && (await op.getByTestId('growth-status-fix').count()) === 0, st20)
-  check('W20b 첫 주 지켜보기 숫자 = 서버 기록(연결 · 와 본 계정 · 보고서 · 열어 봄 · 확인 · 추천 · 관심)',
+  check('W20b 첫 주 지켜보기 숫자 = 서버 기록(연결 · 와 본 계정 · 보고서 · 열어 봄 · 확인 · 문의(D-691) · 추천 · 관심)',
+    fw.ask?.endsWith(`${want.asks}건${Number(want.asksOpen) ? ` · 답 기다림 ${want.asksOpen}` : ''}`) && Number(want.asks) > 0 &&
     fw.link?.endsWith(`${want.link}개`) && fw.visit?.endsWith(`${want.visit}개 계정`) && fw.report?.endsWith(`${want.report}편`) && fw.seen?.endsWith(`${want.seen}편`) && fw.ack?.endsWith(`${want.ack}편`) && fw.reco?.endsWith(`추천 ${want.recos}개 · 관심 ${want.ints}`),
     { fw, want })
   const rc0 = sql(`select count(*) from public.portal_receipts`)
@@ -901,7 +904,7 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '노무 검토 결과', '${O
     return { over: document.documentElement.scrollWidth - window.innerWidth, wide, squeezed, btn, minFont, rows: rows.length }
   })
   await shot(op, 'os-15-growth-status-390', true)
-  check('W20f 390 — 점검 판 넘침 0 · 줄 10개(기능 4 + 첫 주 6) · 짜부라진 글 0 · [점검하기] 40px 이상 · 글자 14px 이상', st20m === '0033:on,0034:on,0035:on,0036:on' && m20.over <= 0 && m20.wide === 0 && m20.squeezed === 0 && m20.btn >= 40 && m20.minFont >= 14 && m20.rows === 10, m20)
+  check('W20f 390 — 점검 판 넘침 0 · 줄 11개(기능 4 + 첫 주 7) · 짜부라진 글 0 · [점검하기] 40px 이상 · 글자 14px 이상', st20m === '0033:on,0034:on,0035:on,0036:on' && m20.over <= 0 && m20.wide === 0 && m20.squeezed === 0 && m20.btn >= 40 && m20.minFont >= 14 && m20.rows === 11, m20)
   if (vp20) await op.setViewportSize(vp20)
   // 내부 팀장 — 설정 › 시스템에 이 판 0
   const pc2 = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })

@@ -3,7 +3,7 @@
  *
  *  1) 켜짐 점검 — 기능마다 가장 가벼운 읽기 한 번(아무것도 쓰지 않는다). 서버 답의 모양으로 켜짐 · 꺼짐 · 모름을 가른다.
  *     고객 함수(0035)는 대표가 부르면 '그 연결의 고객 아님(not found)' 으로 막히는데, 그것이 곧 '있고 · 부를 수 있다' 는 뜻이다.
- *  2) 첫 주 숫자 — 연결된 고객 계정 · 고객 화면에 와 본 계정 · 발행한 보고서 · 열어 본 · 확인한 보고서 · 올라와 있는 추천 · 관심.
+ *  2) 첫 주 숫자 — 연결된 고객 계정 · 고객 화면에 와 본 계정 · 발행한 보고서 · 열어 본 · 확인한 보고서 · 문의(D-691) · 올라와 있는 추천 · 관심.
  *     계획서 '운영 적용 뒤 첫 주 지켜보기'(시범 고객 1곳 → 보고서 1편 → 열람 · 확인 · 문의가 실제로 들어오는지)를 한 줄씩.
  * 대표 화면에만(운영자 말을 써도 되는 곳). 규칙 계산이다 — AI 아님.
  */
@@ -47,6 +47,8 @@ export interface FirstWeekInput {
   reportAcked: ReadonlySet<string>
   recosShown: number
   interests: number
+  /** D-691 고객이 남긴 문의(작업공간 전체) — 못 읽었으면 null */
+  asks: { total: number; open: number } | null
 }
 
 export interface FirstWeekStep {
@@ -57,7 +59,7 @@ export interface FirstWeekStep {
   value: string
 }
 
-/** 첫 주 지켜보기 — 연결 → 첫 방문 → 보고서 → 열어 봄 → 확인 → 추천 관심(차례대로 · 숫자는 실제 기록) */
+/** 첫 주 지켜보기 — 연결 → 첫 방문 → 보고서 → 열어 봄 → 확인 → 문의 → 추천 관심(차례대로 · 숫자는 실제 기록) */
 export function firstWeekSteps(i: FirstWeekInput): FirstWeekStep[] {
   const active = i.links.filter((l) => l.status === 'active')
   const visited = active.filter((l) => i.visited.has(l.id)).length
@@ -70,6 +72,8 @@ export function firstWeekSteps(i: FirstWeekInput): FirstWeekStep[] {
     { key: 'report', label: '보고서 발행', done: published.length > 0, value: `${published.length}편` },
     { key: 'seen', label: '고객이 보고서를 열어 봄', done: seen > 0, value: `${seen}편` },
     { key: 'ack', label: "고객이 [확인했어요]", done: acked > 0, value: `${acked}편` },
+    // D-691 계획서 '열람 · 확인 · 문의가 실제로 들어오는지' 의 문의 — 답을 기다리는 것이 있으면 그 수도
+    { key: 'ask', label: '고객이 문의를 남김', done: (i.asks?.total ?? 0) > 0, value: i.asks ? `${i.asks.total}건${i.asks.open ? ` · 답 기다림 ${i.asks.open}` : ''}` : '확인 못 함' },
     { key: 'reco', label: "추천에 [관심 있어요]", done: i.interests > 0, value: `추천 ${i.recosShown}개 · 관심 ${i.interests}` },
   ]
 }
