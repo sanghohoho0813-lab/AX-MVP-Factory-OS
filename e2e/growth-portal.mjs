@@ -27,7 +27,7 @@
  *       → A2 따로 · B1 0 · 대표 · B1 위조 막힘 · 오늘 '관심 있다고 하셨어요' 맨 앞 → [열기] → [연락했어요] → 빠짐 · 대표 고객 화면 보기 계정마다(기록 0) · 0036 되돌리기 → 다시 · 390
  *   W20 (D-690) 설정 › 시스템 켜짐 점검 — 넷 켜짐 · 첫 주 숫자 = 서버 · 0035 · 0036 되돌리면 그 둘만 꺼짐 + 할 일 한 줄 · 기록 0 · 다시 켜짐 · 팀장 0 · (D-691) 390 넘침 0
  *   W21 (D-691) 잠깐 끊김 — 보고서 · 추천 판이 사라지지 않고 '읽지 못했어요 · [다시 읽기]' → 돌아오면 다시 · 고객 화면 오류 글은 한국어(영어 원문 0)
- *   W22 (D-691) 고객 화면 390 — 홈 · 결과 탭 · 보고서 옆 넘침 0
+ *   W22 (D-691) 고객 화면 390 — 홈 · 결과 탭 · 보고서 옆 넘침 0 · 대표 '고객 화면 보기' 390
  *   W13 JS 오류 0(두 앱)
  *
  *   node e2e/growth-portal.mjs [스크린샷 폴더]   (pg_ctlcluster 16 main start 먼저 · 홈페이지 저장소 ../mirae-ai-lab-homepage)
@@ -971,6 +971,15 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '노무 검토 결과', '${O
   }
   check('W22 고객 화면 390 — 홈 · 결과 탭 · 보고서: 옆 넘침 0 · 내용이 그려짐', Object.values(m22).every((x) => x.over <= 0 && x.text > 20), m22)
   if (vpA1) await a1.page.setViewportSize(vpA1)
+  // W22b 대표 '고객 화면 보기'(OS)도 390 에서 — 실제 기록(새 결과 · 추천)이 있는 업체 · 옆 넘침 0
+  const vpOp = op.viewportSize()
+  await op.setViewportSize({ width: 390, height: 844 })
+  await osGo(op, `/customer-view?client=growth-a&as=${LA1}`)
+  await op.waitForTimeout(600)
+  const cv390 = { over: await overflowX(op), text: ((await op.locator('main').innerText().catch(() => '')) ?? '').length }
+  await shot(op, 'os-17-m-customer-view', true)
+  check("W22b 대표 '고객 화면 보기' 390 — 옆 넘침 0 · 내용이 그려짐", cv390.over <= 0 && cv390.text > 20, cv390)
+  if (vpOp) await op.setViewportSize(vpOp)
 
   check('W13 JS 오류 0(두 앱)', errors.length === 0, errors)
 } catch (e) {
