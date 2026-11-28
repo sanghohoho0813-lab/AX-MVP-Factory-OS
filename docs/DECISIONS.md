@@ -11390,3 +11390,8 @@ AFTER: **설정 › 시스템 › '고객 화면(My MIRAE) 켜짐 점검' [점�
 
 파일: `src/services/growthStatus.ts`(새로 · `probeState` · `firstWeekSteps` · `growthFixText`) · `src/pages/settings/GrowthStatusPanel.tsx`(새로) · `SupabaseSettingsView.tsx`(시스템 탭 · ?tab=system) ·
 시험 `portalGrowth.test.ts`(GS-01~03) · `e2e/growth-portal.mjs`(W20) · 안내서 §2 의 5번.
+
+### D-690 점검(같은 날)
+
+- 단위 `portalGrowth` 107 / 0(GS-01~03) · `test:all` · 타입 · 린트 · 빌드 · `qa:wording` 6 통과.
+- `qa:growthportal` **96 / 0**(W20a~e). 사진: 켜짐 넷 + 첫 주 숫자 · 꺼짐 둘 + 할 일 한 줄.
