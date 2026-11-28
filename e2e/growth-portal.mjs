@@ -25,6 +25,7 @@
  *   W18h (D-688) 같은 말 — 새 자료가 있으면 카드 · 프로젝트 맨 위가 '확인할 일 없음' 대신 '새로 온 자료' · 대표 고객 화면 보기도 같게
  *   W19 (D-689) 담당자가 고른 추천 — OS [추천 고르기] › [직접 적기] · 금액 막힘 · 올리기 · 3개까지(서버도) · 내리기 → 고객 홈 '담당자가 추천해요' · [자세히] · [관심 있어요]
  *       → A2 따로 · B1 0 · 대표 · B1 위조 막힘 · 오늘 '관심 있다고 하셨어요' 맨 앞 → [열기] → [연락했어요] → 빠짐 · 대표 고객 화면 보기 계정마다(기록 0) · 0036 되돌리기 → 다시 · 390
+ *   W20 (D-690) 설정 › 시스템 켜짐 점검 — 넷 켜짐 · 첫 주 숫자 = 서버 · 0035 · 0036 되돌리면 그 둘만 꺼짐 + 할 일 한 줄 · 기록 0 · 다시 켜짐 · 팀장 0
  *   W13 JS 오류 0(두 앱)
  *
  *   node e2e/growth-portal.mjs [스크린샷 폴더]   (pg_ctlcluster 16 main start 먼저 · 홈페이지 저장소 ../mirae-ai-lab-homepage)
@@ -847,6 +848,63 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '노무 검토 결과', '${O
   await hpGo(a1.page, '/my-projects')
   await a1.page.getByTestId('growth-recos').waitFor({ timeout: 10000 }).catch(() => {})
   check('W19o 0036 다시 → 추천 2 · A1 관심 보냄 그대로', (await a1.page.getByTestId('growth-reco').count()) === 2 && (await a1.page.locator('[data-testid="growth-reco"][data-interested="1"]').count()) === 1)
+
+  // ---------- W20 (D-690) 설정 › 시스템 '고객 화면 켜짐 점검 · 첫 주 지켜보기' ----------
+  const runStatus = async () => {
+    await osGo(op, '/settings?tab=system')
+    await op.getByTestId('growth-status-run').waitFor({ timeout: 10000 }).catch(() => {})
+    await op.getByTestId('growth-status-run').click()
+    await op.getByTestId('growth-status').waitFor({ timeout: 10000 }).catch(() => {})
+    await op.waitForTimeout(800)
+    return op.getByTestId('growth-status-row').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-key')}:${e.getAttribute('data-state')}`).join(','))
+  }
+  const st20 = await runStatus()
+  const fw = await op.getByTestId('growth-firstweek-step').evaluateAll((els) => Object.fromEntries(els.map((e) => [e.getAttribute('data-key'), (e.textContent ?? '').replace(/\s+/g, ' ').trim()])))
+  const want = {
+    link: sql(`select count(*) from public.portal_client_links where workspace_id = '${OWNER_WS}' and status = 'active'`),
+    visit: sql(`select count(distinct rc.portal_client_link_id) from public.portal_receipts rc join public.portal_client_links l on l.id = rc.portal_client_link_id where l.workspace_id = '${OWNER_WS}' and l.status = 'active' and rc.item_kind = 'home'`),
+    report: sql(`select count(*) from public.portal_reports where workspace_id = '${OWNER_WS}' and status = 'published'`),
+    seen: sql(`select count(distinct rc.item_id) from public.portal_receipts rc join public.portal_reports r on r.id = rc.item_id and r.status = 'published' where rc.workspace_id = '${OWNER_WS}' and rc.item_kind = 'report'`),
+    ack: sql(`select count(distinct rc.item_id) from public.portal_receipts rc join public.portal_reports r on r.id = rc.item_id and r.status = 'published' where rc.workspace_id = '${OWNER_WS}' and rc.item_kind = 'report' and rc.acknowledged_at is not null`),
+    recos: sql(`select count(*) from public.portal_recommendations where workspace_id = '${OWNER_WS}' and status = 'shown'`),
+    ints: sql(`select count(*) from public.portal_recommendation_interest where workspace_id = '${OWNER_WS}'`),
+  }
+  await op.getByTestId('growth-status').scrollIntoViewIfNeeded().catch(() => {})
+  await shot(op, 'os-13-growth-status', true)
+  check('W20a 대표 설정 › 시스템 [점검하기] — 0033 · 0034 · 0035 · 0036 모두 켜짐 · 할 일 줄 0', st20 === '0033:on,0034:on,0035:on,0036:on' && (await op.getByTestId('growth-status-fix').count()) === 0, st20)
+  check('W20b 첫 주 지켜보기 숫자 = 서버 기록(연결 · 와 본 계정 · 보고서 · 열어 봄 · 확인 · 추천 · 관심)',
+    fw.link?.endsWith(`${want.link}개`) && fw.visit?.endsWith(`${want.visit}개 계정`) && fw.report?.endsWith(`${want.report}편`) && fw.seen?.endsWith(`${want.seen}편`) && fw.ack?.endsWith(`${want.ack}편`) && fw.reco?.endsWith(`추천 ${want.recos}개 · 관심 ${want.ints}`),
+    { fw, want })
+  const rc0 = sql(`select count(*) from public.portal_receipts`)
+  execSync(`su postgres -c "psql -q -d ${DB}"`, { input: execSync('cat supabase/manual/rollback_0036.sql') })
+  execSync(`su postgres -c "psql -q -d ${DB}"`, { input: execSync('cat supabase/manual/rollback_0035.sql') })
+  const st20b = await runStatus()
+  const fix20 = (await op.getByTestId('growth-status-fix').innerText().catch(() => '')) ?? ''
+  await shot(op, 'os-14-growth-status-off')
+  check("W20c 0035 · 0036 되돌리면 — 그 둘만 꺼짐 · '꺼진 것 0035 · 0036 — … apply_0033_0036_all.sql …' 한 줄 · 고객 기록은 늘지 않음(읽기만)",
+    st20b === '0033:on,0034:on,0035:off,0036:off' && fix20.startsWith('꺼진 것 0035 · 0036') && fix20.includes('apply_0033_0036_all.sql') && sql(`select count(*) from public.portal_receipts`) === rc0, { st20b, fix20 })
+  execSync(`su postgres -c "psql -q -d ${DB}"`, { input: execSync('cat supabase/migrations/20261128000035_result_new.sql') })
+  execSync(`su postgres -c "psql -q -d ${DB}"`, { input: execSync('cat supabase/migrations/20261128000036_recommendations.sql') })
+  check('W20d 다시 넣고 [점검하기] → 넷 다시 켜짐', (await runStatus()) === '0033:on,0034:on,0035:on,0036:on')
+  // 내부 팀장 — 설정 › 시스템에 이 판 0
+  const pc2 = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ko-KR', timezoneId: 'Asia/Seoul' })
+  await pc2.route(`https://${REF}.supabase.co/**`, makeRoute('os'))
+  const pp2 = await pc2.newPage()
+  pp2.on('pageerror', (e) => errors.push(`os-pilot2: ${String(e)}`))
+  await pp2.goto(`${OS}/login`, { waitUntil: 'networkidle' })
+  await pp2.getByLabel('이메일').fill(PILOT.email)
+  await pp2.getByLabel('비밀번호').fill(PILOT.password)
+  await pp2.getByRole('button', { name: /^로그인/ }).click()
+  await pp2.waitForURL((x) => !x.pathname.startsWith('/login'), { timeout: 30000 }).catch(() => {})
+  await pp2.waitForLoadState('networkidle').catch(() => {})
+  await pp2.waitForTimeout(800)
+  await pp2.goto(`${OS}/settings?tab=system`, { waitUntil: 'networkidle' }).catch(async () => {
+    await pp2.waitForTimeout(1500)
+    await pp2.goto(`${OS}/settings?tab=system`, { waitUntil: 'networkidle' })
+  })
+  await pp2.waitForTimeout(1200)
+  check('W20e 내부 팀장 설정 › 시스템 — 켜짐 점검 판 0', (await pp2.getByTestId('growth-status-run').count()) === 0)
+  await pc2.close()
 
   check('W13 JS 오류 0(두 앱)', errors.length === 0, errors)
 } catch (e) {

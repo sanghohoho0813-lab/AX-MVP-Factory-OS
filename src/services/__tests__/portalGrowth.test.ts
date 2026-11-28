@@ -43,6 +43,7 @@ import { withContractClose } from '../salesContract'
 import { RECO_LIMIT, amountIn, cleanLink, grantCandidates, pendingInterests, recoDeadlineText, recoInputProblem, recoInterestFollowUps, refKey, taskCandidates } from '../portalRecoRules'
 import { isRecoOff, recoErrorText } from '../portalReco'
 import type { GrantMatch } from '../grants/grantMatch'
+import { firstWeekSteps, growthFixText, probeState } from '../growthStatus'
 
 let passed = 0
 let failed = 0
@@ -322,6 +323,20 @@ check('REC-11 0036 없음 · 되돌림 알아보기 — 다른 오류는 꺼짐�
   isRecoOff({ message: 'Could not find the function public.portal_show_recommendation' }) && isRecoOff({ message: 'permission denied for function portal_recommendations' }) && isRecoOff({ message: 'permission denied for table portal_recommendation_interest' }) &&
   !isRecoOff({ message: 'JWT expired' }) && !isRecoOff({ message: 'permission denied for table operations_clients' }) &&
   recoErrorText({ message: '고객 화면에는 추천을 3개까지 올려요 — 하나를 내린 뒤 올려 주세요.' }, 'x').includes('3개까지') && recoErrorText({ code: '42501', message: 'not allowed' }, 'x') === '이 업체에 추천을 올릴 권한이 없어요.')
+
+// ---------------- D-690 고객 화면 켜짐 점검 · 첫 주 ----------------
+check('GS-01 서버 답 → 켜짐 · 꺼짐 · 모름 — 오류 없음 · 그 연결의 고객 아님 = 켜짐 / 함수 · 표 없음 · 권한 거둠 = 꺼짐 / 끊김 · 로그인 만료 = 모름(꺼졌다고 하지 않음)',
+  probeState(null) === 'on' && probeState({ code: 'P0002', message: 'not found' }) === 'on' &&
+  probeState({ code: 'PGRST202', message: 'Could not find the function public.portal_results_state(p_link_id) in the schema cache' }) === 'off' &&
+  probeState({ code: 'PGRST205', message: "Could not find the table 'public.portal_recommendations' in the schema cache" }) === 'off' &&
+  probeState({ code: '42501', message: 'permission denied for table portal_reports' }) === 'off' && probeState({ code: '42501', message: 'permission denied for function portal_result_receipts_since' }) === 'off' &&
+  probeState({ message: 'Failed to fetch' }) === 'unknown' && probeState({ code: 'PGRST301', message: 'JWT expired' }) === 'unknown' && probeState(new TypeError('Load failed')) === 'unknown')
+const FW = firstWeekSteps({ links: [{ id: 'l1', status: 'active' }, { id: 'l2', status: 'active' }, { id: 'l3', status: 'paused' }], visited: new Set(['l1', 'l3']), reports: [{ id: 'r1', status: 'published' }, { id: 'r2', status: 'published' }], reportSeen: new Set(['r1', 'rX']), reportAcked: new Set(), recosShown: 2, interests: 0 })
+check('GS-02 첫 주 — 연결(활성만) 2 · 와 봄 1(멈춘 연결 빼고) · 보고서 2편 · 열어 봄 1편(없는 보고서 id 안 셈) · 확인 0 · 추천 2 · 관심 0 · 차례 그대로',
+  FW.map((s) => `${s.key}:${s.done ? 1 : 0}:${s.value}`).join('|') === 'link:1:2개|visit:1:1개 계정|report:1:2편|seen:1:1편|ack:0:0편|reco:0:추천 2개 · 관심 0', FW)
+check('GS-03 꺼진 것이 있을 때만 할 일 한 줄 — 꺼진 번호 · 묶음 파일 이름 · 다시 실행해도 같음 / 모름만 있으면 null',
+  (growthFixText([{ key: '0033', label: '', state: 'on' }, { key: '0036', label: '', state: 'off' }]) ?? '').startsWith('꺼진 것 0036 — ') && (growthFixText([{ key: '0036', label: '', state: 'off' }]) ?? '').includes('apply_0033_0036_all.sql') &&
+  growthFixText([{ key: '0033', label: '', state: 'on' }, { key: '0034', label: '', state: 'unknown' }]) === null)
 
 console.log(`\nportalGrowth: ${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)

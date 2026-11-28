@@ -27,6 +27,7 @@ import { ImportWizard } from '../../components/data/ImportWizard'
 import { useCurrentUser } from '../../components/layout/useCurrentUser'
 import { TabNav, SettingRow, AppearancePanel, TextScalePanel, ModuleStartPanel, FeatureVisibilityPanel, SystemPanel, type TabKey } from './parts'
 import { SupabaseHealthPanel } from './SupabaseHealthPanel'
+import { GrowthStatusPanel } from './GrowthStatusPanel'
 import { updateMyName } from '../../auth/authService'
 import { AccountViewPanel, AccountViewRow } from './AccountViewPanel'
 import { BrandSettingsPanel } from './BrandSettingsPanel'
@@ -278,11 +279,12 @@ export function SupabaseSettingsView() {
   const [params] = useSearchParams()
   const focus = params.get('focus') ?? ''
   // D-635 종 '가입 신청' 은 ?tab=workspace&focus=signup 으로 데려온다
-  const [tab, setTab] = useState<TabKey>(() => (params.get('tab') === 'data' ? 'data' : params.get('tab') === 'workspace' ? 'workspace' : 'me'))
+  // D-690 ?tab=system — 고객 화면 켜짐 점검(운영 SQL 뒤 안내서에서 바로 오게)
+  const [tab, setTab] = useState<TabKey>(() => (params.get('tab') === 'data' ? 'data' : params.get('tab') === 'workspace' ? 'workspace' : params.get('tab') === 'system' ? 'system' : 'me'))
   // 설정 화면을 연 채로 종을 눌러도(같은 화면 · 주소만 바뀜) 그 탭으로
   const tabParam = params.get('tab')
   useEffect(() => {
-    if (tabParam === 'data' || tabParam === 'workspace') setTab(tabParam)
+    if (tabParam === 'data' || tabParam === 'workspace' || tabParam === 'system') setTab(tabParam)
   }, [tabParam])
   const { session, workspaces, currentWorkspaceId } = useAuth()
   const current = workspaces.find((w) => w.workspaceId === currentWorkspaceId)
@@ -348,6 +350,7 @@ export function SupabaseSettingsView() {
       )}
       {tab === 'data' && <DataPanelSupabase focus={focus} />}
       {tab === 'system' && <SupabaseHealthPanel />}
+      {tab === 'system' && <GrowthStatusPanel />}
       {tab === 'system' && <SystemPanel mode="supabase" connection={<CloudSaveStatus state="saved" />} />}
     </div>
   )

@@ -11365,3 +11365,9 @@ AFTER:
 홈페이지: `src/lib/customerPortal.ts`(`fetchRecommendations` · `markRecommendationInterest`) · `src/pages/MyProjectsPage.tsx`('담당자가 추천해요' 칸).
 
 **남은 대표 결정**: 계획 6번 — 알림톡 · 메일 자동 발송(비용 · 외부 발송). 지금은 [관심 있어요] 도 오늘 화면 한 줄로만 알린다.
+
+### D-689 점검(같은 날)
+
+- 단위 `portalGrowth` 104 / 0(REC-01~11) · `test:all` 끝남 코드 0 · 타입 · 린트 · 빌드 · 홈페이지 `tsc -b` · 빌드 통과.
+- `qa:db` 끝남 코드 0(통과 1,172줄 · 실패 0 — test-0036 59 · 묶음 연습 33) · `qa:growthportal` **91 / 0**(W19a~o) · `qa:growth` 44(G18a~f) · `qa:customerview` 18 · `qa:wording` 6 · `qa:pilot` 513 · `qa:isolation` 24(실패 0).
+- 사진: 고객 홈 PC · 390 · OS 추천 칸 · 후보 판 · 고치기 창.
