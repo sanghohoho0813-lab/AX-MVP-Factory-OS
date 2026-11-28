@@ -11336,3 +11336,32 @@ AFTER: 해야 할 일이 있으면 예전 그대로(노랑 '해야 할 일 n'). 
 - `ops:bundle --check` 통과(예전 0026~0031 묶음 두 파일은 cmp 로 한 글자도 다르지 않음) · `qa:db` 끝남 코드 0(통과 1,095줄 · 실패 0 — 묶음 연습 17가지 포함).
 - `qa:growthportal` 76 / 0 두 번(W18h · 390 넘침 0) · `qa:customerview` 18 · `qa:wording` 6 · `test:all` · 타입 · 린트 · 빌드 · 홈페이지 `tsc -b` · 빌드 통과.
 - 사진: 고객 홈(390) · 프로젝트 맨 위 · 대표 고객 화면 보기 카드 — 모두 '새로 온 자료 1'.
+
+## D-689 (2026-11-28) 고객 화면 '담당자가 추천해요' — 고객성장관리 P1-4 (DB 0036 · 운영 적용은 승인 뒤)
+
+대표 결정(2026-11-28 질문에 답 — '담당자가 고른 것만'): 고객 화면에 맞는 지원사업 · 다음 성장 과제를 보여 주되, **담당자가 고른 것만** · 저절로 나가는 것 0.
+
+BEFORE: OS 는 업체마다 맞는 공고 · 먼저 제안할 것을 알고 있지만 고객 화면에는 길이 없었다 — 카톡으로 따로 적어 보내고, 고객이 관심이 있는지는 전화해 봐야 알았다.
+AFTER:
+1. **업체 › 고객 플랫폼 탭 '고객에게 추천 n/3'** — [추천 고르기] → 후보(맞는 공고 — 지원사업 판정 그대로 · 먼저 제안할 것 — 맞춤 추천 판정 그대로) 또는 [직접 적기]
+   → 제목 · 근거 한 줄 · 마감 · 공고 주소 고치기 → 미리 보기(고객이 보는 모양) → [고객 화면에 올리기]. 업체마다 3개까지 · [내리기](지우지 않음).
+2. **고객 홈 '담당자가 추천해요'** — 지원사업 · 다음 과제 · 근거 한 줄 · 마감 · [자세히](공고 원문 · 새 창) · **[관심 있어요]**(계정마다 한 번 · '관심 보냄 · 담당자가 연락드려요').
+3. **오늘 '고객 화면 챙길 것' 맨 앞** — '… 추천에 관심 있다고 하셨어요 — 연락드려 주세요' → [열기] → 그 탭(관심 줄 빨강) → 연락 뒤 **[연락했어요]**(업체 기록의 안부 연락 날) → 줄이 빠진다.
+4. 대표 '고객 화면 보기'(D-683)도 같은 칸 · 계정마다 관심 표시(기록 0).
+
+정한 것:
+- **금액 · 점수는 고객 화면에 싣지 않는다** — 후보 글은 판정의 금액 · 점수 · 확률 없이 근거 한 줄만 만들고(공고 금액 글 0), 직접 고친 글에 금액 · 점수가 있으면 [올리기] 가 꺼진다.
+- **판정은 한 곳(D-618)** — 공고 후보는 `matchesFor`(지원사업 판정 그대로 · 맞음 · 확인 필요만 · 마감 안 지난 것), 과제 후보는 `topPicks(buildInsights())`(맞춤 추천 카드와 같은 순서). 새 판정을 만들지 않았다.
+- **DB 0036(더하기)** — 표 2(`portal_recommendations` · `portal_recommendation_interest`) · 고객 함수 2 · 내부 함수 2. 서버가 막는다: 업체마다 3개(업체 하나만 잠가 동시에 올려도) · 같은 출처 겹침 0 ·
+  http(s) 주소만 · 내부 출처는 type · id 두 칸만 · 고객 투영에 내부 출처 · 올린 사람 0 · [관심 있어요] 는 그 연결(활성)의 고객 · 올라와 있는 추천만 · 직원 · 다른 회사 · 멈춘 연결 · 팀장 · 허락 없는 팀장 작업공간 · 구독 고객 · anon 막힘(로컬 시험 59가지).
+- **운영 묶음 한 장** — `apply_0033_0036_all.sql` · `check_applied_0033_0036.sql`(0033~0036 한 거래). 예전 0033~0035 묶음은 그대로 두었고, 그것을 이미 넣은 DB 에 새 묶음을 넣어도 된다(묶음 연습 ⑨).
+- 꺼짐: 0036 전 · 되돌림이면 두 앱 모두 그 칸만 숨고 화면 그대로. 되돌리기 `rollback_0036.sql`(실행 · 읽기 권한만 · 추천 · 관심 기록 그대로).
+- 홍보 글처럼 업체 자기 이름이 들어가야 하는 화면과 섞지 않았다 — 이 추천은 그 업체 고객 화면에만.
+
+파일: `supabase/migrations/20261128000036_recommendations.sql` · `verify_after_0036.sql` · `rollback_0036.sql` · `apply_0033_0036_all.sql` · `check_applied_0033_0036.sql`(새로) · `scripts/db-local/test-0036-recommendations.sql`(새로) ·
+`run.sh` · 준비 스크립트 넷 · `run-growth-bundle.sh`(두 묶음) · `scripts/make-ops-bundle.mjs` · `services/portalRecoRules.ts` · `services/portalReco.ts`(새로) · `components/ops/PortalRecoCard.tsx`(새로) ·
+`PortalTab.tsx` · `TodayPortal.tsx` · `pages/CustomerViewPage.tsx` · `portalGrowthRules.ts`(규칙 이름 하나) · `storage/localStore.ts`(연습 모드 열쇠) · 안내 글(`functionGuide` fn-portal-reco · `sectionHints`) ·
+시험 `portalGrowth.test.ts`(REC-01~11) · `e2e/growth-portal.mjs`(W19) · `e2e/growth.mjs`(G18).
+홈페이지: `src/lib/customerPortal.ts`(`fetchRecommendations` · `markRecommendationInterest`) · `src/pages/MyProjectsPage.tsx`('담당자가 추천해요' 칸).
+
+**남은 대표 결정**: 계획 6번 — 알림톡 · 메일 자동 발송(비용 · 외부 발송). 지금은 [관심 있어요] 도 오늘 화면 한 줄로만 알린다.

@@ -111,3 +111,22 @@
 - 계정마다 따로 · 제목 · 파일 이름 · 경로 · 내부 칸은 돌려주지 않는다(제목은 기존 투영 함수에서).
 - 대표 '고객 화면 보기' 는 같은 규칙의 순수 함수 `newResultIds`(OS)로 그린다. 되돌리기 `rollback_0035.sql`(실행 권한만) · 확인 `verify_after_0035.sql` 1~3 '좋음'.
 
+
+## 9. 고객 화면 '담당자가 추천해요'(D-689 · 0036) — 더한 것만
+
+| 표 | 무엇 | 누가 쓰나 |
+|---|---|---|
+| `portal_recommendations` | 담당자가 고객 화면에 올린 추천(업체 단위 · `grant` 지원사업 / `task` 다음 과제 · 제목 80 · 근거 160 · 마감 · http(s) 주소 · 내부 출처 `{type, id}` · `shown` / `withdrawn`) | 서버 함수만(직원 · 고객 모두 표에 직접 못 씀) |
+| `portal_recommendation_interest` | 고객 계정이 [관심 있어요] 누른 때(추천 · 계정마다 한 줄) | 서버 함수만 · 그 연결(활성)의 고객만 |
+
+| 함수 | 누가 | 하는 일 |
+|---|---|---|
+| `portal_recommendations(p_link_id)` | 고객(읽기만) | 그 연결 업체의 올라와 있는 추천 `{id, kind, title, reason, deadline, link_url, shown_at, interested_at}` — 내부 출처 · 올린 사람 · 올리기 번호 0 |
+| `portal_recommendation_interest(p_link_id, p_rec_id)` | 고객 | [관심 있어요] — 올라와 있는 추천만 · 다시 눌러도 처음 때 · 신청 · 계약이 아님 |
+| `portal_show_recommendation(...)` | 내부(쓸 수 있는 사람 · 0026 허락 문) | 올리기 — 같은 올리기 번호 · 같은 출처면 처음 것 · 업체마다 3개까지(업체 하나만 잠가 동시에 올려도 넘지 않음) · 주소는 http(s) 만 |
+| `portal_withdraw_recommendation(p_rec_id)` | 내부 | 내리기(지우지 않음 · 관심 기록은 남음) |
+
+- 직원은 두 표를 같은 작업공간이면 읽는다(RLS · 0026 허락 문 · 0023 작업공간 고정 · 같은 작업공간 지킴 트리거).
+- 내부 판정 · 금액은 고객에게 가지 않는다 — 후보 글은 OS 규칙(`portalRecoRules`)이 금액 · 점수 없이 만들고, 화면은 금액 · 점수가 든 글을 올리지 못하게 막는다(서버는 길이 · 주소만 본다).
+- 오늘 '고객 화면 챙길 것' 의 관심 줄은 업체 기록 `care.lastContactAt`(안부 연락 날) 뒤의 관심만 — [연락했어요] 로 빠진다. 저절로 보내는 것 0.
+- 되돌리기 `rollback_0036.sql`(함수 넷 실행 · 두 표 읽기 권한만) · 확인 `verify_after_0036.sql` 1~6 '좋음'. 로컬 시험 `test-0036-recommendations.sql` 59가지.

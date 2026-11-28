@@ -796,6 +796,7 @@ values ('${OWNER_WS}', '${LA1}', 'growth-a', 'etc', '노무 검토 결과', '${O
     await op.getByTestId('today-portal-open').click()
     await op.getByTestId('today-portal-sheet').waitFor({ timeout: 5000 }).catch(() => {})
     rules6 = await op.getByTestId('today-portal-row').evaluateAll((els) => els.map((e) => `${e.getAttribute('data-rule')}|${e.textContent}`))
+    await op.waitForTimeout(700)
     await shot(op, 'os-11-today-reco')
   }
   check("W19j 오늘 '고객 화면 챙길 것' 맨 앞 — 한빛정밀 \"'경기도 스마트공장 구축…' 추천에 관심 있다고 하셨어요 — 연락드려 주세요\"",
